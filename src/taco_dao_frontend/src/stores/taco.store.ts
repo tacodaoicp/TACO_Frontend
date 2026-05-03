@@ -2903,9 +2903,6 @@ export const useTacoStore = defineStore('taco', () => {
             let coingeckoSuccess = false
             try {
 
-                // log
-                // console.log('taco.store: fetching new crypto prices - coingecko standard endpoint')
-
                 // fetch with timeout
                 const controller = new AbortController()
                 const timeout = setTimeout(() => controller.abort(), 5000)
@@ -2921,9 +2918,6 @@ export const useTacoStore = defineStore('taco', () => {
                 // parse response
                 const data = await response.json()
 
-                // log
-                // console.log('taco.store: fetchCryptoPrices() - coingecko standard endpoint data:', data)
-
                 // Find the specific coins in the array
                 const icpData = data.find((coin: { id: string }) => coin.id === 'internet-computer')
                 const btcData = data.find((coin: { id: string }) => coin.id === 'bitcoin')
@@ -2934,15 +2928,12 @@ export const useTacoStore = defineStore('taco', () => {
                 btcPriceUsd.value = btcData?.current_price || 0
                 dkpPriceUsd.value = dkpData?.current_price || 0
 
-                // // set last price update
+                // set last price update
                 lastPriceUpdate.value = now
                 coingeckoSuccess = true
 
             } catch (error) {
-
-                // log error
                 console.error('error fetching crypto prices from coingecko standard endpoint:', error)
-
             }
 
             // DKP fallback: GeckoTerminal pool (ICPSwap DKP/ICP) when CoinGecko didn't price DKP

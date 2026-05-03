@@ -502,6 +502,7 @@ import TransferNeuronDialog from '../components/wallet/TransferNeuronDialog.vue'
 import { tokenImages } from '../components/data/TokenData'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
 import { getEffectiveNetwork } from '../config/network-config'
+import { getCanisterId } from '../constants/canisterIds'
 
 ////////////////
 // interfaces //
@@ -597,12 +598,12 @@ const coreTokens = computed<WalletToken[]>(() => {
 
   // NACHOS token — staging only
   if (getEffectiveNetwork() !== 'ic') {
-    const nachosPrincipal = 'pabnq-2qaaa-aaaam-qhryq-cai'
+    const nachosPrincipal = getCanisterId('nachos')
     tokens.push({
       principal: nachosPrincipal,
       name: 'NACHOS',
       symbol: 'NACHOS',
-      logo: tokenImages['Default'],
+      logo: tokenImages['NACHOS'] || tokenImages['Default'],
       balance: allTokenBalances.value.get(nachosPrincipal) || 0n,
       decimals: 8,
       fee: 10000n,

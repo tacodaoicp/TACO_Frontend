@@ -606,6 +606,8 @@ export function useSplitSwap() {
           }
         }
       } catch (err: any) {
+        // Always surface leg failures to console so silent split-swap shortfalls are diagnosable.
+        console.error(`[SplitSwap] ${leg.exchange} leg failed:`, err?.message || err, err)
         // On ICPSwap failure, attempt sweep to recover stranded funds
         if (leg.exchange === 'ICPSwap') {
           try {
@@ -651,8 +653,11 @@ export function useSplitSwap() {
 
     const totalOut = processed.reduce((sum, r) => sum + ('amountOut' in r ? r.amountOut : 0n), 0n)
 
+    const failures = processed.filter(r => !r.success)
+    if (failures.length > 0) {
+      console.warn('[SplitSwap] Failures:', failures.map(r => ({ exchange: r.exchange, error: r.error })))
+    }
     if (isDevEnvironment()) {
-      const failures = processed.filter(r => !r.success)
       console.log('[SWAP executePlan] Result:', {
         totalOut: totalOut.toString(),
         successes: processed.filter(r => r.success).length,

@@ -965,6 +965,13 @@ export const useExchangeStore = defineStore('exchange', () => {
     return actor.claimLPFees(token0, token1)
   }
 
+  async function claimAllLPFees() {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    return actor.claimAllLPFees()
+  }
+
   async function claimConcentratedFees(positionId: bigint) {
     if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
     trackUpdateCall()
@@ -1059,6 +1066,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     addToAllTimeBan: [] | [string[]],
     addAllowedCanisters: [] | [string[]],
     changeallowedSilentWarnings: [] | [bigint],
+    daoTreasuryPrincipalsText: [] | [string[]],
   }) {
     if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
     trackUpdateCall()
@@ -1350,6 +1358,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     getUserConcentratedPositions,
     claimFeesReferrer,
     claimLPFees,
+    claimAllLPFees,
     claimConcentratedFees,
     recoverWronglysent,
     recoverBatch,

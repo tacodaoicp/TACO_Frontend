@@ -2109,7 +2109,8 @@
                 flex-direction: column;
                 gap: 0.25rem;
                 color: var(--dark-brown-to-white);
-                
+                font-family: 'Space Mono', monospace;
+
                 strong {
                     font-size: 1.125rem;
                 }
@@ -2155,6 +2156,7 @@
 
         // neuron id
         &__neuron-id {
+            font-family: 'Space Mono', monospace;
             font-size: 0.875rem;
             font-weight: 600;
             word-break: break-all;
@@ -2162,6 +2164,7 @@
 
         // neuron voting power
         &__neuron-vp {
+            font-family: 'Space Mono', monospace;
             font-size: 0.75rem;
             color: var(--dark-brown-to-white);
         }
@@ -2171,6 +2174,7 @@
             display: flex;
             gap: 0.5rem;
             align-items: center;
+            font-family: 'Space Mono', monospace;
         }
 
         // vote status

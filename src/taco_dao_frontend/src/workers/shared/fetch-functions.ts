@@ -1044,6 +1044,11 @@ export async function fetchUserPerformanceData(
       lastAllocationChange: nd.checkpoints?.length > 0
         ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
         : BigInt(0),
+      // forward the raw checkpoints so PerformanceChart can render the line —
+      // it expects neuron.checkpoints[] with timestamp + totalPortfolioValue
+      checkpoints: nd.checkpoints ?? [],
+      performanceScoreUSD: nd.performanceScoreUSD,
+      performanceScoreICP: nd.performanceScoreICP,
       performance: {
         allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
         allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],

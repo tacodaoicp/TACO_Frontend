@@ -24,7 +24,6 @@
     />
 
     <!-- Swap form -->
-    <template>
       <!-- Header -->
       <div class="swap-card__header">
         <h2 class="swap-card__title">Swap</h2>
@@ -212,7 +211,6 @@
         <template v-else-if="swap.priceImpactTier.value === 'extreme' && !swap.impactAcknowledged.value">Acknowledge price impact to continue</template>
         <template v-else>Swap</template>
       </button>
-    </template>
 
     <!-- Token selector modal -->
     <TokenSelector
@@ -339,7 +337,9 @@ function setPercentage(pct: number) {
   if (!swap.tokenFrom.value || fromBalance.value <= 0n) return
   const fee = swap.tokenFrom.value.transfer_fee
   const tradingFee = (fromBalance.value * store.tradingFeeBps) / 10000n
-  const maxAmount = fromBalance.value - fee - tradingFee
+  // Reserve 2× transfer fee: one is baked into `required` inside calculateRequiredDeposit,
+  // the second is charged by the ledger as the transfer fee on top of `amount`.
+  const maxAmount = fromBalance.value - fee - fee - tradingFee
   if (maxAmount <= 0n) return
   const useAmount = pct === 100 ? maxAmount : (maxAmount * BigInt(pct)) / 100n
   if (useAmount <= 0n) { swap.amountIn.value = ''; return }

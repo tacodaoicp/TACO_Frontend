@@ -224,6 +224,7 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { Principal } from '@dfinity/principal'
 import { useTacoStore } from '../../stores/taco.store'
 import { useNachosStore } from '../../stores/nachos.store'
+import { getCanisterId } from '../../constants/canisterIds'
 import VaultConfirmDialog from './VaultConfirmDialog.vue'
 
 const emit = defineEmits<{ (e: 'operation-complete'): void }>()
@@ -231,7 +232,7 @@ const emit = defineEmits<{ (e: 'operation-complete'): void }>()
 const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 
-const NACHOS_PRINCIPAL = 'pabnq-2qaaa-aaaam-qhryq-cai'
+const NACHOS_PRINCIPAL = getCanisterId('nachos')
 const NACHOS_FEE = 10_000n
 const nachosBalance = ref<bigint | null>(null)
 

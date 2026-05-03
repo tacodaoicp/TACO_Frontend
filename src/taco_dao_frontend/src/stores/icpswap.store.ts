@@ -16,6 +16,10 @@ const safeStringify = (obj: unknown) => JSON.stringify(obj, (_, v) => typeof v =
 // ICPSwap Factory canister ID
 const ICPSWAP_FACTORY_ID = '4mmnk-kiaaa-aaaag-qbllq-cai'
 const DEFAULT_FEE = 3000 // 0.3%
+// ICPSwap pools come in multiple fee tiers; getPool is keyed by (token0, token1, fee).
+// Try each tier until we find a pool. 0.3% first to preserve old behavior, then 1% (where
+// many TACO/ICP pools live), then the niche tiers.
+const ICPSWAP_FEE_TIERS = [3000, 10000, 500, 100]
 
 // Types
 interface Token {
@@ -327,40 +331,44 @@ export const useICPSwapStore = defineStore('icpswap', () => {
   const getPoolCanister = async (token0Principal: string, token1Principal: string): Promise<string> => {
     const cacheKey = `${token0Principal}-${token1Principal}`
     const cachedPool = poolCache.value.get(cacheKey)
-    
+
     if (cachedPool) {
       return cachedPool.canisterId
     }
 
-    // console.log('Looking up pool for tokens:', token0Principal, token1Principal)
     const factoryActor = await createFactoryActor()
+    let lastErr: any = null
 
-    const poolArgs = {
-      token0: {
-        address: token0Principal,
-        standard: token0Principal === 'ryjl3-tyaaa-aaaaa-aaaba-cai' ? 'ICP' : 'ICRC1',
-      },
-      token1: {
-        address: token1Principal,
-        standard: token1Principal === 'ryjl3-tyaaa-aaaaa-aaaba-cai' ? 'ICP' : 'ICRC1',
-      },
-      fee: DEFAULT_FEE,
+    for (const fee of ICPSWAP_FEE_TIERS) {
+      const poolArgs = {
+        token0: {
+          address: token0Principal,
+          standard: token0Principal === 'ryjl3-tyaaa-aaaaa-aaaba-cai' ? 'ICP' : 'ICRC1',
+        },
+        token1: {
+          address: token1Principal,
+          standard: token1Principal === 'ryjl3-tyaaa-aaaaa-aaaba-cai' ? 'ICP' : 'ICRC1',
+        },
+        fee,
+      }
+
+      try {
+        const result = await factoryActor.getPool(poolArgs) as any
+        if ('ok' in result) {
+          const poolData = {
+            ...result.ok,
+            canisterId: result.ok.canisterId.toText(),
+          }
+          poolCache.value.set(cacheKey, poolData)
+          return poolData.canisterId
+        }
+        lastErr = result.err
+      } catch (e) {
+        lastErr = e
+      }
     }
 
-    const result = await factoryActor.getPool(poolArgs) as any
-    // console.log('Pool lookup result:', result)
-
-    if ('err' in result) {
-      throw new Error(`Pool not found for token pair: ${result.err}`)
-    }
-
-    const poolData = {
-      ...result.ok,
-      canisterId: result.ok.canisterId.toText(), // Convert Principal to string
-    }
-    
-    poolCache.value.set(cacheKey, poolData)
-    return poolData.canisterId
+    throw new Error(`No ICPSwap pool found for token pair across fee tiers (${ICPSWAP_FEE_TIERS.join(', ')}): ${safeStringify(lastErr)}`)
   }
 
   /**

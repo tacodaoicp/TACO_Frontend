@@ -412,10 +412,12 @@ export default {
 
 .perf-muted {
   color: var(--dark-brown-to-white);
+  font-family: 'Space Mono', monospace;
 }
 
 .perf-positive {
   color: var(--green);
+  font-family: 'Space Mono', monospace;
 }
 
 .neurons-list {

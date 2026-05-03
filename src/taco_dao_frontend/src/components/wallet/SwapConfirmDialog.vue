@@ -882,6 +882,9 @@ const executeSwap = async () => {
         const failedNames = failures.map(f => f.exchange).join(', ')
         errorMessage.value = `Partial success: ${failedNames} failed, but received ${result.totalOut} from ${successLegs.map(s => s.exchange).join(', ')}`
         hasError.value = true
+        // Persist to console so users can diagnose even if the dialog dismisses
+        // before they see the inline error.
+        console.warn('[SwapConfirm] Partial success:', { failures, totalOut: result.totalOut.toString() })
       }
 
       emit('success', { totalOut: result.totalOut, results: result.results })

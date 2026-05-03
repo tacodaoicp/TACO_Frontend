@@ -106,6 +106,31 @@ export const idlFactory = ({ IDL }) => {
     'lastHopAMMOnly' : IDL.Bool,
   });
   const SwapResult = IDL.Variant({ 'Ok' : SwapOk, 'Err' : ExchangeError });
+  const LPFeeClaimEntry = IDL.Record({
+    'ratioUpper' : IDL.Nat,
+    'source' : IDL.Variant({ 'v2' : IDL.Null, 'v3' : IDL.Null }),
+    'transferred0' : IDL.Nat,
+    'transferred1' : IDL.Nat,
+    'dust1ToDAO' : IDL.Nat,
+    'positionId' : IDL.Nat,
+    'token0' : IDL.Text,
+    'token1' : IDL.Text,
+    'dust0ToDAO' : IDL.Nat,
+    'ratioLower' : IDL.Nat,
+    'fees0' : IDL.Nat,
+    'fees1' : IDL.Nat,
+  });
+  const ClaimAllLPFeesOk = IDL.Record({
+    'totalsTransferredByToken' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)),
+    'positionsClaimed' : IDL.Nat,
+    'positionsScanned' : IDL.Nat,
+    'entries' : IDL.Vec(LPFeeClaimEntry),
+    'consolidationSavings' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)),
+  });
+  const ClaimAllLPFeesResult = IDL.Variant({
+    'Ok' : ClaimAllLPFeesOk,
+    'Err' : ExchangeError,
+  });
   const ClaimFeesOk = IDL.Record({
     'transferred0' : IDL.Nat,
     'transferred1' : IDL.Nat,
@@ -529,11 +554,52 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'adminDeleteKlinesBefore' : IDL.Func([IDL.Int, IDL.Nat], [IDL.Text], []),
-    'adminDrainExchange' : IDL.Func([IDL.Principal], [IDL.Text], []),
-    'adminDrainStatus' : IDL.Func([], [IDL.Text], ['query']),
+    'adminDrainTestModeExchange' : IDL.Func([IDL.Principal], [IDL.Text], []),
+    'adminDrainTestModeStatus' : IDL.Func([], [IDL.Text], ['query']),
     'adminExecuteRouteStrategy' : IDL.Func(
         [IDL.Nat, IDL.Vec(SwapHop), IDL.Nat, IDL.Nat],
         [SwapResult],
+        [],
+      ),
+    'adminFindOptimalArb' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Nat, IDL.Nat, IDL.Nat, IDL.Nat],
+        [
+          IDL.Opt(
+            IDL.Record({
+              'efficiency' : IDL.Int,
+              'hopDetails' : IDL.Vec(HopDetail),
+              'probesRun' : IDL.Nat,
+              'efficiencyBps' : IDL.Int,
+              'amount' : IDL.Nat,
+              'outputAmount' : IDL.Nat,
+              'route' : IDL.Vec(SwapHop),
+            })
+          ),
+        ],
+        ['query'],
+      ),
+    'adminFlashArb' : IDL.Func(
+        [IDL.Nat, IDL.Vec(SwapHop), IDL.Nat],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Record({
+              'realized' : IDL.Nat,
+              'grossProfit' : IDL.Nat,
+              'hops' : IDL.Nat,
+              'capitalSource' : IDL.Variant({
+                'lent' : IDL.Null,
+                'phantom' : IDL.Null,
+              }),
+              'transferFee' : IDL.Nat,
+              'inputTfees' : IDL.Nat,
+              'tradingFee' : IDL.Nat,
+              'notional' : IDL.Nat,
+              'swapId' : IDL.Nat,
+              'netProfit' : IDL.Nat,
+            }),
+            'Err' : IDL.Text,
+          }),
+        ],
         [],
       ),
     'adminRepairLastTradedPriceAndKlines' : IDL.Func(
@@ -610,6 +676,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat))],
         ['query'],
       ),
+    'claimAllLPFees' : IDL.Func([], [ClaimAllLPFeesResult], []),
     'claimConcentratedFees' : IDL.Func([IDL.Nat], [ClaimFeesResult], []),
     'claimFeesReferrer' : IDL.Func(
         [],
@@ -1163,6 +1230,7 @@ export const idlFactory = ({ IDL }) => {
             'addToAllTimeBan' : IDL.Opt(IDL.Vec(IDL.Text)),
             'addAllowedCanisters' : IDL.Opt(IDL.Vec(IDL.Text)),
             'changeallowedSilentWarnings' : IDL.Opt(IDL.Nat),
+            'daoTreasuryPrincipalsText' : IDL.Opt(IDL.Vec(IDL.Text)),
           }),
         ],
         [],

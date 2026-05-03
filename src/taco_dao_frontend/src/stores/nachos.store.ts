@@ -25,7 +25,7 @@ import type {
 // ============================================================================
 
 const NACHOS_VAULT_ID = () => getCanisterId('nachos_vault')
-const NACHOS_LEDGER_ID = 'pabnq-2qaaa-aaaam-qhryq-cai'  // protocol canister, same everywhere
+const NACHOS_LEDGER_ID = () => getCanisterId('nachos')
 const ICP_LEDGER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'      // NNS ledger, same everywhere
 const TREASURY_ID = () => getCanisterId('treasury')
 
@@ -608,7 +608,7 @@ export const useNachosStore = defineStore('nachos', () => {
         amount: nachosAmount.toString(),
       })
     }
-    const tokenActor = await createTokenActor(NACHOS_LEDGER_ID)
+    const tokenActor = await createTokenActor(NACHOS_LEDGER_ID())
     const createdAt = BigInt(Date.now()) * 1_000_000n
     let lastError: any
 
@@ -918,7 +918,7 @@ export const useNachosStore = defineStore('nachos', () => {
     addCachedOp({
       type: 'burn',
       userPrincipal: userPrincipal.value,
-      tokenPrincipal: NACHOS_LEDGER_ID,
+      tokenPrincipal: NACHOS_LEDGER_ID(),
       blockNumber: blockNumber.toString(),
       amount: depositAmount.toString(),
       status: 'minting',
@@ -943,7 +943,7 @@ export const useNachosStore = defineStore('nachos', () => {
 
       if ('ok' in result) {
         if (isDevEnvironment()) console.log('[NACHOS burnNachos] Success:', { burnId: result.ok.burnId?.toString() })
-        updateCachedOp(blockNumber.toString(), NACHOS_LEDGER_ID, {
+        updateCachedOp(blockNumber.toString(), NACHOS_LEDGER_ID(), {
           status: 'completed',
           burnId: result.ok.burnId.toString(),
         })
@@ -951,11 +951,11 @@ export const useNachosStore = defineStore('nachos', () => {
         return result.ok
       } else {
         const errorMsg = mapNachosError(result.err)
-        updateCachedOp(blockNumber.toString(), NACHOS_LEDGER_ID, { status: 'failed', error: errorMsg })
+        updateCachedOp(blockNumber.toString(), NACHOS_LEDGER_ID(), { status: 'failed', error: errorMsg })
         throw new Error(errorMsg)
       }
     } catch (e: any) {
-      updateCachedOp(blockNumber.toString(), NACHOS_LEDGER_ID, { status: 'failed', error: e.message })
+      updateCachedOp(blockNumber.toString(), NACHOS_LEDGER_ID(), { status: 'failed', error: e.message })
       throw e
     } finally {
       activeOperationType.value = null

@@ -47,6 +47,7 @@ import ckusdtToken from "../../assets/tokens/ckusdt.svg"
 import ckbtcToken from "../../assets/tokens/ckbtc.png"
 import ckethToken from "../../assets/tokens/cketh.png"
 import cicpToken from "../../assets/tokens/cicp.png"
+import nachoToken from "../../assets/tokens/nacho.png"
 import clownToken from "../../assets/tokens/clown.png"
 import icfcToken from "../../assets/tokens/snspng/icfc.png"
 import icpExToken from "../../assets/tokens/snspng/icpex.png"
@@ -161,6 +162,10 @@ export const tokenImages: { [key: string]: string } = {
 "PANDA": icpandaDaoToken,
 "Windoge98": windoge98Token,
 "EXE": windoge98Token,
+"NACHOS": nachoToken,
+"Nachos": nachoToken,
+"nachos": nachoToken,
+"NACHO": nachoToken,
 "Windoge 98": windoge98Token,
 "Tendies": tendyToken,
 "TENDY": tendyToken,

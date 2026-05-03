@@ -3,7 +3,10 @@
   <component :is="tag"
               class="taco-title
                      mb-4">
-    <span class="taco-title__icon">{{ emoji }}</span>
+    <span class="taco-title__icon">
+      <img v-if="iconSrc" :src="iconSrc" :alt="title" class="taco-title__icon-img" />
+      <template v-else>{{ emoji }}</template>
+    </span>
     <span class="taco-title__title"
           :style="{color: forceTextColor}">{{ title }}</span>
   </component>
@@ -11,6 +14,12 @@
 </template>
 
 <style lang="scss" scoped>
+.taco-title__icon-img {
+  height: 1.75rem;
+  width: auto;
+  vertical-align: middle;
+  border-radius: 50%;
+}
 </style>
 
 <script setup>
@@ -27,7 +36,13 @@
     },
     emoji: {
       type: String,
-      required: true,
+      required: false,
+      default: '',
+    },
+    iconSrc: {
+      type: String,
+      required: false,
+      default: '',
     },
     title: {
       type: String,

@@ -115,6 +115,7 @@ import { ref, computed, reactive } from 'vue'
 import { useTacoStore } from '../../stores/taco.store'
 import { useNachosStore } from '../../stores/nachos.store'
 import type { CachedOperation } from '../../stores/nachos.store'
+import { getCanisterId } from '../../constants/canisterIds'
 
 const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
@@ -306,7 +307,7 @@ const getSymbolForPrincipal = (principal: string): string => {
   const entry = nachosStore.portfolio.find((p: any) => p.token.toText() === principal)
   if (entry) return entry.symbol
   if (principal === 'ryjl3-tyaaa-aaaaa-aaaba-cai') return 'ICP'
-  if (principal === 'pabnq-2qaaa-aaaam-qhryq-cai') return 'NACHOS'
+  if (principal === getCanisterId('nachos')) return 'NACHOS'
   return principal.substring(0, 8) + '...'
 }
 

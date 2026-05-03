@@ -81,10 +81,42 @@ type create_trading_canister =
       }) query;
    adminDeleteKlinesBefore: (cutoffNs: int, maxDeletesPerBucket: nat) ->
     (text);
-   adminDrainExchange: (target: principal) -> (text);
-   adminDrainStatus: () -> (text) query;
+   adminDrainTestModeExchange: (target: principal) -> (text);
+   adminDrainTestModeStatus: () -> (text) query;
    adminExecuteRouteStrategy: (amount: nat, route: vec SwapHop, minOutput:
     nat, Block: nat) -> (SwapResult);
+   adminFindOptimalArb: (token: text, minSample: nat, maxSample: nat, depth:
+    nat, probes: nat, tolerancePct: nat) ->
+    (opt
+      record {
+        amount: nat;
+        efficiency: int;
+        efficiencyBps: int;
+        hopDetails: vec HopDetail;
+        outputAmount: nat;
+        probesRun: nat;
+        route: vec SwapHop;
+      }) query;
+   adminFlashArb: (notional: nat, route: vec SwapHop, minProfit: nat) ->
+    (variant {
+       Err: text;
+       Ok:
+        record {
+          capitalSource: variant {
+                           lent;
+                           phantom;
+                         };
+          grossProfit: nat;
+          hops: nat;
+          inputTfees: nat;
+          netProfit: nat;
+          notional: nat;
+          realized: nat;
+          swapId: nat;
+          tradingFee: nat;
+          transferFee: nat;
+        };
+     });
    adminRepairLastTradedPriceAndKlines: (affectedPoolIndexes: vec nat,
     alsoRepairVolume24h: bool) -> (text);
    batchAdjustLiquidity: (adjustments:
@@ -136,6 +168,7 @@ type create_trading_canister =
                                    text;
                                    nat;
                                  }) query;
+   claimAllLPFees: () -> (ClaimAllLPFeesResult);
    claimConcentratedFees: (positionId: nat) -> (ClaimFeesResult);
    claimFeesReferrer: () -> (vec record {
                                    text;
@@ -525,6 +558,7 @@ type create_trading_canister =
       addToAllTimeBan: opt vec text;
       changeAllowedCalls: opt nat;
       changeallowedSilentWarnings: opt nat;
+      daoTreasuryPrincipalsText: opt vec text;
       deleteAllowedCanisters: opt vec text;
       deleteFromAllTimeBan: opt vec text;
       deleteFromDayBan: opt vec text;
@@ -917,6 +951,24 @@ type LogEntry =
    message: text;
    timestamp: int;
  };
+type LPFeeClaimEntry = 
+ record {
+   dust0ToDAO: nat;
+   dust1ToDAO: nat;
+   fees0: nat;
+   fees1: nat;
+   positionId: nat;
+   ratioLower: nat;
+   ratioUpper: nat;
+   source: variant {
+             v2;
+             v3;
+           };
+   token0: text;
+   token1: text;
+   transferred0: nat;
+   transferred1: nat;
+ };
 type KlineData = 
  record {
    close: float64;
@@ -1019,6 +1071,25 @@ type ClaimFeesOk =
    fees1: nat;
    transferred0: nat;
    transferred1: nat;
+ };
+type ClaimAllLPFeesResult = 
+ variant {
+   Err: ExchangeError;
+   Ok: ClaimAllLPFeesOk;
+ };
+type ClaimAllLPFeesOk = 
+ record {
+   consolidationSavings: vec record {
+                               text;
+                               nat;
+                             };
+   entries: vec LPFeeClaimEntry;
+   positionsClaimed: nat;
+   positionsScanned: nat;
+   totalsTransferredByToken: vec record {
+                                   text;
+                                   nat;
+                                 };
  };
 type BatchProcessResult = 
  record {

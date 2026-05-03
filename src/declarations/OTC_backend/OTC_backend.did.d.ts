@@ -43,6 +43,15 @@ export interface BatchProcessResult {
   'execMessage' : string,
   'processedTrades' : Array<ProcessedTrade>,
 }
+export interface ClaimAllLPFeesOk {
+  'totalsTransferredByToken' : Array<[string, bigint]>,
+  'positionsClaimed' : bigint,
+  'positionsScanned' : bigint,
+  'entries' : Array<LPFeeClaimEntry>,
+  'consolidationSavings' : Array<[string, bigint]>,
+}
+export type ClaimAllLPFeesResult = { 'Ok' : ClaimAllLPFeesOk } |
+  { 'Err' : ExchangeError };
 export interface ClaimFeesOk {
   'transferred0' : bigint,
   'transferred1' : bigint,
@@ -121,6 +130,21 @@ export interface KlineData {
   'open' : number,
   'volume' : bigint,
   'timestamp' : bigint,
+}
+export interface LPFeeClaimEntry {
+  'ratioUpper' : bigint,
+  'source' : { 'v2' : null } |
+    { 'v3' : null },
+  'transferred0' : bigint,
+  'transferred1' : bigint,
+  'dust1ToDAO' : bigint,
+  'positionId' : bigint,
+  'token0' : string,
+  'token1' : string,
+  'dust0ToDAO' : bigint,
+  'ratioLower' : bigint,
+  'fees0' : bigint,
+  'fees1' : bigint,
 }
 export interface LogEntry {
   'component' : string,
@@ -456,11 +480,44 @@ export interface create_trading_canister {
     >
   >,
   'adminDeleteKlinesBefore' : ActorMethod<[bigint, bigint], string>,
-  'adminDrainExchange' : ActorMethod<[Principal], string>,
-  'adminDrainStatus' : ActorMethod<[], string>,
+  'adminDrainTestModeExchange' : ActorMethod<[Principal], string>,
+  'adminDrainTestModeStatus' : ActorMethod<[], string>,
   'adminExecuteRouteStrategy' : ActorMethod<
     [bigint, Array<SwapHop>, bigint, bigint],
     SwapResult
+  >,
+  'adminFindOptimalArb' : ActorMethod<
+    [string, bigint, bigint, bigint, bigint, bigint],
+    [] | [
+      {
+        'efficiency' : bigint,
+        'hopDetails' : Array<HopDetail>,
+        'probesRun' : bigint,
+        'efficiencyBps' : bigint,
+        'amount' : bigint,
+        'outputAmount' : bigint,
+        'route' : Array<SwapHop>,
+      }
+    ]
+  >,
+  'adminFlashArb' : ActorMethod<
+    [bigint, Array<SwapHop>, bigint],
+    {
+        'Ok' : {
+          'realized' : bigint,
+          'grossProfit' : bigint,
+          'hops' : bigint,
+          'capitalSource' : { 'lent' : null } |
+            { 'phantom' : null },
+          'transferFee' : bigint,
+          'inputTfees' : bigint,
+          'tradingFee' : bigint,
+          'notional' : bigint,
+          'swapId' : bigint,
+          'netProfit' : bigint,
+        }
+      } |
+      { 'Err' : string }
   >,
   'adminRepairLastTradedPriceAndKlines' : ActorMethod<
     [Array<bigint>, boolean],
@@ -520,6 +577,7 @@ export interface create_trading_canister {
     ]
   >,
   'checkFeesReferrer' : ActorMethod<[], Array<[string, bigint]>>,
+  'claimAllLPFees' : ActorMethod<[], ClaimAllLPFeesResult>,
   'claimConcentratedFees' : ActorMethod<[bigint], ClaimFeesResult>,
   'claimFeesReferrer' : ActorMethod<[], Array<[string, bigint]>>,
   'claimLPFees' : ActorMethod<[string, string], ClaimFeesResult>,
@@ -957,6 +1015,7 @@ export interface create_trading_canister {
         'addToAllTimeBan' : [] | [Array<string>],
         'addAllowedCanisters' : [] | [Array<string>],
         'changeallowedSilentWarnings' : [] | [bigint],
+        'daoTreasuryPrincipalsText' : [] | [Array<string>],
       },
     ],
     undefined

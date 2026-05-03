@@ -420,6 +420,7 @@ async function removeFromDayBan() {
     addToAllTimeBan: [],
     addAllowedCanisters: [],
     changeallowedSilentWarnings: [],
+    daoTreasuryPrincipalsText: [],
   }))
 }
 
@@ -433,6 +434,7 @@ async function addPermaBan() {
     addToAllTimeBan: [[permaBanPrincipal.value]],
     addAllowedCanisters: [],
     changeallowedSilentWarnings: [],
+    daoTreasuryPrincipalsText: [],
   }))
 }
 

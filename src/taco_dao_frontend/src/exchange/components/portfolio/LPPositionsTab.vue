@@ -64,7 +64,7 @@
               <button
                 v-if="pos.fee0 > 0n || pos.fee1 > 0n"
                 class="tx-btn tx-btn--sm tx-btn--primary"
-                :disabled="claimingPair !== null"
+                :disabled="claimingPair !== null || claimingAll"
                 @click="claimFees(pos)"
               >
                 {{ claimingPair === `${pos.token0}/${pos.token1}` ? 'Claiming...' : 'Claim Fees' }}
@@ -79,6 +79,15 @@
     <div v-else class="lp-positions-tab__empty">
       No liquidity positions.
     </div>
+
+    <button
+      v-if="showClaimAllButton"
+      class="ex-btn ex-btn--primary lp-positions-tab__claim-all-btn"
+      :disabled="claimingAll || claimingPair !== null"
+      @click="claimAllFees"
+    >
+      {{ claimingAll ? 'Claiming all…' : `Claim All LP Fees (${poolsWithFees.length} pools)` }}
+    </button>
 
     <!-- Remove Liquidity Modal -->
     <Teleport to="body">
@@ -216,6 +225,12 @@ const poolGroups = computed((): PoolGroup[] => {
   }
   return Array.from(map.values()).sort((a, b) => Number(b.totalLiquidity - a.totalLiquidity))
 })
+
+const poolsWithFees = computed(() =>
+  poolGroups.value.filter(g => g.totalFee0 > 0n || g.totalFee1 > 0n)
+)
+const showClaimAllButton = computed(() => poolsWithFees.value.length > 2)
+const claimingAll = ref(false)
 
 const expandedPool = ref<string | null>(null)
 
@@ -384,6 +399,62 @@ async function claimFees(pos: UnifiedPosition) {
   }
 }
 
+async function claimAllFees() {
+  claimingAll.value = true
+
+  // Snapshot pre-claim positions-with-fees count for the transport-error probe.
+  // Use position granularity (not pool-group) because a multi-position pool can
+  // see one position drop to zero fees while siblings still have fees — which is
+  // still a successful partial bulk claim and the probe must catch it.
+  const allPositionsPre = [...fullRangePositions.value, ...concentratedPositions.value]
+  const prePositionsWithFees = allPositionsPre.filter(p => p.fee0 > 0n || p.fee1 > 0n).length
+
+  try {
+    const result = await store.claimAllLPFees()
+    if ('Ok' in result) {
+      const ok = result.Ok
+      await store.refreshAfterMutation('claim')
+      const positions = Number(ok.positionsClaimed)
+      toast.success('All LP Fees Claimed', `${positions} position${positions === 1 ? '' : 's'}`)
+    } else {
+      const { classifyExchangeError } = await import('../../utils/errors')
+      const classified = classifyExchangeError(result.Err)
+      console.error('[LP Fees] Claim All failed:', classified.message)
+      toast.error('Claim All Failed', classified.message)
+    }
+  } catch (err: any) {
+    console.error('[LP Fees] Claim All failed:', err)
+    if (isTransportError(err)) {
+      // Probe directly via getUserLiquidityDetailed — refreshAfterMutation fires
+      // listeners synchronously without awaiting their async work, so reading
+      // component state immediately after could be stale.
+      const probe = async (): Promise<VerifyStatus> => {
+        try {
+          const post: any[] = await store.getUserLiquidityDetailed()
+          const postPositionsWithFees = post.filter((p: any) => p.fee0 > 0n || p.fee1 > 0n).length
+          if (postPositionsWithFees < prePositionsWithFees) return 'succeeded'
+          if (postPositionsWithFees === prePositionsWithFees) return 'failed'
+          return 'unknown'
+        } catch {
+          return 'unknown'
+        }
+      }
+      const status = await verifyAfterTransportError(probe)
+      if (status === 'succeeded') {
+        await store.refreshAfterMutation('claim')
+        toast.success('All LP Fees Claimed', 'Network hiccup during submit — confirmed via query.')
+        return
+      }
+      toast.warning('Network issue',
+        status === 'failed' ? 'Transaction did not land.' : 'Refresh to verify before retrying.')
+      return
+    }
+    toast.error('Claim All Failed', err.message || 'Failed to claim fees')
+  } finally {
+    claimingAll.value = false
+  }
+}
+
 async function loadPositions() {
   if (!loading.value) loading.value = fullRangePositions.value.length === 0 && concentratedPositions.value.length === 0
 
@@ -477,6 +548,10 @@ useStaleAwareLoad({
     flex-direction: column;
     gap: 1px;
     background: var(--border-primary);
+  }
+
+  &__claim-all-btn {
+    margin-top: var(--space-4);
   }
 
   // .tx-card provides bg + border + radius; just add the layout here.

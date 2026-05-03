@@ -477,7 +477,9 @@ async function setPercentage(pct: number) {
     const fromInfo = store.getTokenByAddress(fromToken.value)
     const fee = fromInfo ? BigInt(fromInfo.transfer_fee) : 0n
     const tradingFee = (balance * store.tradingFeeBps) / 10000n
-    const maxAmount = balance - fee - tradingFee
+    // Reserve 2× transfer fee: one is baked into `required` inside calculateRequiredDeposit,
+    // the second is charged by the ledger as the transfer fee on top of `amount`.
+    const maxAmount = balance - fee - fee - tradingFee
     if (maxAmount <= 0n) return
     const useAmount = pct === 100 ? maxAmount : (maxAmount * BigInt(pct)) / 100n
     const dec = Math.min(fromDecimals.value, 6)

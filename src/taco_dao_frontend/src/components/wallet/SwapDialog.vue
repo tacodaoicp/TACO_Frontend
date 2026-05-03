@@ -261,8 +261,13 @@
           <!-- optimal route header -->
           <span class="d-inline-block mb-2" style="font-size: 1.25rem;">Optimal Route</span>
 
-          <!-- optimal plan display -->
-          <div class="quote-item selected-quote">
+          <!-- optimal plan display (clickable to re-select) -->
+          <div
+            class="quote-item"
+            :class="{ 'selected-quote': selectedRouteKey === 'optimal' }"
+            style="cursor: pointer;"
+            @click="selectedRouteKey = 'optimal'"
+          >
 
             <div class="quote-header">
               <div class="exchange-info">
@@ -271,6 +276,7 @@
                   <span v-else>Split Swap ({{ executionPlan.legs.length }}-way)</span>
                 </div>
                 <div class="best-badge">
+                  <i v-if="selectedRouteKey === 'optimal'" class="fa fa-check me-1"></i>
                   <i class="fa fa-star"></i>
                   <span class="text-nowrap">Best Return</span>
                 </div>
@@ -302,14 +308,33 @@
 
           </div>
 
-          <!-- single-exchange comparison -->
+          <!-- single-exchange comparison (each row clickable to override the route) -->
           <div v-if="quotes.length > 0" class="mt-2">
             <span class="d-inline-block mb-1" style="font-size: 0.85rem; opacity: 0.7;">Single-exchange comparison</span>
             <div class="quotes-list">
-              <div v-for="quote in sortedQuotes" :key="quote.exchange" class="quote-item" style="padding: 0.5rem 0.75rem;">
+              <div
+                v-for="quote in sortedQuotes"
+                :key="quote.exchange"
+                class="quote-item"
+                :class="{ 'selected-quote': selectedRouteKey === routeKeyFor(quote.exchange) }"
+                style="padding: 0.5rem 0.75rem; cursor: pointer;"
+                @click="selectedRouteKey = routeKeyFor(quote.exchange)"
+              >
                 <div class="d-flex justify-content-between align-items-center">
-                  <span style="font-size: 0.85rem;">{{ quote.exchange }} only</span>
-                  <span style="font-size: 0.85rem;">{{ formatBalance(quote.amountOut, tacoToken.decimals) }} TACO</span>
+                  <span style="font-size: 0.85rem;">
+                    <i v-if="selectedRouteKey === routeKeyFor(quote.exchange)" class="fa fa-check me-1"></i>
+                    {{ quote.exchange }} only
+                  </span>
+                  <span style="font-size: 0.85rem;">
+                    {{ formatBalance(quote.amountOut, tacoToken.decimals) }} TACO
+                    <span
+                      v-if="quote.amountOut < executionPlan.totalExpectedOut"
+                      class="ms-2"
+                      style="opacity: 0.6; font-size: 0.75rem;"
+                    >
+                      (−{{ deltaPct(quote.amountOut, executionPlan.totalExpectedOut) }}%)
+                    </span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -377,9 +402,9 @@
         <!-- token list -->
         <div class="token-list">
 
-          <!-- token list item -->
-          <div 
-            v-for="token in availableTokens" 
+          <!-- token list item — TACO is excluded since the dialog buys TACO -->
+          <div
+            v-for="token in availableInputTokens"
             :key="token.principal"
             class="token-list-item"
             @click="selectInputToken(token)"
@@ -908,7 +933,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useKongStore } from '../../stores/kong.store'
 import { useICPSwapStore } from '../../stores/icpswap.store'
 import { useTacoStore } from '../../stores/taco.store'
-import { useSplitSwap, type ExecutionPlan } from '../../composables/useSplitSwap'
+import { useSplitSwap, type ExecutionPlan, type LegPlan } from '../../composables/useSplitSwap'
 
 interface Token {
   principal: string
@@ -958,7 +983,10 @@ const selectedInputToken = ref<Token | null>(null)
 const inputAmount = ref('')
 const showTokenSelector = ref(false)
 const quotes = ref<Quote[]>([])
-const selectedQuote = ref<Quote | null>(null)
+
+type RouteKey = 'optimal' | 'Kong' | 'ICPSwap' | 'TACO'
+const selectedRouteKey = ref<RouteKey>('optimal')
+
 const executionPlan = ref<ExecutionPlan | null>(null)
 const loadingQuotes = ref(false)
 const quotesError = ref<string | null>(null)
@@ -992,10 +1020,10 @@ const availableInputTokens = computed(() => {
 // All available tokens for the parent component to pass
 const availableTokens = computed(() => props.availableTokens)
 
-// Computed values
+// Computed values — reflects whichever plan the user has chosen (optimal by default).
 const expectedOutput = computed(() => {
-  if (executionPlan.value) {
-    return formatBalance(executionPlan.value.totalExpectedOut, tacoToken.value.decimals)
+  if (effectivePlan.value) {
+    return formatBalance(effectivePlan.value.totalExpectedOut, tacoToken.value.decimals)
   }
   if (quotes.value.length === 0) return '0.0'
   const bestQuote = sortedQuotes.value[0]
@@ -1011,15 +1039,24 @@ const sortedQuotes = computed(() => {
   })
 })
 
+// Worst-case fee headroom for split swaps: up to 3 DEX legs × 2 ledger fees each
+// (ICRC-2 approve + transferFrom or equivalent), plus a trading-fee buffer for the
+// TACO Exchange leg. Over-reserves on single-leg swaps but guarantees the swap
+// actually goes through regardless of which split the route engine picks.
+const SPLIT_LEDGER_FEE_RESERVE = 6n
+const SPLIT_TRADING_FEE_BPS = 50n
+
 const canProceed = computed(() => {
   if (!selectedInputToken.value ||
       !inputAmount.value ||
       parseFloat(inputAmount.value) <= 0 ||
-      !executionPlan.value) return false
+      !effectivePlan.value) return false
 
-  // Check user has sufficient balance (amount + 2 fees for approval + transfer)
   const amountBigInt = parseAmountToBigInt(inputAmount.value, selectedInputToken.value.decimals)
-  const requiredBalance = amountBigInt + selectedInputToken.value.fee * 2n
+  const tradingFeeReserve = (selectedInputToken.value.balance * SPLIT_TRADING_FEE_BPS) / 10000n
+  const requiredBalance = amountBigInt
+    + selectedInputToken.value.fee * SPLIT_LEDGER_FEE_RESERVE
+    + tradingFeeReserve
   return amountBigInt > 0n && selectedInputToken.value.balance >= requiredBalance
 })
 
@@ -1029,6 +1066,9 @@ const closeModal = () => {
 }
 
 const selectInputToken = (token: Token) => {
+  // Guard: this dialog buys TACO, so TACO can't be the input. The dropdown already
+  // filters TACO out via availableInputTokens; this is belt-and-suspenders.
+  if (token.symbol === 'TACO') return
   selectedInputToken.value = token
   showTokenSelector.value = false
   if (inputAmount.value) {
@@ -1039,10 +1079,13 @@ const selectInputToken = (token: Token) => {
 const setMaxAmount = () => {
   if (!selectedInputToken.value) return
 
-  // Subtract 2 fees to account for:
-  // 1. ICRC2 approval fee
-  // 2. Transfer/deposit fee when the swap pulls tokens
-  const maxAmount = selectedInputToken.value.balance - (selectedInputToken.value.fee * 2n)
+  // Reserve enough headroom for the worst-case split (3 DEX legs × 2 ledger fees + a
+  // trading-fee buffer for the TACO Exchange leg). See SPLIT_LEDGER_FEE_RESERVE /
+  // SPLIT_TRADING_FEE_BPS above for rationale.
+  const balance = selectedInputToken.value.balance
+  const fee = selectedInputToken.value.fee
+  const tradingFeeReserve = (balance * SPLIT_TRADING_FEE_BPS) / 10000n
+  const maxAmount = balance - (fee * SPLIT_LEDGER_FEE_RESERVE) - tradingFeeReserve
   if (maxAmount <= 0n) {
     inputAmount.value = '0'
     return
@@ -1083,7 +1126,7 @@ const onAmountChange = () => {
 const fetchQuotes = async () => {
   if (!selectedInputToken.value || !inputAmount.value || parseFloat(inputAmount.value) <= 0) {
     quotes.value = []
-    selectedQuote.value = null
+    selectedRouteKey.value = 'optimal'
     executionPlan.value = null
     return
   }
@@ -1092,6 +1135,7 @@ const fetchQuotes = async () => {
   quotesError.value = null
   quotes.value = []
   executionPlan.value = null
+  selectedRouteKey.value = 'optimal'
 
   try {
     const amountIn = parseAmountToBigInt(inputAmount.value, selectedInputToken.value.decimals)
@@ -1133,7 +1177,6 @@ const fetchQuotes = async () => {
       })
     }
     quotes.value = newQuotes
-    selectedQuote.value = null
 
   } catch (error: any) {
     console.error('Error fetching quotes:', error)
@@ -1143,9 +1186,55 @@ const fetchQuotes = async () => {
   }
 }
 
-const selectQuote = (quote: Quote) => {
-  selectedQuote.value = quote
-  // console.log('Selected quote:', quote)
+// Map a comparison-row exchange label to the LegPlan enum used by the executor.
+// The label uses 'TACO Exchange' but the LegPlan enum uses 'TACO'.
+function routeKeyFor(exchangeLabel: string): RouteKey {
+  if (exchangeLabel === 'Kong') return 'Kong'
+  if (exchangeLabel === 'ICPSwap') return 'ICPSwap'
+  return 'TACO'
+}
+
+// Build a single-leg ExecutionPlan from a 100% comparison quote.
+// Mirrors the no-split fallback shape in useSplitSwap.findBestExecution.
+function buildSinglePlan(exchange: 'Kong' | 'ICPSwap' | 'TACO'): ExecutionPlan | null {
+  if (!executionPlan.value || !selectedInputToken.value || !inputAmount.value) return null
+  const amountIn = parseAmountToBigInt(inputAmount.value, selectedInputToken.value.decimals)
+  const src =
+    exchange === 'Kong'    ? executionPlan.value.quotes.kong[5] :
+    exchange === 'ICPSwap' ? executionPlan.value.quotes.icpswap[5] :
+                             executionPlan.value.quotes.taco[5]
+  if (!src || src.out <= 0n) return null
+  const leg: LegPlan = {
+    exchange,
+    pctBP: 10000,
+    amountIn,
+    expectedOut: src.out,
+    slipBP: src.slipBP,
+    route: src.route,
+  }
+  return {
+    type: 'single',
+    legs: [leg],
+    totalExpectedOut: src.out,
+    totalSlipBP: src.slipBP,
+    interpolated: false,
+    quotes: executionPlan.value.quotes,
+  }
+}
+
+// What the user has actually selected — optimal by default, or a single-DEX
+// override if they clicked a comparison row. Falls back to optimal when the
+// selected DEX has no usable quote (e.g. after an amount change).
+const effectivePlan = computed<ExecutionPlan | null>(() => {
+  if (!executionPlan.value) return null
+  if (selectedRouteKey.value === 'optimal') return executionPlan.value
+  return buildSinglePlan(selectedRouteKey.value) ?? executionPlan.value
+})
+
+function deltaPct(actual: bigint, optimal: bigint): string {
+  if (optimal === 0n) return '0.00'
+  const diff = optimal - actual
+  return ((Number(diff) / Number(optimal)) * 100).toFixed(2)
 }
 
 const setSlippageTolerance = (value: number) => {
@@ -1161,13 +1250,13 @@ const setCustomSlippage = () => {
 }
 
 const proceedWithSwap = () => {
-  if (!canProceed.value || !selectedInputToken.value || !executionPlan.value) return
+  if (!canProceed.value || !selectedInputToken.value || !effectivePlan.value) return
 
   emit('confirm', {
     inputToken: selectedInputToken.value,
     outputToken: tacoToken.value,
     amount: inputAmount.value,
-    executionPlan: executionPlan.value,
+    executionPlan: effectivePlan.value,
     slippageTolerance: slippageTolerance.value
   })
 }
@@ -1241,7 +1330,7 @@ const clearSwapData = () => {
   selectedInputToken.value = null
   inputAmount.value = ''
   quotes.value = []
-  selectedQuote.value = null
+  selectedRouteKey.value = 'optimal'
   executionPlan.value = null
   loadingQuotes.value = false
   quotesError.value = null

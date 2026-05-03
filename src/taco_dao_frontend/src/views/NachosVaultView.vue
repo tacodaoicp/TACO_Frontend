@@ -14,11 +14,12 @@
           <!-- vault page -->
           <div class="nachos-vault-view">
 
-            <!-- title container -->
-            <div class="d-flex align-items-center">
+            <!-- title container — ps-3 aligns with the 1rem horizontal padding on
+                 .nachos-vault-view__public-content so the title sits over the cards. -->
+            <div class="d-flex align-items-center ps-3">
 
               <!-- vault title -->
-              <TacoTitle level="h2" emoji="🧀" title="NACHOS Vault" class="mt-4" />
+              <TacoTitle level="h2" :iconSrc="nachoLogo" title="Nacho Vault" class="mt-4" />
 
             </div>
 
@@ -202,6 +203,7 @@
 
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
+import nachoLogo from '../assets/tokens/nacho.png'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import { useNachosStore } from '../stores/nachos.store'
