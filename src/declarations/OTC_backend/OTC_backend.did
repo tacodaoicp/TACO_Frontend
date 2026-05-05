@@ -386,7 +386,23 @@ type create_trading_canister =
             priceImpact: float64;
             routeDescription: text;
             routeTokens: vec text;
-          };}) query;
+          };
+        splitSim:
+         opt
+          record {
+            legs:
+             vec
+              record {
+                amountIn: nat;
+                expectedOut: nat;
+                route: vec record {
+                             tokenIn: text;
+                             tokenOut: text;
+                           };
+              };
+            totalOut: nat;
+          };
+      }) query;
    getFeeCollectors: () -> (vec principal) query;
    getKlineData: (token1: text, token2: text, timeFrame: TimeFrame,
     initialGet: bool) -> (vec KlineData) query;
@@ -606,6 +622,15 @@ type create_trading_canister =
       }) query;
    setMinimumAmount: (token: text, newMinimum: nat) -> (ActionResult);
    setTest: (a: bool) -> ();
+   simulateSplitRoutes: (splits:
+    vec record {
+          amountIn: nat;
+          route: vec SwapHop;
+        }) -> (record {
+                 error: text;
+                 perLegOut: vec nat;
+                 totalOut: nat;
+               }) query;
    swapMultiHop: (tokenIn: text, tokenOut: text, amountIn: nat, route:
     vec SwapHop, minAmountOut: nat, Block: nat) -> (SwapResult);
    swapSplitRoutes: (tokenIn: text, tokenOut: text, splits: vec SplitLeg,

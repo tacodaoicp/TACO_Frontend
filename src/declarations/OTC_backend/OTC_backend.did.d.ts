@@ -810,6 +810,18 @@ export interface create_trading_canister {
             'expectedBuyAmount' : bigint,
           }
         >,
+        'splitSim' : [] | [
+          {
+            'legs' : Array<
+              {
+                'amountIn' : bigint,
+                'expectedOut' : bigint,
+                'route' : Array<{ 'tokenIn' : string, 'tokenOut' : string }>,
+              }
+            >,
+            'totalOut' : bigint,
+          }
+        ],
       }
     >
   >,
@@ -1075,6 +1087,10 @@ export interface create_trading_canister {
   >,
   'setMinimumAmount' : ActorMethod<[string, bigint], ActionResult>,
   'setTest' : ActorMethod<[boolean], undefined>,
+  'simulateSplitRoutes' : ActorMethod<
+    [Array<{ 'amountIn' : bigint, 'route' : Array<SwapHop> }>],
+    { 'perLegOut' : Array<bigint>, 'error' : string, 'totalOut' : bigint }
+  >,
   'swapMultiHop' : ActorMethod<
     [string, string, bigint, Array<SwapHop>, bigint, bigint],
     SwapResult

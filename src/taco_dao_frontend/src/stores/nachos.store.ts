@@ -220,6 +220,21 @@ export const useNachosStore = defineStore('nachos', () => {
       : await tacoStore.createNachosVaultActorAnonymous()
   }
 
+  // Quote/estimate caller — uses the user's principal when logged in so the
+  // canister can apply caller-dependent logic (e.g. FeeExemptConfig); falls
+  // back to anonymous for logged-out users. Dashboard/config/NAV history stay
+  // anonymous via createVaultActor(false).
+  const createVaultQuoteActor = async () => {
+    if (userLoggedIn.value) {
+      try {
+        return await tacoStore.createNachosVaultActor()
+      } catch {
+        return await tacoStore.createNachosVaultActorAnonymous()
+      }
+    }
+    return await tacoStore.createNachosVaultActorAnonymous()
+  }
+
   // ICRC1 token actor — inline IDL from kong.store.ts
   const createTokenActor = async (tokenPrincipal: string) => {
     const agent = await tacoStore.getAuthenticatedAgent()
@@ -472,28 +487,28 @@ export const useNachosStore = defineStore('nachos', () => {
   }
 
   // ============================================================================
-  // Estimate Actions (anonymous)
+  // Estimate Actions (authenticated when logged in, else anonymous)
   // ============================================================================
 
   const estimateMintICP = async (amountE8s: bigint) => {
-    const actor = await createVaultActor(false)
+    const actor = await createVaultQuoteActor()
     return await (actor as any).estimateMintICP(amountE8s)
   }
 
   const estimateMintWithToken = async (tokenPrincipal: Principal, amount: bigint) => {
-    const actor = await createVaultActor(false)
+    const actor = await createVaultQuoteActor()
     const result = await (actor as any).estimateMintWithToken(tokenPrincipal, amount)
     if ('ok' in result) return result.ok
     throw new Error(mapNachosError(result.err))
   }
 
   const getRequiredPortfolioShares = async (totalValueICP: bigint) => {
-    const actor = await createVaultActor(false)
+    const actor = await createVaultQuoteActor()
     return await (actor as any).getRequiredPortfolioShares(totalValueICP)
   }
 
   const estimateBurn = async (nachosAmount: bigint) => {
-    const actor = await createVaultActor(false)
+    const actor = await createVaultQuoteActor()
     return await (actor as any).estimateBurnTokens(nachosAmount)
   }
 

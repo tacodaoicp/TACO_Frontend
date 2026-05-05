@@ -103,9 +103,8 @@
         </a>
 
         <!-- vault - router link — positioned last -->
-        <router-link to="/vault" class="header-bar__rl header-bar__rl--with-badge">
+        <router-link to="/vault" class="header-bar__rl">
           <span class="header-bar__rl-span">Vault</span>
-          <span class="header-bar__rl-beta">Coming Soon</span>
         </router-link>
 
       </div>
@@ -306,7 +305,7 @@
 
         <!-- vault - router link — positioned last -->
         <router-link @click="togglePagesMenu()" to="/vault" class="list-group-item">
-          <span>Vault <span class="header-bar__rl-beta">Coming Soon</span></span>
+          <span>Vault</span>
         </router-link>
 
       </div>

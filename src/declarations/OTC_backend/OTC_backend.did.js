@@ -973,6 +973,23 @@ export const idlFactory = ({ IDL }) => {
                   'expectedBuyAmount' : IDL.Nat,
                 })
               ),
+              'splitSim' : IDL.Opt(
+                IDL.Record({
+                  'legs' : IDL.Vec(
+                    IDL.Record({
+                      'amountIn' : IDL.Nat,
+                      'expectedOut' : IDL.Nat,
+                      'route' : IDL.Vec(
+                        IDL.Record({
+                          'tokenIn' : IDL.Text,
+                          'tokenOut' : IDL.Text,
+                        })
+                      ),
+                    })
+                  ),
+                  'totalOut' : IDL.Nat,
+                })
+              ),
             })
           ),
         ],
@@ -1311,6 +1328,21 @@ export const idlFactory = ({ IDL }) => {
       ),
     'setMinimumAmount' : IDL.Func([IDL.Text, IDL.Nat], [ActionResult], []),
     'setTest' : IDL.Func([IDL.Bool], [], []),
+    'simulateSplitRoutes' : IDL.Func(
+        [
+          IDL.Vec(
+            IDL.Record({ 'amountIn' : IDL.Nat, 'route' : IDL.Vec(SwapHop) })
+          ),
+        ],
+        [
+          IDL.Record({
+            'perLegOut' : IDL.Vec(IDL.Nat),
+            'error' : IDL.Text,
+            'totalOut' : IDL.Nat,
+          }),
+        ],
+        ['query'],
+      ),
     'swapMultiHop' : IDL.Func(
         [IDL.Text, IDL.Text, IDL.Nat, IDL.Vec(SwapHop), IDL.Nat, IDL.Nat],
         [SwapResult],

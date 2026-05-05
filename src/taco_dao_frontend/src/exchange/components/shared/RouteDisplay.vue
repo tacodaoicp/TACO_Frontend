@@ -104,6 +104,13 @@ function impactClass(impact: number): string {
 
 <style scoped lang="scss">
 .route-display {
+  // Allow long multi-hop routes to scroll horizontally inside the card
+  // instead of pushing the card out of bounds on narrow screens.
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+
   &__simple {
     color: var(--text-secondary);
   }
@@ -114,6 +121,10 @@ function impactClass(impact: number): string {
     justify-content: center;
     gap: 0;
     padding: var(--space-2) 0;
+    // Without this the inner content forces the parent to its content width
+    // even when overflow-x: auto is set on the parent.
+    width: max-content;
+    min-width: 100%;
   }
 
   &__node {

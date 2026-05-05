@@ -81,7 +81,16 @@
         <i class="fa-solid fa-check-circle me-2"></i>
         <strong>ICP Detected:</strong> {{ formatE8s(detectedIcpAmount) }} ICP
       </div>
+      <div v-if="detectedBelowMin" class="vault-fiat-mint__limit-warning">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+        Below minimum mint value of {{ formatE8s(nachosStore.minMintValueICP) }} ICP.
+      </div>
+      <div v-else-if="detectedAboveMax" class="vault-fiat-mint__limit-warning">
+        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+        Exceeds remaining mint capacity ({{ formatE8s(BigInt(Math.round(nachosStore.remainingMintICP ?? 0))) }} ICP).
+      </div>
       <button class="btn taco-btn taco-btn--green w-100"
+              :disabled="detectedBelowMin || detectedAboveMax"
               @click="confirmMint">
         <i class="fa-solid fa-coins me-2"></i>
         Mint NACHOS
@@ -169,6 +178,22 @@ const buyButtonText = computed(() => {
   if (mintPhase.value === 'detecting') return 'Waiting for ICP...'
   if (mintPhase.value === 'minting') return 'Minting NACHOS...'
   return selectedProvider.value === 'banxa' ? 'Fund via Banxa' : 'Start Monitoring'
+})
+
+// Mint-value limits — gate the manual "Mint NACHOS" button so backend doesn't reject after the fact.
+// Account for the ICP transfer fee that mintWithICP deducts before depositing.
+const ICP_TRANSFER_FEE_FOR_MINT = 10_000n
+const detectedNetForMint = computed(() =>
+  detectedIcpAmount.value > ICP_TRANSFER_FEE_FOR_MINT ? detectedIcpAmount.value - ICP_TRANSFER_FEE_FOR_MINT : 0n
+)
+const detectedBelowMin = computed(() =>
+  detectedIcpAmount.value > 0n &&
+  detectedNetForMint.value < BigInt(nachosStore.minMintValueICP ?? 0n)
+)
+const detectedAboveMax = computed(() => {
+  const cap = nachosStore.remainingMintICP
+  if (cap === null || !Number.isFinite(cap)) return false
+  return detectedNetForMint.value > BigInt(Math.floor(cap))
 })
 
 /////////////////////////////
@@ -490,6 +515,18 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  &__limit-warning {
+    padding: 0.5rem 0.75rem;
+    background: rgba(220, 53, 69, 0.12);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    border-radius: 0.375rem;
+    color: var(--red-to-light-red);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
   }
 
   // provider toggle

@@ -214,6 +214,16 @@
                    @input="debouncedGetShares" />
             <span class="vault-mint__input-suffix">ICP</span>
           </div>
+          <span class="vault-mint__hint">
+            Min: {{ nachosStore.formatE8s(nachosStore.minMintValueICP) }} ICP
+            <template v-if="nachosStore.remainingMintICP !== null">
+              · Max: {{ nachosStore.formatE8s(BigInt(Math.round(nachosStore.remainingMintICP))) }} ICP
+            </template>
+          </span>
+          <div v-if="portfolioExceedsMax" class="vault-mint__shares-warning">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            Amount exceeds your remaining mint capacity ({{ nachosStore.formatE8s(BigInt(Math.round(nachosStore.remainingMintICP ?? 0))) }} ICP).
+          </div>
         </div>
 
         <!-- required deposits table -->
@@ -223,19 +233,27 @@
               <tr>
                 <th>Token</th>
                 <th class="text-end">Required</th>
+                <th class="text-end">Balance</th>
                 <th class="text-end">Value (ICP)</th>
                 <th class="text-end">Weight</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="t in portfolioShares.tokens" :key="t.symbol">
+              <tr v-for="t in portfolioShares.tokens" :key="t.symbol"
+                  :class="{ 'vault-mint__shares-row--insufficient': isInsufficient(t) }">
                 <td class="fw-bold">{{ t.symbol }}</td>
                 <td class="text-end">{{ nachosStore.formatE8s(t.requiredAmount, Number(t.decimals)) }}</td>
+                <td class="text-end">{{ nachosStore.formatE8s(portfolioBalances[t.token.toText()] ?? 0n, Number(t.decimals)) }}</td>
                 <td class="text-end">{{ nachosStore.formatE8s(t.valueICP) }}</td>
                 <td class="text-end">{{ (Number(t.basisPoints) / 100).toFixed(1) }}%</td>
               </tr>
             </tbody>
           </table>
+
+          <div v-if="insufficientPortfolioTokens.length > 0" class="vault-mint__shares-warning">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            Insufficient balance for: {{ insufficientPortfolioTokens.map(t => t.symbol).join(', ') }}
+          </div>
 
           <!-- 30m low price note -->
           <div class="vault-mint__info-note">
@@ -392,7 +410,9 @@ const icpFeePct = computed(() => {
 const canConfirmICP = computed(() => {
   if (icpAmountE8s.value <= 0n) return false
   if (!icpEstimate.value) return false
+  if (icpAmountE8s.value < BigInt(nachosStore.minMintValueICP ?? 0n)) return false
   // Check amount doesn't exceed available balance
+  if (!Number.isFinite(maxMintableICP.value)) return true
   const maxE8s = BigInt(Math.floor(maxMintableICP.value * 1e8))
   if (icpAmountE8s.value > maxE8s) return false
   return true
@@ -475,15 +495,25 @@ const canConfirmToken = computed(() => {
   if (tokenAmountRaw.value <= 0n) return false
   if (!tokenEstimate.value) return false
 
+  // Enforce minimum mint value (ICP-equivalent of deposit)
+  const depositValueICP = BigInt(tokenEstimate.value.depositValueICP ?? 0n)
+  if (depositValueICP < BigInt(nachosStore.minMintValueICP ?? 0n)) return false
+  // Enforce remaining mint capacity (per-tx max + 4h user/global rate caps)
+  if (nachosStore.remainingMintICP !== null && Number.isFinite(nachosStore.remainingMintICP)) {
+    if (depositValueICP > BigInt(Math.floor(nachosStore.remainingMintICP))) return false
+  }
+
   // Check amount doesn't exceed token balance
   const portfolioEntry = nachosStore.portfolio.find(
     (p: any) => p.token.toText() === selectedTokenPrincipal.value
   )
   if (!portfolioEntry) return false
 
-  // Account for token transfer fee (2x for approval + transfer)
-  const requiredBalance = tokenAmountRaw.value + (portfolioEntry.fee * 2n)
-  if (portfolioEntry.balance < requiredBalance) return false
+  // Account for token transfer fee (2x for approval + transfer).
+  // Portfolio records from getVaultDashboard don't include a fee field — fall back to 10_000n (default ICRC fee).
+  const tokenFee: bigint = typeof portfolioEntry.fee === 'bigint' ? portfolioEntry.fee : 10_000n
+  const requiredBalance = tokenAmountRaw.value + (tokenFee * 2n)
+  if (BigInt(portfolioEntry.balance ?? 0n) < requiredBalance) return false
 
   return true
 })
@@ -544,6 +574,7 @@ const handleMintToken = async () => {
 
 const portfolioValue = ref('')
 const portfolioShares = ref<any>(null)
+const portfolioBalances = ref<Record<string, bigint>>({})
 let portfolioDebounce: ReturnType<typeof setTimeout> | null = null
 
 const portfolioValueE8s = computed(() => {
@@ -552,9 +583,64 @@ const portfolioValueE8s = computed(() => {
   return BigInt(Math.round(val * 1e8))
 })
 
+const insufficientPortfolioTokens = computed<Array<{ symbol: string; required: bigint; balance: bigint; decimals: number }>>(() => {
+  if (!portfolioShares.value) return []
+  const out: Array<{ symbol: string; required: bigint; balance: bigint; decimals: number }> = []
+  for (const t of portfolioShares.value.tokens) {
+    const principal: string = t.token.toText()
+    const fee: bigint = BigInt(t.tokenFee ?? 10_000n)
+    const required: bigint = BigInt(t.requiredAmount ?? 0n) + fee * 2n
+    const balance: bigint = portfolioBalances.value[principal] ?? 0n
+    if (balance < required) {
+      out.push({ symbol: t.symbol, required, balance, decimals: Number(t.decimals) })
+    }
+  }
+  return out
+})
+
+const portfolioExceedsMax = computed(() => {
+  if (nachosStore.remainingMintICP === null || !Number.isFinite(nachosStore.remainingMintICP)) return false
+  return portfolioValueE8s.value > BigInt(Math.floor(nachosStore.remainingMintICP))
+})
+
 const canConfirmPortfolio = computed(() =>
-  portfolioValueE8s.value > 0n && portfolioShares.value
+  portfolioValueE8s.value > 0n &&
+  portfolioValueE8s.value >= BigInt(nachosStore.minMintValueICP ?? 0n) &&
+  !portfolioExceedsMax.value &&
+  !!portfolioShares.value &&
+  insufficientPortfolioTokens.value.length === 0
 )
+
+const loadPortfolioBalances = async (shares: any) => {
+  if (!shares?.tokens || !tacoStore.userLoggedIn) {
+    portfolioBalances.value = {}
+    return
+  }
+  const results = await Promise.all(
+    shares.tokens.map(async (t: any) => {
+      const principal: string = t.token.toText()
+      try {
+        const bal = await nachosStore.getTokenBalance(principal)
+        return [principal, bal] as const
+      } catch {
+        return [principal, 0n] as const
+      }
+    })
+  )
+  const next: Record<string, bigint> = {}
+  for (const [p, b] of results) next[p] = b
+  portfolioBalances.value = next
+}
+
+watch(portfolioShares, (s) => { loadPortfolioBalances(s) })
+
+const isInsufficient = (t: any): boolean => {
+  const principal: string = t.token.toText()
+  const fee: bigint = BigInt(t.tokenFee ?? 10_000n)
+  const required: bigint = BigInt(t.requiredAmount ?? 0n) + fee * 2n
+  const balance: bigint = portfolioBalances.value[principal] ?? 0n
+  return balance < required
+}
 
 const debouncedGetShares = () => {
   if (portfolioDebounce) clearTimeout(portfolioDebounce)
@@ -1046,6 +1132,24 @@ onBeforeUnmount(() => {
       text-transform: uppercase;
       opacity: 0.7;
     }
+  }
+
+  &__shares-row--insufficient {
+    color: var(--red-to-light-red);
+  }
+
+  &__shares-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--red-to-light-red);
+    background: rgba(220, 53, 69, 0.12);
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    border-radius: 0.375rem;
   }
 
   &__token-estimate {

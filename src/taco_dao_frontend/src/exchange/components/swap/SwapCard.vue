@@ -658,6 +658,13 @@ onMounted(() => {
     padding: var(--space-1) var(--space-2);
     background: rgba(0, 0, 0, 0.1);
     border-radius: 6px;
+
+    // Let the RouteDisplay shrink below its content width so its own
+    // overflow-x can take over for long multi-hop routes on narrow screens.
+    :deep(.route-display) {
+      min-width: 0;
+      flex: 1;
+    }
   }
 
   &__split-pct {

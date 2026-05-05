@@ -596,20 +596,18 @@ const coreTokens = computed<WalletToken[]>(() => {
     isRegistered: false
   })
 
-  // NACHOS token — staging only
-  if (getEffectiveNetwork() !== 'ic') {
-    const nachosPrincipal = getCanisterId('nachos')
-    tokens.push({
-      principal: nachosPrincipal,
-      name: 'NACHOS',
-      symbol: 'NACHOS',
-      logo: tokenImages['NACHOS'] || tokenImages['Default'],
-      balance: allTokenBalances.value.get(nachosPrincipal) || 0n,
-      decimals: 8,
-      fee: 10000n,
-      isRegistered: false
-    })
-  }
+  // NACHOS token
+  const nachosPrincipal = getCanisterId('nachos')
+  tokens.push({
+    principal: nachosPrincipal,
+    name: 'NACHOS',
+    symbol: 'NACHOS',
+    logo: tokenImages['NACHOS'] || tokenImages['Default'],
+    balance: allTokenBalances.value.get(nachosPrincipal) || 0n,
+    decimals: 8,
+    fee: 10000n,
+    isRegistered: false
+  })
 
   // return tokens array
   return tokens

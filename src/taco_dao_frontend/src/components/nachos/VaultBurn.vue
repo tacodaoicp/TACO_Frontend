@@ -300,7 +300,11 @@ const nonDustTokens = computed(() =>
 const canConfirm = computed(() => {
   if (nachosAmountE8s.value <= 0n) return false
   if (!burnEstimate.value) return false
+  // Enforce minimum burn value (ICP-equivalent of redemption)
+  const redemptionValueICP = BigInt(burnEstimate.value.redemptionValueICP ?? 0n)
+  if (redemptionValueICP < BigInt(nachosStore.minBurnValueICP ?? 0n)) return false
   // Check amount doesn't exceed available balance
+  if (!Number.isFinite(maxBurnable.value)) return true
   const maxE8s = BigInt(Math.floor(maxBurnable.value * 1e8))
   if (nachosAmountE8s.value > maxE8s) return false
   return true
