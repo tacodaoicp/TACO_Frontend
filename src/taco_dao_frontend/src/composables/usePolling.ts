@@ -1,9 +1,6 @@
 /**
  * Composable for visibility-aware polling.
- * Based on Section 16 of FRONTEND_DEV_GUIDE.md.
  *
- * The exchange has no WebSocket/push. All data must be polled.
- * This composable:
  * - Pauses polling when the browser tab is hidden
  * - Automatically cleans up on component unmount
  * - Supports dynamic interval changes

@@ -40,7 +40,7 @@
       </button>
 
       <div v-if="showChart" class="mobile-trade__chart">
-        <TradingChart v-if="token0 && token1" :token0="token0" :token1="token1" :decimals0="decimals0" :decimals1="decimals1" />
+        <TradingChart v-if="token0 && token1" :token0="token0" :token1="token1" :decimals0="decimals0" :decimals1="decimals1" :datafeed="datafeed" hide-attribution />
       </div>
 
       <!-- Bottom tabs -->
@@ -78,7 +78,8 @@ import { useExchangeStore } from '../store/exchange.store'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import OrderbookPanel from '../components/orderbook/OrderbookPanel.vue'
 import OrderEntryPanel from '../components/order/OrderEntryPanel.vue'
-import TradingChart from '../components/chart/TradingChart.vue'
+import TradingChart from '../../components/charts/TradingChart.vue'
+import { useExchangeKlineDatafeed } from '../composables/useExchangeKlineDatafeed'
 import OpenOrdersTab from '../components/portfolio/OpenOrdersTab.vue'
 import TradeHistoryTab from '../components/portfolio/TradeHistoryTab.vue'
 import LPPositionsTab from '../components/portfolio/LPPositionsTab.vue'
@@ -86,6 +87,7 @@ import WalletTab from '../components/portfolio/WalletTab.vue'
 import RecentPairTradesTab from '../components/portfolio/RecentPairTradesTab.vue'
 
 const store = useExchangeStore()
+const datafeed = useExchangeKlineDatafeed()
 
 const token0 = computed(() => store.selectedToken0)
 const token1 = computed(() => store.selectedToken1)

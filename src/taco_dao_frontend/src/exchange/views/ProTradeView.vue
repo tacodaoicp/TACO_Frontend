@@ -18,6 +18,8 @@
         :token1="selectedToken1"
         :decimals0="decimals0"
         :decimals1="decimals1"
+        :datafeed="datafeed"
+        hide-attribution
       />
       <div v-else class="ex-panel pro-trade-view__placeholder">
         <span class="ex-label">Select a trading pair</span>
@@ -99,7 +101,8 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ProLayout from '../components/layout/ProLayout.vue'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
-import TradingChart from '../components/chart/TradingChart.vue'
+import TradingChart from '../../components/charts/TradingChart.vue'
+import { useExchangeKlineDatafeed } from '../composables/useExchangeKlineDatafeed'
 import OrderbookPanel from '../components/orderbook/OrderbookPanel.vue'
 import OrderEntryPanel from '../components/order/OrderEntryPanel.vue'
 import OpenOrdersTab from '../components/portfolio/OpenOrdersTab.vue'
@@ -112,6 +115,7 @@ import { useExchangeStore } from '../store/exchange.store'
 const store = useExchangeStore()
 const router = useRouter()
 const layoutRef = ref<InstanceType<typeof ProLayout> | null>(null)
+const datafeed = useExchangeKlineDatafeed()
 
 // Pair selection — reads from store (shared with ExchangeHeader)
 const selectedToken0 = computed(() => store.selectedToken0)

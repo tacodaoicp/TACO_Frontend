@@ -245,9 +245,13 @@ const allRows = computed((): WalletRow[] => {
     const balance = balances.value.get(token.address) ?? 0n
     const decimals = Number(token.decimals)
     const balanceNum = Number(balance) / 10 ** decimals
-    // Try to find USD price from DAO data
+    // Prefer the exchange store's derived price: derivePoolPrices walks every
+    // pool from ICP/ckUSDC anchors, so tokens with only a /ckUSDC pool still
+    // get priced. Fall back to the DAO backend's /ICP-pool-only value.
+    const storePrice = store.getTokenPriceUSD(token.address)
     const daoToken = daoTokens.value.find(d => d.address === token.address)
-    const usdValue = daoToken ? balanceNum * daoToken.priceInUSD : 0
+    const unitPrice = storePrice > 0 ? storePrice : (daoToken?.priceInUSD ?? 0)
+    const usdValue = balanceNum * unitPrice
 
     return {
       address: token.address,
@@ -271,7 +275,9 @@ const allRows = computed((): WalletRow[] => {
 
     const balance = balances.value.get(dt.address) ?? 0n
     const balanceNum = Number(balance) / 10 ** dt.decimals
-    const usdValue = balanceNum * dt.priceInUSD
+    const storePrice = store.getTokenPriceUSD(dt.address)
+    const unitPrice = storePrice > 0 ? storePrice : dt.priceInUSD
+    const usdValue = balanceNum * unitPrice
 
     rows.push({
       address: dt.address,

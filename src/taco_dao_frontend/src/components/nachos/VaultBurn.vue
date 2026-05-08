@@ -224,6 +224,7 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { Principal } from '@dfinity/principal'
 import { useTacoStore } from '../../stores/taco.store'
 import { useNachosStore } from '../../stores/nachos.store'
+import { useTokenBalance } from '../../composables/useTokenBalance'
 import { getCanisterId } from '../../constants/canisterIds'
 import VaultConfirmDialog from './VaultConfirmDialog.vue'
 
@@ -234,20 +235,7 @@ const nachosStore = useNachosStore()
 
 const NACHOS_PRINCIPAL = getCanisterId('nachos')
 const NACHOS_FEE = 10_000n
-const nachosBalance = ref<bigint | null>(null)
-
-const loadNachosBalance = async () => {
-  try {
-    nachosBalance.value = await nachosStore.getTokenBalance(NACHOS_PRINCIPAL)
-  } catch { nachosBalance.value = null }
-}
-loadNachosBalance()
-
-// Refresh NACHOS balance when dashboard data updates (after operations)
-watch(() => nachosStore.dashboardData, loadNachosBalance)
-
-// Poll NACHOS balance every 15s
-const balanceInterval = setInterval(loadNachosBalance, 15_000)
+const { balance: nachosBalance, refresh: loadNachosBalance } = useTokenBalance(NACHOS_PRINCIPAL)
 
 const nachosAmount = ref('')
 const burnEstimate = ref<any>(null)
@@ -462,7 +450,6 @@ watch(() => nachosAmountE8s.value > 0n, (active) => {
 
 onBeforeUnmount(() => {
   if (refreshInterval) clearInterval(refreshInterval)
-  clearInterval(balanceInterval)
 })
 </script>
 

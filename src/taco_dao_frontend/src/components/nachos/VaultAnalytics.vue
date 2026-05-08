@@ -116,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useNachosStore } from '../../stores/nachos.store'
 
 const nachosStore = useNachosStore()
@@ -147,8 +147,7 @@ const loadAnalytics = async () => {
 
 onMounted(loadAnalytics)
 
-// Re-fetch when dashboard data updates (30s auto-refresh or after operations)
-watch(() => nachosStore.dashboardData, loadAnalytics)
+defineExpose({ refresh: loadAnalytics })
 
 // Create anonymous actor for analytics query
 const createAnalyticsActor = async () => {

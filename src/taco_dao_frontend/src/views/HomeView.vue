@@ -78,12 +78,46 @@
                       <i class="fa-solid fa-expand"></i>
                     </button>
 
-                    <!-- chart iframe - lazy loaded for performance -->
-                    <iframe v-if="!isMobile && shouldLoadDex"
-                            ref="dexIframeRef"
-                            loading="lazy"
-                            style="border-radius: 0.5rem; border: none;"
-                            src="https://www.dextools.io/widget-chart/en/icp/pe-light/vhoia-myaaa-aaaar-qbmja-cai?theme=dark&chartType=1&chartResolution=240&drawingToolbars=false&chartInUsd=true&headerColor=1F2937&tvPlatformColor=1F2937&tvPaneColor=1F2937"></iframe>
+                    <!-- chart - lazy loaded for performance -->
+                    <div v-if="!isMobile && shouldLoadDex"
+                         class="home-view__taco-token-chart__inline">
+
+                      <!-- pair switch — TACO/ICP always visible (so users know
+                           which pair they're looking at); TACO/ckUSDC only when
+                           the OTC backend actually has klines for it. When
+                           there's only TACO/ICP, the pill becomes a link into
+                           the exchange's pro view for that pair. -->
+                      <div class="home-view__taco-token-chart__pair-switch">
+                        <a v-if="!hasCkusdcKlines"
+                           :href="exchangeUrl"
+                           class="home-view__taco-token-chart__pair-btn home-view__taco-token-chart__pair-btn--active"
+                           :title="`Open TACO/ICP in the exchange`">
+                          TACO/ICP
+                        </a>
+                        <button v-else
+                                class="home-view__taco-token-chart__pair-btn"
+                                :class="{ 'home-view__taco-token-chart__pair-btn--active': chartQuote === 'icp' }"
+                                @click="chartQuote = 'icp'">
+                          TACO/ICP
+                        </button>
+                        <button v-if="hasCkusdcKlines"
+                                class="home-view__taco-token-chart__pair-btn"
+                                :class="{ 'home-view__taco-token-chart__pair-btn--active': chartQuote === 'ckusdc' }"
+                                @click="chartQuote = 'ckusdc'">
+                          TACO/ckUSDC
+                        </button>
+                      </div>
+
+                      <TradingChart
+                        :token0="TACO_PRINCIPAL"
+                        :token1="chartQuotePrincipal"
+                        :decimals0="8"
+                        :decimals1="chartQuoteDecimals"
+                        :datafeed="chartDatafeed"
+                        :enabled="!viewingChartModal"
+                        hide-fullscreen
+                        hide-attribution />
+                    </div>
 
                     <!-- if mobile, tap to view -->
                     <div v-else @click="viewingChartModal = true"
@@ -626,7 +660,17 @@
         <!-- message middle -->
         <div class="home-view__chart-modal__dialog__middle" style="width: 100%; height: 100%;">
 
-            <iframe style="width: 100%; height: 100%; border: none;" src="https://www.dextools.io/widget-chart/en/icp/pe-light/vhoia-myaaa-aaaar-qbmja-cai?theme=dark&chartType=1&chartResolution=240&drawingToolbars=false&chartInUsd=true&headerColor=1F2937&tvPlatformColor=1F2937&tvPaneColor=1F2937"></iframe>
+            <div v-if="viewingChartModal" style="width: 100%; height: 100%;">
+              <TradingChart
+                :token0="TACO_PRINCIPAL"
+                :token1="chartQuotePrincipal"
+                :decimals0="8"
+                :decimals1="chartQuoteDecimals"
+                :datafeed="chartDatafeed"
+                :enabled="viewingChartModal"
+                hide-fullscreen
+                hide-attribution />
+            </div>
 
         </div>
 
@@ -710,6 +754,12 @@
         display: flex;
         gap: 1rem;
         margin-top: 1.5rem;
+        // Each card sits at its own natural content height. The
+        // Taco Dao Assets (right) panel is the visual anchor; the
+        // TACO Token (chart) panel matches it because its inner
+        // container uses aspect-ratio: 16/9, giving it a height
+        // close to Treasury's row count for a 33% column.
+        align-items: flex-start;
 
         &__left {
           width: 33.33%;
@@ -1155,6 +1205,95 @@
       aspect-ratio: 16 / 9;
       border-radius: 0.5rem;
       border: none;
+    }
+
+    // In-house TradingView chart container — fills the tile so its outer
+    // envelope matches the right (Treasury) tile's height. `zoom: 2`
+    // cancels the parent's `zoom: 0.5` so the chart UI renders at 1x.
+    //
+    // No min-height here AND we override the chart's internal
+    // `__container { min-height: 300px }` to 0, otherwise the chart
+    // would push the row taller than the Treasury panel.
+    &__inline {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      zoom: 2;
+
+      :deep(.trading-chart__container) {
+        min-height: 0;
+      }
+
+      // The homepage panel has its own expand button (positioned absolute
+      // top-right of the parent). Reserve space at the right end of the
+      // chart's toolbar so the Candles | Line toggle isn't hidden behind it.
+      :deep(.trading-chart__toolbar) {
+        padding-right: 3.5rem !important;
+      }
+
+      // Drop the 1W timeframe button only on the homepage — fewer buttons
+      // means more room for the Candles | Line toggle without overlap.
+      :deep(.trading-chart__timeframes .trading-chart__tf-btn:nth-child(5)) {
+        display: none;
+      }
+
+      // Belt-and-braces: hide any TradingView attribution link inside the
+      // chart even if `attributionLogo: false` is somehow ignored.
+      :deep(a[href*="tradingview.com"]) {
+        display: none !important;
+      }
+
+      // Homepage-only typography on the chart's toolbar — match the rest
+      // of the page (Space Mono). Exchange embeds keep their own defaults.
+      :deep(.trading-chart__tf-btn),
+      :deep(.trading-chart__type-btn) {
+        font-family: 'Space Mono', ui-monospace, monospace;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+
+      @supports (-moz-appearance: none) {
+        zoom: unset;
+      }
+    }
+
+    &__pair-switch {
+      position: absolute;
+      bottom: 0.5rem;
+      left: 0.5rem;
+      display: inline-flex;
+      gap: 2px;
+      padding: 2px;
+      background: rgba(0, 0, 0, 0.65);
+      border: 1px solid var(--dark-orange);
+      border-radius: 0.375rem;
+      z-index: 1000;
+    }
+
+    &__pair-btn {
+      background: transparent;
+      border: 0;
+      color: rgba(255, 255, 255, 0.7);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 3px 8px;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: color 140ms, background 140ms;
+
+      &:hover { color: #fff; }
+
+      &--active {
+        color: #fff;
+        background: var(--yellow-to-dark-orange, rgba(255, 193, 7, 0.5));
+      }
     }
 
     &__icon {
@@ -2008,6 +2147,8 @@
   import { useRoute } from 'vue-router'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
+  import TradingChart from "../components/charts/TradingChart.vue"
+  import { useOtcKlineDatafeed } from "../composables/useOtcKlineDatafeed"
   import TacoCoinIcon from "../assets/tokens/tacoCoinIcon.vue"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
   import TacoChefWave from '../assets/images/chef/chef-wave.png'
@@ -2087,6 +2228,33 @@
   const shouldLoadYouTube = ref(false)
   const youtubeIframeRef = ref<HTMLIFrameElement | null>(null)
   const dexIframeRef = ref<HTMLIFrameElement | null>(null)
+
+  // TACO/* price chart — replaces dextools iframe with the in-house
+  // TradingView Lightweight Charts component fed by our own OTC_backend.
+  const TACO_PRINCIPAL = 'kknbx-zyaaa-aaaaq-aae4a-cai'
+  const ICP_PRINCIPAL = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
+  const CKUSDC_PRINCIPAL = 'xevnm-gaaaa-aaaar-qafnq-cai'
+  const chartDatafeed = useOtcKlineDatafeed()
+  const chartQuote = ref<'icp' | 'ckusdc'>('icp')
+  const chartQuotePrincipal = computed(() =>
+    chartQuote.value === 'icp' ? ICP_PRINCIPAL : CKUSDC_PRINCIPAL,
+  )
+  const chartQuoteDecimals = computed(() => chartQuote.value === 'icp' ? 8 : 6)
+
+  // Only surface the TACO/ckUSDC toggle if the OTC backend actually has
+  // kline history for that pair. Probe once on mount; if it errors or
+  // returns empty, the user only sees the TACO/ICP option.
+  const hasCkusdcKlines = ref(false)
+  ;(async () => {
+    try {
+      const data = await chartDatafeed.getRange(
+        TACO_PRINCIPAL, CKUSDC_PRINCIPAL, { hour: null }, [], 5n,
+      )
+      hasCkusdcKlines.value = Array.isArray(data) && data.length > 0
+    } catch {
+      hasCkusdcKlines.value = false
+    }
+  })()
 
   // Route for watching navigation
   const route = useRoute()

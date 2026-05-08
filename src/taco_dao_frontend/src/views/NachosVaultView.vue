@@ -79,7 +79,7 @@
 
               <!-- analytics (public) -->
               <div class="nachos-vault-view__public-content">
-                <VaultAnalytics />
+                <VaultAnalytics ref="analyticsRef" />
               </div>
             </div>
 
@@ -204,19 +204,21 @@
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
 import nachoLogo from '../assets/tokens/nacho.png'
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import { useNachosStore } from '../stores/nachos.store'
 
-// sub-components
+// sub-components — eager (above the fold / primary CTA)
 import VaultStatusBanner from '../components/nachos/VaultStatusBanner.vue'
 import VaultDashboard from '../components/nachos/VaultDashboard.vue'
-import NAVChart from '../components/nachos/NAVChart.vue'
 import VaultMint from '../components/nachos/VaultMint.vue'
 import VaultBurn from '../components/nachos/VaultBurn.vue'
-import VaultPortfolioBreakdown from '../components/nachos/VaultPortfolioBreakdown.vue'
-import VaultOperations from '../components/nachos/VaultOperations.vue'
-import VaultAnalytics from '../components/nachos/VaultAnalytics.vue'
+
+// sub-components — lazy (below the fold; chart libs / extra canister calls)
+const NAVChart = defineAsyncComponent(() => import('../components/nachos/NAVChart.vue'))
+const VaultPortfolioBreakdown = defineAsyncComponent(() => import('../components/nachos/VaultPortfolioBreakdown.vue'))
+const VaultOperations = defineAsyncComponent(() => import('../components/nachos/VaultOperations.vue'))
+const VaultAnalytics = defineAsyncComponent(() => import('../components/nachos/VaultAnalytics.vue'))
 
 ////////////
 // stores //
@@ -224,49 +226,48 @@ import VaultAnalytics from '../components/nachos/VaultAnalytics.vue'
 
 const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
-const { appLoadingOn, appLoadingOff } = tacoStore
 const showAsLoggedIn = computed(() => tacoStore.userLoggedIn || tacoStore.tourBypassAuth)
+
+// Template ref to VaultAnalytics so we can trigger its refresh explicitly
+// (it no longer auto-refetches on every dashboard tick).
+const analyticsRef = ref<{ refresh: () => Promise<void> } | null>(null)
 
 ///////////////////
 // local methods //
 ///////////////////
 
-// refresh after any mint/burn operation
+// refresh after any mint/burn operation — fire all sources in parallel
 const onOperationComplete = async () => {
   await Promise.all([
     nachosStore.loadDashboard(),
     nachosStore.loadUserActivity(),
     nachosStore.loadNAVHistory(),
     nachosStore.loadConfig(),
+    analyticsRef.value?.refresh() ?? Promise.resolve(),
   ])
 }
 
-// ============ 30s auto-refresh ============
+// ============ user-activity-only auto-refresh ============
+// The worker already polls dashboard / config / navHistory at appropriate
+// staleness; only userActivity is auth-only and not in the worker.
 
-let autoRefreshInterval: ReturnType<typeof setInterval> | null = null
+let userActivityInterval: ReturnType<typeof setInterval> | null = null
 
-const startAutoRefresh = () => {
-  stopAutoRefresh()
-  autoRefreshInterval = setInterval(async () => {
-    try {
-      await Promise.all([
-        nachosStore.loadDashboard(),
-        nachosStore.loadUserActivity(),
-        nachosStore.loadNAVHistory(),
-        nachosStore.loadConfig(),
-      ])
-    } catch (_e) { /* silent */ }
+const startUserActivityRefresh = () => {
+  stopUserActivityRefresh()
+  userActivityInterval = setInterval(() => {
+    nachosStore.loadUserActivity().catch(() => { /* silent */ })
   }, 30_000)
 }
 
-const stopAutoRefresh = () => {
-  if (autoRefreshInterval) {
-    clearInterval(autoRefreshInterval)
-    autoRefreshInterval = null
+const stopUserActivityRefresh = () => {
+  if (userActivityInterval) {
+    clearInterval(userActivityInterval)
+    userActivityInterval = null
   }
 }
 
-// manual refresh
+// manual refresh — user-initiated, fine to fire everything
 const refreshing = ref(false)
 
 const handleRefresh = async () => {
@@ -277,6 +278,7 @@ const handleRefresh = async () => {
       nachosStore.loadUserActivity(),
       nachosStore.loadNAVHistory(),
       nachosStore.loadConfig(),
+      analyticsRef.value?.refresh() ?? Promise.resolve(),
     ])
   } finally {
     refreshing.value = false
@@ -287,36 +289,35 @@ const handleRefresh = async () => {
 // lifecycle hooks //
 /////////////////////
 
-// on mounted — data loading
-onMounted(async () => {
-  try {
-    // Worker handles dashboard/config/nav data - no loading animation needed
-    // Data is already cached and reactive via worker subscriptions
-
-    await tacoStore.checkIfLoggedIn()
-    if (tacoStore.userLoggedIn) {
-      await nachosStore.initialize()  // Loads user activity only
-      startAutoRefresh()              // Starts 30s polling for active operations
-    }
-  } catch (error) {
-    console.error('Error in vault onMounted:', error)
-  }
+// on mounted — don't block the public render on the auth check.
+// Worker subscriptions already feed dashboard/config/navHistory reactively.
+onMounted(() => {
+  tacoStore.checkIfLoggedIn()
+    .then(() => {
+      if (tacoStore.userLoggedIn) {
+        nachosStore.initialize()  // fire-and-forget; userActivity arrives reactively
+        startUserActivityRefresh()
+      }
+    })
+    .catch((error) => {
+      console.error('Error in vault onMounted:', error)
+    })
 })
 
 // re-load on login state change
 watch(() => tacoStore.userLoggedIn, async (loggedIn) => {
   if (loggedIn) {
     await nachosStore.initialize()
-    startAutoRefresh()
+    startUserActivityRefresh()
   } else {
-    stopAutoRefresh()
+    stopUserActivityRefresh()
     nachosStore.stopPolling()
   }
 })
 
-// cleanup polling + auto-refresh on unmount
+// cleanup on unmount
 onBeforeUnmount(() => {
-  stopAutoRefresh()
+  stopUserActivityRefresh()
   nachosStore.cleanup()
 })
 

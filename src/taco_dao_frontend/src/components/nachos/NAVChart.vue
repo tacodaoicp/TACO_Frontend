@@ -46,38 +46,51 @@ const filteredHistory = computed(() =>
   nachosStore.navHistory.length > 1 ? nachosStore.navHistory.slice(1) : nachosStore.navHistory
 )
 
-function buildSeriesData() {
-  return filteredHistory.value.map((snap: any) => ({
-    x: new Date(Number(snap.timestamp / 1_000_000n)).getTime(),
-    y: Number(snap.navPerTokenE8s) / 1e8,
-  }))
-}
+// Single-pass build: produce series points + marker overrides together so the
+// history list is iterated only once per change.
+const chartData = computed(() => {
+  const data: Array<{ x: number; y: number }> = []
+  const markers: Array<{
+    seriesIndex: number
+    dataPointIndex: number
+    fillColor: string
+    strokeColor: string
+    size: number
+  }> = []
 
-function buildMarkers() {
-  return filteredHistory.value.map((snap: any, i: number) => {
+  const history = filteredHistory.value
+  for (let i = 0; i < history.length; i++) {
+    const snap: any = history[i]
+    data.push({
+      x: new Date(Number(snap.timestamp / 1_000_000n)).getTime(),
+      y: Number(snap.navPerTokenE8s) / 1e8,
+    })
+
     let color = '#4CAF50'
+    const isScheduled = 'Scheduled' in snap.reason
     if ('Burn' in snap.reason) color = '#F44336'
     else if ('Mint' in snap.reason) color = '#4CAF50'
-    else if ('Scheduled' in snap.reason) color = '#FFD600'
+    else if (isScheduled) color = '#FFD600'
     else if ('Manual' in snap.reason) color = '#FF9800'
-    return {
+
+    markers.push({
       seriesIndex: 0,
       dataPointIndex: i,
       fillColor: color,
       strokeColor: color,
-      size: ('Scheduled' in snap.reason) ? 0 : 4,
-    }
-  })
-}
+      size: isScheduled ? 0 : 4,
+    })
+  }
+  return { data, markers }
+})
 
-// Reactive series — updates when filteredHistory changes (fixes race condition on quick navigation)
 const series = computed(() => [{
   name: 'NAV per NACHOS (ICP)',
-  data: buildSeriesData(),
+  data: chartData.value.data,
 }])
 
-// Reactive options — markers update automatically when data changes
-const chartOptions = computed(() => ({
+// Static options — extracted once so they aren't rebuilt on every history change.
+const STATIC_CHART_OPTIONS = {
   chart: {
     type: 'line' as const,
     background: 'transparent',
@@ -105,19 +118,19 @@ const chartOptions = computed(() => ({
   },
   stroke: { curve: 'smooth' as const, width: 2 },
   colors: ['#4CAF50'],
-  grid: {
-    borderColor: 'rgba(128, 128, 128, 0.2)',
-  },
+  grid: { borderColor: 'rgba(128, 128, 128, 0.2)' },
   tooltip: {
     theme: 'dark',
     x: { format: 'MMM dd, HH:mm' },
-    y: {
-      formatter: (val: number) => val.toFixed(8) + ' ICP',
-    },
+    y: { formatter: (val: number) => val.toFixed(8) + ' ICP' },
   },
+}
+
+const chartOptions = computed(() => ({
+  ...STATIC_CHART_OPTIONS,
   markers: {
     size: 3,
-    discrete: buildMarkers(),
+    discrete: chartData.value.markers,
   },
 }))
 </script>

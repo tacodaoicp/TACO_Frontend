@@ -25,7 +25,10 @@
           {{ ct.label }}
         </button>
       </div>
-      <button class="trading-chart__fullscreen-btn" @click="toggleFullscreen" aria-label="Toggle fullscreen">
+      <button v-if="!hideFullscreen"
+              class="trading-chart__fullscreen-btn"
+              @click="toggleFullscreen"
+              aria-label="Toggle fullscreen">
         <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
     </div>
@@ -48,31 +51,30 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, type IChartApi, type ISeriesApi, ColorType, type CandlestickData, type HistogramData, type LineData, type Time } from 'lightweight-charts'
-import { useExchangeStore } from '../../store/exchange.store'
-import { useTacoStore } from '../../../stores/taco.store'
 import { usePolling } from '../../composables/usePolling'
-import type { TimeFrame } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
+import type { KlineDatafeed, TimeFrame } from './types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   token0: string
   token1: string
   decimals0?: number
   decimals1?: number
   enabled?: boolean
-}>()
-
-const store = useExchangeStore()
+  datafeed: KlineDatafeed
+  /** Hide the built-in fullscreen toggle (when the host already provides one). */
+  hideFullscreen?: boolean
+  /** Hide the TradingView attribution logo in the chart's bottom-left. */
+  hideAttribution?: boolean
+}>(), {
+  hideFullscreen: false,
+  hideAttribution: false,
+})
 
 // Detect if display pair order is inverted from canonical pool order.
 // getKlineData always returns prices in pool-native order.
 const priceCorrection = computed((): { factor: number; invert: boolean } => {
-  const info = store.exchangeInfoData
-  if (!info?.pool_canister?.length) return { factor: 1, invert: false }
-  for (const [t0, t1] of info.pool_canister) {
-    if (t0 === props.token0 && t1 === props.token1) return { factor: 1, invert: false }
-    if (t0 === props.token1 && t1 === props.token0) return { factor: 1, invert: true }
-  }
-  return { factor: 1, invert: false }
+  const inverted = props.datafeed.isInverted(props.token0, props.token1)
+  return { factor: 1, invert: inverted }
 })
 
 function adjustCandle(d: { open: number; high: number; low: number; close: number }) {
@@ -255,6 +257,7 @@ function initChart() {
     layout: {
       background: { type: ColorType.Solid, color: c.bgPrimary },
       textColor: c.textSecondary,
+      attributionLogo: !props.hideAttribution,
     },
     grid: {
       vertLines: { color: c.bgSecondary + '30' },
@@ -349,7 +352,7 @@ async function loadOlderHistory() {
   const mySwitchId = switchId
   isLoadingHistory = true
   try {
-    const data = await store.getKlineDataRange(
+    const data = await props.datafeed.getRange(
       props.token0,
       props.token1,
       getTimeframeVariant(),
@@ -423,7 +426,7 @@ async function loadInitialData() {
   if (!hasExistingData) isLoading.value = true
 
   try {
-    const data = await store.getKlineDataRange(
+    const data = await props.datafeed.getRange(
       props.token0,
       props.token1,
       getTimeframeVariant(),
@@ -527,14 +530,23 @@ async function loadInitialData() {
     volumeSeries?.setData(volumes)
 
     // Reset viewport for the new pair: show last 100 candles on X, re-fit Y to that range.
-    // Explicit autoScale reapply forces the right price scale to recompute against the
-    // new pair's price magnitude (prevents inheriting the prior pair's Y range).
+    //
+    // The Y-axis refit is fragile in lightweight-charts — `applyOptions({ autoScale: true })`
+    // alone doesn't always force a recompute when the data magnitude changed (e.g.
+    // TACO/ICP ≈ 0.013 → TACO/ckUSDC ≈ 0.07). We flip-flop autoScale and do a second
+    // pass on the next frame to guarantee both X and Y refit to the new pair's range.
     if (candles.length > 0) {
       const from = candles.length > 100 ? candles[candles.length - 100].time : candles[0].time
       const to = candles[candles.length - 1].time
-      chart?.timeScale().setVisibleRange({ from, to })
+      chart?.priceScale('right').applyOptions({ autoScale: false })
       chart?.priceScale('right').applyOptions({ autoScale: true })
+      chart?.priceScale('volume').applyOptions({ autoScale: false })
       chart?.priceScale('volume').applyOptions({ autoScale: true })
+      chart?.timeScale().setVisibleRange({ from, to })
+      requestAnimationFrame(() => {
+        chart?.priceScale('right').applyOptions({ autoScale: true })
+        chart?.priceScale('volume').applyOptions({ autoScale: true })
+      })
     }
 
     isLoading.value = false
@@ -587,7 +599,7 @@ async function pollUpdate() {
 
   const mySwitchId = switchId
   try {
-    const data = await store.getKlineData(
+    const data = await props.datafeed.getLatest(
       props.token0,
       props.token1,
       getTimeframeVariant(),
@@ -596,7 +608,6 @@ async function pollUpdate() {
 
     if (mySwitchId !== switchId) return
 
-    console.log('[TradingChart] Poll:', data?.length, 'candles')
     if (!data || data.length === 0) return
 
     // Sort candles ascending by timestamp (initialGet=false may return newest-first or just 2 candles)
@@ -620,12 +631,22 @@ async function pollUpdate() {
         color: adj.close >= adj.open ? colorBuy + '40' : colorSell + '40',
       }
 
-      if (activeChartType.value === 'candles') {
-        candleSeries?.update(candle)
-      } else {
-        lineSeries?.update({ time, value: adj.close })
+      // Lightweight Charts' update() only accepts time >= the series' last time
+      // (replace-or-append). The poll endpoint can return up to 3 buckets, the
+      // older two of which are already painted from the initial load — applying
+      // them via update() throws "Cannot update oldest data". Skip the series
+      // call for older candles; the cache still tracks the latest values.
+      const lastTime = cachedCandles.length > 0
+        ? Number(cachedCandles[cachedCandles.length - 1].time)
+        : -Infinity
+      if (Number(time) >= lastTime) {
+        if (activeChartType.value === 'candles') {
+          candleSeries?.update(candle)
+        } else {
+          lineSeries?.update({ time, value: adj.close })
+        }
+        volumeSeries?.update(volume)
       }
-      volumeSeries?.update(volume)
 
       // Keep cache in sync
       const idx = cachedCandles.findIndex(c => c.time === time)
@@ -648,7 +669,7 @@ async function pollUpdate() {
 }
 
 function reconcileLastCandleWithEffectivePrice() {
-  const ep = store.effectivePrice
+  const ep = props.datafeed.livePrice?.value
   if (!ep || ep <= 0 || cachedCandles.length === 0 || !candleSeries) return
   const last = { ...cachedCandles[cachedCandles.length - 1] }
   if (ep === last.close) return
@@ -664,26 +685,28 @@ function reconcileLastCandleWithEffectivePrice() {
 }
 
 // Poll every 5 seconds for faster chart updates after trades
-const enabledRef = ref(props.enabled !== false)
+const enabledRef = computed(() => props.enabled !== false)
 usePolling(pollUpdate, { interval: 5000, immediate: false, enabled: enabledRef })
 
-// Reactively update last candle when effective price changes (no network dependency)
-watch(() => store.effectivePrice, (ep) => {
-  console.log('[TradingChart] effectivePrice →', ep, 'cached:', cachedCandles.length, 'series:', !!candleSeries)
-  if (!ep || ep <= 0 || cachedCandles.length === 0 || !candleSeries) return
-  // effectivePrice is already in display space (set by orderbook which uses same token0/token1)
-  const last = { ...cachedCandles[cachedCandles.length - 1] }
-  if (ep === last.close) return
-  last.close = ep
-  last.high = Math.max(last.high, ep)
-  last.low = Math.min(last.low, ep)
-  cachedCandles[cachedCandles.length - 1] = last
-  if (activeChartType.value === 'candles') {
-    candleSeries.update(last)
-  } else {
-    lineSeries?.update({ time: last.time, value: ep })
-  }
-})
+// Reactively update last candle when live price changes (no network dependency).
+// Only the Exchange supplies a livePrice (orderbook-derived). DAO embeds skip this.
+if (props.datafeed.livePrice) {
+  watch(props.datafeed.livePrice, (ep) => {
+    if (!ep || ep <= 0 || cachedCandles.length === 0 || !candleSeries) return
+    // livePrice is already in display space (orderbook uses same token0/token1)
+    const last = { ...cachedCandles[cachedCandles.length - 1] }
+    if (ep === last.close) return
+    last.close = ep
+    last.high = Math.max(last.high, ep)
+    last.low = Math.min(last.low, ep)
+    cachedCandles[cachedCandles.length - 1] = last
+    if (activeChartType.value === 'candles') {
+      candleSeries.update(last)
+    } else {
+      lineSeries?.update({ time: last.time, value: ep })
+    }
+  })
+}
 
 // Switch between candle and line chart modes
 watch(activeChartType, (mode) => {
@@ -733,13 +756,21 @@ onUnmounted(() => {
   cachedVolumes = []
 })
 
-// Reload on pair change — keep old data visible until new data arrives (no-flicker)
+// Reload on pair change. Pair switches can change price magnitude (TACO/ICP
+// ≈ 0.013 vs TACO/ckUSDC ≈ 0.07) and the time range, so the previous pair's
+// price/time scales would be wrong for the new data. Clear the series before
+// fetching so the axes refit cleanly when new candles arrive.
 watch([() => props.token0, () => props.token1], () => {
   switchId++
   isStale.value = true
   oldestLoadedTs = null
   isLoadingHistory = false
   historyExhausted = false
+  candleSeries?.setData([])
+  lineSeries?.setData([])
+  volumeSeries?.setData([])
+  cachedCandles = []
+  cachedVolumes = []
   loadInitialData()
 })
 </script>
@@ -771,18 +802,20 @@ watch([() => props.token0, () => props.token1], () => {
   &__tf-btn {
     background: transparent;
     border: 0;
-    color: var(--tx-ink-3);
+    // Fallbacks (after the comma) used when the chart is mounted outside the
+    // exchange theme scope (e.g. on the DAO homepage) where --tx-* aren't set.
+    color: var(--tx-ink-3, rgba(255, 255, 255, 0.7));
     font-size: 12px;
     font-weight: 500;
     padding: 4px 10px;
-    border-radius: var(--tx-r-sm);
+    border-radius: var(--tx-r-sm, 4px);
     cursor: pointer;
     transition: color 140ms, background 140ms;
 
-    &:hover { color: var(--tx-ink-2); }
+    &:hover { color: var(--tx-ink-2, rgba(255, 255, 255, 0.9)); }
     &--active {
-      color: var(--tx-ink);
-      background: var(--tx-surface-2);
+      color: var(--tx-ink, #fff);
+      background: var(--tx-surface-2, rgba(255, 255, 255, 0.12));
     }
   }
 
@@ -795,24 +828,24 @@ watch([() => props.token0, () => props.token1], () => {
   &__type-btn {
     background: none;
     border: none;
-    color: var(--text-tertiary);
-    font-size: var(--text-xs);
+    color: var(--text-tertiary, rgba(255, 255, 255, 0.7));
+    font-size: var(--text-xs, 12px);
     padding: 4px 8px;
     border-radius: 4px;
     cursor: pointer;
 
-    &:hover { color: var(--text-primary); }
-    &--active { color: var(--accent-primary); }
+    &:hover { color: var(--text-primary, #fff); }
+    &--active { color: var(--accent-primary, #f28b3a); }
   }
 
   &__fullscreen-btn {
     background: none;
     border: none;
-    color: var(--text-tertiary);
+    color: var(--text-tertiary, rgba(255, 255, 255, 0.7));
     cursor: pointer;
     padding: 4px;
     border-radius: 4px;
-    &:hover { color: var(--text-primary); }
+    &:hover { color: var(--text-primary, #fff); }
   }
 
   &__container {

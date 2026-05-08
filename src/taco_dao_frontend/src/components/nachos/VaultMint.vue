@@ -304,6 +304,7 @@
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useTacoStore } from '../../stores/taco.store'
 import { useNachosStore } from '../../stores/nachos.store'
+import { useTokenBalance } from '../../composables/useTokenBalance'
 import VaultMintEstimate from './VaultMintEstimate.vue'
 import VaultConfirmDialog from './VaultConfirmDialog.vue'
 import VaultFiatMint from './VaultFiatMint.vue'
@@ -313,21 +314,8 @@ const emit = defineEmits<{ (e: 'operation-complete'): void }>()
 const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 
-const icpBalance = ref<bigint | null>(null)
 const ICP_FEE = 10_000n
-
-const loadICPBalance = async () => {
-  try {
-    icpBalance.value = await nachosStore.getTokenBalance('ryjl3-tyaaa-aaaaa-aaaba-cai')
-  } catch { icpBalance.value = null }
-}
-loadICPBalance()
-
-// Refresh ICP balance when dashboard data updates (after operations)
-watch(() => nachosStore.dashboardData, loadICPBalance)
-
-// Poll ICP balance every 15s
-const balanceInterval = setInterval(loadICPBalance, 15_000)
+const { balance: icpBalance, refresh: loadICPBalance } = useTokenBalance('ryjl3-tyaaa-aaaaa-aaaba-cai')
 
 // mode state — only show 'Single Token' if there are non-ICP tokens in portfolio
 const ICP_PRINCIPAL = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
@@ -797,7 +785,6 @@ watch(hasActiveInput, (active) => {
 
 onBeforeUnmount(() => {
   if (refreshInterval) clearInterval(refreshInterval)
-  clearInterval(balanceInterval)
 })
 </script>
 
