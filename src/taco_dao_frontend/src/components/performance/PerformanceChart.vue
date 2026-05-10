@@ -359,6 +359,84 @@ export default {
       icpSeries.setData(toLineData(icp, icpCheckpointByTime))
 
       chart?.timeScale().fitContent()
+
+      // Re-attach the simulateHover hook to the latest container so the tour
+      // can drive the chart programmatically. Idempotent — see attachHoverHook.
+      attachHoverHook()
+    }
+
+    // ----- Programmatic hover (driven by GrandTour) -----
+    //
+    // The tour exposes a `hoverChartPoints` interaction that previously poked
+    // ApexCharts' SVG directly. lightweight-charts is a canvas, so we drive
+    // the same Vue tooltip overlay by computing screen coordinates from the
+    // chart APIs and updating the tooltip refs directly.
+
+    let hoverAborted = false
+
+    async function simulateHover(count, dwellMs) {
+      if (!chart || !usdSeries || !chartContainer.value) return
+      const usd = usdSeriesData.value
+      const icp = icpSeriesData.value
+      if (usd.length === 0) return
+
+      hoverAborted = false
+      const containerWidth = chartContainer.value.clientWidth
+      const startIdx = Math.max(0, Math.floor(usd.length * 0.5))
+      const step = Math.max(1, Math.floor((usd.length - startIdx) / (count + 1)))
+
+      try {
+        for (let i = 0; i < count; i++) {
+          if (hoverAborted) break
+          const dataIdx = Math.min(startIdx + step * (i + 1), usd.length - 1)
+          const p = usd[dataIdx]
+          if (!p) continue
+
+          const timeSec = Math.floor(p.x / 1000)
+          const xCoord = chart.timeScale().timeToCoordinate(timeSec)
+          const yCoord = usdSeries.priceToCoordinate(p.y)
+          if (xCoord == null || yCoord == null) continue
+
+          // Pair with ICP value at the same data index (worker output keeps the
+          // two series aligned by checkpointIndex / position).
+          const icpVal = icp[dataIdx]?.y ?? null
+
+          // Show the lightweight-charts crosshair lines as well as the tooltip.
+          chart.setCrosshairPosition(p.y, timeSec, usdSeries)
+
+          tooltipPayload.value = buildTooltipPayload(timeSec, p.y, icpVal)
+          tooltipPos.value = {
+            x: xCoord,
+            y: yCoord,
+            flip: xCoord > containerWidth / 2,
+          }
+          tooltipVisible.value = true
+
+          await new Promise(r => setTimeout(r, dwellMs))
+        }
+      } finally {
+        chart?.clearCrosshairPosition()
+        tooltipVisible.value = false
+        hoverAborted = false
+      }
+    }
+
+    // Stash the hover function on the container DOM node so the tour helper —
+    // which only knows about CSS selectors — can find it without a Vue ref.
+    function attachHoverHook() {
+      if (chartContainer.value) {
+        // eslint-disable-next-line no-extra-semi
+        ;(chartContainer.value).__performanceChartHover = simulateHover
+        ;(chartContainer.value).__performanceChartHoverAbort = () => { hoverAborted = true }
+      }
+    }
+    function detachHoverHook() {
+      if (chartContainer.value) {
+        try {
+          delete (chartContainer.value).__performanceChartHover
+          delete (chartContainer.value).__performanceChartHoverAbort
+        } catch (_e) { /* ignore */ }
+      }
     }
 
     // ----- Tooltip overlay -----
@@ -574,6 +652,7 @@ export default {
     })
 
     onBeforeUnmount(() => {
+      detachHoverHook()
       resizeObserver?.disconnect()
       resizeObserver = null
       chart?.remove()

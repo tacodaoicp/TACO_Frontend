@@ -261,38 +261,43 @@ export async function hoverChartPoints(
     return
   }
 
-  // Wait for ApexCharts SVG to render inside the container
-  let svg: Element | null = null
+  // PerformanceChart attaches a `__performanceChartHover(count, dwellMs)`
+  // function on its inner container DOM node. Find it inside this row.
+  type HoverHook = (count: number, dwellMs: number) => Promise<void>
+  type AbortHook = () => void
+
+  const findHookHost = (): { host: HTMLElement; hover: HoverHook; abort: AbortHook | null } | null => {
+    const candidates = container.querySelectorAll<HTMLElement>('*')
+    for (const el of candidates) {
+      const hover = (el as any).__performanceChartHover as HoverHook | undefined
+      if (typeof hover === 'function') {
+        const abort = (el as any).__performanceChartHoverAbort as AbortHook | undefined
+        return { host: el, hover, abort: typeof abort === 'function' ? abort : null }
+      }
+    }
+    return null
+  }
+
+  // Wait for the chart component to register its hook (data may load async).
+  let hook: ReturnType<typeof findHookHost> = null
   const waitStart = Date.now()
-  while (Date.now() - waitStart < 3000) {
-    svg = container.querySelector('.apexcharts-svg')
-    if (svg) break
+  while (Date.now() - waitStart < 8000) {
+    hook = findHookHost()
+    if (hook) break
+    if (tourAborted) return
     await new Promise(r => setTimeout(r, 200))
   }
-  if (!svg) {
-    console.warn('[Tour] ApexCharts SVG not found')
+  if (!hook) {
+    console.warn('[Tour] PerformanceChart hover hook not found')
     return
   }
 
-  // Wait for actual chart DATA to render — markers prove data is loaded
-  // (the SVG shell renders before async data arrives)
-  let markers: Element[] = []
-  const dataStart = Date.now()
-  while (Date.now() - dataStart < 5000) {
-    markers = Array.from(svg.querySelectorAll('.apexcharts-marker'))
-    if (markers.length > 0) break
-    await new Promise(r => setTimeout(r, 300))
-  }
-  if (markers.length === 0) {
-    console.warn('[Tour] Chart has no data markers — no tooltips to show')
-    return
-  }
+  // Settle a beat so any final layout pass finishes before we drive the chart.
+  await new Promise(r => setTimeout(r, 300))
+  if (tourAborted) return
 
-  // Extra settle time after data renders
-  await new Promise(r => setTimeout(r, 500))
-
-  // Temporarily elevate the container above the tour overlay (z-index 100000)
-  // so the ApexCharts tooltip is visible and not hidden behind the tour backdrop
+  // Elevate the chart's host above the tour backdrop so the tooltip overlay
+  // (which is rendered inside the chart's container) isn't hidden behind it.
   const containerEl = container instanceof HTMLElement ? container : null
   const origZIndex = containerEl?.style.zIndex ?? ''
   const origPosition = containerEl?.style.position ?? ''
@@ -302,56 +307,17 @@ export async function hoverChartPoints(
     containerEl.style.zIndex = '100001'
   }
 
-  // Pick markers from the right portion of the chart
-  const startIdx = Math.max(0, Math.floor(markers.length * 0.5))
-  const step = Math.max(1, Math.floor((markers.length - startIdx) / (count + 1)))
-
-  // ApexCharts v4 requires mouseenter (NOT mouseover) to initialize tooltip tracking
-  svg.dispatchEvent(new MouseEvent('mouseenter', {
-    bubbles: false, cancelable: false, view: window,
-  }))
-
-  for (let i = 0; i < count; i++) {
-    if (tourAborted) break
-
-    // Use the actual marker element coordinates — exact data point positions
-    const markerIdx = Math.min(startIdx + step * (i + 1), markers.length - 1)
-    const marker = markers[markerIdx]
-    if (!marker) continue
-
-    const markerRect = marker.getBoundingClientRect()
-    const clientX = markerRect.left + markerRect.width / 2
-    const clientY = markerRect.top + markerRect.height / 2
-
-    // Dispatch mousemove on the SVG with exact marker coordinates
-    // Pulse multiple times to overcome ApexCharts' 20ms mousemove throttle
-    for (let pulse = 0; pulse < 3; pulse++) {
-      svg.dispatchEvent(new MouseEvent('mousemove', {
-        bubbles: true, cancelable: true, clientX, clientY, view: window,
-      }))
-      await new Promise(r => setTimeout(r, 30))
+  try {
+    // If the user aborts mid-loop, ask the hook to bail early too.
+    const onAbort = () => { hook?.abort?.() }
+    if (tourAborted) { onAbort(); return }
+    await hook.hover(count, dwellMs)
+    if (tourAborted) onAbort()
+  } finally {
+    if (containerEl) {
+      containerEl.style.zIndex = origZIndex
+      containerEl.style.position = origPosition
     }
-
-    // Hold tooltip visible
-    await new Promise(r => setTimeout(r, dwellMs))
-    if (tourAborted) break
-
-    // Dismiss tooltip
-    svg.dispatchEvent(new MouseEvent('mouseout', {
-      bubbles: true, cancelable: true, view: window,
-    }))
-    await new Promise(r => setTimeout(r, 400))
-  }
-
-  // Final dismiss
-  svg.dispatchEvent(new MouseEvent('mouseleave', {
-    bubbles: false, cancelable: false, view: window,
-  }))
-
-  // Restore container z-index
-  if (containerEl) {
-    containerEl.style.zIndex = origZIndex
-    containerEl.style.position = origPosition
   }
 }
 
