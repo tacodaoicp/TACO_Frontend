@@ -52,10 +52,38 @@ type TokenDeposit =
    token: principal;
    valueICP: nat;
  };
-type Result_6 = 
+type Result_8 = 
+ variant {
+   err: text;
+   ok: record {
+         backfilled: nat;
+         remaining: nat;
+         scanned: nat;
+       };
+ };
+type Result_7 = 
  variant {
    err: NachosError;
    ok: record {refundTaskId: nat;};
+ };
+type Result_6 = 
+ variant {
+   err: text;
+   ok:
+    record {
+      burn: vec record {
+                  principal;
+                  nat;
+                };
+      cancellation: vec record {
+                          principal;
+                          nat;
+                        };
+      mint: vec record {
+                  principal;
+                  nat;
+                };
+    };
  };
 type Result_5 = 
  variant {
@@ -116,6 +144,7 @@ type NavSnapshotReason =
  };
 type NavSnapshot = 
  record {
+   icpPriceUSD: opt float64;
    nachosSupply: nat;
    navPerTokenE8s: nat;
    portfolioValueICP: nat;
@@ -131,8 +160,11 @@ type NachosVaultDAO =
    addRateLimitExemptPrincipal: ("principal": principal, reason: text) ->
     (Result);
    adminForceRefreshBalances: () -> (Result);
+   backfillNavSnapshotUSDPrices: (maxBatch: nat) -> (Result_8);
    cancelDeposit: (tokenPrincipal: principal, blockNumber: nat,
-    fromSubaccount: opt blob) -> (Result_6);
+    fromSubaccount: opt blob) -> (Result_7);
+   claimAllFees: (recipient: principal, recipientSubaccount: opt blob) ->
+    (Result_6);
    claimBurnFees: (recipient: principal, tokenPrincipal: principal, amount:
     nat) -> (Result);
    claimCancellationFees: (recipient: principal, tokenPrincipal: principal,
@@ -190,6 +222,8 @@ type NachosVaultDAO =
      }) query;
    genesisMint: (blockNumber: nat, fromSubaccount: opt blob, recipient:
     opt Account) -> (Result_4);
+   genesisMintNoDeposit: (recipient: Account, amountToMint: nat) ->
+    (Result_4);
    getAcceptedMintTokens: () ->
     (vec record {
            principal;
@@ -399,6 +433,25 @@ type NachosVaultDAO =
     (vec
       record {
         navPerTokenE8s: nat;
+        reason: NavSnapshotReason;
+        timestamp: int;
+      }) query;
+   getNAVHistoryAdaptiveUSD: () ->
+    (vec
+      record {
+        navPerTokenUSD: float64;
+        reason: NavSnapshotReason;
+        timestamp: int;
+      }) query;
+   getNAVHistoryUSD: (limit: nat) ->
+    (vec
+      record {
+        icpPriceUSD: float64;
+        nachosSupply: nat;
+        navPerTokenE8s: nat;
+        navPerTokenUSD: float64;
+        portfolioValueICP: nat;
+        portfolioValueUSD: float64;
         reason: NavSnapshotReason;
         timestamp: int;
       }) query;
@@ -719,6 +772,7 @@ type NachosUpdateConfig =
    burnFeeBasisPoints: opt nat;
    burningEnabled: opt bool;
    cancellationFeeMultiplier: opt nat;
+   kongEnabled: opt bool;
    maxBurnAmountNachos: opt nat;
    maxBurnNachosPerUser4Hours: opt nat;
    maxBurnOpsPerUser4Hours: opt nat;

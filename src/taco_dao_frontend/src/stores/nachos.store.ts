@@ -74,6 +74,7 @@ export const useNachosStore = defineStore('nachos', () => {
   const dashboardData = ref<any | null>(null)
   const userActivity = ref<any | null>(null)
   const navHistory = ref<NavSnapshot[]>([])
+  const navHistoryUSD = ref<Array<{ navPerTokenUSD: number; timestamp: bigint; reason: any }>>([])
   const isLoading = ref(false)
   const lastError = ref<string | null>(null)
   const activeOperationStatus = ref<string | null>(null)
@@ -113,8 +114,15 @@ export const useNachosStore = defineStore('nachos', () => {
 
   workerUnsubscribers.push(
     workerBridge.subscribe('nachosNavHistory', (data: unknown) => {
-      if (data && Array.isArray(data)) {
-        navHistory.value = deserializeFromTransfer(data) as NavSnapshot[]
+      if (!data) return
+      const decoded = deserializeFromTransfer(data) as any
+      if (decoded && Array.isArray(decoded.icp) && Array.isArray(decoded.usd)) {
+        // New shape (worker v7+): { icp, usd }
+        navHistory.value = decoded.icp as NavSnapshot[]
+        navHistoryUSD.value = decoded.usd
+      } else if (Array.isArray(decoded)) {
+        // Defensive fallback for any stale-cache delivery of the old shape
+        navHistory.value = decoded as NavSnapshot[]
       }
     })
   )
@@ -1104,7 +1112,7 @@ export const useNachosStore = defineStore('nachos', () => {
 
   return {
     // State
-    dashboardData, userActivity, navHistory, isLoading, lastError,
+    dashboardData, userActivity, navHistory, navHistoryUSD, isLoading, lastError,
     activeOperationStatus, activeOperationType, cachedOperations, slippageBP, vaultConfig,
     // Computed
     userPrincipal, userLoggedIn, icpPriceUsd,

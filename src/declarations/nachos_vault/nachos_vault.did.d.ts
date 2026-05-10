@@ -258,6 +258,7 @@ export type NachosError = { 'PriceStale' : null } |
 export interface NachosUpdateConfig {
   'maxMintICPWorthPer4Hours' : [] | [bigint],
   'minBurnValueICP' : [] | [bigint],
+  'kongEnabled' : [] | [boolean],
   'portfolioShareMaxDeviationBP' : [] | [bigint],
   'maxBurnNachosPerUser4Hours' : [] | [bigint],
   'cancellationFeeMultiplier' : [] | [bigint],
@@ -287,8 +288,13 @@ export interface NachosVaultDAO {
   'addFeeExemptPrincipal' : ActorMethod<[Principal, string], Result>,
   'addRateLimitExemptPrincipal' : ActorMethod<[Principal, string], Result>,
   'adminForceRefreshBalances' : ActorMethod<[], Result>,
+  'backfillNavSnapshotUSDPrices' : ActorMethod<[bigint], Result_8>,
   'cancelDeposit' : ActorMethod<
     [Principal, bigint, [] | [Uint8Array | number[]]],
+    Result_7
+  >,
+  'claimAllFees' : ActorMethod<
+    [Principal, [] | [Uint8Array | number[]]],
     Result_6
   >,
   'claimBurnFees' : ActorMethod<[Principal, Principal, bigint], Result>,
@@ -341,6 +347,7 @@ export interface NachosVaultDAO {
     [bigint, [] | [Uint8Array | number[]], [] | [Account]],
     Result_4
   >,
+  'genesisMintNoDeposit' : ActorMethod<[Account, bigint], Result_4>,
   'getAcceptedMintTokens' : ActorMethod<
     [],
     Array<[Principal, AcceptedTokenConfig]>
@@ -550,6 +557,31 @@ export interface NachosVaultDAO {
         'navPerTokenE8s' : bigint,
         'timestamp' : bigint,
         'reason' : NavSnapshotReason,
+      }
+    >
+  >,
+  'getNAVHistoryAdaptiveUSD' : ActorMethod<
+    [],
+    Array<
+      {
+        'navPerTokenUSD' : number,
+        'timestamp' : bigint,
+        'reason' : NavSnapshotReason,
+      }
+    >
+  >,
+  'getNAVHistoryUSD' : ActorMethod<
+    [bigint],
+    Array<
+      {
+        'icpPriceUSD' : number,
+        'nachosSupply' : bigint,
+        'navPerTokenE8s' : bigint,
+        'navPerTokenUSD' : number,
+        'timestamp' : bigint,
+        'reason' : NavSnapshotReason,
+        'portfolioValueICP' : bigint,
+        'portfolioValueUSD' : number,
       }
     >
   >,
@@ -880,6 +912,7 @@ export interface NachosVaultDAO {
   'updateNachosConfig' : ActorMethod<[NachosUpdateConfig], Result>,
 }
 export interface NavSnapshot {
+  'icpPriceUSD' : [] | [number],
   'nachosSupply' : bigint,
   'navPerTokenE8s' : bigint,
   'timestamp' : bigint,
@@ -922,8 +955,20 @@ export type Result_5 = {
     }
   } |
   { 'err' : NachosError };
-export type Result_6 = { 'ok' : { 'refundTaskId' : bigint } } |
+export type Result_6 = {
+    'ok' : {
+      'burn' : Array<[Principal, bigint]>,
+      'mint' : Array<[Principal, bigint]>,
+      'cancellation' : Array<[Principal, bigint]>,
+    }
+  } |
+  { 'err' : string };
+export type Result_7 = { 'ok' : { 'refundTaskId' : bigint } } |
   { 'err' : NachosError };
+export type Result_8 = {
+    'ok' : { 'scanned' : bigint, 'backfilled' : bigint, 'remaining' : bigint }
+  } |
+  { 'err' : string };
 export interface TokenDeposit {
   'token' : Principal,
   'priceUsed' : bigint,

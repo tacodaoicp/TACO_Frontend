@@ -79,7 +79,7 @@ const workersConnected = ref(false)
 // ============================================================================
 
 // Increment to force browser to load fresh SharedWorker code
-const WORKER_VERSION = 'v6' // Incremented for nachos vault + performance worker integration
+const WORKER_VERSION = 'v7' // v7: nachosNavHistory wire format changed to { icp, usd }
 
 function getMainWorker(): WorkerAdapter {
   if (!mainWorker) {

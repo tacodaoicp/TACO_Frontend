@@ -27,6 +27,14 @@ export const idlFactory = ({ IDL }) => {
     'applicableTokens' : IDL.Vec(IDL.Principal),
   });
   const Result_1 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text });
+  const Result_8 = IDL.Variant({
+    'ok' : IDL.Record({
+      'scanned' : IDL.Nat,
+      'backfilled' : IDL.Nat,
+      'remaining' : IDL.Nat,
+    }),
+    'err' : IDL.Text,
+  });
   const NachosError = IDL.Variant({
     'PriceStale' : IDL.Null,
     'DepositAlreadyConsumed' : IDL.Null,
@@ -100,9 +108,17 @@ export const idlFactory = ({ IDL }) => {
     'TokenNotAccepted' : IDL.Null,
     'OperationInProgress' : IDL.Null,
   });
-  const Result_6 = IDL.Variant({
+  const Result_7 = IDL.Variant({
     'ok' : IDL.Record({ 'refundTaskId' : IDL.Nat }),
     'err' : NachosError,
+  });
+  const Result_6 = IDL.Variant({
+    'ok' : IDL.Record({
+      'burn' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
+      'mint' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
+      'cancellation' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
+    }),
+    'err' : IDL.Text,
   });
   const Result_5 = IDL.Variant({
     'ok' : IDL.Record({
@@ -329,6 +345,7 @@ export const idlFactory = ({ IDL }) => {
     'Manual' : IDL.Null,
   });
   const NavSnapshot = IDL.Record({
+    'icpPriceUSD' : IDL.Opt(IDL.Float64),
     'nachosSupply' : IDL.Nat,
     'navPerTokenE8s' : IDL.Nat,
     'timestamp' : IDL.Int,
@@ -362,6 +379,7 @@ export const idlFactory = ({ IDL }) => {
   const NachosUpdateConfig = IDL.Record({
     'maxMintICPWorthPer4Hours' : IDL.Opt(IDL.Nat),
     'minBurnValueICP' : IDL.Opt(IDL.Nat),
+    'kongEnabled' : IDL.Opt(IDL.Bool),
     'portfolioShareMaxDeviationBP' : IDL.Opt(IDL.Nat),
     'maxBurnNachosPerUser4Hours' : IDL.Opt(IDL.Nat),
     'cancellationFeeMultiplier' : IDL.Opt(IDL.Nat),
@@ -396,8 +414,14 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'adminForceRefreshBalances' : IDL.Func([], [Result], []),
+    'backfillNavSnapshotUSDPrices' : IDL.Func([IDL.Nat], [Result_8], []),
     'cancelDeposit' : IDL.Func(
         [IDL.Principal, IDL.Nat, IDL.Opt(IDL.Vec(IDL.Nat8))],
+        [Result_7],
+        [],
+      ),
+    'claimAllFees' : IDL.Func(
+        [IDL.Principal, IDL.Opt(IDL.Vec(IDL.Nat8))],
         [Result_6],
         [],
       ),
@@ -493,6 +517,7 @@ export const idlFactory = ({ IDL }) => {
         [Result_4],
         [],
       ),
+    'genesisMintNoDeposit' : IDL.Func([Account, IDL.Nat], [Result_4], []),
     'getAcceptedMintTokens' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Principal, AcceptedTokenConfig))],
@@ -772,6 +797,37 @@ export const idlFactory = ({ IDL }) => {
               'navPerTokenE8s' : IDL.Nat,
               'timestamp' : IDL.Int,
               'reason' : NavSnapshotReason,
+            })
+          ),
+        ],
+        ['query'],
+      ),
+    'getNAVHistoryAdaptiveUSD' : IDL.Func(
+        [],
+        [
+          IDL.Vec(
+            IDL.Record({
+              'navPerTokenUSD' : IDL.Float64,
+              'timestamp' : IDL.Int,
+              'reason' : NavSnapshotReason,
+            })
+          ),
+        ],
+        ['query'],
+      ),
+    'getNAVHistoryUSD' : IDL.Func(
+        [IDL.Nat],
+        [
+          IDL.Vec(
+            IDL.Record({
+              'icpPriceUSD' : IDL.Float64,
+              'nachosSupply' : IDL.Nat,
+              'navPerTokenE8s' : IDL.Nat,
+              'navPerTokenUSD' : IDL.Float64,
+              'timestamp' : IDL.Int,
+              'reason' : NavSnapshotReason,
+              'portfolioValueICP' : IDL.Nat,
+              'portfolioValueUSD' : IDL.Float64,
             })
           ),
         ],

@@ -38,18 +38,66 @@
           <span class="visually-hidden">Computing...</span>
         </div>
       </div>
-      <apexchart
-        type="area"
-        :options="chartOptions"
-        :series="chartSeries"
-        :height="height"
-      />
+
+      <!-- Chart container + Vue tooltip overlay -->
+      <div class="performance-chart__shell" :style="{ height: heightCss }">
+        <div ref="chartContainer" class="performance-chart__container"></div>
+
+        <div v-if="tooltipVisible && tooltipPayload"
+             class="performance-chart__tooltip"
+             :class="{ 'performance-chart__tooltip--flipped': tooltipPos.flip }"
+             :style="tooltipStyle">
+          <div class="performance-chart__tooltip-header">{{ formatTooltipDate(tooltipPayload.timeMs) }}</div>
+          <div v-if="tooltipPayload.usdReturn !== null"
+               class="performance-chart__tooltip-row"
+               :style="{ color: COLORS.usd }">
+            <span>Return (USD)</span>
+            <span>{{ formatPct(tooltipPayload.usdReturn) }}</span>
+          </div>
+          <div v-if="tooltipPayload.icpReturn !== null"
+               class="performance-chart__tooltip-row"
+               :style="{ color: COLORS.icp }">
+            <span>Return (ICP)</span>
+            <span>{{ formatPct(tooltipPayload.icpReturn) }}</span>
+          </div>
+
+          <div v-if="tooltipPayload.allocations.length" class="performance-chart__tooltip-section">
+            <div class="performance-chart__tooltip-section-head">
+              <span>Allocation</span>
+              <span v-if="tooltipPayload.hasIcpChange" class="performance-chart__tooltip-section-meta">USD / ICP</span>
+            </div>
+            <div class="performance-chart__tooltip-allocs"
+                 :style="{ gridTemplateColumns: tooltipPayload.allocColumns }">
+              <template v-for="(a, i) in tooltipPayload.allocations" :key="i">
+                <span class="performance-chart__tooltip-symbol">{{ a.symbol }}</span>
+                <span class="performance-chart__tooltip-percent">{{ a.percent }}%</span>
+                <span v-if="tooltipPayload.hasAnyPriceChange"
+                      class="performance-chart__tooltip-change"
+                      :style="{ color: a.usdChangeColor }">{{ a.usdChangeText }}</span>
+                <span v-if="tooltipPayload.hasIcpChange"
+                      class="performance-chart__tooltip-change performance-chart__tooltip-change--icp"
+                      :style="{ color: a.icpChangeColor }">{{ a.icpChangeText }}</span>
+              </template>
+            </div>
+          </div>
+
+          <div v-if="tooltipPayload.note" class="performance-chart__tooltip-section">
+            <div class="performance-chart__tooltip-section-head">
+              <span>Note</span>
+            </div>
+            <div class="performance-chart__tooltip-note">{{ tooltipPayload.note }}</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, shallowRef, computed, watch, onMounted } from 'vue'
+import { ref, shallowRef, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import {
+  createChart, AreaSeries, ColorType, LineStyle,
+} from 'lightweight-charts'
 import { useTacoStore } from '../../stores/taco.store'
 import { storeToRefs } from 'pinia'
 import { getChartPort } from '../../workers/chart-worker-port'
@@ -59,25 +107,30 @@ import { getChartPort } from '../../workers/chart-worker-port'
 const performanceDataCache = new Map()
 const CACHE_TTL_MS = 60_000 // 60 seconds
 
+const COLORS = {
+  usd: '#FEC800',
+  icp: '#7CDC86',
+  axisText: '#FEEAC1',
+  gridLine: '#DA8D28',
+  crosshair: '#DA8D28',
+  crosshairLabelBg: '#934A17',
+  breakEven: '#934A17',
+  pricePos: '#4CAF50',
+  priceNeg: '#FF5252',
+}
+
+// hex (#RRGGBB) + alpha 0..1 → #RRGGBBAA
+function withAlpha(hex, a) {
+  const n = Math.max(0, Math.min(255, Math.round(a * 255)))
+  return hex + n.toString(16).padStart(2, '0')
+}
+
 export default {
   name: 'PerformanceChart',
   props: {
-    // Principal of the user to show performance for
-    principal: {
-      type: String,
-      required: true
-    },
-    // Chart height
-    height: {
-      type: [Number, String],
-      default: 250
-    },
-    // Optional performance data from parent (worker subscription)
-    // If provided, skips fetching and uses this data directly
-    performanceData: {
-      type: Object,
-      default: null
-    },
+    principal: { type: String, required: true },
+    height: { type: [Number, String], default: 250 },
+    performanceData: { type: Object, default: null },
   },
 
   setup(props) {
@@ -91,19 +144,50 @@ export default {
     const icpCheckpoints = ref([])
     const baselineIndex = ref(0)
     const serializedCheckpoints = shallowRef([])
-    const chartSeries = shallowRef([])
     const tooltipDataMap = shallowRef({})
+
+    // Chart + series refs (kept outside reactivity — these are imperative handles)
+    const chartContainer = ref(null)
+    let chart = null
+    let usdSeries = null
+    let icpSeries = null
+    let resizeObserver = null
+    // time -> checkpointIndex maps so we can recover the index from crosshair-move events
+    let usdCheckpointByTime = new Map()
+    let icpCheckpointByTime = new Map()
+    // raw data refs so we can rebuild on demand
+    const usdSeriesData = shallowRef([])
+    const icpSeriesData = shallowRef([])
+
+    // Vue tooltip overlay state
+    const tooltipVisible = ref(false)
+    const tooltipPos = ref({ x: 0, y: 0, flip: false })
+    const tooltipPayload = ref(null)
+
+    // Pixel offset from the cursor when the tooltip floats next to it
+    const TOOLTIP_GAP = 14
+
+    const tooltipStyle = computed(() => {
+      const p = tooltipPos.value
+      // When `flip` is true, the cursor is on the right half; we render the
+      // tooltip to the LEFT of the cursor by translating itself by -100% width.
+      const tx = p.flip ? `calc(-100% - ${TOOLTIP_GAP}px)` : `${TOOLTIP_GAP}px`
+      return {
+        left: `${p.x}px`,
+        top: `${p.y}px`,
+        transform: `translate(${tx}, -50%)`,
+      }
+    })
 
     // Chart compute worker — singleton, preloaded at app startup
     const chartPort = getChartPort()
     chartPort.onmessage = (e) => {
       computing.value = false
-      const { usdSeries, icpSeries, tooltipData } = e.data
-      const series = []
-      if (usdSeries.length > 0) series.push({ name: 'Return (USD)', data: usdSeries })
-      if (icpSeries.length > 0) series.push({ name: 'Return (ICP)', data: icpSeries })
-      chartSeries.value = series
+      const { usdSeries: usd, icpSeries: icp, tooltipData } = e.data
+      usdSeriesData.value = usd
+      icpSeriesData.value = icp
       tooltipDataMap.value = tooltipData
+      applyData()
     }
 
     const isLocal = window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.')
@@ -116,32 +200,27 @@ export default {
           try {
             const principalStr = principal.toText ? principal.toText() : principal.toString()
             map.set(principalStr, details.tokenSymbol || 'Unknown')
-          } catch (e) {
-            // Skip invalid entries
-          }
+          } catch (e) { /* skip */ }
         }
       }
       return map
     })
 
-    // Check if we have data to display
-    const hasData = computed(() => {
-      return usdCheckpoints.value.length > 0 || icpCheckpoints.value.length > 0
-    })
+    const hasData = computed(() => usdCheckpoints.value.length > 0 || icpCheckpoints.value.length > 0)
 
-    // Baseline options for the dropdown - use USD checkpoints (primary series)
     const baselineOptions = computed(() => {
       const cps = usdCheckpoints.value.length > 0 ? usdCheckpoints.value : icpCheckpoints.value
       return cps.map((cp, idx) => {
         const date = new Date(Number(cp.timestamp) / 1_000_000)
-        const label = idx === 0
-          ? `${date.toLocaleDateString()} (First)`
-          : date.toLocaleDateString()
+        const label = idx === 0 ? `${date.toLocaleDateString()} (First)` : date.toLocaleDateString()
         return { index: idx, label }
       })
     })
 
-    // Serialize checkpoints for worker (convert Principals to strings, BigInts to numbers)
+    const heightCss = computed(() => typeof props.height === 'number' ? `${props.height}px` : props.height)
+
+    // ----- Worker dispatch -----
+
     const serializeCheckpoints = (cps) => cps.map(cp => ({
       timestamp: Number(cp.timestamp),
       allocations: (cp.allocations || []).map(a => ({
@@ -157,7 +236,6 @@ export default {
       reason: (cp.reason || []).map(r => r || '')
     }))
 
-    // Dispatch computation to worker when data or baseline changes
     const dispatchToWorker = () => {
       if (!serializedCheckpoints.value.length) return
       computing.value = true
@@ -170,307 +248,216 @@ export default {
     }
 
     watch([serializedCheckpoints, baselineIndex], dispatchToWorker)
-    // Also re-dispatch when token symbols load (they may arrive after checkpoints)
     watch(tokenSymbolMap, () => {
       if (serializedCheckpoints.value.length) dispatchToWorker()
     })
 
-    // Helper function to truncate long notes to prevent tooltip overflow
-    const truncateNote = (text, maxLines = 15) => {
-      if (!text) return ''
+    // ----- Chart lifecycle -----
 
-      // Split by newlines first (preserve user's line breaks)
-      const lines = text.split('\n')
-      const truncatedLines = []
-      let lineCount = 0
+    function setupChart() {
+      if (!chartContainer.value || chart) return
 
-      for (const line of lines) {
-        if (lineCount >= maxLines) {
-          truncatedLines.push('...')
-          break
-        }
-        truncatedLines.push(line)
-        lineCount++
-      }
-
-      return truncatedLines.join('\n')
-    }
-
-    // Chart options - dual series: USD (green/red) and ICP (blue)
-    const chartOptions = computed(() => {
-      const usdColor = '#FEC800' // Yellow/Gold for USD
-      const icpColor = '#7CDC86' // Light green for ICP
-
-      return {
-        chart: {
-          type: 'area',
-          toolbar: {
-            show: true,
-            tools: {
-              download: false,
-              selection: true,
-              zoom: true,
-              zoomin: true,
-              zoomout: true,
-              pan: false,
-              reset: true
-            }
-          },
-          zoom: { enabled: true },
-          background: 'transparent',
-          animations: {
-            enabled: true,
-            easing: 'easeinout',
-            speed: 500
-          }
-        },
-        theme: { mode: 'dark' },
-        colors: [usdColor, icpColor],
-        stroke: {
-          curve: 'smooth',
-          width: 2
-        },
-        fill: {
-          type: 'gradient',
-          gradient: {
-            shadeIntensity: 1,
-            opacityFrom: 0.3,
-            opacityTo: 0.05,
-            stops: [0, 90, 100]
-          }
-        },
-        dataLabels: {
-          enabled: false
-        },
-        legend: {
-          show: chartSeries.value.length > 1,
-          position: 'top',
-          horizontalAlign: 'left',
-          labels: { colors: '#fff' },
-          markers: { width: 10, height: 10, radius: 2 }
-        },
-        markers: {
-          size: 4,
-          strokeColors: '#934A17',
-          strokeWidth: 2,
-          hover: {
-            size: 6
-          }
-        },
-        xaxis: {
-          type: 'datetime',
-          labels: {
-            datetimeUTC: false,
-            style: {
-              colors: '#FEEAC1'
-            }
-          },
-          axisBorder: {
-            color: '#DA8D28'
-          },
-          axisTicks: {
-            color: '#DA8D28'
-          }
-        },
-        yaxis: {
-          labels: {
-            formatter: (val) => `${val >= 0 ? '+' : ''}${val.toFixed(1)}%`,
-            style: {
-              colors: '#FEEAC1'
-            }
-          }
-        },
-        tooltip: {
-          theme: 'dark',
-          shared: true,
-          intersect: false,
-          custom: function({ seriesIndex, dataPointIndex, w }) {
-            // Determine if data point is in the left or right half of the chart
-            const totalPoints = Math.max(...w.config.series.map(s => s.data?.length || 0), 1)
-            const isLeftHalf = dataPointIndex < totalPoints / 2
-            // Get the hovered timestamp from whichever series the user is hovering
-            // seriesIndex may be -1 when shared tooltip triggers, so try each series
-            let timestamp = null
-            if (seriesIndex >= 0 && w.config.series[seriesIndex]?.data?.[dataPointIndex]) {
-              timestamp = w.config.series[seriesIndex].data[dataPointIndex].x
-            } else {
-              // Fallback: try series 0, then series 1
-              for (let s = 0; s < w.config.series.length; s++) {
-                const dp = w.config.series[s]?.data?.[dataPointIndex]
-                if (dp) {
-                  timestamp = dp.x
-                  break
-                }
-              }
-            }
-            if (timestamp === null) return ''
-            const date = new Date(timestamp)
-            const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-
-            // For each series, find the closest data point by timestamp
-            // (series may have different data points from different neurons)
-            const findClosestPoint = (seriesData, ts) => {
-              if (!seriesData || seriesData.length === 0) return null
-              let closest = seriesData[0]
-              let closestDiff = Math.abs(closest.x - ts)
-              for (const pt of seriesData) {
-                const diff = Math.abs(pt.x - ts)
-                if (diff < closestDiff) {
-                  closest = pt
-                  closestDiff = diff
-                }
-              }
-              return closest
-            }
-
-            // Build returns HTML for both series
-            let returnsHtml = ''
-            for (let i = 0; i < w.config.series.length; i++) {
-              const pt = findClosestPoint(w.config.series[i].data, timestamp)
-              if (!pt) continue
-              const val = pt.y
-              if (val === undefined || val === null) continue
-              const name = w.config.series[i].name
-              const color = w.config.colors[i]
-              const sign = val >= 0 ? '+' : ''
-              returnsHtml += `<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
-                <span style="color:${color};font-size:12px;">${name}</span>
-                <span style="font-weight:600;color:${color};">${sign}${val.toFixed(2)}%</span>
-              </div>`
-            }
-
-            // Get checkpoint index from the chart data point
-            let checkpointIdx = null
-            for (let s = 0; s < w.config.series.length; s++) {
-              const pt = w.config.series[s]?.data?.[dataPointIndex]
-              if (pt?.checkpointIndex != null) {
-                checkpointIdx = pt.checkpointIndex
-                break
-              }
-            }
-
-            // Build allocation HTML from pre-computed tooltip data (computed in worker)
-            let allocationHtml = ''
-            const cpTooltip = checkpointIdx != null ? tooltipDataMap.value[checkpointIdx] : null
-            if (cpTooltip && cpTooltip.tokens.length > 0) {
-              const fmtChange = (change, opacity) => {
-                if (change == null) return ''
-                const sign = change >= 0 ? '+' : ''
-                const color = change >= 0 ? '#4CAF50' : '#FF5252'
-                const opStyle = opacity ? 'opacity:0.75;' : ''
-                return `<span style="color:${color};font-size:13px;white-space:nowrap;${opStyle}">${sign}${change.toFixed(2)}%</span>`
-              }
-
-              const tokenRows = cpTooltip.tokens.map(t => ({
-                ...t,
-                usdChangeHtml: fmtChange(t.usdChange, false),
-                icpChangeHtml: fmtChange(t.icpChange, true)
-              }))
-
-              const hasAnyPrice = tokenRows.some(a => a.usdChangeHtml || a.icpChangeHtml)
-              const hasIcp = tokenRows.some(a => a.icpChangeHtml)
-              const rows = tokenRows.map(a => {
-                let priceCols = ''
-                if (hasAnyPrice) {
-                  priceCols = `<span style="text-align:right;justify-self:end;">${a.usdChangeHtml || ''}</span>`
-                  if (hasIcp) priceCols += `<span style="text-align:right;justify-self:end;">${a.icpChangeHtml || ''}</span>`
-                }
-                return `<span style="color:#FEEAC1;font-size:15px;">${a.symbol}</span>` +
-                  `<span style="color:#fff;text-align:right;font-size:15px;justify-self:end;">${a.percent}%</span>` +
-                  priceCols
-              }).join('')
-              const cols = hasAnyPrice
-                ? (hasIcp ? 'auto auto minmax(52px,auto) minmax(52px,auto)' : 'auto auto minmax(52px,auto)')
-                : 'auto 1fr'
-              allocationHtml = `
-                <div style="border-top:1px solid #DA8D28;margin-top:8px;padding-top:8px;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                    <span style="color:#FEEAC1;font-size:11px;">Allocation:</span>
-                    ${hasIcp ? '<span style="color:#FEEAC1;font-size:9px;opacity:0.5;">USD / ICP</span>' : ''}
-                  </div>
-                  <div style="display:grid;grid-template-columns:${cols};gap:2px 10px;align-items:center;">
-                    ${rows}
-                  </div>
-                </div>
-              `
-            }
-
-            // Build note HTML from raw checkpoint data
-            const checkpoint = checkpointIdx != null ? usdCheckpoints.value[checkpointIdx] : null
-            let noteHtml = ''
-            if (checkpoint?.reason && checkpoint.reason.length > 0 && checkpoint.reason[0]) {
-              const rawNote = checkpoint.reason[0]
-              const truncatedNote = truncateNote(rawNote, 15)
-              const escapedNote = truncatedNote
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-
-              noteHtml = `
-                <div style="border-top:1px solid #DA8D28;margin-top:8px;padding-top:8px;">
-                  <div style="color:#FEEAC1;font-size:11px;margin-bottom:4px;">Note:</div>
-                  <div style="color:#fff;font-size:11px;word-break:break-word;white-space:pre-wrap;max-width:400px;overflow:hidden;">${escapedNote}</div>
-                </div>
-              `
-            }
-
-            // Reposition tooltip to opposite side of cursor after render
-            setTimeout(() => {
-              const chartEl = w.globals.dom.baseEl
-              if (!chartEl) return
-              const tooltipEl = chartEl.querySelector('.apexcharts-tooltip')
-              if (!tooltipEl) return
-              const chartRect = chartEl.getBoundingClientRect()
-              const tooltipWidth = tooltipEl.offsetWidth
-              if (isLeftHalf) {
-                // Point is on left, show tooltip on right
-                tooltipEl.style.left = (chartRect.width - tooltipWidth - 10) + 'px'
-              } else {
-                // Point is on right, show tooltip on left
-                tooltipEl.style.left = '10px'
-              }
-              tooltipEl.style.top = '0px'
-            }, 0)
-
-            return `
-              <div style="background:#512100;border:1px solid #DA8D28;border-radius:6px;padding:10px;min-width:210px;color:#fff;">
-                <div style="color:#FEEAC1;font-size:11px;margin-bottom:6px;">${dateStr}</div>
-                ${returnsHtml}
-                ${allocationHtml}
-                ${noteHtml}
-              </div>
-            `
-          }
+      chart = createChart(chartContainer.value, {
+        layout: {
+          background: { type: ColorType.Solid, color: 'transparent' },
+          textColor: COLORS.axisText,
+          attributionLogo: false,
         },
         grid: {
-          borderColor: '#DA8D28',
-          strokeDashArray: 4,
-          xaxis: {
-            lines: {
-              show: false
-            }
-          }
+          vertLines: { color: withAlpha(COLORS.gridLine, 0.25), style: LineStyle.Dashed },
+          horzLines: { color: withAlpha(COLORS.gridLine, 0.25), style: LineStyle.Dashed },
         },
-        annotations: {
-          yaxis: [{
-            y: 0,
-            strokeDashArray: 5,
-            borderColor: '#934A17',
-            label: {
-              borderColor: '#934A17',
-              style: {
-                color: '#fff',
-                background: '#512100'
-              },
-              text: 'Break-even'
-            }
-          }]
+        crosshair: {
+          vertLine: { color: withAlpha(COLORS.crosshair, 0.6), width: 1, style: LineStyle.Solid, labelBackgroundColor: COLORS.crosshairLabelBg },
+          horzLine: { color: withAlpha(COLORS.crosshair, 0.6), width: 1, style: LineStyle.Solid, labelBackgroundColor: COLORS.crosshairLabelBg },
+        },
+        timeScale: {
+          borderColor: 'transparent',
+          timeVisible: true,
+          secondsVisible: false,
+        },
+        rightPriceScale: { borderColor: 'transparent', autoScale: true },
+        width: chartContainer.value.clientWidth,
+        height: chartContainer.value.clientHeight,
+      })
+
+      const pctFormat = {
+        type: 'custom',
+        formatter: (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`,
+        minMove: 0.01,
+      }
+
+      usdSeries = chart.addSeries(AreaSeries, {
+        lineColor: COLORS.usd,
+        topColor: withAlpha(COLORS.usd, 0.30),
+        bottomColor: withAlpha(COLORS.usd, 0.05),
+        lineWidth: 2,
+        priceLineVisible: false,
+        priceFormat: pctFormat,
+        title: 'USD',
+      })
+
+      icpSeries = chart.addSeries(AreaSeries, {
+        lineColor: COLORS.icp,
+        topColor: withAlpha(COLORS.icp, 0.30),
+        bottomColor: withAlpha(COLORS.icp, 0.05),
+        lineWidth: 2,
+        priceLineVisible: false,
+        priceFormat: pctFormat,
+        title: 'ICP',
+      })
+
+      // Break-even reference line at y = 0 with axis label
+      usdSeries.createPriceLine({
+        price: 0,
+        color: COLORS.breakEven,
+        lineStyle: LineStyle.Dashed,
+        lineWidth: 1,
+        axisLabelVisible: true,
+        title: 'Break-even',
+      })
+
+      chart.subscribeCrosshairMove(handleCrosshairMove)
+
+      resizeObserver = new ResizeObserver(() => {
+        if (chart && chartContainer.value) {
+          chart.applyOptions({
+            width: chartContainer.value.clientWidth,
+            height: chartContainer.value.clientHeight,
+          })
+        }
+      })
+      resizeObserver.observe(chartContainer.value)
+
+      applyData()
+    }
+
+    function applyData() {
+      if (!usdSeries || !icpSeries) return
+      const usd = usdSeriesData.value
+      const icp = icpSeriesData.value
+
+      // Build time->checkpointIndex maps and dedupe time keys (lightweight-charts
+      // requires unique, ascending time values).
+      usdCheckpointByTime = new Map()
+      icpCheckpointByTime = new Map()
+
+      const toLineData = (points, indexMap) => {
+        const out = []
+        let prevSec = -Infinity
+        for (const p of points) {
+          let sec = Math.floor(p.x / 1000)
+          if (sec <= prevSec) sec = prevSec + 1 // dedupe collisions deterministically
+          out.push({ time: sec, value: p.y })
+          indexMap.set(sec, p.checkpointIndex)
+          prevSec = sec
+        }
+        return out
+      }
+
+      usdSeries.setData(toLineData(usd, usdCheckpointByTime))
+      icpSeries.setData(toLineData(icp, icpCheckpointByTime))
+
+      chart?.timeScale().fitContent()
+    }
+
+    // ----- Tooltip overlay -----
+
+    const truncateNote = (text, maxLines = 15) => {
+      if (!text) return ''
+      const lines = text.split('\n')
+      const out = []
+      for (let i = 0; i < lines.length; i++) {
+        if (i >= maxLines) { out.push('...'); break }
+        out.push(lines[i])
+      }
+      return out.join('\n')
+    }
+
+    const formatPct = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
+    const formatTooltipDate = (ms) => {
+      const d = new Date(ms)
+      return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    }
+
+    function buildTooltipPayload(timeSec, usdValue, icpValue) {
+      const checkpointIdx = usdCheckpointByTime.get(timeSec) ?? icpCheckpointByTime.get(timeSec) ?? -1
+      const td = checkpointIdx >= 0 ? tooltipDataMap.value[checkpointIdx] : null
+      const checkpoint = checkpointIdx >= 0 ? usdCheckpoints.value[checkpointIdx] : null
+
+      const allocations = []
+      let hasAnyPriceChange = false
+      let hasIcpChange = false
+
+      if (td?.tokens?.length) {
+        for (const t of td.tokens) {
+          const usdHas = t.usdChange != null
+          const icpHas = t.icpChange != null
+          if (usdHas) hasAnyPriceChange = true
+          if (icpHas) hasIcpChange = true
+          allocations.push({
+            symbol: t.symbol,
+            percent: t.percent,
+            usdChangeText: usdHas ? formatPct(t.usdChange) : '',
+            icpChangeText: icpHas ? formatPct(t.icpChange) : '',
+            usdChangeColor: usdHas ? (t.usdChange >= 0 ? COLORS.pricePos : COLORS.priceNeg) : 'transparent',
+            icpChangeColor: icpHas ? (t.icpChange >= 0 ? COLORS.pricePos : COLORS.priceNeg) : 'transparent',
+          })
         }
       }
-    })
 
-    // Load performance data using getUserPerformanceGraphData API
-    // If performanceData prop is provided (from worker), uses that directly
-    // Otherwise fetches data (for leaderboard/following use cases)
+      let allocColumns = 'auto 1fr'
+      if (hasAnyPriceChange) {
+        allocColumns = hasIcpChange
+          ? 'auto auto minmax(56px, auto) minmax(56px, auto)'
+          : 'auto auto minmax(56px, auto)'
+      }
+
+      let note = null
+      if (checkpoint?.reason && checkpoint.reason.length > 0 && checkpoint.reason[0]) {
+        note = truncateNote(checkpoint.reason[0], 15)
+      }
+
+      return {
+        timeMs: timeSec * 1000,
+        usdReturn: usdValue ?? null,
+        icpReturn: icpValue ?? null,
+        allocations,
+        hasAnyPriceChange,
+        hasIcpChange,
+        allocColumns,
+        note,
+      }
+    }
+
+    function handleCrosshairMove(param) {
+      if (!param || !param.time || !param.point ||
+          param.point.x < 0 || param.point.y < 0 ||
+          !chartContainer.value ||
+          param.point.x > chartContainer.value.clientWidth ||
+          param.point.y > chartContainer.value.clientHeight) {
+        tooltipVisible.value = false
+        return
+      }
+      const timeSec = typeof param.time === 'number' ? param.time : Number(param.time)
+      const usdData = usdSeries ? param.seriesData.get(usdSeries) : null
+      const icpData = icpSeries ? param.seriesData.get(icpSeries) : null
+      const usdVal = usdData ? usdData.value : null
+      const icpVal = icpData ? icpData.value : null
+
+      tooltipPayload.value = buildTooltipPayload(timeSec, usdVal, icpVal)
+
+      const containerWidth = chartContainer.value.clientWidth
+      tooltipPos.value = {
+        x: param.point.x,
+        y: param.point.y,
+        flip: param.point.x > containerWidth / 2,
+      }
+      tooltipVisible.value = true
+    }
+
+    // ----- Data load (canister or prop) -----
+
     const loadPerformanceData = async () => {
       if (!props.principal) return
 
@@ -482,12 +469,9 @@ export default {
       try {
         let graphData
 
-        // If performance data provided via prop (worker subscription), use it
         if (props.performanceData) {
           graphData = props.performanceData
         } else {
-          // Otherwise fetch data (leaderboard/following cases)
-          // Check module-level cache first
           const cached = performanceDataCache.get(props.principal)
           if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
             graphData = cached.data
@@ -496,8 +480,8 @@ export default {
             const { Principal } = await import('@dfinity/principal')
 
             const nowMs = BigInt(Date.now())
-            const endTime = nowMs * BigInt(1_000_000) // nanoseconds
-            const startTime = BigInt(0) // Always AllTime for the graph
+            const endTime = nowMs * BigInt(1_000_000)
+            const startTime = BigInt(0)
 
             const graphResult = await rewardsActor.getUserPerformanceGraphData(
               Principal.fromText(props.principal),
@@ -515,7 +499,6 @@ export default {
           }
         }
 
-        // Process helper: map checkpoints to include both USD and ICP values
         const processCheckpoints = (neuron) => {
           if (!neuron || !neuron.checkpoints || neuron.checkpoints.length === 0) return []
           const cps = neuron.checkpoints.map(cp => ({
@@ -527,7 +510,6 @@ export default {
           return cps
         }
 
-        // Select the longest neuron (most checkpoints), tiebreaker: best ICP performance
         const allNeurons = graphData.neurons || []
         let selectedNeuron = null
         if (allNeurons.length > 0) {
@@ -536,7 +518,6 @@ export default {
             const currLen = curr.checkpoints?.length ?? 0
             if (currLen > bestLen) return curr
             if (currLen === bestLen) {
-              // Tiebreaker: better ICP performance
               const bestIcp = best.performanceScoreICP?.[0] ?? -Infinity
               const currIcp = curr.performanceScoreICP?.[0] ?? -Infinity
               return currIcp > bestIcp ? curr : best
@@ -545,21 +526,15 @@ export default {
           })
         }
 
-        // Use same neuron for both USD and ICP chart lines
         const cps = processCheckpoints(selectedNeuron)
         if (cps.length === 0) {
           error.value = 'No checkpoint data available'
           return
         }
 
-        // Both chart lines use same checkpoints (different Y values: USD vs ICP)
         usdCheckpoints.value = cps
         icpCheckpoints.value = cps
-
-        // Serialize for worker (converts Principals to strings, BigInts to numbers)
         serializedCheckpoints.value = serializeCheckpoints(cps)
-
-        // Reset baseline to first checkpoint when new data loads
         baselineIndex.value = 0
 
       } catch (err) {
@@ -575,7 +550,6 @@ export default {
       }
     }
 
-    // Format error messages
     const formatError = (err) => {
       if ('NeuronNotFound' in err) return 'No performance data yet'
       if ('NotAuthorized' in err) return 'Not authorized'
@@ -586,45 +560,46 @@ export default {
       return 'Failed to load data'
     }
 
-    // Watch for principal change and reload data
-    watch(
-      () => props.principal,
-      () => {
-        loadPerformanceData()
-      },
-      { immediate: false }
-    )
+    watch(() => props.principal, () => { loadPerformanceData() }, { immediate: false })
+    watch(() => props.performanceData, (newData) => { if (newData) loadPerformanceData() }, { deep: true })
 
-    // Watch for performanceData prop change (from worker subscription)
-    watch(
-      () => props.performanceData,
-      (newData) => {
-        if (newData) {
-          loadPerformanceData()
-        }
-      },
-      { deep: true }
-    )
+    // hasData controls v-else-if rendering of the chart container, so we need
+    // to wait for the DOM to settle before calling setupChart.
+    watch(hasData, (now) => {
+      if (now) nextTick(() => setupChart())
+    })
 
     onMounted(() => {
       loadPerformanceData()
     })
 
+    onBeforeUnmount(() => {
+      resizeObserver?.disconnect()
+      resizeObserver = null
+      chart?.remove()
+      chart = null
+      usdSeries = null
+      icpSeries = null
+    })
+
     return {
-      loading,
-      computing,
-      error,
-      hasData,
-      baselineIndex,
-      baselineOptions,
-      chartSeries,
-      chartOptions
+      // state
+      loading, computing, error, hasData,
+      baselineIndex, baselineOptions,
+      // chart refs
+      chartContainer, heightCss,
+      // tooltip overlay
+      tooltipVisible, tooltipPos, tooltipPayload, tooltipStyle,
+      // helpers used in template
+      formatPct, formatTooltipDate,
+      // constants used in template
+      COLORS,
     }
   }
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .performance-chart {
   width: 100%;
   min-height: 100px;
@@ -632,15 +607,103 @@ export default {
   touch-action: pan-y;
 }
 
-/* Allow tooltip to overflow the chart container */
-.performance-chart :deep(.apexcharts-tooltip) {
-  overflow: visible !important;
+.performance-chart__shell {
+  position: relative;
+  width: 100%;
 }
 
-.performance-chart :deep(.apexcharts-canvas),
-.performance-chart :deep(.apexcharts-svg),
-.performance-chart :deep(.apexcharts-inner) {
-  overflow: visible !important;
+.performance-chart__container {
+  width: 100%;
+  height: 100%;
+}
+
+.performance-chart__tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10;
+  background: #512100;
+  border: 1px solid #DA8D28;
+  border-radius: 6px;
+  padding: 10px;
+  min-width: 210px;
+  max-width: 360px;
+  color: #fff;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.performance-chart__tooltip-header {
+  color: #FEEAC1;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.performance-chart__tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  font-size: 12px;
+
+  > span:last-child { font-weight: 600; }
+}
+
+.performance-chart__tooltip-section {
+  border-top: 1px solid #DA8D28;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.performance-chart__tooltip-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  color: #FEEAC1;
+  font-size: 11px;
+}
+
+.performance-chart__tooltip-section-meta {
+  font-size: 9px;
+  opacity: 0.5;
+}
+
+.performance-chart__tooltip-allocs {
+  display: grid;
+  gap: 2px 10px;
+  align-items: center;
+}
+
+.performance-chart__tooltip-symbol {
+  color: #FEEAC1;
+  font-size: 13px;
+}
+
+.performance-chart__tooltip-percent {
+  color: #fff;
+  font-size: 13px;
+  text-align: right;
+  justify-self: end;
+}
+
+.performance-chart__tooltip-change {
+  font-size: 12px;
+  text-align: right;
+  justify-self: end;
+  white-space: nowrap;
+
+  &--icp { opacity: 0.75; }
+}
+
+.performance-chart__tooltip-note {
+  color: #fff;
+  font-size: 11px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  max-width: 340px;
+  overflow: hidden;
 }
 
 .baseline-label {

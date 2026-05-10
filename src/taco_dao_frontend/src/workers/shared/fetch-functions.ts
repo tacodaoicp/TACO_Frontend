@@ -1160,10 +1160,13 @@ export async function fetchNachosConfig(agent: HttpAgent): Promise<any> {
 }
 
 /**
- * Fetch nachos NAV history (adaptive)
- * Returns array of NAV snapshots with timestamps and reasons
+ * Fetch nachos NAV history (adaptive) — both ICP and USD denominations.
+ * Returns parallel arrays sampled identically (same length, same timestamps).
  */
-export async function fetchNachosNavHistory(agent: HttpAgent): Promise<any> {
+export async function fetchNachosNavHistory(agent: HttpAgent): Promise<{
+  icp: any[]
+  usd: any[]
+}> {
   const canisterId = getNachosVaultCanisterId()
 
   const actor = Actor.createActor(nachosVaultIDL, {
@@ -1171,7 +1174,11 @@ export async function fetchNachosNavHistory(agent: HttpAgent): Promise<any> {
     canisterId,
   })
 
-  return await (actor as any).getNAVHistoryAdaptive()
+  const [icp, usd] = await Promise.all([
+    (actor as any).getNAVHistoryAdaptive(),
+    (actor as any).getNAVHistoryAdaptiveUSD(),
+  ])
+  return { icp, usd }
 }
 
 // ============================================================================

@@ -1192,6 +1192,16 @@
 
   &__taco-token-chart {
     border-radius: 1rem;
+
+    // Override the exchange-theme CSS vars TradingChart reads via getComputedStyle.
+    // CSS vars cascade, so the chart picks these up and the dark exchange palette
+    // gives way to the warm DAO theme — letting the parent .taco-container--l2
+    // gradient show through the canvas.
+    --tx-bg: transparent;
+    --tx-surface-1: var(--card-border);
+    --tx-surface-2: var(--card-gradient-to);
+    --tx-ink-2: var(--black-to-white);
+
     // Chrome/Safari: use zoom for better chart visibility
     zoom: 0.5;
 
@@ -1399,6 +1409,14 @@
         gap: 2rem;
         flex: 1;
         min-height: 0; // Allow shrinking in flexbox
+
+        // Same exchange-theme overrides as the inline tile so the modal's
+        // fullscreen TradingChart blends with the modal's gradient backdrop
+        // instead of painting a hard dark slab over it.
+        --tx-bg: transparent;
+        --tx-surface-1: var(--card-border);
+        --tx-surface-2: var(--card-gradient-to);
+        --tx-ink-2: var(--black-to-white);
       }
 
     }

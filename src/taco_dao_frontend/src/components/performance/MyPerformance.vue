@@ -242,8 +242,10 @@
 </template>
 
 <script>
-import { ref } from 'vue'
-import PerformanceChart from './PerformanceChart.vue'
+import { ref, defineAsyncComponent } from 'vue'
+
+// Lazy-load: lightweight-charts is heavy enough to warrant its own chunk.
+const PerformanceChart = defineAsyncComponent(() => import('./PerformanceChart.vue'))
 
 export default {
   name: 'MyPerformance',

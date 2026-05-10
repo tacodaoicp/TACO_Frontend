@@ -1,32 +1,30 @@
 <template>
 
-  <div v-if="filteredHistory.length > 0" class="nav-chart">
+  <div v-if="hasData" class="nav-chart">
 
     <!-- section title -->
     <h3 class="nav-chart__title">NAV History</h3>
 
     <!-- chart -->
     <div class="nav-chart__wrap taco-container taco-container--l1">
-      <div class="nav-chart__inner">
-        <apexchart
-          ref="chartRef"
-          type="line"
-          :options="chartOptions"
-          :series="series"
-          height="100%"
-        />
-      </div>
+      <div ref="chartContainer" class="nav-chart__inner"></div>
 
       <!-- legend -->
       <div class="nav-chart__legend">
         <span class="nav-chart__legend-item">
-          <span class="nav-chart__legend-dot" style="background:#4CAF50"></span> Mint
+          <span class="nav-chart__legend-dot" :style="{ background: COLORS.usd }"></span> USD (left)
         </span>
         <span class="nav-chart__legend-item">
-          <span class="nav-chart__legend-dot" style="background:#F44336"></span> Burn
+          <span class="nav-chart__legend-dot" :style="{ background: COLORS.icp }"></span> ICP (right)
         </span>
         <span class="nav-chart__legend-item">
-          <span class="nav-chart__legend-dot" style="background:#FF9800"></span> Manual
+          <span class="nav-chart__legend-dot" :style="{ background: COLORS.mint }"></span> Mint
+        </span>
+        <span class="nav-chart__legend-item">
+          <span class="nav-chart__legend-dot" :style="{ background: COLORS.burn }"></span> Burn
+        </span>
+        <span class="nav-chart__legend-item">
+          <span class="nav-chart__legend-dot" :style="{ background: COLORS.manual }"></span> Manual
         </span>
       </div>
     </div>
@@ -36,103 +34,184 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick } from 'vue'
+import {
+  createChart, LineSeries, ColorType,
+  type IChartApi, type ISeriesApi, type LineData, type Time, type UTCTimestamp,
+} from 'lightweight-charts'
 import { useNachosStore } from '../../stores/nachos.store'
 
 const nachosStore = useNachosStore()
+const chartContainer = ref<HTMLDivElement | null>(null)
 
-// Skip first NAV snapshot (genesis / initialization point)
-const filteredHistory = computed(() =>
-  nachosStore.navHistory.length > 1 ? nachosStore.navHistory.slice(1) : nachosStore.navHistory
-)
-
-// Single-pass build: produce series points + marker overrides together so the
-// history list is iterated only once per change.
-const chartData = computed(() => {
-  const data: Array<{ x: number; y: number }> = []
-  const markers: Array<{
-    seriesIndex: number
-    dataPointIndex: number
-    fillColor: string
-    strokeColor: string
-    size: number
-  }> = []
-
-  const history = filteredHistory.value
-  for (let i = 0; i < history.length; i++) {
-    const snap: any = history[i]
-    data.push({
-      x: new Date(Number(snap.timestamp / 1_000_000n)).getTime(),
-      y: Number(snap.navPerTokenE8s) / 1e8,
-    })
-
-    let color = '#4CAF50'
-    const isScheduled = 'Scheduled' in snap.reason
-    if ('Burn' in snap.reason) color = '#F44336'
-    else if ('Mint' in snap.reason) color = '#4CAF50'
-    else if (isScheduled) color = '#FFD600'
-    else if ('Manual' in snap.reason) color = '#FF9800'
-
-    markers.push({
-      seriesIndex: 0,
-      dataPointIndex: i,
-      fillColor: color,
-      strokeColor: color,
-      size: isScheduled ? 0 : 4,
-    })
-  }
-  return { data, markers }
-})
-
-const series = computed(() => [{
-  name: 'NAV per NACHOS (ICP)',
-  data: chartData.value.data,
-}])
-
-// Static options — extracted once so they aren't rebuilt on every history change.
-const STATIC_CHART_OPTIONS = {
-  chart: {
-    type: 'line' as const,
-    background: 'transparent',
-    toolbar: { show: true },
-    zoom: { enabled: true },
-    animations: {
-      enabled: true,
-      dynamicAnimation: { enabled: true, speed: 300 },
-      animateGradually: { enabled: false },
-    },
-  },
-  xaxis: {
-    type: 'datetime' as const,
-    labels: {
-      datetimeUTC: false,
-      style: { colors: 'var(--black-to-white)', fontSize: '0.7rem' },
-    },
-  },
-  yaxis: {
-    title: { text: 'NAV (ICP)', style: { color: 'var(--black-to-white)' } },
-    labels: {
-      style: { colors: 'var(--black-to-white)', fontSize: '0.7rem' },
-      formatter: (val: number) => val.toFixed(4),
-    },
-  },
-  stroke: { curve: 'smooth' as const, width: 2 },
-  colors: ['#4CAF50'],
-  grid: { borderColor: 'rgba(128, 128, 128, 0.2)' },
-  tooltip: {
-    theme: 'dark',
-    x: { format: 'MMM dd, HH:mm' },
-    y: { formatter: (val: number) => val.toFixed(8) + ' ICP' },
-  },
+const COLORS = {
+  icp: '#4CAF50',
+  usd: '#FFD700',
+  mint: '#4CAF50',
+  burn: '#F44336',
+  manual: '#FF9800',
 }
 
-const chartOptions = computed(() => ({
-  ...STATIC_CHART_OPTIONS,
-  markers: {
-    size: 3,
-    discrete: chartData.value.markers,
-  },
-}))
+const hasData = computed(() => nachosStore.navHistory.length > 0)
+
+let chart: IChartApi | null = null
+let icpSeries: ISeriesApi<'Line'> | null = null
+let usdSeries: ISeriesApi<'Line'> | null = null
+let resizeObserver: ResizeObserver | null = null
+
+// ns → UNIX seconds (lightweight-charts time format)
+const toUnixSec = (nsTimestamp: bigint): UTCTimestamp =>
+  Number(nsTimestamp / 1_000_000_000n) as UTCTimestamp
+
+function buildIcpData(history: any[]): LineData[] {
+  // Skip first snapshot (genesis / initialization point)
+  const start = history.length > 1 ? 1 : 0
+  const out: LineData[] = []
+  for (let i = start; i < history.length; i++) {
+    const s = history[i]
+    out.push({
+      time: toUnixSec(s.timestamp),
+      value: Number(s.navPerTokenE8s) / 1e8,
+    })
+  }
+  return out
+}
+
+function buildUsdData(history: any[]): LineData[] {
+  const start = history.length > 1 ? 1 : 0
+  const out: LineData[] = []
+  for (let i = start; i < history.length; i++) {
+    const s = history[i]
+    out.push({
+      time: toUnixSec(s.timestamp),
+      value: s.navPerTokenUSD,
+    })
+  }
+  return out
+}
+
+function buildMarkers(history: any[]) {
+  const start = history.length > 1 ? 1 : 0
+  const markers: Array<{
+    time: Time
+    position: 'inBar' | 'aboveBar' | 'belowBar'
+    color: string
+    shape: 'circle' | 'square'
+    text?: string
+  }> = []
+  for (let i = start; i < history.length; i++) {
+    const s = history[i]
+    if ('Scheduled' in s.reason) continue
+    let color = COLORS.mint
+    if ('Burn' in s.reason) color = COLORS.burn
+    else if ('Manual' in s.reason) color = COLORS.manual
+    markers.push({
+      time: toUnixSec(s.timestamp),
+      position: 'inBar',
+      color,
+      shape: 'circle',
+    })
+  }
+  return markers
+}
+
+function applyData() {
+  if (!icpSeries || !usdSeries) return
+  icpSeries.setData(buildIcpData(nachosStore.navHistory))
+  usdSeries.setData(buildUsdData(nachosStore.navHistoryUSD))
+  // setMarkers is the legacy API but still supported in v5; cast for type compatibility
+  if (typeof (icpSeries as any).setMarkers === 'function') {
+    (icpSeries as any).setMarkers(buildMarkers(nachosStore.navHistory))
+  }
+  chart?.timeScale().fitContent()
+}
+
+function setupChart() {
+  if (!chartContainer.value || chart) return
+
+  const textColor =
+    getComputedStyle(document.documentElement).getPropertyValue('--black-to-white').trim() || '#ddd'
+
+  chart = createChart(chartContainer.value, {
+    layout: {
+      // Transparent canvas — parent .nav-chart__inner background shows through, matches site theme.
+      background: { type: ColorType.Solid, color: 'transparent' },
+      textColor,
+      attributionLogo: false, // remove TradingView logo
+    },
+    grid: {
+      vertLines: { color: 'rgba(128, 128, 128, 0.15)' },
+      horzLines: { color: 'rgba(128, 128, 128, 0.15)' },
+    },
+    crosshair: {
+      vertLine: { width: 1, style: 2, labelBackgroundColor: '#222' },
+      horzLine: { width: 1, style: 2, labelBackgroundColor: '#222' },
+    },
+    timeScale: {
+      borderColor: 'transparent',
+      timeVisible: true,
+      secondsVisible: false,
+    },
+    rightPriceScale: { borderColor: 'transparent', visible: true },
+    leftPriceScale: { borderColor: 'transparent', visible: true },
+    width: chartContainer.value.clientWidth,
+    height: chartContainer.value.clientHeight,
+  })
+
+  icpSeries = chart.addSeries(LineSeries, {
+    priceScaleId: 'right',
+    color: COLORS.icp,
+    lineWidth: 2,
+    title: 'ICP',
+    priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
+    priceLineVisible: false, // hide the horizontal dashed line to last price
+  })
+
+  usdSeries = chart.addSeries(LineSeries, {
+    priceScaleId: 'left',
+    color: COLORS.usd,
+    lineWidth: 2,
+    title: 'USD',
+    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+    priceLineVisible: false,
+  })
+
+  applyData()
+
+  resizeObserver = new ResizeObserver(() => {
+    if (chart && chartContainer.value) {
+      chart.applyOptions({
+        width: chartContainer.value.clientWidth,
+        height: chartContainer.value.clientHeight,
+      })
+    }
+  })
+  resizeObserver.observe(chartContainer.value)
+}
+
+onMounted(() => {
+  // Wait one tick — the v-if="hasData" gate may need to flip true before container exists.
+  nextTick(() => setupChart())
+})
+
+// If data arrives after mount (worker delivery), set up the chart on first arrival.
+watch(hasData, (now) => {
+  if (now) nextTick(() => setupChart())
+})
+
+watch(
+  () => [nachosStore.navHistory, nachosStore.navHistoryUSD],
+  () => applyData(),
+)
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  chart?.remove()
+  chart = null
+  icpSeries = null
+  usdSeries = null
+})
 </script>
 
 <style scoped lang="scss">
