@@ -396,7 +396,9 @@ async function handleSend() {
           subaccount: subBytes,
         },
         amount,
-        fee: [token.transferFee],
+        // Opt None — let the ledger apply its standard fee (matches deposit.ts).
+        // Avoids BadFee when the cached token.transferFee is stale.
+        fee: [],
         memo: [],
         from_subaccount: [],
         created_at_time: [],
@@ -405,10 +407,27 @@ async function handleSend() {
       if (result.Err) {
         const errKey = Object.keys(result.Err)[0]
         const errVal = (result.Err as any)[errKey]
-        if (errKey === 'InsufficientFunds') {
-          throw new Error(`Insufficient funds. Balance: ${fmt(errVal.balance, token.decimals)} ${token.symbol}`)
+        const jsonSafe = (_: string, v: any) => typeof v === 'bigint' ? v.toString() : v
+        switch (errKey) {
+          case 'InsufficientFunds':
+            throw new Error(`Insufficient funds. Balance: ${fmt(errVal.balance, token.decimals)} ${token.symbol}`)
+          case 'BadFee':
+            throw new Error(`Wrong fee. Ledger expects ${fmt(errVal.expected_fee, token.decimals)} ${token.symbol}.`)
+          case 'BadBurn':
+            throw new Error(`Amount below the minimum burn of ${fmt(errVal.min_burn_amount, token.decimals)} ${token.symbol}.`)
+          case 'Duplicate':
+            throw new Error(`Duplicate transfer (already submitted as block ${errVal.duplicate_of?.toString?.() ?? '?'}).`)
+          case 'CreatedInFuture':
+            throw new Error('Transfer rejected: clock skew. Try again.')
+          case 'TooOld':
+            throw new Error('Transfer too old. Refresh and retry.')
+          case 'TemporarilyUnavailable':
+            throw new Error('Ledger temporarily unavailable. Try again shortly.')
+          case 'GenericError':
+            throw new Error(`Ledger error ${errVal.error_code?.toString?.() ?? ''}: ${errVal.message ?? 'unknown'}`)
+          default:
+            throw new Error(`${errKey}: ${JSON.stringify(errVal, jsonSafe)}`)
         }
-        throw new Error(`${errKey}: ${JSON.stringify(errVal)}`)
       }
     }
 

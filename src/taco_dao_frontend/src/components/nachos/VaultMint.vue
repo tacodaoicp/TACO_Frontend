@@ -103,6 +103,9 @@
               · Max: {{ nachosStore.formatE8s(BigInt(Math.round(nachosStore.remainingMintICP))) }} ICP
             </template>
           </span>
+          <p v-if="disabledReasonICP" class="vault-mint__reason">
+            <i class="fa-solid fa-circle-info"></i> {{ disabledReasonICP }}
+          </p>
         </div>
 
         <!-- estimate -->
@@ -356,16 +359,18 @@ const adjustSlippage = (delta: number) => {
 
 const icpAmount = ref('')
 const icpEstimate = ref<any>(null)
+const icpEstimateError = ref<string | null>(null)
 let icpDebounce: ReturnType<typeof setTimeout> | null = null
 
 const icpAmountE8s = computed(() => {
   const val = parseFloat(icpAmount.value)
-  if (isNaN(val) || val <= 0) return 0n
+  if (isNaN(val) || val <= 0 || !Number.isFinite(val)) return 0n
   return BigInt(Math.round(val * 1e8))
 })
 
 const maxMintableICP = computed(() => {
-  const bal = icpBalance.value !== null ? Number(icpBalance.value) - Number(ICP_FEE) : Infinity
+  if (icpBalance.value === null) return 0
+  const bal = Number(icpBalance.value) - Number(ICP_FEE)
   const rateLimit = nachosStore.remainingMintICP !== null ? nachosStore.remainingMintICP : Infinity
   const result = Math.min(bal, rateLimit)
   return result > 0 ? result : 0
@@ -374,20 +379,20 @@ const maxMintableICP = computed(() => {
 const setMaxICP = () => {
   if (maxMintableICP.value <= 0) return
   icpAmount.value = (Math.floor(maxMintableICP.value / 1e4) / 1e4).toFixed(4)
-  debouncedEstimateICP()
+  fetchICPEstimateNow()
 }
 
 const setICPPercent = (pct: number) => {
   if (maxMintableICP.value <= 0) return
   const e8s = Math.floor(maxMintableICP.value * pct / 100)
   icpAmount.value = (Math.floor(e8s / 1e4) / 1e4).toFixed(4)
-  debouncedEstimateICP()
+  fetchICPEstimateNow()
 }
 
 const onICPSlider = (e: Event) => {
   const val = Number((e.target as HTMLInputElement).value)
   icpAmount.value = (Math.floor(val / 1e4) / 1e4).toFixed(4)
-  debouncedEstimateICP()
+  fetchICPEstimateNow()
 }
 
 const icpFeePct = computed(() => {
@@ -397,25 +402,75 @@ const icpFeePct = computed(() => {
 
 const canConfirmICP = computed(() => {
   if (icpAmountE8s.value <= 0n) return false
+  // Hard cap on balance / rate limit — before the estimate so the button stays
+  // disabled even before the canister responds.
+  if (icpBalance.value === null) return false
+  const maxE8s = BigInt(Math.floor(maxMintableICP.value))
+  if (icpAmountE8s.value > maxE8s) return false
   if (!icpEstimate.value) return false
   if (icpAmountE8s.value < BigInt(nachosStore.minMintValueICP ?? 0n)) return false
-  // Check amount doesn't exceed available balance
-  if (!Number.isFinite(maxMintableICP.value)) return true
-  const maxE8s = BigInt(Math.floor(maxMintableICP.value * 1e8))
-  if (icpAmountE8s.value > maxE8s) return false
   return true
+})
+
+const disabledReasonICP = computed<string | null>(() => {
+  if (nachosStore.activeOperationStatus) return null
+  if (icpAmountE8s.value <= 0n) return null
+  if (icpBalance.value !== null) {
+    const balAfterFee = Number(icpBalance.value) - Number(ICP_FEE)
+    if (icpBalance.value === 0n) {
+      return 'You have no ICP to mint with.'
+    }
+    if (balAfterFee <= 0) {
+      return `Balance (${nachosStore.formatE8s(icpBalance.value)} ICP) is too small to cover the transfer fee.`
+    }
+    if (maxMintableICP.value === 0 && nachosStore.remainingMintICP === 0) {
+      return 'Mint rate limit reached for the current 4-hour window.'
+    }
+  }
+  if (icpEstimateError.value) return `Couldn't estimate: ${icpEstimateError.value}`
+  if (!icpEstimate.value) return 'Calculating estimate…'
+  const minVal = BigInt(nachosStore.minMintValueICP ?? 0n)
+  if (icpAmountE8s.value < minVal) {
+    return `Amount (${nachosStore.formatE8s(icpAmountE8s.value)} ICP) is below the minimum of ${nachosStore.formatE8s(minVal)} ICP.`
+  }
+  const maxE8s = BigInt(Math.floor(maxMintableICP.value))
+  if (maxE8s > 0n && icpAmountE8s.value > maxE8s) {
+    return `Amount exceeds your available balance / rate limit (${nachosStore.formatE8s(maxE8s)} ICP).`
+  }
+  return null
 })
 
 const debouncedEstimateICP = () => {
   if (icpDebounce) clearTimeout(icpDebounce)
   icpEstimate.value = null
+  icpEstimateError.value = null
   icpDebounce = setTimeout(async () => {
     if (icpAmountE8s.value > 0n) {
       try {
         icpEstimate.value = await nachosStore.estimateMintICP(icpAmountE8s.value)
-      } catch (e) { console.error('Estimate failed:', e) }
+      } catch (e: any) {
+        icpEstimateError.value = e?.message || 'Estimate failed'
+        console.error('Estimate failed:', e)
+      }
     }
   }, 300)
+}
+
+const fetchICPEstimateNow = async () => {
+  if (icpDebounce) { clearTimeout(icpDebounce); icpDebounce = null }
+  if (icpAmountE8s.value <= 0n) {
+    icpEstimate.value = null
+    icpEstimateError.value = null
+    return
+  }
+  try {
+    icpEstimate.value = await nachosStore.estimateMintICP(icpAmountE8s.value)
+    icpEstimateError.value = null
+  } catch (e: any) {
+    icpEstimate.value = null
+    icpEstimateError.value = e?.message || 'Estimate failed'
+    console.error('Estimate failed:', e)
+  }
 }
 
 const handleMintICP = async () => {
@@ -1036,6 +1091,19 @@ onBeforeUnmount(() => {
   &__hint {
     font-size: 0.7rem;
     opacity: 0.5;
+  }
+
+  &__reason {
+    font-size: 0.75rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--gold);
+    opacity: 0.85;
+    margin: 0.25rem 0 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+
+    > i { margin-top: 0.15rem; }
   }
 
   // select dropdown house styling

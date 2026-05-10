@@ -181,8 +181,11 @@ export const useNachosStore = defineStore('nachos', () => {
   const liquidPortfolioICP = computed(() => dashboardData.value?.liquidPortfolioICP ?? 0n)
 
   // Remaining capacity — mint (ICP e8s)
+  // Returns null until BOTH userRateLimits and vaultConfig are loaded — otherwise
+  // the `?? 0n` defaults on config-derived ceilings collapse the computation to 0
+  // and the UI mistakes that for "rate limit hit".
   const remainingMintICP = computed(() => {
-    if (!userRateLimits.value) return null
+    if (!userRateLimits.value || !vaultConfig.value) return null
     const userRemaining = Number(maxMintICPPerUser4Hours.value) - Number(userRateLimits.value.mintValueIn4h)
     const globalRemaining = Number(maxMintPer4h.value) - Number(globalMintIn4h.value)
     const candidates = [userRemaining, globalRemaining]
@@ -191,13 +194,13 @@ export const useNachosStore = defineStore('nachos', () => {
   })
 
   const remainingMintOps = computed(() => {
-    if (!userRateLimits.value) return null
+    if (!userRateLimits.value || !vaultConfig.value) return null
     return Math.max(0, Number(maxMintOpsPerUser4Hours.value) - Number(userRateLimits.value.mintOpsIn4h))
   })
 
   // Remaining capacity — burn (NACHOS e8s)
   const remainingBurnNachos = computed(() => {
-    if (!userRateLimits.value) return null
+    if (!userRateLimits.value || !vaultConfig.value) return null
     const userRemaining = Number(maxBurnNachosPerUser4Hours.value) - Number(userRateLimits.value.burnValueIn4h)
     const globalRemaining = Number(effectiveBurnLimit.value) - Number(globalBurnIn4h.value)
     const candidates = [userRemaining, globalRemaining]
@@ -206,7 +209,7 @@ export const useNachosStore = defineStore('nachos', () => {
   })
 
   const remainingBurnOps = computed(() => {
-    if (!userRateLimits.value) return null
+    if (!userRateLimits.value || !vaultConfig.value) return null
     return Math.max(0, Number(maxBurnOpsPerUser4Hours.value) - Number(userRateLimits.value.burnOpsIn4h))
   })
 

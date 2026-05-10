@@ -48,6 +48,9 @@
         <span class="vault-burn__hint">
           Min: {{ nachosStore.formatE8s(nachosStore.minBurnValueICP) }} ICP equivalent
         </span>
+        <p v-if="disabledReason" class="vault-burn__reason">
+          <i class="fa-solid fa-circle-info"></i> {{ disabledReason }}
+        </p>
         <!-- rate limit info -->
         <div v-if="nachosStore.userRateLimits" class="vault-burn__limits">
           <span>
@@ -239,6 +242,7 @@ const { balance: nachosBalance, refresh: loadNachosBalance } = useTokenBalance(N
 
 const nachosAmount = ref('')
 const burnEstimate = ref<any>(null)
+const estimateError = ref<string | null>(null)
 const showAdvanced = ref(false)
 const perTokenMins = ref<Record<string, string>>({})
 const lastBurnResult = ref<any>(null)
@@ -246,12 +250,13 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const nachosAmountE8s = computed(() => {
   const val = parseFloat(nachosAmount.value)
-  if (isNaN(val) || val <= 0) return 0n
+  if (isNaN(val) || val <= 0 || !Number.isFinite(val)) return 0n
   return BigInt(Math.round(val * 1e8))
 })
 
 const maxBurnable = computed(() => {
-  const bal = nachosBalance.value !== null ? Number(nachosBalance.value) - Number(NACHOS_FEE) : Infinity
+  if (nachosBalance.value === null) return 0
+  const bal = Number(nachosBalance.value) - Number(NACHOS_FEE)
   const rateLimit = nachosStore.remainingBurnNachos !== null ? nachosStore.remainingBurnNachos : Infinity
   const result = Math.min(bal, rateLimit)
   return result > 0 ? result : 0
@@ -260,20 +265,20 @@ const maxBurnable = computed(() => {
 const setMaxBurn = () => {
   if (maxBurnable.value <= 0) return
   nachosAmount.value = (Math.floor(maxBurnable.value / 1e4) / 1e4).toFixed(4)
-  debouncedEstimate()
+  fetchEstimateNow()
 }
 
 const setBurnPercent = (pct: number) => {
   if (maxBurnable.value <= 0) return
   const e8s = Math.floor(maxBurnable.value * pct / 100)
   nachosAmount.value = (Math.floor(e8s / 1e4) / 1e4).toFixed(4)
-  debouncedEstimate()
+  fetchEstimateNow()
 }
 
 const onBurnSlider = (e: Event) => {
   const val = Number((e.target as HTMLInputElement).value)
   nachosAmount.value = (Math.floor(val / 1e4) / 1e4).toFixed(4)
-  debouncedEstimate()
+  fetchEstimateNow()
 }
 
 const feePct = computed(() => {
@@ -287,15 +292,48 @@ const nonDustTokens = computed(() =>
 
 const canConfirm = computed(() => {
   if (nachosAmountE8s.value <= 0n) return false
+  // Hard cap on balance / rate limit — must come first, before the estimate
+  // check, so the button stays disabled even before the canister responds.
+  if (nachosBalance.value === null) return false  // balance unknown — don't let user act
+  const maxE8s = BigInt(Math.floor(maxBurnable.value))
+  if (nachosAmountE8s.value > maxE8s) return false
   if (!burnEstimate.value) return false
   // Enforce minimum burn value (ICP-equivalent of redemption)
   const redemptionValueICP = BigInt(burnEstimate.value.redemptionValueICP ?? 0n)
   if (redemptionValueICP < BigInt(nachosStore.minBurnValueICP ?? 0n)) return false
-  // Check amount doesn't exceed available balance
-  if (!Number.isFinite(maxBurnable.value)) return true
-  const maxE8s = BigInt(Math.floor(maxBurnable.value * 1e8))
-  if (nachosAmountE8s.value > maxE8s) return false
   return true
+})
+
+const disabledReason = computed<string | null>(() => {
+  if (nachosStore.activeOperationStatus) return null
+  if (nachosAmountE8s.value <= 0n) return null
+  // Check balance / rate-limit reasons before estimate-based ones — those are
+  // the root cause when maxBurnable collapsed to 0.
+  if (nachosBalance.value !== null) {
+    const balAfterFee = Number(nachosBalance.value) - Number(NACHOS_FEE)
+    if (nachosBalance.value === 0n) {
+      return 'You have no NACHOS to burn.'
+    }
+    if (balAfterFee <= 0) {
+      return `Balance (${nachosStore.formatE8s(nachosBalance.value)} NACHOS) is too small to cover the transfer fee.`
+    }
+    // Balance is positive — if maxBurnable is still 0, the rate limit really is the cause.
+    if (maxBurnable.value === 0 && nachosStore.remainingBurnNachos === 0) {
+      return 'Burn rate limit reached for the current 4-hour window.'
+    }
+  }
+  if (estimateError.value) return `Couldn't estimate: ${estimateError.value}`
+  if (!burnEstimate.value) return 'Calculating estimate…'
+  const redemption = BigInt(burnEstimate.value.redemptionValueICP ?? 0n)
+  const minVal = BigInt(nachosStore.minBurnValueICP ?? 0n)
+  if (redemption < minVal) {
+    return `Redemption value (${nachosStore.formatE8s(redemption)} ICP) is below the minimum of ${nachosStore.formatE8s(minVal)} ICP.`
+  }
+  const maxE8s = BigInt(Math.floor(maxBurnable.value))
+  if (maxE8s > 0n && nachosAmountE8s.value > maxE8s) {
+    return `Amount exceeds your available balance / rate limit (${nachosStore.formatE8s(maxE8s)} NACHOS).`
+  }
+  return null
 })
 
 const burnSlippageBP = ref(300)  // 3% default, independent of mint
@@ -324,13 +362,37 @@ const defaultMinForToken = (t: any): bigint => {
 const debouncedEstimate = () => {
   if (debounceTimer) clearTimeout(debounceTimer)
   burnEstimate.value = null
+  estimateError.value = null
   debounceTimer = setTimeout(async () => {
     if (nachosAmountE8s.value > 0n) {
       try {
         burnEstimate.value = await nachosStore.estimateBurn(nachosAmountE8s.value)
-      } catch (e) { console.error('Burn estimate failed:', e) }
+      } catch (e: any) {
+        estimateError.value = e?.message || 'Estimate failed'
+        console.error('Burn estimate failed:', e)
+      }
     }
   }, 300)
+}
+
+// Programmatic input (MAX, slider, percent buttons) — fire estimate immediately
+// instead of going through the 300 ms debounce window so the burn button can
+// enable as soon as the canister responds.
+const fetchEstimateNow = async () => {
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  if (nachosAmountE8s.value <= 0n) {
+    burnEstimate.value = null
+    estimateError.value = null
+    return
+  }
+  try {
+    burnEstimate.value = await nachosStore.estimateBurn(nachosAmountE8s.value)
+    estimateError.value = null
+  } catch (e: any) {
+    burnEstimate.value = null
+    estimateError.value = e?.message || 'Estimate failed'
+    console.error('Burn estimate failed:', e)
+  }
 }
 
 const buildPerTokenMinimums = (): Array<{ token: Principal; minAmount: bigint }> | undefined => {
@@ -604,6 +666,19 @@ onBeforeUnmount(() => {
   &__hint {
     font-size: 0.7rem;
     opacity: 0.5;
+  }
+
+  &__reason {
+    font-size: 0.75rem;
+    font-family: 'Space Mono', monospace;
+    color: var(--gold);
+    opacity: 0.85;
+    margin: 0.25rem 0 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+
+    > i { margin-top: 0.15rem; }
   }
 
   &__limits {
