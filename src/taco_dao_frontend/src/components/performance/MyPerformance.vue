@@ -407,9 +407,10 @@ export default {
 .perf-item span:last-child {
   font-weight: 600;
   font-size: 1.1rem;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.25);
   padding: 0.15rem 0.5rem;
   border-radius: 0.375rem;
+  font-family: 'Space Mono', monospace;
 }
 
 .perf-muted {
@@ -444,6 +445,7 @@ export default {
 .neuron-id {
   font-size: 0.85rem;
   color: var(--brown-to-white);
+  font-family: 'Space Mono', monospace;
 }
 
 .neuron-badge {
@@ -481,7 +483,7 @@ export default {
   align-items: center;
   font-weight: 600;
   font-family: 'Space Mono', monospace;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.25);
   padding: 0.1rem 0.4rem;
   border-radius: 0.375rem;
   font-size: 0.85rem;

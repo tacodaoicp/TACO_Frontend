@@ -45,7 +45,6 @@
               <h1 class="taco-title mb-0">
                 <span class="taco-title__icon">🏆</span>
                 <span class="taco-title__title">Performance</span>
-                <span class="perf-beta-badge">BETA</span>
               </h1>
 
               <!-- refresh removed — use floating .taco-refresh-btn -->
@@ -823,19 +822,6 @@ export default {
 }
 
 
-
-.perf-beta-badge {
-  font-size: 0.6rem;
-  padding: 0.15rem 0.4rem;
-  background-color: var(--dark-orange);
-  color: var(--white);
-  border-radius: 0.25rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  vertical-align: super;
-  margin-left: 0.25rem;
-  letter-spacing: 0.05em;
-}
 
 /* Theme text helpers */
 .perf-muted {
