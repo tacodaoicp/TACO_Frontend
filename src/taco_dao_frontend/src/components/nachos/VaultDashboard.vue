@@ -7,15 +7,27 @@
 
       <!-- NAV per token -->
       <div class="vault-dashboard__metric-card taco-container taco-container--l1">
-        <span class="vault-dashboard__metric-label">NAV per NACHOS</span>
+        <span class="vault-dashboard__metric-label">NAV per NACHO</span>
         <span class="vault-dashboard__metric-value">
           {{ nav ? nachosStore.formatE8s(nav.navPerTokenE8s) : '—' }} ICP
         </span>
-        <span v-if="navChange24h !== null"
-              class="vault-dashboard__metric-change"
-              :class="navChangeClass">
-          {{ navChangePercent }} (24h)
+        <span v-if="navUSD !== null" class="vault-dashboard__metric-sub">
+          ~${{ navUSD }} USD
         </span>
+        <div v-if="navChange24h !== null || navChange24hUSD !== null"
+             class="vault-dashboard__metric-change-row">
+          <span v-if="navChange24h !== null"
+                class="vault-dashboard__metric-change"
+                :class="navChangeClass">
+            {{ navChangePercent }} ICP
+          </span>
+          <span v-if="navChange24hUSD !== null"
+                class="vault-dashboard__metric-change"
+                :class="navChangeClassUSD">
+            {{ navChangePercentUSD }} USD
+          </span>
+          <span class="vault-dashboard__metric-change-suffix">(24h)</span>
+        </div>
       </div>
 
       <!-- portfolio value -->
@@ -31,7 +43,7 @@
 
       <!-- NACHOS supply -->
       <div class="vault-dashboard__metric-card taco-container taco-container--l1">
-        <span class="vault-dashboard__metric-label">NACHOS Supply</span>
+        <span class="vault-dashboard__metric-label">NACHO Supply</span>
         <span class="vault-dashboard__metric-value">
           {{ nachosStore.formatE8s(nachosStore.nachosSupply) }}
         </span>
@@ -107,6 +119,51 @@ const portfolioUSD = computed(() => {
   const icpValue = Number(nachosStore.portfolioValueICP) / 1e8
   return (icpValue * nachosStore.icpPriceUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 })
+
+// Live USD NAV — current ICP NAV × current ICP/USD price. Returns null when
+// either input is missing so the sub-line gracefully hides.
+const navUSD = computed<string | null>(() => {
+  if (!nav.value || !nachosStore.icpPriceUsd) return null
+  const icpNav = Number(nav.value.navPerTokenE8s) / 1e8
+  return (icpNav * nachosStore.icpPriceUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+})
+
+// 24h NAV change in USD — uses navHistoryUSD (each snapshot has the ICP/USD
+// rate captured at write time, so this reflects both NAV movement and ICP/USD
+// movement, not just today's rate scaled across history).
+const navChange24hUSD = computed<number | null>(() => {
+  const history = nachosStore.navHistoryUSD
+  if (history.length < 2) return null
+  const current = history[history.length - 1]
+  const currentNavUSD = Number(current.navPerTokenUSD)
+  if (currentNavUSD === 0) return null
+  const now = BigInt(Date.now()) * 1_000_000n
+  const oneDayAgo = now - 86_400_000_000_000n
+  let best: any = history[1] // skip genesis at index 0 — same as ICP path
+  for (let i = history.length - 2; i >= 1; i--) {
+    if (history[i].timestamp <= oneDayAgo) {
+      best = history[i]
+      break
+    }
+    best = history[i]
+  }
+  const baseNavUSD = Number(best.navPerTokenUSD)
+  if (baseNavUSD === 0) return null
+  return ((currentNavUSD - baseNavUSD) / baseNavUSD) * 100
+})
+
+const navChangePercentUSD = computed(() => {
+  if (navChange24hUSD.value === null) return ''
+  const sign = navChange24hUSD.value >= 0 ? '+' : ''
+  return `${sign}${navChange24hUSD.value.toFixed(2)}%`
+})
+
+const navChangeClassUSD = computed(() => {
+  if (navChange24hUSD.value === null) return ''
+  if (navChange24hUSD.value > 0) return 'vault-dashboard__metric-change--positive'
+  if (navChange24hUSD.value < 0) return 'vault-dashboard__metric-change--negative'
+  return ''
+})
 </script>
 
 <style scoped lang="scss">
@@ -152,6 +209,19 @@ const portfolioUSD = computed(() => {
 
     &--positive { color: var(--success-green); }
     &--negative { color: var(--red-to-light-red); }
+  }
+
+  &__metric-change-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: baseline;
+  }
+
+  &__metric-change-suffix {
+    font-size: 0.75rem;
+    font-family: 'Space Mono', monospace;
+    opacity: 0.6;
   }
 
   &__loading {

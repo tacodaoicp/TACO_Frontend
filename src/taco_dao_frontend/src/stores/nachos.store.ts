@@ -192,32 +192,54 @@ export const useNachosStore = defineStore('nachos', () => {
   // Returns null until BOTH userRateLimits and vaultConfig are loaded — otherwise
   // the `?? 0n` defaults on config-derived ceilings collapse the computation to 0
   // and the UI mistakes that for "rate limit hit".
+  // Note: each ceiling is only added as a candidate when it's > 0. A zero ceiling
+  // means the dashboard didn't return that field (e.g. getVaultDashboard omits
+  // effectiveBurnLimit) — treat as "not enforced", not "exhausted".
   const remainingMintICP = computed(() => {
     if (!userRateLimits.value || !vaultConfig.value) return null
-    const userRemaining = Number(maxMintICPPerUser4Hours.value) - Number(userRateLimits.value.mintValueIn4h)
-    const globalRemaining = Number(maxMintPer4h.value) - Number(globalMintIn4h.value)
-    const candidates = [userRemaining, globalRemaining]
+    const candidates: number[] = []
+    if (Number(maxMintICPPerUser4Hours.value) > 0) {
+      candidates.push(Number(maxMintICPPerUser4Hours.value) - Number(userRateLimits.value.mintValueIn4h))
+    }
+    if (Number(maxMintPer4h.value) > 0) {
+      candidates.push(Number(maxMintPer4h.value) - Number(globalMintIn4h.value))
+    }
     if (Number(maxMintAmountICP.value) > 0) candidates.push(Number(maxMintAmountICP.value))
+    if (candidates.length === 0) return null
     return Math.max(0, Math.min(...candidates))
   })
 
   const remainingMintOps = computed(() => {
     if (!userRateLimits.value || !vaultConfig.value) return null
+    if (Number(maxMintOpsPerUser4Hours.value) <= 0) return null
     return Math.max(0, Number(maxMintOpsPerUser4Hours.value) - Number(userRateLimits.value.mintOpsIn4h))
   })
 
   // Remaining capacity — burn (NACHOS e8s)
+  // Note on the global cap: the canister exposes TWO related fields:
+  //   • `maxBurnPer4h` — unconstrained 4h global cap (in getVaultDashboard) ← used here
+  //   • `effectiveBurnLimit` — LP-adjusted cap (in getVaultAnalytics ONLY)
+  // We use `maxBurnPer4h` to mirror how the mint side uses `maxMintPer4h`,
+  // since `effectiveBurnLimit` isn't on the dashboard response. During heavy
+  // LP-lock periods the canister may reject burns that pass this frontend cap
+  // — that's surfaced as a canister error toast.
   const remainingBurnNachos = computed(() => {
     if (!userRateLimits.value || !vaultConfig.value) return null
-    const userRemaining = Number(maxBurnNachosPerUser4Hours.value) - Number(userRateLimits.value.burnValueIn4h)
-    const globalRemaining = Number(effectiveBurnLimit.value) - Number(globalBurnIn4h.value)
-    const candidates = [userRemaining, globalRemaining]
+    const candidates: number[] = []
+    if (Number(maxBurnNachosPerUser4Hours.value) > 0) {
+      candidates.push(Number(maxBurnNachosPerUser4Hours.value) - Number(userRateLimits.value.burnValueIn4h))
+    }
+    if (Number(maxBurnPer4h.value) > 0) {
+      candidates.push(Number(maxBurnPer4h.value) - Number(globalBurnIn4h.value))
+    }
     if (Number(maxBurnAmountNachos.value) > 0) candidates.push(Number(maxBurnAmountNachos.value))
+    if (candidates.length === 0) return null
     return Math.max(0, Math.min(...candidates))
   })
 
   const remainingBurnOps = computed(() => {
     if (!userRateLimits.value || !vaultConfig.value) return null
+    if (Number(maxBurnOpsPerUser4Hours.value) <= 0) return null
     return Math.max(0, Number(maxBurnOpsPerUser4Hours.value) - Number(userRateLimits.value.burnOpsIn4h))
   })
 
@@ -292,9 +314,25 @@ export const useNachosStore = defineStore('nachos', () => {
       })
       return IDL.Service({
         'icrc1_balance_of': IDL.Func([Account], [IDL.Nat], ['query']),
+        'icrc1_fee': IDL.Func([], [IDL.Nat], ['query']),
       })
     }
     return Actor.createActor(icrcIDL, { agent, canisterId: tokenPrincipal })
+  }
+
+  // Per-token transfer fee cache. Each ICRC1 ledger publishes its own fee
+  // (ckBTC = 10, ckUSDT = 10_000, ICP = 10_000, NACHOS = 10_000, etc.).
+  // Hardcoding 10_000n produces BadFee errors on tokens with non-standard fees.
+  const tokenFeeCache = ref<Record<string, bigint>>({})
+
+  const getTokenFee = async (tokenPrincipal: string): Promise<bigint> => {
+    if (tokenFeeCache.value[tokenPrincipal] !== undefined) {
+      return tokenFeeCache.value[tokenPrincipal]
+    }
+    const actor = await createBalanceActor(tokenPrincipal)
+    const fee = await (actor as any).icrc1_fee() as bigint
+    tokenFeeCache.value = { ...tokenFeeCache.value, [tokenPrincipal]: fee }
+    return fee
   }
 
   // ============================================================================
@@ -313,7 +351,7 @@ export const useNachosStore = defineStore('nachos', () => {
 
   const formatICP = (e8s: bigint): string => formatE8s(e8s, 8) + ' ICP'
 
-  const formatNachos = (e8s: bigint): string => formatE8s(e8s, 8) + ' NACHOS'
+  const formatNachos = (e8s: bigint): string => formatE8s(e8s, 8) + ' NACHO'
 
   const formatBasisPoints = (bp: bigint): string => (Number(bp) / 100).toFixed(2) + '%'
 
@@ -373,7 +411,7 @@ export const useNachosStore = defineStore('nachos', () => {
     }
     if ('UserBurnLimitExceeded' in error) {
       const d = (error as any).UserBurnLimitExceeded
-      return `You've burned ${formatE8s(d.recentBurns)} NACHOS in the last 4 hours (limit: ${formatE8s(d.maxPer4Hours)}).`
+      return `You've burned ${formatE8s(d.recentBurns)} NACHO in the last 4 hours (limit: ${formatE8s(d.maxPer4Hours)}).`
     }
     if ('TokenNotAccepted' in error) return 'This token is not accepted for minting.'
     if ('OperationInProgress' in error) return 'Another operation is in progress. Please wait.'
@@ -661,9 +699,9 @@ export const useNachosStore = defineStore('nachos', () => {
         }
         const errStr = JSON.stringify(result.Err, (_, v) => typeof v === 'bigint' ? v.toString() : v)
         if ('Err' in result && ('InsufficientFunds' in result.Err || 'BadFee' in result.Err)) {
-          throw new Error(`NACHOS transfer failed: ${errStr}`)
+          throw new Error(`NACHO transfer failed: ${errStr}`)
         }
-        lastError = new Error(`NACHOS transfer failed: ${errStr}`)
+        lastError = new Error(`NACHO transfer failed: ${errStr}`)
       } catch (e: any) {
         lastError = e
         if (e.message?.includes('InsufficientFunds') || e.message?.includes('BadFee')) throw e
@@ -927,7 +965,7 @@ export const useNachosStore = defineStore('nachos', () => {
   const burnNachos = async (nachosAmount: bigint, perTokenMinimums?: Array<{ token: Principal; minAmount: bigint }>) => {
     // Deduct NACHOS transfer fee — the ledger charges fee on top of amount
     const depositAmount = nachosAmount > NACHOS_TRANSFER_FEE ? nachosAmount - NACHOS_TRANSFER_FEE : 0n
-    if (depositAmount === 0n) throw new Error('Amount too small to cover NACHOS transfer fee')
+    if (depositAmount === 0n) throw new Error('Amount too small to cover NACHO transfer fee')
 
     activeOperationType.value = 'burn'
     activeOperationStatus.value = 'depositing'
@@ -1017,6 +1055,49 @@ export const useNachosStore = defineStore('nachos', () => {
   // ============================================================================
   // Retry Failed Mint
   // ============================================================================
+
+  // Retry a previously-failed burn. Same idempotency model as retryMint:
+  // the canister tracks burns by deposit blockNumber, so re-submitting after a
+  // failure is supported. We pass no per-token minimums on retry — the original
+  // minimums (if any) were specific to a prior price snapshot; using the
+  // canister's default slippage on retry is the safer choice.
+  const retryBurn = async (op: CachedOperation) => {
+    if (isDevEnvironment()) {
+      console.log('[NACHOS retryBurn]', {
+        blockNumber: op.blockNumber,
+        amount: op.amount,
+      })
+    }
+    const blockNumber = BigInt(op.blockNumber)
+
+    updateCachedOp(op.blockNumber, op.tokenPrincipal, { status: 'minting', error: undefined })
+    activeOperationType.value = 'burn'
+    activeOperationStatus.value = 'burning'
+
+    try {
+      const actor = await createVaultActor(true)
+      const result = await (actor as any).redeemNachos(blockNumber, [])
+
+      if (result && 'ok' in result) {
+        updateCachedOp(op.blockNumber, op.tokenPrincipal, {
+          status: 'completed',
+          burnId: result.ok.burnId?.toString(),
+        })
+        startPolling()
+        return result.ok
+      } else if (result) {
+        const errorMsg = mapNachosError(result.err)
+        updateCachedOp(op.blockNumber, op.tokenPrincipal, { status: 'failed', error: errorMsg })
+        throw new Error(errorMsg)
+      }
+    } catch (e: any) {
+      updateCachedOp(op.blockNumber, op.tokenPrincipal, { status: 'failed', error: e.message })
+      throw e
+    } finally {
+      activeOperationType.value = null
+      activeOperationStatus.value = null
+    }
+  }
 
   const retryMint = async (op: CachedOperation) => {
     if (isDevEnvironment()) {
@@ -1135,9 +1216,9 @@ export const useNachosStore = defineStore('nachos', () => {
     // Burn actions
     burnNachos,
     // Deposit management
-    cancelDeposit, retryMint, loadOpsFromCache, saveOpsToCache,
+    cancelDeposit, retryMint, retryBurn, loadOpsFromCache, saveOpsToCache,
     // Balance
-    getTokenBalance,
+    getTokenBalance, getTokenFee, tokenFeeCache,
     // Polling
     startPolling, stopPolling,
     // Lifecycle

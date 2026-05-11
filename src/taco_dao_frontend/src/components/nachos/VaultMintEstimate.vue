@@ -3,7 +3,7 @@
   <div v-if="nachosEstimate" class="mint-estimate taco-container taco-container--l2">
 
     <div class="mint-estimate__row">
-      <span class="mint-estimate__label">NACHOS to receive</span>
+      <span class="mint-estimate__label">NACHO to receive</span>
       <span class="mint-estimate__value fw-bold">{{ nachosStore.formatE8s(nachosEstimate) }}</span>
     </div>
 

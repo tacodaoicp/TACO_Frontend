@@ -46,7 +46,7 @@
                   <button v-if="op.canRetry"
                           class="btn btn-sm taco-btn taco-btn--green"
                           :disabled="!!nachosStore.activeOperationStatus"
-                          title="Retry mint"
+                          :title="op.typeClass === 'burn' ? 'Retry burn' : 'Retry mint'"
                           @click="handleRetry(op)">
                     <i class="fa-solid fa-rotate"></i>
                   </button>
@@ -206,7 +206,7 @@ const allOperations = computed((): UnifiedOperation[] => {
       time: formatTime(BigInt(op.timestamp * 1_000_000)),
       sortTimestamp: op.timestamp,
       error: op.error,
-      canRetry: op.status === 'failed' && op.type !== 'burn',
+      canRetry: op.status === 'failed',
       canCancel: op.status === 'failed',
       showCancelConfirm: false,
       cachedOp: op,
@@ -248,7 +248,7 @@ const allOperations = computed((): UnifiedOperation[] => {
       typeLabel: isMint ? mintTypeLabel(tx.mintMode) : 'Burn',
       typeClass: isMint ? 'mint' : 'burn',
       displayAmount: nachosStore.formatE8s(tx.nachosAmount),
-      symbol: 'NACHOS',
+      symbol: 'NACHO',
       statusLabel: 'Completed',
       statusClass: 'completed',
       time: formatTime(tx.timestamp),
@@ -307,7 +307,7 @@ const getSymbolForPrincipal = (principal: string): string => {
   const entry = nachosStore.portfolio.find((p: any) => p.token.toText() === principal)
   if (entry) return entry.symbol
   if (principal === 'ryjl3-tyaaa-aaaaa-aaaba-cai') return 'ICP'
-  if (principal === getCanisterId('nachos')) return 'NACHOS'
+  if (principal === getCanisterId('nachos')) return 'NACHO'
   return principal.substring(0, 8) + '...'
 }
 
@@ -356,7 +356,9 @@ const handleRetry = async (op: UnifiedOperation) => {
     let cachedOp = op.cachedOp
     if (!cachedOp && op.raw) {
       cachedOp = {
-        type: op.raw.tokenPrincipal.toText() === 'ryjl3-tyaaa-aaaaa-aaaba-cai' ? 'mint_icp' : 'mint_token',
+        type: op.typeClass === 'burn'
+          ? 'burn'
+          : op.raw.tokenPrincipal.toText() === 'ryjl3-tyaaa-aaaaa-aaaba-cai' ? 'mint_icp' : 'mint_token',
         userPrincipal: nachosStore.userPrincipal,
         tokenPrincipal: op.tokenPrincipal!,
         blockNumber: op.blockNumber!,
@@ -367,13 +369,19 @@ const handleRetry = async (op: UnifiedOperation) => {
     }
     if (!cachedOp) return
 
-    const result = await nachosStore.retryMint(cachedOp)
+    const isBurn = cachedOp.type === 'burn'
+    const result = isBurn
+      ? await nachosStore.retryBurn(cachedOp)
+      : await nachosStore.retryMint(cachedOp)
+
     tacoStore.addToast({
       id: Date.now(),
-      code: 'nachos-retry-success',
-      title: 'Mint Retry Successful!',
+      code: isBurn ? 'nachos-burn-retry-success' : 'nachos-retry-success',
+      title: isBurn ? 'Burn Retry Successful!' : 'Mint Retry Successful!',
       icon: 'fa-solid fa-check',
-      message: `Received ${nachosStore.formatNachos(result.nachosReceived)}`
+      message: isBurn
+        ? `Redeemed ${nachosStore.formatE8s(result.netValueICP)} ICP worth of tokens`
+        : `Received ${nachosStore.formatNachos(result.nachosReceived)}`
     })
     await nachosStore.loadUserActivity()
   } catch (e: any) {

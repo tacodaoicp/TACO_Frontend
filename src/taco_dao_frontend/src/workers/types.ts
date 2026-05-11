@@ -526,12 +526,25 @@ export function getRoutePriorities(
     if (!priorities.has(key)) priorities.set(key, 'high')
   })
 
-  // Adjacent routes (medium priority)
+  // Adjacent routes (medium priority for their criticals)
   config.preloadRoutes.forEach((route) => {
     const adjConfig = ROUTE_PRIORITIES[route]
     if (adjConfig) {
       adjConfig.critical.forEach((key) => {
         if (!priorities.has(key)) priorities.set(key, 'medium')
+      })
+    }
+  })
+
+  // Adjacent routes' HIGH-priority data at LOW priority — prefetched as one of
+  // the last things, so the user lands on the adjacent route with this data
+  // already warm. Examples from `/`: `/performance` brings `userPerformance`,
+  // `/vault` brings `nachosNavHistory`, `/vote` brings `tacoProposals`, etc.
+  config.preloadRoutes.forEach((route) => {
+    const adjConfig = ROUTE_PRIORITIES[route]
+    if (adjConfig) {
+      adjConfig.high.forEach((key) => {
+        if (!priorities.has(key)) priorities.set(key, 'low')
       })
     }
   })

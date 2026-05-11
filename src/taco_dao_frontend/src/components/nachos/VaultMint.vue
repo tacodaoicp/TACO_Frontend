@@ -3,7 +3,7 @@
   <div class="vault-mint">
 
     <!-- section title -->
-    <h3 class="vault-mint__title">Mint NACHOS</h3>
+    <h3 class="vault-mint__title">Mint NACHO</h3>
 
     <!-- cannot mint banner -->
     <div v-if="!nachosStore.canMint" class="vault-mint__disabled">
@@ -123,9 +123,9 @@
                 @click="requestMintICP">
           <span v-if="nachosStore.activeOperationType === 'mint'">
             <i class="fa-solid fa-spinner fa-spin"></i>
-            {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring ICP...' : 'Minting NACHOS...' }}
+            {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring ICP...' : 'Minting NACHO...' }}
           </span>
-          <span v-else>Mint NACHOS</span>
+          <span v-else>Mint NACHO</span>
         </button>
 
       </div>
@@ -136,7 +136,8 @@
         <!-- token selector -->
         <div class="vault-mint__input-group">
           <label class="vault-mint__label">Select Token</label>
-          <select v-model="selectedTokenPrincipal" class="form-control taco-input" @change="tokenEstimate = null">
+          <select v-model="selectedTokenPrincipal" class="form-control taco-input"
+                  @change="tokenEstimate = null; tokenEstimateError = null">
             <option value="">Choose a token...</option>
             <option v-for="[principal, config] in nonICPAcceptedTokens"
                     :key="principal.toText()"
@@ -149,7 +150,16 @@
 
         <!-- amount input -->
         <div class="vault-mint__input-group">
-          <label class="vault-mint__label">Amount</label>
+          <div class="vault-mint__label-row">
+            <label class="vault-mint__label">Amount</label>
+            <span v-if="userSelectedTokenBalance !== null && selectedTokenSymbol" class="vault-mint__balance">
+              Bal: {{ nachosStore.formatE8s(userSelectedTokenBalance, selectedTokenDecimals) }} {{ selectedTokenSymbol }}
+              <button class="btn btn-link vault-mint__max-btn"
+                      :disabled="!canMaxToken"
+                      :title="canMaxToken ? 'Use max' : 'Balance is too small to cover the transfer fee'"
+                      @click="setMaxToken">MAX</button>
+            </span>
+          </div>
           <div class="vault-mint__input-wrap">
             <input type="text"
                    inputmode="decimal"
@@ -159,6 +169,9 @@
                    @input="debouncedEstimateToken" />
             <span v-if="selectedTokenSymbol" class="vault-mint__input-suffix">{{ selectedTokenSymbol }}</span>
           </div>
+          <p v-if="disabledReasonToken" class="vault-mint__reason">
+            <i class="fa-solid fa-circle-info"></i> {{ disabledReasonToken }}
+          </p>
         </div>
 
         <!-- estimate with allocation info -->
@@ -195,9 +208,9 @@
                 @click="requestMintToken">
           <span v-if="nachosStore.activeOperationType === 'mint'">
             <i class="fa-solid fa-spinner fa-spin"></i>
-            {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring token...' : 'Minting NACHOS...' }}
+            {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring token...' : 'Minting NACHO...' }}
           </span>
-          <span v-else>Mint NACHOS</span>
+          <span v-else>Mint NACHO</span>
         </button>
 
       </div>
@@ -277,9 +290,9 @@
                 @click="requestMintPortfolio">
           <span v-if="nachosStore.activeOperationType === 'mint'">
             <i class="fa-solid fa-spinner fa-spin"></i>
-            {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring tokens...' : 'Minting NACHOS...' }}
+            {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring tokens...' : 'Minting NACHO...' }}
           </span>
-          <span v-else>Mint NACHOS (Portfolio Share)</span>
+          <span v-else>Mint NACHO (Portfolio Share)</span>
         </button>
 
       </div>
@@ -480,7 +493,7 @@ const handleMintICP = async () => {
     tacoStore.addToast({
       id: Date.now(),
       code: 'nachos-mint-success',
-      title: 'NACHOS Minted!',
+      title: 'NACHO Minted!',
       icon: 'fa-solid fa-check',
       message: `Received ${nachosStore.formatNachos(result.nachosReceived)}`
     })
@@ -504,6 +517,10 @@ const handleMintICP = async () => {
 const selectedTokenPrincipal = ref('')
 const tokenAmount = ref('')
 const tokenEstimate = ref<any>(null)
+const tokenEstimateError = ref<string | null>(null)
+// User's wallet balance of the currently-selected token (raw base units).
+// Fetched on token-change and after a successful mint.
+const userSelectedTokenBalance = ref<bigint | null>(null)
 let tokenDebounce: ReturnType<typeof setTimeout> | null = null
 
 const getTokenSymbol = (principal: any): string => {
@@ -546,17 +563,13 @@ const canConfirmToken = computed(() => {
     if (depositValueICP > BigInt(Math.floor(nachosStore.remainingMintICP))) return false
   }
 
-  // Check amount doesn't exceed token balance
-  const portfolioEntry = nachosStore.portfolio.find(
-    (p: any) => p.token.toText() === selectedTokenPrincipal.value
-  )
-  if (!portfolioEntry) return false
-
-  // Account for token transfer fee (2x for approval + transfer).
-  // Portfolio records from getVaultDashboard don't include a fee field — fall back to 10_000n (default ICRC fee).
-  const tokenFee: bigint = typeof portfolioEntry.fee === 'bigint' ? portfolioEntry.fee : 10_000n
-  const requiredBalance = tokenAmountRaw.value + (tokenFee * 2n)
-  if (BigInt(portfolioEntry.balance ?? 0n) < requiredBalance) return false
+  // Check amount fits in the USER's wallet, including the ICRC1 transfer fee.
+  // `mintWithToken(X)` calls `icrc1_transfer(amount: X - fee, fee)`, which deducts
+  // exactly X from the user's balance. So required user balance = amount + 0 if
+  // amount already includes the fee, but we conservatively require amount + fee
+  // here so MAX leaves one fee of dust (matching ICP & burn flows).
+  if (userSelectedTokenBalance.value === null) return false
+  if (userSelectedTokenBalance.value < tokenAmountRaw.value + selectedTokenFee.value) return false
 
   return true
 })
@@ -564,6 +577,7 @@ const canConfirmToken = computed(() => {
 const debouncedEstimateToken = () => {
   if (tokenDebounce) clearTimeout(tokenDebounce)
   tokenEstimate.value = null
+  tokenEstimateError.value = null
   tokenDebounce = setTimeout(async () => {
     if (selectedTokenPrincipal.value && tokenAmountRaw.value > 0n) {
       try {
@@ -572,19 +586,150 @@ const debouncedEstimateToken = () => {
           Principal.fromText(selectedTokenPrincipal.value),
           tokenAmountRaw.value
         )
-      } catch (e) { console.error('Token estimate failed:', e) }
+      } catch (e: any) {
+        tokenEstimateError.value = e?.message || 'Estimate failed'
+        console.error('Token estimate failed:', e)
+      }
     }
   }, 300)
+}
+
+const disabledReasonToken = computed<string | null>(() => {
+  if (nachosStore.activeOperationStatus) return null
+  if (!selectedTokenPrincipal.value) return null
+
+  // Persistent token-level info shown even when amount = 0:
+  // surface estimate errors (so user sees them after MAX even if input ends up empty)
+  // and the "balance too small" case so MAX button being disabled has a visible reason.
+  if (tokenEstimateError.value) return tokenEstimateError.value
+  if (userSelectedTokenBalance.value !== null
+      && userSelectedTokenBalance.value > 0n
+      && !canMaxToken.value) {
+    return 'Balance is too small to cover the transfer fee — deposit more of this token to mint.'
+  }
+  if (userSelectedTokenBalance.value === 0n) {
+    return 'You have none of this token in your wallet.'
+  }
+
+  if (tokenAmountRaw.value <= 0n) return null
+  if (!tokenEstimate.value) return 'Calculating estimate…'
+
+  // Min-value check: the canister requires deposit value (ICP-equivalent) to
+  // meet `minMintValueICP`. tokenEstimate.depositValueICP is the ICP value of
+  // what the user is depositing. Surfaces when MAX would produce a sub-minimum
+  // amount (e.g., tiny ckBTC balance worth < 0.5 ICP equivalent).
+  const depositValueICP = BigInt(tokenEstimate.value.depositValueICP ?? 0n)
+  const minVal = BigInt(nachosStore.minMintValueICP ?? 0n)
+  if (depositValueICP < minVal) {
+    return `Deposit value (${nachosStore.formatE8s(depositValueICP)} ICP equivalent) is below the minimum of ${nachosStore.formatE8s(minVal)} ICP. Try a larger amount.`
+  }
+
+  // Rate-limit check (per-tx max + 4h user/global caps).
+  if (nachosStore.remainingMintICP !== null && Number.isFinite(nachosStore.remainingMintICP)) {
+    const remaining = BigInt(Math.floor(nachosStore.remainingMintICP))
+    if (depositValueICP > remaining) {
+      return `Deposit value (${nachosStore.formatE8s(depositValueICP)} ICP equivalent) exceeds the remaining 4h mint capacity of ${nachosStore.formatE8s(remaining)} ICP.`
+    }
+  }
+
+  // Balance check (user wallet — same logic as canConfirmToken).
+  if (userSelectedTokenBalance.value !== null
+      && userSelectedTokenBalance.value < tokenAmountRaw.value + selectedTokenFee.value) {
+    return `Amount + transfer fee exceeds your wallet balance.`
+  }
+
+  return null
+})
+
+// ============ User-side balance + MAX for single-token mint ============
+
+// ICRC1 default fee — used only as a last-resort fallback before the live
+// fee fetched from the token ledger lands in `nachosStore.tokenFeeCache`.
+// Real fees vary by token (ckBTC=10, ckUSDT=10_000, etc.) so always prefer
+// the cached real value via `nachosStore.getTokenFee()`.
+const TOKEN_FEE_DEFAULT = 10_000n
+
+const loadSelectedTokenBalance = async () => {
+  const principal = selectedTokenPrincipal.value
+  if (!principal) { userSelectedTokenBalance.value = null; return }
+  try {
+    userSelectedTokenBalance.value = await nachosStore.getTokenBalance(principal)
+  } catch {
+    userSelectedTokenBalance.value = null
+  }
+}
+
+// Pre-fetch the token's real ICRC1 fee (cached in the store) so MAX / canConfirm /
+// the mint call all use the correct value — not the 10_000n default which is
+// wrong for tokens like ckBTC (fee=10) or any other non-standard fee token.
+const loadSelectedTokenFee = async () => {
+  const principal = selectedTokenPrincipal.value
+  if (!principal) return
+  try {
+    await nachosStore.getTokenFee(principal)
+  } catch (e) {
+    console.warn('Failed to fetch token fee, will fall back to default:', e)
+  }
+}
+
+watch(selectedTokenPrincipal, () => {
+  userSelectedTokenBalance.value = null
+  loadSelectedTokenBalance()
+  loadSelectedTokenFee()
+})
+
+// Resolve the transfer fee for the currently-selected token. Source priority:
+//   1. tokenFeeCache (fetched live from the token's `icrc1_fee` — authoritative)
+//   2. portfolioEntry.fee if backend ever adds one (not currently in the IDL)
+//   3. 10_000n ICRC1 default (last resort before the cache populates)
+const selectedTokenFee = computed<bigint>(() => {
+  const principal = selectedTokenPrincipal.value
+  if (!principal) return TOKEN_FEE_DEFAULT
+  const cached = nachosStore.tokenFeeCache[principal]
+  if (typeof cached === 'bigint') return cached
+  const portfolioEntry = nachosStore.portfolio.find(
+    (p: any) => p.token.toText() === principal
+  )
+  return portfolioEntry && typeof portfolioEntry.fee === 'bigint'
+    ? portfolioEntry.fee
+    : TOKEN_FEE_DEFAULT
+})
+
+// MAX is only meaningful when the balance can cover at least one transfer fee.
+const canMaxToken = computed<boolean>(() => {
+  const bal = userSelectedTokenBalance.value
+  return bal !== null && bal > selectedTokenFee.value
+})
+
+const setMaxToken = () => {
+  if (!canMaxToken.value) return
+  const bal = userSelectedTokenBalance.value!
+  const tokenFee = selectedTokenFee.value
+  // Subtract ONE transfer fee — matches ICP/burn MAX accounting. The deposit
+  // uses icrc1_transfer (not ICRC2 approve+transferFrom), so only one ledger
+  // fee is charged. Leaves `fee`-worth of dust in the wallet as a safety net.
+  const usable = bal - tokenFee
+  if (usable <= 0n) return
+  // Convert raw base units to display string using the token's decimals.
+  const decimals = selectedTokenDecimals.value
+  const divisor = 10n ** BigInt(decimals)
+  const whole = usable / divisor
+  const frac = usable % divisor
+  if (frac === 0n) {
+    tokenAmount.value = whole.toString()
+  } else {
+    const fracStr = frac.toString().padStart(decimals, '0').replace(/0+$/, '')
+    tokenAmount.value = fracStr ? `${whole}.${fracStr}` : whole.toString()
+  }
+  debouncedEstimateToken()
 }
 
 const handleMintToken = async () => {
   if (!canConfirmToken.value) return
   try {
-    // Get token fee from portfolio data
-    const portfolioEntry = nachosStore.portfolio.find(
-      (p: any) => p.token.toText() === selectedTokenPrincipal.value
-    )
-    const tokenFee = portfolioEntry ? 10_000n : 10_000n // default fee
+    // Get the token's real ICRC1 fee from the cached ledger query (populated
+    // when the user picked this token). Falls back to default if cache miss.
+    const tokenFee = await nachosStore.getTokenFee(selectedTokenPrincipal.value)
 
     const result = await nachosStore.mintWithToken(
       selectedTokenPrincipal.value,
@@ -594,7 +739,7 @@ const handleMintToken = async () => {
     tacoStore.addToast({
       id: Date.now(),
       code: 'nachos-mint-success',
-      title: 'NACHOS Minted!',
+      title: 'NACHO Minted!',
       icon: 'fa-solid fa-check',
       message: `Received ${nachosStore.formatNachos(result.nachosReceived)}`
     })
@@ -602,6 +747,7 @@ const handleMintToken = async () => {
     tokenEstimate.value = null
     emit('operation-complete')
     loadICPBalance()
+    loadSelectedTokenBalance()
   } catch (e: any) {
     tacoStore.addToast({
       id: Date.now(),
@@ -631,8 +777,11 @@ const insufficientPortfolioTokens = computed<Array<{ symbol: string; required: b
   const out: Array<{ symbol: string; required: bigint; balance: bigint; decimals: number }> = []
   for (const t of portfolioShares.value.tokens) {
     const principal: string = t.token.toText()
+    // The canister returns the real per-token fee in `tokenFee`. icrc1_transfer
+    // charges ONE fee per deposit call (not approve+transfer × 2), so require
+    // amount + 1 × fee — matches ICP/burn MAX accounting.
     const fee: bigint = BigInt(t.tokenFee ?? 10_000n)
-    const required: bigint = BigInt(t.requiredAmount ?? 0n) + fee * 2n
+    const required: bigint = BigInt(t.requiredAmount ?? 0n) + fee
     const balance: bigint = portfolioBalances.value[principal] ?? 0n
     if (balance < required) {
       out.push({ symbol: t.symbol, required, balance, decimals: Number(t.decimals) })
@@ -680,7 +829,7 @@ watch(portfolioShares, (s) => { loadPortfolioBalances(s) })
 const isInsufficient = (t: any): boolean => {
   const principal: string = t.token.toText()
   const fee: bigint = BigInt(t.tokenFee ?? 10_000n)
-  const required: bigint = BigInt(t.requiredAmount ?? 0n) + fee * 2n
+  const required: bigint = BigInt(t.requiredAmount ?? 0n) + fee
   const balance: bigint = portfolioBalances.value[principal] ?? 0n
   return balance < required
 }
@@ -709,7 +858,7 @@ const handleMintPortfolio = async () => {
     tacoStore.addToast({
       id: Date.now(),
       code: 'nachos-mint-success',
-      title: 'NACHOS Minted!',
+      title: 'NACHO Minted!',
       icon: 'fa-solid fa-check',
       message: `Received ${nachosStore.formatNachos(result.nachosReceived)}`
     })
@@ -746,7 +895,7 @@ const requestMintICP = () => {
     title: 'Confirm Mint (ICP)',
     rows: [
       { label: 'Deposit', value: `${icpAmount.value} ICP` },
-      { label: 'NACHOS estimate', value: nachosStore.formatNachos(icpEstimate.value.nachosEstimate) },
+      { label: 'NACHO estimate', value: nachosStore.formatNachos(icpEstimate.value.nachosEstimate) },
       { label: 'Fee', value: `${nachosStore.formatE8s(icpEstimate.value.feeEstimate)} ICP` },
       { label: 'NAV', value: `${nachosStore.formatE8s(icpEstimate.value.navUsed)} ICP` },
     ],
@@ -763,7 +912,7 @@ const requestMintToken = () => {
     title: `Confirm Mint (${sym})`,
     rows: [
       { label: 'Deposit', value: `${tokenAmount.value} ${sym}` },
-      { label: 'NACHOS estimate', value: nachosStore.formatNachos(tokenEstimate.value.nachosEstimate) },
+      { label: 'NACHO estimate', value: nachosStore.formatNachos(tokenEstimate.value.nachosEstimate) },
       { label: 'Fee', value: `${nachosStore.formatE8s(tokenEstimate.value.feeEstimate)} ICP` },
       { label: 'NAV', value: `${nachosStore.formatE8s(tokenEstimate.value.navUsed)} ICP` },
     ],
@@ -780,7 +929,7 @@ const requestMintPortfolio = () => {
     rows: [
       { label: 'Total deposit', value: `${portfolioValue.value} ICP` },
       { label: 'Tokens', value: portfolioShares.value.tokens.map((t: any) => t.symbol).join(', ') },
-      { label: 'NACHOS estimate', value: nachosStore.formatNachos(portfolioShares.value.nachosEstimate) },
+      { label: 'NACHO estimate', value: nachosStore.formatNachos(portfolioShares.value.nachosEstimate) },
       { label: 'Fee', value: `${nachosStore.formatE8s(portfolioShares.value.feeEstimate)} ICP` },
     ],
     actionLabel: 'Confirm Mint',

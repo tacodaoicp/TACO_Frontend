@@ -93,7 +93,7 @@
               :disabled="detectedBelowMin || detectedAboveMax"
               @click="confirmMint">
         <i class="fa-solid fa-coins me-2"></i>
-        Mint NACHOS
+        Mint NACHO
       </button>
     </div>
 
@@ -176,11 +176,11 @@ const isActive = computed(() =>
 
 const buyButtonText = computed(() => {
   if (mintPhase.value === 'detecting') return 'Waiting for ICP...'
-  if (mintPhase.value === 'minting') return 'Minting NACHOS...'
+  if (mintPhase.value === 'minting') return 'Minting NACHO...'
   return selectedProvider.value === 'banxa' ? 'Fund via Banxa' : 'Start Monitoring'
 })
 
-// Mint-value limits — gate the manual "Mint NACHOS" button so backend doesn't reject after the fact.
+// Mint-value limits — gate the manual "Mint NACHO" button so backend doesn't reject after the fact.
 // Account for the ICP transfer fee that mintWithICP deducts before depositing.
 const ICP_TRANSFER_FEE_FOR_MINT = 10_000n
 const detectedNetForMint = computed(() =>
@@ -202,8 +202,8 @@ const detectedAboveMax = computed(() => {
 
 const NACHOS_MINT_STEPS: ProgressStep[] = [
   { key: 'fund', label: 'Fund Wallet', description: 'ICP deposited to your wallet', activeDescription: 'Waiting for ICP deposit...' },
-  { key: 'mint', label: 'Mint NACHOS', description: 'NACHOS minted at current NAV', activeDescription: 'Depositing ICP and minting...' },
-  { key: 'done', label: 'Complete', description: 'NACHOS in your wallet' },
+  { key: 'mint', label: 'Mint NACHO', description: 'NACHO minted at current NAV', activeDescription: 'Depositing ICP and minting...' },
+  { key: 'done', label: 'Complete', description: 'NACHO in your wallet' },
 ]
 
 const errorAtStep = ref(0)
@@ -445,7 +445,7 @@ const executeMint = async (amount: bigint) => {
     const result = await nachosStore.mintWithICP(amount)
     mintPhase.value = 'complete'
     const mintId = result?.mintId != null ? ` (mint #${result.mintId})` : ''
-    completionMessage.value = `NACHOS minted successfully!${mintId}`
+    completionMessage.value = `NACHO minted successfully!${mintId}`
     emit('operation-complete')
   } catch (err: any) {
     console.error('NACHOS mint failed (vault fiat):', err)

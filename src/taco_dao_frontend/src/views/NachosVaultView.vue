@@ -51,7 +51,7 @@
                   </template>
                   <div v-else-if="!tacoStore.tourBypassAuth" class="nachos-vault-view__login-prompt">
                     <i class="fa-solid fa-lock"></i>
-                    <span>Mint & burn NACHOS</span>
+                    <span>Mint & burn NACHO</span>
                     <button class="btn iid-login" @click="tacoStore.iidLogIn()">
                       <DfinityLogo />
                       <span class="taco-text-white">Log in</span>

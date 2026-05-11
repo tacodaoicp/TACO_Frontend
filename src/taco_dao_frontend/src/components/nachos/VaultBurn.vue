@@ -3,7 +3,7 @@
   <div class="vault-burn">
 
     <!-- section title -->
-    <h3 class="vault-burn__title">Burn / Redeem NACHOS</h3>
+    <h3 class="vault-burn__title">Burn / Redeem NACHO</h3>
 
     <!-- cannot burn banner -->
     <div v-if="!nachosStore.canBurn" class="vault-burn__disabled">
@@ -16,9 +16,9 @@
       <!-- amount input -->
       <div class="vault-burn__input-group">
         <div class="vault-burn__label-row">
-          <label class="vault-burn__label">NACHOS Amount</label>
+          <label class="vault-burn__label">NACHO Amount</label>
           <span v-if="nachosBalance !== null" class="vault-burn__balance">
-            Bal: {{ nachosStore.formatE8s(nachosBalance) }} NACHOS
+            Bal: {{ nachosStore.formatE8s(nachosBalance) }} NACHO
             <button class="btn btn-link vault-burn__max-btn" @click="setMaxBurn">MAX</button>
           </span>
         </div>
@@ -29,7 +29,7 @@
                  class="form-control taco-input"
                  placeholder="0.00"
                  @input="debouncedEstimate" />
-          <span class="vault-burn__input-suffix">NACHOS</span>
+          <span class="vault-burn__input-suffix">NACHO</span>
         </div>
         <div v-if="maxBurnable > 0" class="vault-burn__slider-row">
           <input type="range"
@@ -55,14 +55,14 @@
         <div v-if="nachosStore.userRateLimits" class="vault-burn__limits">
           <span>
             Window: {{ nachosStore.formatE8s(BigInt(nachosStore.userRateLimits.burnValueIn4h)) }} /
-            {{ nachosStore.formatE8s(nachosStore.maxBurnNachosPerUser4Hours) }} NACHOS
+            {{ nachosStore.formatE8s(nachosStore.maxBurnNachosPerUser4Hours) }} NACHO
           </span>
           <span>
             Ops: {{ nachosStore.userRateLimits.burnOpsIn4h.toString() }} /
             {{ nachosStore.maxBurnOpsPerUser4Hours.toString() }}
           </span>
           <span v-if="nachosStore.remainingBurnNachos !== null">
-            Max: {{ nachosStore.formatE8s(BigInt(Math.round(nachosStore.remainingBurnNachos))) }} NACHOS
+            Max: {{ nachosStore.formatE8s(BigInt(Math.round(nachosStore.remainingBurnNachos))) }} NACHO
           </span>
         </div>
       </div>
@@ -173,7 +173,7 @@
               @click="requestBurn">
         <span v-if="nachosStore.activeOperationType === 'burn'">
           <i class="fa-solid fa-spinner fa-spin"></i>
-          {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring NACHOS...' : 'Burning NACHOS...' }}
+          {{ nachosStore.activeOperationStatus === 'depositing' ? 'Transferring NACHO...' : 'Burning NACHO...' }}
         </span>
         <span v-else>Burn & Redeem</span>
       </button>
@@ -184,7 +184,7 @@
           <i class="fa-solid fa-check-circle"></i> Burn Complete
         </h4>
         <div class="vault-burn__result-row">
-          <span>NACHOS burned</span>
+          <span>NACHO burned</span>
           <span class="fw-bold">{{ nachosStore.formatNachos(lastBurnResult.nachosBurned) }}</span>
         </div>
         <div class="vault-burn__result-row">
@@ -312,10 +312,10 @@ const disabledReason = computed<string | null>(() => {
   if (nachosBalance.value !== null) {
     const balAfterFee = Number(nachosBalance.value) - Number(NACHOS_FEE)
     if (nachosBalance.value === 0n) {
-      return 'You have no NACHOS to burn.'
+      return 'You have no NACHO to burn.'
     }
     if (balAfterFee <= 0) {
-      return `Balance (${nachosStore.formatE8s(nachosBalance.value)} NACHOS) is too small to cover the transfer fee.`
+      return `Balance (${nachosStore.formatE8s(nachosBalance.value)} NACHO) is too small to cover the transfer fee.`
     }
     // Balance is positive — if maxBurnable is still 0, the rate limit really is the cause.
     if (maxBurnable.value === 0 && nachosStore.remainingBurnNachos === 0) {
@@ -331,7 +331,7 @@ const disabledReason = computed<string | null>(() => {
   }
   const maxE8s = BigInt(Math.floor(maxBurnable.value))
   if (maxE8s > 0n && nachosAmountE8s.value > maxE8s) {
-    return `Amount exceeds your available balance / rate limit (${nachosStore.formatE8s(maxE8s)} NACHOS).`
+    return `Amount exceeds your available balance / rate limit (${nachosStore.formatE8s(maxE8s)} NACHO).`
   }
   return null
 })
@@ -426,7 +426,7 @@ const handleBurn = async () => {
     tacoStore.addToast({
       id: Date.now(),
       code: 'nachos-burn-success',
-      title: 'NACHOS Burned!',
+      title: 'NACHO Burned!',
       icon: 'fa-solid fa-fire',
       message: `Redeemed ${nachosStore.formatE8s(result.netValueICP)} ICP worth of tokens`
     })
@@ -464,7 +464,7 @@ const requestBurn = () => {
   confirmDialogData.value = {
     title: 'Confirm Burn & Redeem',
     rows: [
-      { label: 'Burn', value: `${nachosAmount.value} NACHOS` },
+      { label: 'Burn', value: `${nachosAmount.value} NACHO` },
       { label: 'Redemption value', value: `${nachosStore.formatE8s(burnEstimate.value.redemptionValueICP)} ICP` },
       { label: 'Fee', value: `${nachosStore.formatE8s(burnEstimate.value.feeEstimate)} ICP` },
       { label: 'Net value', value: `${nachosStore.formatE8s(burnEstimate.value.netValueICP)} ICP` },

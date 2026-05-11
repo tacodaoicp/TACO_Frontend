@@ -29,17 +29,23 @@
           <span class="vault-analytics__metric-value">{{ nachosStore.formatE8s(analytics.totalBurnVolumeICP) }} ICP</span>
         </div>
         <div class="vault-analytics__metric">
-          <span class="vault-analytics__metric-label">NACHOS Supply</span>
+          <span class="vault-analytics__metric-label">NACHO Supply</span>
           <span class="vault-analytics__metric-value">{{ nachosStore.formatNachos(analytics.nachosSupply) }}</span>
         </div>
         <div class="vault-analytics__metric">
           <span class="vault-analytics__metric-label">Portfolio Value</span>
           <span class="vault-analytics__metric-value">{{ nachosStore.formatE8s(analytics.portfolioValueICP) }} ICP</span>
+          <span v-if="portfolioUSD !== null" class="vault-analytics__metric-sub">
+            ~${{ portfolioUSD }} USD
+          </span>
         </div>
         <div class="vault-analytics__metric">
           <span class="vault-analytics__metric-label">NAV Change (24h)</span>
           <span class="vault-analytics__metric-value" :class="navChangeClass">
             {{ navChangeText }}
+          </span>
+          <span v-if="navChange24hUSD !== null" class="vault-analytics__metric-sub" :class="navChangeClassUSD">
+            {{ navChangeTextUSD }}
           </span>
         </div>
         <div class="vault-analytics__metric">
@@ -100,11 +106,11 @@
                    :style="{ width: rateLimitPct('burn') + '%' }"></div>
             </div>
             <span class="vault-analytics__rate-text">
-              {{ nachosStore.formatE8s(analytics.globalBurnIn4h) }} / {{ nachosStore.formatE8s(analytics.effectiveBurnLimit) }} NACHOS
+              {{ nachosStore.formatE8s(analytics.globalBurnIn4h) }} / {{ nachosStore.formatE8s(analytics.effectiveBurnLimit) }} NACHO
             </span>
           </div>
           <div v-if="analytics.effectiveBurnLimit < analytics.maxBurnPer4h" class="vault-analytics__rate-note">
-            Burn capacity reduced to {{ nachosStore.formatE8s(analytics.effectiveBurnLimit) }} NACHOS — treasury assets partially in LP
+            Burn capacity reduced to {{ nachosStore.formatE8s(analytics.effectiveBurnLimit) }} NACHO — treasury assets partially in LP
           </div>
         </div>
       </div>
@@ -189,12 +195,55 @@ const navChange24h = computed(() => {
 const navChangeText = computed(() => {
   if (navChange24h.value === null) return 'N/A'
   const sign = navChange24h.value >= 0 ? '+' : ''
-  return `${sign}${navChange24h.value.toFixed(2)}% (24h)`
+  return `${sign}${navChange24h.value.toFixed(2)}% ICP`
 })
 
 const navChangeClass = computed(() => {
   if (navChange24h.value === null) return ''
   return navChange24h.value >= 0 ? 'text-success' : 'text-danger'
+})
+
+// Portfolio value in USD — analytics returns ICP e8s; multiply by live ICP/USD
+// rate. Returns null when price feed isn't loaded so the sub-line stays hidden.
+const portfolioUSD = computed<string | null>(() => {
+  if (!analytics.value || !nachosStore.icpPriceUsd) return null
+  const icpValue = Number(analytics.value.portfolioValueICP) / 1e8
+  return (icpValue * nachosStore.icpPriceUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+})
+
+// 24h NAV change in USD — uses navHistoryUSD (each snapshot has its own
+// captured ICP/USD rate, so the trajectory reflects both NAV evolution AND
+// ICP/USD movement, not today's rate scaled across history).
+const navChange24hUSD = computed<number | null>(() => {
+  const history = nachosStore.navHistoryUSD
+  if (history.length < 2) return null
+  const current = history[history.length - 1]
+  const currentNavUSD = Number(current.navPerTokenUSD)
+  if (currentNavUSD === 0) return null
+  const now = BigInt(Date.now()) * 1_000_000n
+  const oneDayAgo = now - 86_400_000_000_000n
+  let best: any = history[1] // skip genesis at index 0
+  for (let i = history.length - 2; i >= 1; i--) {
+    if (history[i].timestamp <= oneDayAgo) {
+      best = history[i]
+      break
+    }
+    best = history[i]
+  }
+  const baseNavUSD = Number(best.navPerTokenUSD)
+  if (baseNavUSD === 0) return null
+  return ((currentNavUSD - baseNavUSD) / baseNavUSD) * 100
+})
+
+const navChangeTextUSD = computed(() => {
+  if (navChange24hUSD.value === null) return ''
+  const sign = navChange24hUSD.value >= 0 ? '+' : ''
+  return `${sign}${navChange24hUSD.value.toFixed(2)}% USD`
+})
+
+const navChangeClassUSD = computed(() => {
+  if (navChange24hUSD.value === null) return ''
+  return navChange24hUSD.value >= 0 ? 'text-success' : 'text-danger'
 })
 
 // Mint mode bar widths
@@ -279,6 +328,12 @@ const rateLimitPct = (type: 'mint' | 'burn'): number => {
       font-size: 1rem;
       font-family: 'Space Mono', monospace;
       font-weight: bold;
+    }
+
+    &-sub {
+      font-size: 0.8rem;
+      font-family: 'Space Mono', monospace;
+      opacity: 0.75;
     }
   }
 
