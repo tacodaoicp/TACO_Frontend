@@ -156,6 +156,7 @@ import { ADMIN_PRINCIPALS } from '../../../composables/useAdminCheck'
 import { getTokenIcon } from '../../utils/token-icons'
 import { formatUSD } from '../../utils/format'
 import { useExchangeToast } from '../../composables/useExchangeToast'
+import { isVisible as isDocumentVisible, onVisible } from '../../composables/useVisibilityAware'
 import ThemeToggle from '../common/ThemeToggle.vue'
 import ExchangeBrandMark from '../common/ExchangeBrandMark.vue'
 import WalletButton from '../common/WalletButton.vue'
@@ -655,15 +656,23 @@ function setDefaultPair() {
 watch(() => exchangeStore.tokens.length, () => setDefaultPair())
 
 // Refresh 24h stats whenever the pair changes or every 60s while mounted.
+// Polling is visibility-gated: hidden tabs don't burn a canister call here.
 watch([selectedBase, selectedQuote], () => { loadStats24h() }, { immediate: true })
+let offStatsVisible: (() => void) | null = null
 onMounted(() => {
-  statsTimer = window.setInterval(loadStats24h, 60_000)
+  statsTimer = window.setInterval(() => {
+    if (!isDocumentVisible.value) return
+    loadStats24h()
+  }, 60_000)
+  offStatsVisible = onVisible(() => loadStats24h())
 })
 onUnmounted(() => {
   if (statsTimer !== null) {
     clearInterval(statsTimer)
     statsTimer = null
   }
+  offStatsVisible?.()
+  offStatsVisible = null
 })
 
 // Close dropdowns on outside click

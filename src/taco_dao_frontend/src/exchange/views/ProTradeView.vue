@@ -19,6 +19,7 @@
         :decimals0="decimals0"
         :decimals1="decimals1"
         :datafeed="datafeed"
+        default-timeframe="hour"
         hide-attribution
       />
       <div v-else class="ex-panel pro-trade-view__placeholder">
@@ -70,26 +71,28 @@
           </button>
         </div>
         <div class="pro-bottom__content">
-          <!-- Public data — no auth needed -->
-          <RecentPairTradesTab
-            v-if="activeBottomTab === 'pairTrades' && selectedToken0 && selectedToken1"
-            :token0="selectedToken0"
-            :token1="selectedToken1"
-            :decimals0="decimals0"
-            :decimals1="decimals1"
-          />
-          <!-- Auth-required tabs -->
-          <template v-else-if="!store.isAuthenticated">
-            <div style="padding:var(--space-4);color:var(--text-tertiary);font-size:var(--text-sm)">
+          <!-- KeepAlive the bottom tabs so flipping back to a tab is instant
+               and uses the stale-window check (no refetch on remount). Each
+               tab still owns its own onActivated logic via useStaleAwareLoad. -->
+          <KeepAlive>
+            <RecentPairTradesTab
+              v-if="activeBottomTab === 'pairTrades' && selectedToken0 && selectedToken1"
+              :token0="selectedToken0"
+              :token1="selectedToken1"
+              :decimals0="decimals0"
+              :decimals1="decimals1"
+            />
+            <div
+              v-else-if="!store.isAuthenticated"
+              style="padding:var(--space-4);color:var(--text-tertiary);font-size:var(--text-sm)"
+            >
               Connect wallet to view your data.
             </div>
-          </template>
-          <template v-else>
-            <OpenOrdersTab v-if="activeBottomTab === 'orders'" />
+            <OpenOrdersTab v-else-if="activeBottomTab === 'orders'" />
             <TradeHistoryTab v-else-if="activeBottomTab === 'history'" />
             <LPPositionsTab v-else-if="activeBottomTab === 'lp'" />
             <WalletTab v-else-if="activeBottomTab === 'assets'" @trade="onTradeFromWallet" />
-          </template>
+          </KeepAlive>
         </div>
       </div>
     </template>

@@ -6,6 +6,8 @@
       :alt="symbol"
       :width="size"
       :height="size"
+      loading="lazy"
+      decoding="async"
       class="tx-coin__img"
       @error="onImgError"
     />

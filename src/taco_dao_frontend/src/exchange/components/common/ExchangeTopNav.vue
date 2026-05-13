@@ -26,6 +26,9 @@
         :key="item.route"
         class="tx-tab"
         :aria-selected="active === item.key || route.path === item.route"
+        @pointerenter="warmDestination(item.route)"
+        @focus="warmDestination(item.route)"
+        @touchstart.passive="warmDestination(item.route)"
         @click="navigate(item.route)"
       >
         {{ item.label }}
@@ -43,6 +46,33 @@ import ThemeToggle from './ThemeToggle.vue'
 import WalletButton from './WalletButton.vue'
 import PairSelector from './PairSelector.vue'
 import PairStatsCluster from './PairStatsCluster.vue'
+import { preloadRoute } from '../../router'
+import { useExchangeStore } from '../../store/exchange.store'
+
+// Map URL → route name for chunk preload, plus the data queries that should
+// be warmed when the user signals intent (hover/focus/touch). Each
+// .prefetch() is a no-op if the cached query is already fresh.
+const routeMeta: Record<string, { name: string; warm?: () => void }> = {
+  '/':          { name: 'ProTrade' },
+  '/trade':     { name: 'MobileTrade' },
+  '/easy':      { name: 'EasySwap' },
+  '/pool':      { name: 'Pool' },
+  '/otc':       { name: 'OTC' },
+  '/recover':   { name: 'Recover' },
+  '/portfolio': { name: 'Portfolio', warm: () => {
+    const s = useExchangeStore()
+    if (!s.isAuthenticated) return
+    s.userLpQuery.prefetch()
+    s.userTradesQuery.prefetch()
+  } },
+}
+
+function warmDestination(target: string) {
+  const meta = routeMeta[target]
+  if (!meta) return
+  preloadRoute(meta.name)
+  meta.warm?.()
+}
 
 // Pro view (`/`) is desktop-only — on mobile, route to `/trade` directly
 // instead of letting ProTradeView mount and immediately redirect (which

@@ -10,7 +10,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Actor } from '@dfinity/agent'
 import { Principal } from '@dfinity/principal'
 import { idlFactory } from 'declarations/OTC_backend/OTC_backend.did.js'
@@ -33,6 +33,8 @@ import { getCanisterId } from '../../constants/canisterIds'
 import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../shared/auth-cache'
 import { getEffectiveNetwork } from '../../config/network-config'
 import { readCache, writeCache } from '../utils/persistCache'
+import { createCachedQuery, createKeyedQueryFactory, type CachedQuery } from '../utils/cachedQuery'
+import { isVisible as isDocumentVisible } from '../composables/useVisibilityAware'
 
 // TTLs for the persistent (localStorage) cache. Tokens + treasury + fees
 // are practically static (rarely change between sessions); pool data is
@@ -202,6 +204,10 @@ export const useExchangeStore = defineStore('exchange', () => {
   function startFrozenPolling() {
     if (frozenPollTimer) return
     frozenPollTimer = setInterval(async () => {
+      // While the user's tab is hidden there's no point checking — and once
+      // they return, the next 30s tick (or the visibility-driven nudges from
+      // useStaleAwareLoad) catches us up.
+      if (!isDocumentVisible.value) return
       const stillFrozen = await checkFrozenStatus()
       if (!stillFrozen) {
         stopFrozenPolling()
@@ -261,6 +267,14 @@ export const useExchangeStore = defineStore('exchange', () => {
 
       const actor = await getQueryActor()
       console.log('[Exchange] Init: canister =', getExchangeCanisterId())
+
+      // Start the external-price fetch in PARALLEL with the canister fetches.
+      // They have no dependency on each other (token-USD prices need icpPriceUSD
+      // but that only matters when fetchTokenPricesUSD runs, which we chain
+      // after fetchCryptoPrices). This shaves ~1-2 s off cold load TTFP.
+      const cryptoPricesPromise = fetchCryptoPrices()
+        .then(() => fetchTokenPricesUSD())
+        .catch(() => { /* prices best-effort */ })
 
       // Fetch each independently so one failure doesn't kill everything
       const results = await Promise.allSettled([
@@ -334,8 +348,10 @@ export const useExchangeStore = defineStore('exchange', () => {
         })
       }
 
-      // Fetch prices — don't block init, components reactively update when prices arrive
-      fetchCryptoPrices().then(() => fetchTokenPricesUSD())
+      // Prices are already racing in parallel — kicked off above before
+      // Promise.allSettled. Just keep the in-flight handle around so any
+      // tests / hot reloads that await initExchange see prices resolve too.
+      void cryptoPricesPromise
 
       // Start periodic exchangeInfo refresh (every 15s)
       startExchangeInfoPolling()
@@ -564,6 +580,9 @@ export const useExchangeStore = defineStore('exchange', () => {
   function startExchangeInfoPolling() {
     if (infoPollingTimer) return
     infoPollingTimer = setInterval(async () => {
+      // Skip the canister + external price calls while the tab is hidden;
+      // when the user comes back, the next tick within 15s catches us up.
+      if (!isDocumentVisible.value) return
       if (isFrozen.value) return
       try {
         const frozen = await checkFrozenStatus()
@@ -622,6 +641,136 @@ export const useExchangeStore = defineStore('exchange', () => {
       try { cb(kind) } catch { /* one bad subscriber shouldn't break others */ }
     }
   }
+
+  // ═══════════════════════════════════════════
+  // Shared cached queries (cache-first, deduped, persisted)
+  // ═══════════════════════════════════════════
+  // Every view that wants LP positions or open orders reads the same Ref. Pro
+  // mode → Portfolio navigation no longer triggers redundant fetches because
+  // the data is already in the query's reactive data ref. Mutation events
+  // hook a single refresh() call per kind, replacing 4+ per-component
+  // subscriptions that previously fanned out across PortfolioView, LPPositionsTab
+  // and friends.
+
+  const userLpQuery: CachedQuery<DetailedLiquidityPosition[]> = createCachedQuery({
+    key: 'user.lp',
+    fetcher: async () => (await getUpdateActor()).getUserLiquidityDetailed(),
+    persist: true,
+    maxAgeMs: 15_000,
+    principalRef: principalText,
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  const userTradesQuery: CachedQuery<TradePrivate2[]> = createCachedQuery({
+    key: 'user.trades',
+    fetcher: async () => (await getUpdateActor()).getUserTrades(),
+    persist: true,
+    maxAgeMs: 5_000,
+    principalRef: principalText,
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  const userReferralQuery = createCachedQuery({
+    key: 'user.referral',
+    fetcher: async () => (await getUpdateActor()).getUserReferralInfo(),
+    persist: true,
+    maxAgeMs: 5 * 60_000,
+    principalRef: principalText,
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  const userFeesReferrerQuery: CachedQuery<[string, bigint][]> = createCachedQuery({
+    key: 'user.feesReferrer',
+    fetcher: async () => (await getUpdateActor()).checkFeesReferrer(),
+    persist: true,
+    maxAgeMs: 60_000,
+    principalRef: principalText,
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  // Per-token balance query factory. The same address shares one in-flight
+  // call across AddLiquidity, OTC, the wallet form, etc. Mutations refresh
+  // through the bus below (swap/lp/claim move balances).
+  // The fetcher uses an ANONYMOUS agent: icrc1_balance_of is a public query
+  // that takes the principal as its argument — no signing required, and using
+  // the authed agent causes HTTP 400 for tokens not in the II delegation's
+  // `targets`. Identical reasoning to getUserBalance below.
+  async function fetchIcrc1Balance(address: string): Promise<bigint> {
+    const identity = await getCachedIdentity()
+    if (!identity || identity.getPrincipal().isAnonymous()) return 0n
+    const { HttpAgent } = await import('@dfinity/agent')
+    const agent = new HttpAgent({ host: getNetworkHost() })
+    if (getEffectiveNetwork() === 'local') await agent.fetchRootKey()
+    const tokenActor = Actor.createActor(_icrc1BalanceIdl, { agent, canisterId: address })
+    const balance = await tokenActor.icrc1_balance_of({
+      owner: identity.getPrincipal(),
+      subaccount: [],
+    })
+    return balance as bigint
+  }
+
+  const userBalanceQuery = createKeyedQueryFactory<string, bigint>((address) => createCachedQuery({
+    key: `user.balance:${address}`,
+    fetcher: () => fetchIcrc1Balance(address),
+    persist: true,
+    maxAgeMs: 10_000,
+    principalRef: principalText,
+    timeoutMs: 10_000,
+  }))
+
+  function refreshAllBalances() {
+    // Refresh every per-token query we've ever opened, sharing the in-flight
+    // dedup per address. Cheap because untouched queries don't exist.
+    for (const t of tokens.value) {
+      const q = userBalanceQuery(t.address)
+      if (q.data !== null) void q.refresh()
+    }
+  }
+
+  // Centralised mutation propagation. Each kind only refreshes what it can
+  // possibly affect. Balances refresh for every token the user has *already*
+  // queried (so freshly-loaded views see fresh numbers immediately) — we
+  // don't proactively query tokens nobody has asked about yet.
+  onMutation((kind) => {
+    if (kind === 'lp' || kind === 'claim') void userLpQuery.refresh()
+    if (kind === 'order' || kind === 'revoke' || kind === 'swap') void userTradesQuery.refresh()
+    if (kind === 'swap' || kind === 'lp' || kind === 'claim') refreshAllBalances()
+    if (kind === 'claim' || kind === 'referral') {
+      void userFeesReferrerQuery.refresh()
+      void userReferralQuery.refresh()
+    }
+  })
+
+  // Auth-flip handling:
+  //   true→false: drop personal data from memory + localStorage so it can't
+  //               leak into the UI of whoever logs in next on the same machine.
+  //   false→true: eagerly prefetch the most-likely-needed user queries so the
+  //               first nav after login paints from a hot cache. Runs in
+  //               parallel with whatever view is mounting.
+  watch(isAuthenticated, (v, prev) => {
+    if (!v && prev) {
+      userLpQuery.clear()
+      userTradesQuery.clear()
+      userReferralQuery.clear()
+      userFeesReferrerQuery.clear()
+      return
+    }
+    if (v && !prev) {
+      // Eager prefetch — the user's first nav post-login has hot data ready.
+      void userLpQuery.refresh()
+      void userTradesQuery.refresh()
+      // Lower-priority surfaces: stagger by a microtask so the rate-limited
+      // update channel isn't slammed with 4 calls in the same JS tick.
+      queueMicrotask(() => {
+        void userReferralQuery.prefetch()
+        void userFeesReferrerQuery.prefetch()
+      })
+    }
+  })
 
   async function getExpectedReceiveAmount(tokenSell: string, tokenBuy: string, amount: bigint) {
     const actor = await getQueryActor()
@@ -718,9 +867,41 @@ export const useExchangeStore = defineStore('exchange', () => {
     return actor.getOrderbookCombined(token0, token1, numLevels, stepPercent)
   }
 
+  // Kline factory: each unique (pair, timeframe, initialGet) tuple gets its
+  // own cached query. Multiple components rendering the same pair at the same
+  // timeframe (ExchangeHeader's 24h stats + PairStatsCluster + TradingChart)
+  // share one in-flight call.
+  function timeframeKey(tf: TimeFrame): string {
+    return Object.keys(tf as Record<string, unknown>)[0] ?? 'unknown'
+  }
+  const klineQuery = createKeyedQueryFactory<string, KlineData[]>((compositeKey) => {
+    const [token1, token2, tfKey, initialGetStr] = compositeKey.split('|')
+    const tfMap: Record<string, TimeFrame> = {
+      fivemin:   { fivemin: null },
+      hour:      { hour: null },
+      fourHours: { fourHours: null },
+      day:       { day: null },
+      week:      { week: null },
+    }
+    return createCachedQuery({
+      key: `kline:${compositeKey}`,
+      fetcher: async () => {
+        const actor = await getQueryActor()
+        return actor.getKlineData(token1, token2, tfMap[tfKey] ?? { day: null }, initialGetStr === 'true')
+      },
+      persist: false,
+      // Keep below the TradingChart 5s poll so periodic refreshes still fetch
+      // fresh data, while concurrent consumers (Header stats24h + PairStatsCluster
+      // + chart) dedup via the in-flight promise within the same tick.
+      maxAgeMs: 2_000,
+      shallow: true,
+      timeoutMs: 15_000,
+    })
+  })
+
   async function getKlineData(token1: string, token2: string, timeframe: TimeFrame, initialGet: boolean): Promise<KlineData[]> {
-    const actor = await getQueryActor()
-    return actor.getKlineData(token1, token2, timeframe, initialGet)
+    const key = `${token1}|${token2}|${timeframeKey(timeframe)}|${initialGet ? 'true' : 'false'}`
+    return (await klineQuery(key).ensure()) ?? []
   }
 
   async function getKlineDataRange(
@@ -737,22 +918,40 @@ export const useExchangeStore = defineStore('exchange', () => {
   // 7d trend batch — one query returns 28 6h samples + server-computed
   // 24h / 7d % deltas per token. Backing: src/exchange/main.mo:5148-5268.
   // Unknown or data-less tokens return `points: []` — frontend hides the sparkline.
+  // Trends factory: keyed by sorted address list so PortfolioView (full token
+  // set) and WalletTab sparklines (subset) share whenever they ask for the
+  // same set. Network cost is a single canister call regardless of how many
+  // components subscribe.
+  const trendsQuery = createKeyedQueryFactory<string, TokenTrend7d[]>((sortedJoinedKey) => createCachedQuery({
+    key: `tokens.trends:${sortedJoinedKey}`,
+    fetcher: async () => {
+      const addrs = sortedJoinedKey.split('|').filter(Boolean)
+      if (addrs.length === 0) return []
+      const actor = await getQueryActor()
+      const principals = addrs.map(addr => Principal.fromText(addr))
+      const result = await actor.get_token_trends_7d(principals)
+      if ('err' in result) {
+        console.warn('[Exchange] get_token_trends_7d error:', result.err)
+        return []
+      }
+      return result.ok.map(t => ({
+        token:          t.token.toText(),
+        points:         t.points,
+        priceNow:       t.price_now,
+        changePct24h:   t.change_pct_24h,
+        changePct7d:    t.change_pct_7d,
+      }))
+    },
+    persist: true,
+    maxAgeMs: 5 * 60_000,
+    shallow: true,
+    timeoutMs: 15_000,
+  }))
+
   async function getTokenTrends7d(tokenAddresses: string[]): Promise<TokenTrend7d[]> {
     if (tokenAddresses.length === 0) return []
-    const actor = await getQueryActor()
-    const principals = tokenAddresses.map(addr => Principal.fromText(addr))
-    const result = await actor.get_token_trends_7d(principals)
-    if ('err' in result) {
-      console.warn('[Exchange] get_token_trends_7d error:', result.err)
-      return []
-    }
-    return result.ok.map(t => ({
-      token:          t.token.toText(),
-      points:         t.points,
-      priceNow:       t.price_now,
-      changePct24h:   t.change_pct_24h,
-      changePct7d:    t.change_pct_7d,
-    }))
+    const key = [...tokenAddresses].sort().join('|')
+    return (await trendsQuery(key).ensure()) ?? []
   }
 
   async function getPoolHistory(token1: string, token2: string, limit: bigint) {
@@ -765,10 +964,12 @@ export const useExchangeStore = defineStore('exchange', () => {
     return actor.getPrivateTrade(accesscode)
   }
 
-  // User-specific queries — need authenticated actor (canister checks msg.caller)
+  // User-specific queries — need authenticated actor (canister checks msg.caller).
+  // These now delegate to the shared cached query so concurrent callers (e.g.
+  // PortfolioView + OpenOrdersTab on the same screen) share one in-flight
+  // canister call, and a fresh-enough cache short-circuits the network entirely.
   async function getUserTrades(): Promise<TradePrivate2[]> {
-    const actor = await getUpdateActor()
-    return actor.getUserTrades()
+    return (await userTradesQuery.ensure()) ?? []
   }
 
   async function getUserPreviousTrades(token1: string, token2: string) {
@@ -787,8 +988,7 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
 
   async function getUserLiquidityDetailed(): Promise<DetailedLiquidityPosition[]> {
-    const actor = await getUpdateActor()
-    return actor.getUserLiquidityDetailed()
+    return (await userLpQuery.ensure()) ?? []
   }
 
   async function getTokenUSDPrices(icpPriceUSD: number, ckusdcPriceUSD: number) {
@@ -797,13 +997,11 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
 
   async function checkFeesReferrer(): Promise<[string, bigint][]> {
-    const actor = await getUpdateActor()
-    return actor.checkFeesReferrer()
+    return (await userFeesReferrerQuery.ensure()) ?? []
   }
 
   async function getUserReferralInfo() {
-    const actor = await getUpdateActor()
-    return actor.getUserReferralInfo()
+    return await userReferralQuery.ensure()
   }
 
   // Admin queries — need authenticated actor
@@ -1162,8 +1360,26 @@ export const useExchangeStore = defineStore('exchange', () => {
   // Helpers
   // ═══════════════════════════════════════════
 
+  // O(1) address → TokenInfo lookup. Built once per tokens.length change, then
+  // every component reading getTokenByAddress / getTokenSymbol / getTokenDecimals
+  // hits the Map instead of scanning the array. Saves >25 .find() call sites.
+  const tokensByAddress = computed<ReadonlyMap<string, TokenInfo>>(() => {
+    const m = new Map<string, TokenInfo>()
+    for (const t of tokens.value) m.set(t.address, t)
+    return m
+  })
+
   function getTokenByAddress(address: string): TokenInfo | undefined {
-    return tokens.value.find((t: TokenInfo) => t.address === address)
+    return tokensByAddress.value.get(address)
+  }
+
+  function getTokenSymbol(address: string, fallback = '???'): string {
+    return tokensByAddress.value.get(address)?.symbol ?? fallback
+  }
+
+  function getTokenDecimals(address: string, fallback = 8): number {
+    const t = tokensByAddress.value.get(address)
+    return t ? Number(t.decimals) : fallback
   }
 
   function getTokenBySymbol(symbol: string): TokenInfo | undefined {
@@ -1256,27 +1472,7 @@ export const useExchangeStore = defineStore('exchange', () => {
    * `targets`. Anonymous queries sidestep that entirely.
    */
   async function getUserBalance(tokenAddress: string): Promise<bigint> {
-    try {
-      const identity = await getCachedIdentity()
-      if (!identity || identity.getPrincipal().isAnonymous()) return 0n
-
-      const { HttpAgent } = await import('@dfinity/agent')
-      const agent = new HttpAgent({ host: getNetworkHost() })
-      if (getEffectiveNetwork() === 'local') await agent.fetchRootKey()
-
-      const tokenActor = Actor.createActor(_icrc1BalanceIdl, {
-        agent,
-        canisterId: tokenAddress,
-      })
-      const balance = await tokenActor.icrc1_balance_of({
-        owner: identity.getPrincipal(),
-        subaccount: [],
-      })
-      return balance as bigint
-    } catch (err) {
-      console.warn('[getUserBalance] query failed for', tokenAddress, err)
-      return 0n
-    }
+    return (await userBalanceQuery(tokenAddress).ensure()) ?? 0n
   }
 
   return {
@@ -1311,6 +1507,15 @@ export const useExchangeStore = defineStore('exchange', () => {
     // Mutation event bus
     refreshAfterMutation,
     onMutation,
+
+    // Shared cached queries — components read .data for cache-first paints,
+    // or call .refresh()/.prefetch() for explicit control.
+    userLpQuery,
+    userTradesQuery,
+    userReferralQuery,
+    userFeesReferrerQuery,
+    userBalanceQuery,
+    refreshAllBalances,
 
     // Query methods
     refreshExchangeInfo,
@@ -1389,6 +1594,9 @@ export const useExchangeStore = defineStore('exchange', () => {
 
     // Helpers
     getTokenByAddress,
+    tokensByAddress,
+    getTokenSymbol,
+    getTokenDecimals,
     getTokenBySymbol,
     isTokenPaused,
     clearActorCache,

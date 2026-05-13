@@ -65,9 +65,12 @@ const props = withDefaults(defineProps<{
   hideFullscreen?: boolean
   /** Hide the TradingView attribution logo in the chart's bottom-left. */
   hideAttribution?: boolean
+  /** Initial timeframe key — one of fivemin | hour | fourHours | day | week. */
+  defaultTimeframe?: 'fivemin' | 'hour' | 'fourHours' | 'day' | 'week'
 }>(), {
   hideFullscreen: false,
   hideAttribution: false,
+  defaultTimeframe: 'fivemin',
 })
 
 // Detect if display pair order is inverted from canonical pool order.
@@ -134,7 +137,7 @@ const timeframes = [
   { key: 'week', label: '1W' },
 ]
 
-const activeTimeframe = ref('fivemin')
+const activeTimeframe = ref<string>(props.defaultTimeframe)
 
 const chartTypes = [
   { key: 'candles', label: 'Candles' },

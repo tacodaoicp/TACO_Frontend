@@ -23,6 +23,7 @@
 
 import { onActivated, onDeactivated, onMounted, onUnmounted, watch } from 'vue'
 import { useExchangeStore } from '../store/exchange.store'
+import { isVisible, onVisible } from './useVisibilityAware'
 
 type MutationKind = 'swap' | 'order' | 'revoke' | 'lp' | 'claim' | 'referral'
 
@@ -79,13 +80,22 @@ export function useStaleAwareLoad(opts: StaleAwareOptions) {
     if (Date.now() - lastFetchedAt > staleMs) await load()
   }
 
+  // Visibility-aware ticker: skip the network call while the tab is hidden;
+  // on the hidden→visible flip, do one immediate refresh, then resume normal
+  // cadence. Saves a steady stream of canister calls when the user has the
+  // browser in another tab/window.
+  function tick() {
+    if (!isVisible.value) return
+    load()
+  }
   function startPolling() {
     if (pollTimer) clearInterval(pollTimer)
-    pollTimer = setInterval(load, staleMs)
+    pollTimer = setInterval(tick, staleMs)
   }
   function stopPolling() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   }
+  let offVisible: (() => void) | null = null
 
   onMounted(() => {
     load()
@@ -96,11 +106,14 @@ export function useStaleAwareLoad(opts: StaleAwareOptions) {
         load()
       }
     })
+    offVisible = onVisible(() => { loadIfStale() })
   })
   onUnmounted(() => {
     stopPolling()
     offMutation?.()
     offMutation = null
+    offVisible?.()
+    offVisible = null
   })
   onActivated(() => {
     loadIfStale()

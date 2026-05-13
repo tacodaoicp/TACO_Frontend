@@ -239,11 +239,11 @@ function togglePool(pairKey: string) {
 }
 
 function getSymbol(address: string): string {
-  return store.tokens.find(t => t.address === address)?.symbol ?? '???'
+  return store.getTokenSymbol(address)
 }
 
 function getDecimals(address: string): number {
-  return Number(store.tokens.find(t => t.address === address)?.decimals ?? 8)
+  return store.getTokenDecimals(address)
 }
 
 function formatAmount(amount: bigint, decimals: number): string {

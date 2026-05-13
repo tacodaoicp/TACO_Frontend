@@ -159,11 +159,11 @@ const filteredOrders = computed(() => {
 })
 
 function getTokenSymbol(address: string): string {
-  return store.tokens.find(t => t.address === address)?.symbol ?? '???'
+  return store.getTokenSymbol(address)
 }
 
 function getTokenDecimals(address: string): number {
-  return Number(store.tokens.find(t => t.address === address)?.decimals ?? 8)
+  return store.getTokenDecimals(address)
 }
 
 function getOrderPair(order: TradePrivate2): string {

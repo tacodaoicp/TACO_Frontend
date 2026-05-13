@@ -101,11 +101,11 @@ const currentPairOnly = ref(false)
 const BASE_TOKENS = new Set(['ryjl3-tyaaa-aaaaa-aaaba-cai', 'xevnm-gaaaa-aaaar-qafnq-cai'])
 
 function getSymbol(addr: string): string {
-  return store.tokens.find(t => t.address === addr)?.symbol ?? addr.slice(0, 5) + '...'
+  return store.getTokenSymbol(addr, addr.slice(0, 5) + '...')
 }
 
 function getDecimals(addr: string): number {
-  return Number(store.tokens.find(t => t.address === addr)?.decimals ?? 8)
+  return store.getTokenDecimals(addr)
 }
 
 function formatAmt(amount: bigint, addr: string): string {

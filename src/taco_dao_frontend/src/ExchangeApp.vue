@@ -40,29 +40,8 @@ const isProRoute = computed(() => route.meta?.mode === 'pro')
 const isTerminalRoute = computed(() => route.meta?.mode === 'pro' || route.meta?.mode === 'trade')
 const isAdmin = computed(() => ADMIN_PRINCIPALS.includes(exchangeStore.principalText))
 
-// Font loader — inject Google Fonts <link>s once, keep handles for cleanup.
-// CSP allows fonts.googleapis.com (style-src) and fonts.gstatic.com (font-src).
-const FONT_LINK_IDS = ['tx-font-preconnect-1', 'tx-font-preconnect-2', 'tx-font-stylesheet'] as const
-function injectFonts() {
-  if (document.getElementById(FONT_LINK_IDS[0])) return
-  const preconnect1 = document.createElement('link')
-  preconnect1.id = FONT_LINK_IDS[0]
-  preconnect1.rel = 'preconnect'
-  preconnect1.href = 'https://fonts.googleapis.com'
-  const preconnect2 = document.createElement('link')
-  preconnect2.id = FONT_LINK_IDS[1]
-  preconnect2.rel = 'preconnect'
-  preconnect2.href = 'https://fonts.gstatic.com'
-  preconnect2.crossOrigin = ''
-  const sheet = document.createElement('link')
-  sheet.id = FONT_LINK_IDS[2]
-  sheet.rel = 'stylesheet'
-  sheet.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap'
-  document.head.append(preconnect1, preconnect2, sheet)
-}
-function removeFonts() {
-  for (const id of FONT_LINK_IDS) document.getElementById(id)?.remove()
-}
+// Fonts are now preconnected + stylesheet-linked in index.html so requests
+// start in parallel with the JS bundle parse. Nothing to inject at runtime.
 
 // Global cross-viewport redirect.
 // Pro terminal grid needs ≥ 768px; mobile trade is the narrow-viewport
@@ -79,14 +58,15 @@ function syncTradeRouteToViewport() {
   }
 }
 
-onMounted(async () => {
-  injectFonts()
+onMounted(() => {
   document.documentElement.dataset.txTheme = tacoStore.exchangeTheme
-  try {
-    await exchangeStore.initExchange()
-  } catch (err) {
+  // Fire-and-forget. initExchange already hydrates from localStorage
+  // synchronously inside the store, so views render against populated state
+  // immediately; the canister fetches resolve in the background. Awaiting
+  // here just delayed every onMounted in the app for nothing.
+  exchangeStore.initExchange().catch((err) => {
     console.error('Failed to initialize exchange:', err)
-  }
+  })
 
   window.addEventListener('keydown', handleKeydown)
   mobileMql.addEventListener('change', syncTradeRouteToViewport)
@@ -100,7 +80,6 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   mobileMql.removeEventListener('change', syncTradeRouteToViewport)
   delete document.documentElement.dataset.txTheme
-  removeFonts()
 })
 
 function handleKeydown(e: KeyboardEvent) {

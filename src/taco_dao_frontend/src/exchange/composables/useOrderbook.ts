@@ -6,6 +6,7 @@
 
 import { ref, computed, watch, onMounted, onUnmounted, onActivated, onDeactivated, type Ref } from 'vue'
 import { useExchangeStore } from '../store/exchange.store'
+import { isVisible, onVisible } from './useVisibilityAware'
 import {
   spreadPercent,
   spreadSeverity,
@@ -172,7 +173,12 @@ export function useOrderbook(
   function startPolling() {
     stopPolling()
     fetchOrderbook()
-    pollTimer = setInterval(fetchOrderbook, 3000)
+    // Visibility-gated: while tab is hidden, skip the canister call entirely.
+    // The hidden→visible flip below catches up with one immediate fetch.
+    pollTimer = setInterval(() => {
+      if (!isVisible.value) return
+      fetchOrderbook()
+    }, 3000)
   }
 
   function stopPolling() {
@@ -197,8 +203,16 @@ export function useOrderbook(
     watch(precision, () => fetchOrderbook())
   }
 
-  onMounted(startPolling)
-  onUnmounted(stopPolling)
+  let offVisible: (() => void) | null = null
+  onMounted(() => {
+    startPolling()
+    offVisible = onVisible(() => fetchOrderbook())
+  })
+  onUnmounted(() => {
+    stopPolling()
+    offVisible?.()
+    offVisible = null
+  })
   onActivated(startPolling)
   onDeactivated(stopPolling)
 

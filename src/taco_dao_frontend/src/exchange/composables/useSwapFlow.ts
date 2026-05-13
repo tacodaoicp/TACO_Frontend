@@ -6,7 +6,9 @@
  */
 
 import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useExchangeStore } from '../store/exchange.store'
+import { isVisible as isDocumentVisible, onVisible } from './useVisibilityAware'
 import { depositToken, removeDepositFromCache } from '../utils/deposit'
 import { classifyExchangeError, classifyTransportReject, isTransportError, verifyAfterTransportError, type ClassifyContext, type VerifyStatus } from '../utils/errors'
 import { formatTokenAmount } from '../utils/format'
@@ -586,6 +588,9 @@ export function useSwapFlow() {
     if (!quoteStartTime) quoteStartTime = Date.now()
     quotePollTimer = setTimeout(async () => {
       if (phase.value !== 'quoteReady') return
+      // Don't burn quote bandwidth while the tab is in the background; we'll
+      // catch up via the onVisible hook below.
+      if (!isDocumentVisible.value) { scheduleQuotePoll(); return }
       try {
         await fetchQuote(true)
       } catch { /* ignore silent refresh errors */ }
@@ -923,10 +928,26 @@ export function useSwapFlow() {
     // In the real implementation, the swap card component passes the balance
   }
 
+  // Stop quote polling the moment the user leaves the swap surface (we may
+  // be inside a parent that stays mounted under <KeepAlive>, in which case
+  // onBeforeUnmount won't fire).
+  const route = useRoute()
+  watch(() => route.fullPath, () => { stopQuotePoll() })
+
+  // While the tab is hidden, scheduleQuotePoll reschedules itself without
+  // calling the canister. When the user returns, run one immediate refresh
+  // so the displayed quote isn't stale.
+  const offVisible = onVisible(() => {
+    if (phase.value === 'quoteReady') {
+      fetchQuote(true).catch(() => { /* ignore */ })
+    }
+  })
+
   // Cleanup
   onBeforeUnmount(() => {
     if (debounceTimer) clearTimeout(debounceTimer)
     stopQuotePoll()
+    offVisible()
   })
 
   return {

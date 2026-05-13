@@ -84,20 +84,25 @@ import StatCluster from '../components/common/StatCluster.vue'
 import AllocationBar from '../components/common/AllocationBar.vue'
 import { useExchangeStore, type TokenTrend7d } from '../store/exchange.store'
 import { ADMIN_PRINCIPALS } from '../../composables/useAdminCheck'
+import { isVisible as isDocumentVisible } from '../composables/useVisibilityAware'
 
 const router = useRouter()
 const store = useExchangeStore()
 const isAdmin = computed(() => ADMIN_PRINCIPALS.includes(store.principalText))
 
 const activeTab = ref('wallet')
-const orderCount = ref(0)
-const lpCount = ref(0)
+
+// Counts derive directly from the shared cached queries. No local refs to
+// keep in sync, no parallel fetches on mount — the store already paints from
+// localStorage on first frame and revalidates in the background.
+const orderCount = computed(() => store.userTradesQuery.data?.length ?? 0)
+const lpCount    = computed(() => store.userLpQuery.data?.length ?? 0)
 
 // Total net worth = wallet (free) + LP positions (locked) + claimable fees.
 // Wallet feed comes from WalletTab's @total-usd emit; LP feed is computed
 // alongside the claimable-fees fetch (single getUserLiquidityDetailed pass).
 const walletUsd = ref<number>(0)
-const lpHoldingsUsd = ref<number>(0)
+const lpHoldingsUsd = computed<number>(() => lpAggregates.value?.holdingsTotal ?? 0)
 const netWorth = computed(() => walletUsd.value + lpHoldingsUsd.value)
 const netWorthText = computed(() =>
   netWorth.value > 0
@@ -156,44 +161,36 @@ const return7dPct = computed<number | null>(() => {
 // LP holdings — same loop, summing token0Amount/token1Amount * price so the
 // position value rolls into Total net worth. Fees are kept separate so the
 // hero stat (and the Claim Fees button on each position) stays meaningful.
-const feesEarnedUsd = ref<number | null>(null)
+// Derived directly from the shared LP query. When userLpQuery.data updates
+// (initial fetch, mutation refresh, background revalidation) these recompute
+// in lock-step with LPPositionsTab — both surfaces always agree.
+const lpAggregates = computed<{ feesTotal: number; holdingsTotal: number } | null>(() => {
+  if (!store.isAuthenticated) return null
+  const positions = store.userLpQuery.data
+  if (!positions) return null
+  const byAddr = store.tokensByAddress
+  let feesTotal = 0
+  let holdingsTotal = 0
+  for (const p of positions) {
+    const t0 = byAddr.get(p.token0)
+    const t1 = byAddr.get(p.token1)
+    if (t0) {
+      const dec = Number(t0.decimals)
+      const price = store.getTokenPriceUSD(p.token0) || 0
+      feesTotal     += (Number(p.fee0)         / 10 ** dec) * price
+      holdingsTotal += (Number(p.token0Amount) / 10 ** dec) * price
+    }
+    if (t1) {
+      const dec = Number(t1.decimals)
+      const price = store.getTokenPriceUSD(p.token1) || 0
+      feesTotal     += (Number(p.fee1)         / 10 ** dec) * price
+      holdingsTotal += (Number(p.token1Amount) / 10 ** dec) * price
+    }
+  }
+  return { feesTotal, holdingsTotal }
+})
 
-async function loadLpAggregates() {
-  if (!store.isAuthenticated) {
-    feesEarnedUsd.value = null
-    lpHoldingsUsd.value = 0
-    return
-  }
-  try {
-    const positions = await store.getUserLiquidityDetailed()
-    const byAddr = new Map<string, { decimals: number; priceUsd: number }>()
-    for (const t of store.tokens) {
-      byAddr.set(t.address, {
-        decimals: Number(t.decimals),
-        priceUsd: store.getTokenPriceUSD(t.address) || 0,
-      })
-    }
-    let feesTotal = 0
-    let holdingsTotal = 0
-    for (const p of positions) {
-      const t0 = byAddr.get(p.token0)
-      const t1 = byAddr.get(p.token1)
-      if (t0) {
-        feesTotal     += (Number(p.fee0)         / 10 ** t0.decimals) * t0.priceUsd
-        holdingsTotal += (Number(p.token0Amount) / 10 ** t0.decimals) * t0.priceUsd
-      }
-      if (t1) {
-        feesTotal     += (Number(p.fee1)         / 10 ** t1.decimals) * t1.priceUsd
-        holdingsTotal += (Number(p.token1Amount) / 10 ** t1.decimals) * t1.priceUsd
-      }
-    }
-    feesEarnedUsd.value = feesTotal
-    lpHoldingsUsd.value = holdingsTotal
-  } catch {
-    feesEarnedUsd.value = null
-    lpHoldingsUsd.value = 0
-  }
-}
+const feesEarnedUsd = computed<number | null>(() => lpAggregates.value?.feesTotal ?? null)
 
 // Wallet composition — raw holdings from WalletTab, then filtered below.
 const holdingsRaw = ref<Array<{ address: string; symbol: string; usdValue: number; color: string }>>([])
@@ -279,56 +276,25 @@ watch(listedTokenKey, (key) => {
 }, { immediate: true })
 
 const TREND_REFRESH_MS = 5 * 60 * 1000
-let unsubscribeMutation: (() => void) | null = null
 
-async function refreshLpCount() {
-  try {
-    const lps = await store.getUserLiquidityDetailed().catch(() => [])
-    lpCount.value = lps.length
-  } catch { /* ignore */ }
-}
+// LP & open-order counts, hero net-worth, and "Fees to claim" all derive from
+// the store's shared cached queries (userLpQuery, userTradesQuery). Those
+// queries are refreshed centrally by the mutation bus + auth flips inside the
+// store, so this view no longer needs onMutation subscriptions or auth
+// watchers — every reactive consumer here updates automatically.
 
-async function refreshAuthOnlyData() {
-  if (!store.isAuthenticated) return
-  try {
-    const orders = await store.getUserTrades().catch(() => [])
-    orderCount.value = orders.length
-  } catch { /* ignore */ }
-  refreshLpCount()
-  loadLpAggregates()
-}
-
-// On cold F5, auth often restores AFTER this view mounts. Fire the
-// auth-only fetches the moment isAuthenticated flips so the hero
-// counters and LP totals don't sit empty until the next interaction.
-watch(() => store.isAuthenticated, (v, prev) => {
-  if (v && !prev) refreshAuthOnlyData()
-})
-
-onMounted(async () => {
+onMounted(() => {
+  // Touch the queries so they ensure() — cache-first when warm (zero network),
+  // or background refresh when cold. The Promise is fire-and-forget; nothing
+  // here awaits it because the template reads the reactive .data refs.
   if (store.isAuthenticated) {
-    try {
-      const [orders, lps] = await Promise.all([
-        store.getUserTrades().catch(() => []),
-        store.getUserLiquidityDetailed().catch(() => []),
-      ])
-      orderCount.value = orders.length
-      lpCount.value = lps.length
-    } catch { /* ignore */ }
-    // Fires its own fetch; runs in parallel with the counts query above.
-    loadLpAggregates()
+    void store.userTradesQuery.ensure()
+    void store.userLpQuery.ensure()
   }
-  // Re-fetch LP aggregates + counts whenever any LP mutation lands so the
-  // hero "Total net worth" doesn't double-count tokens that just left LP
-  // and returned to the wallet.
-  unsubscribeMutation = store.onMutation((kind) => {
-    if (kind === 'lp' || kind === 'claim') {
-      loadLpAggregates()
-      refreshLpCount()
-    }
-  })
-  // Periodic trend refresh while the view is mounted.
+  // Periodic trend refresh while the view is mounted — visibility-gated so
+  // we don't burn a 28-sample query while the tab is hidden.
   trendsTimer = window.setInterval(() => {
+    if (!isDocumentVisible.value) return
     const addrs = listedTokenKey.value.split('|').filter(Boolean)
     if (addrs.length) loadTrends(addrs)
   }, TREND_REFRESH_MS)
@@ -338,10 +304,6 @@ onUnmounted(() => {
   if (trendsTimer !== null) {
     clearInterval(trendsTimer)
     trendsTimer = null
-  }
-  if (unsubscribeMutation) {
-    unsubscribeMutation()
-    unsubscribeMutation = null
   }
 })
 </script>

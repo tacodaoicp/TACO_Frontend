@@ -107,18 +107,31 @@ export function formatPercentage(pct: number): string {
 /**
  * Format a nanosecond IC timestamp to relative or absolute time.
  */
+// Intl.DateTimeFormat instantiation is the slow part. Hoist to module scope
+// so per-row callers in TradeHistoryTab / OpenOrdersTab reuse one formatter
+// instead of building a new one each cell.
+const SHORT_DT_FMT = new Intl.DateTimeFormat(undefined, {
+  month:  'short',
+  day:    'numeric',
+  hour:   '2-digit',
+  minute: '2-digit',
+})
+const FULL_DT_FMT = new Intl.DateTimeFormat(undefined, {
+  year:   'numeric',
+  month:  'short',
+  day:    'numeric',
+  hour:   '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+})
+
 export function formatTimestamp(nsTimestamp: bigint): string {
   const ms = Number(nsTimestamp / 1_000_000n)
   const diff = Date.now() - ms
   if (diff < 60_000) return Math.floor(diff / 1000) + 's ago'
   if (diff < 3_600_000) return Math.floor(diff / 60_000) + 'm ago'
   if (diff < 86_400_000) return Math.floor(diff / 3_600_000) + 'h ago'
-  return new Date(ms).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return SHORT_DT_FMT.format(ms)
 }
 
 /**
@@ -126,14 +139,7 @@ export function formatTimestamp(nsTimestamp: bigint): string {
  */
 export function formatFullTimestamp(nsTimestamp: bigint): string {
   const ms = Number(nsTimestamp / 1_000_000n)
-  return new Date(ms).toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  })
+  return FULL_DT_FMT.format(ms)
 }
 
 /**

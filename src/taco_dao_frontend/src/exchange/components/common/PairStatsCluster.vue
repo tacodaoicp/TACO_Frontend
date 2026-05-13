@@ -29,6 +29,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangePairs } from '../../composables/useExchangePairs'
+import { isVisible as isDocumentVisible, onVisible } from '../../composables/useVisibilityAware'
 
 const store = useExchangeStore()
 const { activePair } = useExchangePairs()
@@ -88,14 +89,21 @@ watch(
   loadStats24h,
   { immediate: true },
 )
+let offStatsVisible: (() => void) | null = null
 onMounted(() => {
-  statsTimer = window.setInterval(loadStats24h, 60_000)
+  statsTimer = window.setInterval(() => {
+    if (!isDocumentVisible.value) return
+    loadStats24h()
+  }, 60_000)
+  offStatsVisible = onVisible(() => loadStats24h())
 })
 onUnmounted(() => {
   if (statsTimer !== null) {
     clearInterval(statsTimer)
     statsTimer = null
   }
+  offStatsVisible?.()
+  offStatsVisible = null
 })
 </script>
 

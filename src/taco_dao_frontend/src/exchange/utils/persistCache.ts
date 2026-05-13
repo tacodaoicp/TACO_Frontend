@@ -41,6 +41,28 @@ export function readCache<T>(key: string, maxAgeMs: number): T | null {
   }
 }
 
+/**
+ * Like readCache but returns the timestamp too, and never applies a TTL filter.
+ * cachedQuery needs the original write time so its `lastFetchedAt` survives a
+ * page reload — otherwise an instant refetch would fire even though the data
+ * on screen is seconds old.
+ */
+export function readCacheEntry<T>(key: string): { v: T; t: number } | null {
+  try {
+    const raw = localStorage.getItem(`${NAMESPACE}:${key}`)
+    if (!raw) return null
+    const entry = JSON.parse(raw, bigintReviver) as CacheEntry<T>
+    if (!entry || typeof entry.t !== 'number') return null
+    return entry
+  } catch {
+    return null
+  }
+}
+
+export function removeCache(key: string): void {
+  try { localStorage.removeItem(`${NAMESPACE}:${key}`) } catch { /* ignore */ }
+}
+
 export function writeCache<T>(key: string, value: T): void {
   try {
     const entry: CacheEntry<T> = { v: value, t: Date.now() }

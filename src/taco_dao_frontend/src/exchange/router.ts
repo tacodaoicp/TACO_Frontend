@@ -10,18 +10,44 @@ const RecoverView = () => import('./views/RecoverView.vue')
 const MobileTradeView = () => import('./views/MobileTradeView.vue')
 const StyleGuideView = () => import('./views/StyleGuideView.vue')
 
-// Preload all route chunks after initial page load
+// Route-chunk loader registry — `preloadRoute('Portfolio')` from a nav link's
+// hover handler resolves the dynamic import for that route. Empty strings or
+// unknown names are no-ops.
+const routeChunkLoaders: Record<string, () => Promise<unknown>> = {
+  ProTrade:      ProTradeView,
+  MobileTrade:   MobileTradeView,
+  EasySwap:      EasySwapView,
+  Portfolio:     PortfolioView,
+  Pool:          PoolView,
+  OTC:           OTCView,
+  ExchangeAdmin: ExchangeAdminView,
+  Recover:       RecoverView,
+  StyleGuide:    StyleGuideView,
+}
+const preloadedChunks = new Set<string>()
+export function preloadRoute(name: string): void {
+  if (!name || preloadedChunks.has(name)) return
+  const loader = routeChunkLoaders[name]
+  if (!loader) return
+  preloadedChunks.add(name)
+  void loader()
+}
+
+// At load, idle-preload only the hot trio (Pro / Portfolio / Easy). Pool, OTC,
+// Recover, etc. only load when the user signals intent (hover/focus on the
+// nav link). Saves a chunk of bytes the user may never need.
 if (typeof window !== 'undefined') {
+  const idle = (cb: () => void) => {
+    const ric = (window as any).requestIdleCallback
+    if (typeof ric === 'function') ric(cb, { timeout: 2000 })
+    else setTimeout(cb, 1500)
+  }
   window.addEventListener('load', () => {
-    setTimeout(() => {
-      ProTradeView()
-      EasySwapView()
-      PortfolioView()
-      PoolView()
-      OTCView()
-      MobileTradeView()
-      RecoverView()
-    }, 1000)
+    idle(() => {
+      preloadRoute('ProTrade')
+      preloadRoute('Portfolio')
+      preloadRoute('EasySwap')
+    })
   }, { once: true })
 }
 
