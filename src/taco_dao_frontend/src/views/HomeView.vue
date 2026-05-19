@@ -270,6 +270,21 @@
 
                     </div>
 
+                    <!-- kvp (ntn) -->
+                    <div class="home-view__taco-assets__kvp">
+
+                        <!-- key -->
+                        <span class="home-view__taco-assets__kvp__key"
+                            style="padding-left: 0.5rem">
+                            <img :src="neutriniteLogo" class="home-view__taco-assets__svg"/>
+                            NTN
+                        </span>
+
+                        <!-- value -->
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasuryNtnValueInUsd)}}</span>
+
+                    </div>
+
                     <hr class="m-0 p-0"></hr>
 
                     <!-- kvp (portfolio) -->
@@ -2177,6 +2192,7 @@
   import icpLogo from "../assets/tokens/snspng/icp.png"
   import dkpLogo from "../assets/tokens/snspng/dragginz.png"
   import solumLogo from "../assets/tokens/solum.png"
+  import neutriniteLogo from "../assets/tokens/snspng/neutrinite.png"
   import TaggrSocialImg from '../assets/images/social/taggr.vue'
   import CatalyzeSocialImg from '../assets/images/social/catalyze.vue'
   import GithubSocialImg from '../assets/images/social/github.vue'
@@ -2217,7 +2233,7 @@
   const { userLoggedIn } = storeToRefs(tacoStore)
 
   // dao
-  const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd } = storeToRefs(tacoStore)
+  const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
   /////////////////////
   // Local Variables //

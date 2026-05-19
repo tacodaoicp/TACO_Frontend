@@ -99,7 +99,7 @@
 
             <!-- kvp (solum) -->
             <div class="taco-entity-value-chip__tooltip__kvp pt-2"
-                style="padding: 0.75rem 1rem 1rem 1.25rem !important; border-bottom: 1px solid var(--table-row-border);">
+                style="padding-top: 0.75rem !important; padding-left: 1.25rem !important;">
 
                 <!-- key -->
                 <span class="taco-entity-value-chip__tooltip__kvp__key
@@ -113,6 +113,23 @@
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value
                     taco-text-black-to-white">${{formatNumber(snsTreasurySolumValueInUsd)}}</span>
+
+            </div>
+
+            <!-- kvp (ntn) -->
+            <div class="taco-entity-value-chip__tooltip__kvp pt-2"
+                style="padding: 0.75rem 1rem 1rem 1.25rem !important; border-bottom: 1px solid var(--table-row-border);">
+
+                <!-- key -->
+                <span class="taco-entity-value-chip__tooltip__kvp__key
+                    taco-text-black-to-white">
+                    <img :src="neutriniteLogo" style="width: 1rem; height: 1rem;"/>
+                    NTN
+                </span>
+
+                <!-- value -->
+                <span class="taco-entity-value-chip__tooltip__kvp__value
+                    taco-text-black-to-white">${{formatNumber(snsTreasuryNtnValueInUsd)}}</span>
 
             </div>
 
@@ -288,6 +305,7 @@
     import icpLogo from "../../assets/tokens/snspng/icp.png"
     import dkpLogo from "../../assets/tokens/snspng/dragginz.png"
     import solumLogo from "../../assets/tokens/solum.png"
+    import neutriniteLogo from "../../assets/tokens/snspng/neutrinite.png"
     import TacoCoinIcon from "../../assets/tokens/tacoCoinIcon.vue"
 
     ///////////
@@ -304,7 +322,7 @@
     // # STATE #
 
     // dao
-    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd } = storeToRefs(tacoStore)
+    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
     // prices (for watching)
     const { icpPriceUsd, tacoPriceUsd, dkpPriceUsd } = storeToRefs(tacoStore)
@@ -376,14 +394,14 @@
     // watchers //
     //////////////
 
-    // Watch for prices to load - refetch treasury values when prices become available
-    // This handles the case where treasury balances are fetched before prices arrive
+    // Watch for prices to load - fetch treasury balances once prices become available.
+    // USD rows and total are computeds, so they react to price changes automatically — only the
+    // first balance fetch needs gating. The store function has its own dedup, so no force flag needed.
     watch(
         () => icpPriceUsd.value + tacoPriceUsd.value + dkpPriceUsd.value,
         (newTotal, oldTotal) => {
-            // If prices just became available (were 0, now have value) and treasury shows 0, refetch
-            if (oldTotal === 0 && newTotal > 0 && totalTreasuryValueInUsd.value === 0) {
-                fetchTotalTreasuryValueInUsd(true) // force refetch since prices are now available
+            if (oldTotal === 0 && newTotal > 0) {
+                fetchTotalTreasuryValueInUsd()
             }
         }
     )

@@ -3,7 +3,7 @@
 /////////////
 
 // vue
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
@@ -1477,17 +1477,75 @@ export const useTacoStore = defineStore('taco', () => {
     const cachedTacoNeurons = ref<any[]>([])
     const cachedNeuronRewardBalances = ref<Map<string, number>>(new Map())
 
-    // sns provided canisters
-    const snsTreasuryTacoValueInUsd = ref(0)
-    const snsTreasuryIcpValueInUsd = ref(0)
-    const snsTreasuryDkpValueInUsd = ref(0)
-    const snsTreasurySolumValueInUsd = ref(0)
-    const totalTreasuryValueInUsd = ref(0)
-
     // solum: off-chain reserve, 10k ICP from 2026-04-01, 10% APR simple linear accrual
     const SOLUM_INITIAL_ICP = 10_000
     const SOLUM_START_DATE_MS = Date.UTC(2026, 3, 1)
     const SOLUM_APR = 0.10
+
+    // off-chain ICP held outside the SNS treasury (locked-neuron + reserve)
+    const EXTRA_ICP_HOLDINGS = 7832
+
+    // NTN held by a DAO-controlled canister; value derived from fetchedTokenDetails price feed
+    const NTN_DEFAULT_HOLDINGS = 3423
+    const NTN_HOLDER_PRINCIPAL = '6jvpj-sqaaa-aaaaj-azwnq-cai'
+    const NTN_LEDGER_CANISTER_ID = 'f54if-eqaaa-aaaaq-aacea-cai'
+    const ICP_LEDGER_CANISTER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
+
+    // Raw token amounts in the SNS treasury (written by fetchTotalTreasuryValueInUsd).
+    // USD values below are computeds so price/balance updates flow into the total automatically.
+    const snsTreasuryTacoAmount = ref<number>(0)
+    const snsTreasuryIcpAmount = ref<number>(0)  // queried treasury ICP only — EXTRA_ICP_HOLDINGS is added in the computed
+    const snsTreasuryDkpAmount = ref<number>(0)
+    const snsTreasuryNtnHoldings = ref<number>(NTN_DEFAULT_HOLDINGS)
+
+    const ntnPriceUsd = computed<number>(() => {
+        const entry = fetchedTokenDetails.value.find(
+            (e) => e[0].toText() === NTN_LEDGER_CANISTER_ID
+        )
+        return entry ? Number(entry[1].priceInUSD) : 0
+    })
+
+    const snsTreasuryTacoValueInUsd = computed<number>(
+        () => snsTreasuryTacoAmount.value * tacoPriceUsd.value
+    )
+    const snsTreasuryIcpValueInUsd = computed<number>(
+        () => (snsTreasuryIcpAmount.value + EXTRA_ICP_HOLDINGS) * icpPriceUsd.value
+    )
+    const snsTreasuryDkpValueInUsd = computed<number>(
+        () => snsTreasuryDkpAmount.value * dkpPriceUsd.value
+    )
+    const snsTreasurySolumValueInUsd = computed<number>(() => {
+        const yearsSinceSolumStart = Math.max(
+            0,
+            (Date.now() - SOLUM_START_DATE_MS) / (1000 * 60 * 60 * 24 * 365.25)
+        )
+        const solumIcpAmount = SOLUM_INITIAL_ICP * (1 + SOLUM_APR * yearsSinceSolumStart)
+        return solumIcpAmount * icpPriceUsd.value
+    })
+    const snsTreasuryNtnValueInUsd = computed<number>(
+        () => snsTreasuryNtnHoldings.value * ntnPriceUsd.value
+    )
+    const totalTreasuryValueInUsd = computed<number>(
+        () => snsTreasuryTacoValueInUsd.value
+            + snsTreasuryIcpValueInUsd.value
+            + snsTreasuryDkpValueInUsd.value
+            + snsTreasurySolumValueInUsd.value
+            + snsTreasuryNtnValueInUsd.value
+    )
+
+    // also source ICP price from fetchedTokenDetails (reuses existing fetch; other providers stay as fallbacks)
+    watch(
+        fetchedTokenDetails,
+        (newDetails) => {
+            const icpEntry = newDetails.find(
+                (e) => e[0].toText() === ICP_LEDGER_CANISTER_ID
+            )
+            if (!icpEntry) return
+            const price = Number(icpEntry[1].priceInUSD)
+            if (price > 0) icpPriceUsd.value = price
+        },
+        { immediate: true }
+    )
 
     // treasury
     const fetchedTradingStatus = ref()
@@ -3152,8 +3210,9 @@ export const useTacoStore = defineStore('taco', () => {
             return false
         }
 
-        // if total treasury value in usd is already set, return (unless forced)
-        if (totalTreasuryValueInUsd.value > 0 && !forceRefetch) {
+        // if we've already fetched treasury balances, return (unless forced)
+        // (use a balance ref as the signal — totalTreasuryValueInUsd is now reactive and includes Solum, which is non-zero before any on-chain fetch)
+        if (snsTreasuryTacoAmount.value > 0 && !forceRefetch) {
             return true
         }
 
@@ -3227,65 +3286,29 @@ export const useTacoStore = defineStore('taco', () => {
         // log
         // console.log('treasury dkp balance:', snsTreasuryDkpBalance)
 
+        /////////////////////////////////////
+        // fetch NTN held by holder canister //
+        /////////////////////////////////////
+
+        const snsTreasuryNtnBalance = await icrc1BalanceOf(
+            NTN_LEDGER_CANISTER_ID,
+            Principal.fromText(NTN_HOLDER_PRINCIPAL),
+        )
+
         /////////////////
-        // format data //
+        // store balances; USD rows + total are reactive computeds that follow price refs //
         /////////////////
 
-        // convert balances to numbers
         const tacoBalance = snsTreasuryTacoBalance ? Number(snsTreasuryTacoBalance) : 0
         const icpBalance = snsTreasuryIcpBalance ? Number(snsTreasuryIcpBalance) : 0
         const dkpBalance = snsTreasuryDkpBalance ? Number(snsTreasuryDkpBalance) : 0
+        const ntnBalance = snsTreasuryNtnBalance ? Number(snsTreasuryNtnBalance) : 0
 
-        // convert to proper units (ICP has 8 decimals, TACO has 8 decimals)
-        const tacoBalanceNormalized = tacoBalance / Math.pow(10, 8)
-        const icpBalanceNormalized = icpBalance / Math.pow(10, 8)
-        const dkpBalanceNormalized = dkpBalance / Math.pow(10, 8)
+        snsTreasuryTacoAmount.value = tacoBalance / Math.pow(10, 8)
+        snsTreasuryIcpAmount.value = icpBalance / Math.pow(10, 8)
+        snsTreasuryDkpAmount.value = dkpBalance / Math.pow(10, 8)
+        snsTreasuryNtnHoldings.value = ntnBalance / Math.pow(10, 8)
 
-        // convert to USD using current prices
-        const tacoValueUsd = tacoBalanceNormalized * tacoPriceUsd.value
-
-        // log
-        // console.log('taco value in usd: %c$' + tacoValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
-
-        // convert to USD using current prices
-        const icpValueUsd = icpBalanceNormalized * icpPriceUsd.value
-
-        // log
-        // console.log('icp value in usd: %c$' + icpValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
-
-        // convert to USD using current prices
-        const dkpValueUsd = dkpBalanceNormalized * dkpPriceUsd.value
-
-        // log
-        // console.log('dkp value in usd: %c$' + dkpValueUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
-
-        // solum: 10k ICP since 2026-04-01, 10% APR simple linear accrual
-        const yearsSinceSolumStart = Math.max(0, (Date.now() - SOLUM_START_DATE_MS) / (1000 * 60 * 60 * 24 * 365.25))
-        const solumIcpAmount = SOLUM_INITIAL_ICP * (1 + SOLUM_APR * yearsSinceSolumStart)
-        const solumValueUsd = solumIcpAmount * icpPriceUsd.value
-
-        // calculate total treasury value in usd
-        const totalValue = tacoValueUsd + icpValueUsd + dkpValueUsd + solumValueUsd
-
-        // log total value
-        // console.log('total treasury value: %c$' + totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'color: green; font-weight: bold;')
-
-        // set sns treasury taco value in usd
-        snsTreasuryTacoValueInUsd.value = tacoValueUsd
-
-        // set sns treasury icp value in usd
-        snsTreasuryIcpValueInUsd.value = icpValueUsd
-
-        // set sns treasury dkp value in usd
-        snsTreasuryDkpValueInUsd.value = dkpValueUsd
-
-        // set solum value in usd
-        snsTreasurySolumValueInUsd.value = solumValueUsd
-
-        // set total treasury value in usd
-        totalTreasuryValueInUsd.value = totalValue
-
-        // return
         return
 
     }
@@ -6503,9 +6526,29 @@ export const useTacoStore = defineStore('taco', () => {
                 subaccount: [] // Empty subaccount
             }
 
-            const results = await Promise.allSettled(
-                neuronIds.map(id => rewardsActor.withdraw(account, [id]) as Promise<any>)
-            )
+            // Sequential, not parallel: the rewards canister forwards each
+            // withdraw to the ICRC-1 ledger, and the ledger dedupes by
+            // (caller, to, amount, created_at_time, memo). When the
+            // withdraws fired via Promise.allSettled in the same JS tick
+            // they hit the ledger with identical receive-times, causing the
+            // second+third calls to be rejected as
+            // `{Duplicate:{duplicate_of:N}}`. Sequencing with a small
+            // inter-call gap gives each transfer a distinct receive-time
+            // so the ledger treats them as separate txs.
+            const INTER_CLAIM_GAP_MS = 150
+            const results: PromiseSettledResult<any>[] = []
+            for (let i = 0; i < neuronIds.length; i++) {
+                const id = neuronIds[i]
+                try {
+                    const value = await (rewardsActor.withdraw(account, [id]) as Promise<any>)
+                    results.push({ status: 'fulfilled', value })
+                } catch (reason) {
+                    results.push({ status: 'rejected', reason })
+                }
+                if (i < neuronIds.length - 1) {
+                    await new Promise(r => setTimeout(r, INTER_CLAIM_GAP_MS))
+                }
+            }
 
             let okCount = 0
             let failCount = 0
@@ -8954,6 +8997,7 @@ export const useTacoStore = defineStore('taco', () => {
         snsTreasuryIcpValueInUsd,
         snsTreasuryDkpValueInUsd,
         snsTreasurySolumValueInUsd,
+        snsTreasuryNtnValueInUsd,
         tacoForumId,
         proposalsTopicId,
         fetchedForums,

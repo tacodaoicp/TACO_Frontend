@@ -559,13 +559,42 @@ export default {
 
             const nowMs = BigInt(Date.now())
             const endTime = nowMs * BigInt(1_000_000)
-            const startTime = BigInt(0)
 
-            const graphResult = await rewardsActor.getUserPerformanceGraphData(
-              Principal.fromText(props.principal),
-              startTime,
-              endTime
-            )
+            // Leaderboard data starts Feb 2026. For large accounts the full payload
+            // exceeds the 2 MiB IC query reply limit and throws a RejectError with
+            // "msg_reply_data_append: application payload size ... cannot be larger".
+            // Drop the oldest month and retry until the response fits.
+            const DATA_START_MS = Date.UTC(2026, 1, 1)
+            const MAX_MONTHS_CUTOFF = 36
+            const isPayloadTooLargeError = (e) => {
+              const m = e instanceof Error ? e.message : String(e)
+              return m.includes('msg_reply_data_append') || m.includes('payload size')
+            }
+            const addMonthsUtc = (baseMs, months) => {
+              const d = new Date(baseMs)
+              return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate())
+            }
+
+            let monthsCutoff = 0
+            let graphResult
+            while (monthsCutoff <= MAX_MONTHS_CUTOFF) {
+              const startTimeMs = monthsCutoff === 0 ? 0 : addMonthsUtc(DATA_START_MS, monthsCutoff)
+              const startTime = BigInt(startTimeMs) * BigInt(1_000_000)
+              try {
+                graphResult = await rewardsActor.getUserPerformanceGraphData(
+                  Principal.fromText(props.principal),
+                  startTime,
+                  endTime
+                )
+                break
+              } catch (e) {
+                if (!isPayloadTooLargeError(e)) throw e
+                monthsCutoff++
+              }
+            }
+            if (!graphResult) {
+              throw new Error('Could not load performance graph within size limit')
+            }
 
             if ('err' in graphResult) {
               error.value = formatError(graphResult.err)

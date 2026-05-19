@@ -1555,10 +1555,14 @@ const claimAllRewards = async () => {
   if (!tacoStore.userLoggedIn || totalRewards.value <= 0) return
   
   claimingAllRewards.value = true
+  tacoStore.addToast({
+    id: Date.now(),
+    code: 'claim-all-started',
+    title: 'Claiming rewards',
+    icon: 'fa-solid fa-circle-info',
+    message: 'Claiming all rewards in the background — you can keep using the app.',
+  })
   try {
-
-    // turn app loading on
-    tacoStore.appLoadingOn()
 
     // Use the real claim all function from taco store
     const success = await tacoStore.claimAllNeuronRewards(categorizedNeurons.value.all)
@@ -1588,10 +1592,6 @@ const claimAllRewards = async () => {
     })
   } finally {
     claimingAllRewards.value = false
-
-    // turn app loading off
-    tacoStore.appLoadingOff()
-    
   }
 }
 
