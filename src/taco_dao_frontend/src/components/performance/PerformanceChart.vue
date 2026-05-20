@@ -100,7 +100,7 @@ import {
 } from 'lightweight-charts'
 import { useTacoStore } from '../../stores/taco.store'
 import { storeToRefs } from 'pinia'
-import { getChartPort } from '../../workers/chart-worker-port'
+import { createChartPort } from '../../workers/chart-worker-port'
 
 // Module-level cache for getUserPerformanceGraphData results by principal
 // Used only when data is not provided via props (leaderboard/following cases)
@@ -180,7 +180,7 @@ export default {
     })
 
     // Chart compute worker — singleton, preloaded at app startup
-    const chartPort = getChartPort()
+    const { port: chartPort, dispose: disposeChartPort } = createChartPort()
     chartPort.onmessage = (e) => {
       computing.value = false
       const { usdSeries: usd, icpSeries: icp, tooltipData } = e.data
@@ -563,22 +563,19 @@ export default {
             // Leaderboard data starts Feb 2026. For large accounts the full payload
             // exceeds the 2 MiB IC query reply limit and throws a RejectError with
             // "msg_reply_data_append: application payload size ... cannot be larger".
-            // Drop the oldest month and retry until the response fits.
+            // Drop the oldest 2 weeks and retry until the response fits.
             const DATA_START_MS = Date.UTC(2026, 1, 1)
-            const MAX_MONTHS_CUTOFF = 36
+            const SHIFT_MS = 14 * 24 * 60 * 60 * 1000 // 2 weeks
+            const MAX_SHIFTS = 200 // safety cap (~7.7 years at 2-week steps)
             const isPayloadTooLargeError = (e) => {
               const m = e instanceof Error ? e.message : String(e)
               return m.includes('msg_reply_data_append') || m.includes('payload size')
             }
-            const addMonthsUtc = (baseMs, months) => {
-              const d = new Date(baseMs)
-              return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate())
-            }
 
-            let monthsCutoff = 0
+            let shiftCount = 0
             let graphResult
-            while (monthsCutoff <= MAX_MONTHS_CUTOFF) {
-              const startTimeMs = monthsCutoff === 0 ? 0 : addMonthsUtc(DATA_START_MS, monthsCutoff)
+            while (shiftCount <= MAX_SHIFTS) {
+              const startTimeMs = shiftCount === 0 ? 0 : DATA_START_MS + shiftCount * SHIFT_MS
               const startTime = BigInt(startTimeMs) * BigInt(1_000_000)
               try {
                 graphResult = await rewardsActor.getUserPerformanceGraphData(
@@ -589,7 +586,7 @@ export default {
                 break
               } catch (e) {
                 if (!isPayloadTooLargeError(e)) throw e
-                monthsCutoff++
+                shiftCount++
               }
             }
             if (!graphResult) {
@@ -688,6 +685,7 @@ export default {
       chart = null
       usdSeries = null
       icpSeries = null
+      disposeChartPort()
     })
 
     return {
@@ -817,6 +815,7 @@ export default {
 .baseline-label {
   font-size: 0.8rem;
   white-space: nowrap;
+  font-family: 'Space Mono', monospace;
 }
 
 .baseline-select {

@@ -139,24 +139,36 @@ defineEmits<{
 
 const store = useExchangeStore()
 
-interface PoolRow {
+// Raw on-chain shape: no USD math, no derivatives. Populated from getAllPoolStats /
+// fallback paths. The derived `pools` computed below multiplies reserves by live
+// store prices, so TVL/APR/Vol24h re-derive automatically when prices arrive.
+interface PoolRowRaw {
   token0: string
   token1: string
   symbol0: string
   symbol1: string
+  dec0: number
+  dec1: number
+  reserve0: number          // normalized: raw / 10^dec0
+  reserve1: number          // normalized: raw / 10^dec1
+  volume24hTok1: number     // normalized in token1 base units (backend contract since 2026-04-17)
   reserve0Formatted: string
   reserve1Formatted: string
   priceFormatted: string
   hasLiquidity: boolean
   isDust: boolean
   currentPrice: number
+  feeRateBps: number
+  lpFeeSharePct: number     // 0–100, defaults to LP_FEE_SHARE_PCT_DEFAULT when stats omit it
+  priceChange24h: number
+}
+
+interface PoolRow extends PoolRowRaw {
   reserve0USD: number
   reserve1USD: number
   totalValueUSD: number
   volume24hUSD: number
-  feeRateBps: number
   apr24h: number
-  priceChange24h: number
 }
 
 interface ExpandedStats {
@@ -168,11 +180,59 @@ interface ExpandedStats {
   feesLifetime1Formatted: string
 }
 
-const pools = ref<PoolRow[]>([])
+interface ExpandedRaw {
+  pairKey: string                  // `${token0}/${token1}` of the expanded row
+  volume7dTok1: number             // normalized volume in token1 base units
+  lpFeeSharePct: number            // 0–100
+  feesLifetime0: number            // already-normalized (token amount)
+  feesLifetime1: number            // already-normalized
+  feesLifetime0Formatted: string
+  feesLifetime1Formatted: string
+}
+
+const rawPools = ref<PoolRowRaw[]>([])
 const loading = ref(true)
 const expandedPool = ref<string | null>(null)
 const poolSearch = ref('')
-const expandedStats = ref<ExpandedStats | null>(null)
+const expandedRaw = ref<ExpandedRaw | null>(null)
+
+// Derived rows: re-runs whenever rawPools mutates OR store.tokenPricesUSD updates
+// (getTokenPriceUSD reads the reactive Map ref). Fixes the cache-vs-prices race
+// where TVL/Vol24h/APR painted from snapshot values taken before prices arrived.
+const pools = computed<PoolRow[]>(() =>
+  rawPools.value.map((r) => {
+    const p0 = store.getTokenPriceUSD(r.token0)
+    const p1 = store.getTokenPriceUSD(r.token1)
+    const reserve0USD = r.reserve0 * p0
+    const reserve1USD = r.reserve1 * p1
+    const totalValueUSD = reserve0USD + reserve1USD
+    const volume24hUSD = r.volume24hTok1 * p1
+    // Same APR formula computePoolMetrics used: vol × feeRate × lpShare / TVL × 365
+    const fee24hUSD = volume24hUSD * r.feeRateBps * r.lpFeeSharePct / (10000 * 100)
+    const apr24h = totalValueUSD > 0 ? (fee24hUSD * 365 / totalValueUSD) * 100 : 0
+    return { ...r, reserve0USD, reserve1USD, totalValueUSD, volume24hUSD, apr24h }
+  })
+)
+
+// Expanded-row stats re-derive on price updates too. Finds the matching pool in
+// the derived `pools` computed so TVL used for APR also reflects current prices.
+const expandedStats = computed<ExpandedStats | null>(() => {
+  const e = expandedRaw.value
+  if (!e) return null
+  const pool = pools.value.find(p => `${p.token0}/${p.token1}` === e.pairKey)
+  if (!pool) return null
+  const vol7dUSD = e.volume7dTok1 * store.getTokenPriceUSD(pool.token1)
+  const fee7dUSD = vol7dUSD * pool.feeRateBps * e.lpFeeSharePct / (10000 * 100)
+  const apr7d = pool.totalValueUSD > 0 ? (fee7dUSD * 52 / pool.totalValueUSD) * 100 : 0
+  return {
+    vol7dUSD,
+    apr7d,
+    feesLifetime0: e.feesLifetime0,
+    feesLifetime1: e.feesLifetime1,
+    feesLifetime0Formatted: e.feesLifetime0Formatted,
+    feesLifetime1Formatted: e.feesLifetime1Formatted,
+  }
+})
 
 type SortKey = 'pair' | 'tvl' | 'volume' | 'apr' | 'price' | 'change'
 const sortKey = ref<SortKey>('tvl')
@@ -228,22 +288,6 @@ function getDecimals(address: string): number {
 // from stats instead of this constant.
 const LP_FEE_SHARE_PCT_DEFAULT = 70
 
-function computePoolMetrics(stats: any) {
-  const p0usd = store.getTokenPriceUSD(stats.token0)
-  const p1usd = store.getTokenPriceUSD(stats.token1)
-  const dec0 = Number(stats.decimals0)
-  const dec1 = Number(stats.decimals1)
-  const tvl = (Number(stats.reserve0) / 10 ** dec0) * p0usd
-            + (Number(stats.reserve1) / 10 ** dec1) * p1usd
-  // CONTRACT: backend returns volume in token1 (quote) base units (post-2026-04-17 backend upgrade).
-  const vol24hUSD = (Number(stats.volume24h) / 10 ** dec1) * p1usd
-  const feeRate = Number(stats.feeRateBps)
-  const lpShare = Number(stats.lpFeeSharePct ?? LP_FEE_SHARE_PCT_DEFAULT)
-  const fee24hUSD = vol24hUSD * feeRate * lpShare / (10000 * 100)
-  const apr24h = tvl > 0 ? (fee24hUSD * 365 / tvl) * 100 : 0
-  return { tvl, vol24hUSD, fee24hUSD, apr24h }
-}
-
 // Display-friendly APR: avoids rounding genuinely tiny-but-positive yields
 // down to "0.00 %" (which reads as "no yield" even when the pool earns fees).
 function formatAPR(apr: number): string {
@@ -264,13 +308,13 @@ async function toggleExpand(pool: PoolRow) {
   if (expandedPool.value === key) {
     expandedPool.value = null
     expandedRanges.value = []
-    expandedStats.value = null
+    expandedRaw.value = null
     return
   }
 
   expandedPool.value = key
   expandedRanges.value = []
-  expandedStats.value = null
+  expandedRaw.value = null
 
   // Lazy-load ranges and detailed stats in parallel
   const rangesPromise = pool.hasLiquidity
@@ -304,23 +348,19 @@ async function toggleExpand(pool: PoolRow) {
       }
     })
 
-  // Process detailed pool stats
+  // Process detailed pool stats. Store raw inputs only — the `expandedStats`
+  // computed multiplies by live prices at render time so vol7dUSD / apr7d stay
+  // in sync with TVL whenever store.tokenPricesUSD updates.
   const detail = Array.isArray(detailResult) ? detailResult[0] : detailResult
   if (detail && 'volume7d' in detail) {
-    const p0usd = store.getTokenPriceUSD(pool.token0)
-    const p1usd = store.getTokenPriceUSD(pool.token1)
-    const vol7dUSD = (Number(detail.volume7d) / 10 ** dec1) * p1usd
-    const feeRate = Number(detail.feeRateBps)
-    const lpShare = Number(detail.lpFeeSharePct ?? LP_FEE_SHARE_PCT_DEFAULT)
-    const fee7dUSD = vol7dUSD * feeRate * lpShare / (10000 * 100)
-    const apr7d = pool.totalValueUSD > 0 ? (fee7dUSD * 52 / pool.totalValueUSD) * 100 : 0
-
+    const volume7dTok1 = Number(detail.volume7d) / 10 ** dec1
     const f0 = Number(detail.feesLifetimeToken0) / 10 ** dec0
     const f1 = Number(detail.feesLifetimeToken1) / 10 ** dec1
 
-    expandedStats.value = {
-      vol7dUSD,
-      apr7d,
+    expandedRaw.value = {
+      pairKey: key,
+      volume7dTok1,
+      lpFeeSharePct: Number(detail.lpFeeSharePct ?? LP_FEE_SHARE_PCT_DEFAULT),
       feesLifetime0: f0,
       feesLifetime1: f1,
       feesLifetime0Formatted: f0 > 0 ? f0.toLocaleString(undefined, { maximumFractionDigits: 4 }) + ' ' + pool.symbol0 : '—',
@@ -335,7 +375,7 @@ onMounted(async () => {
 
     if (allStats.length > 0) {
       const seen = new Set<string>()
-      pools.value = allStats.map((stats: any) => {
+      rawPools.value = allStats.map((stats: any): PoolRowRaw | null => {
         let t0 = stats.token0 as string
         let t1 = stats.token1 as string
         let s0 = stats.symbol0 as string
@@ -367,15 +407,19 @@ onMounted(async () => {
           price = r1 / r0
         }
 
-        const { tvl, vol24hUSD, apr24h } = computePoolMetrics(stats)
-        const r0usd = r0 * store.getTokenPriceUSD(t0)
-        const r1usd = r1 * store.getTokenPriceUSD(t1)
+        // CONTRACT: backend returns volume in token1 (quote) base units (post-2026-04-17 backend upgrade).
+        const volume24hTok1 = Number(stats.volume24h) / 10 ** dec1
 
         return {
           token0: t0,
           token1: t1,
           symbol0: s0,
           symbol1: s1,
+          dec0,
+          dec1,
+          reserve0: r0,
+          reserve1: r1,
+          volume24hTok1,
           reserve0Formatted: r0 > 0 ? r0.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—',
           reserve1Formatted: r1 > 0 ? r1.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—',
           priceFormatted: price > 0 ? price.toFixed(6) : '—',
@@ -385,21 +429,14 @@ onMounted(async () => {
             r1 < Number(store.getTokenByAddress(t1)?.minimum_amount ?? 0n) * 10 / 10 ** dec1
           ),
           currentPrice: price,
-          reserve0USD: r0usd,
-          reserve1USD: r1usd,
-          totalValueUSD: tvl > 0 ? tvl : r0usd + r1usd,
-          volume24hUSD: vol24hUSD,
           feeRateBps: Number(stats.feeRateBps),
-          apr24h,
+          lpFeeSharePct: Number(stats.lpFeeSharePct ?? LP_FEE_SHARE_PCT_DEFAULT),
           priceChange24h: stats.priceChange24hPct as number,
         }
-      }).filter((p: PoolRow | null): p is PoolRow => p !== null)
-
-      pools.value.sort((a, b) => {
-        if (a.hasLiquidity !== b.hasLiquidity) return a.hasLiquidity ? -1 : 1
-        if (b.totalValueUSD !== a.totalValueUSD) return b.totalValueUSD - a.totalValueUSD
-        return b.volume24hUSD - a.volume24hUSD
-      })
+      }).filter((p: PoolRowRaw | null): p is PoolRowRaw => p !== null)
+      // Initial sort by hasLiquidity only — TVL/Vol sorting happens in `filteredPools`
+      // and stays live as prices update (it reads the derived `pools` computed).
+      rawPools.value.sort((a, b) => (a.hasLiquidity === b.hasLiquidity) ? 0 : (a.hasLiquidity ? -1 : 1))
     } else {
       // Fallback to old method if getAllPoolStats not available
       const info = store.exchangeInfoData
@@ -414,7 +451,7 @@ onMounted(async () => {
 
       if (info?.pool_canister?.length) {
         const seen = new Set<string>()
-        pools.value = info.pool_canister.map((pair: [string, string]) => {
+        rawPools.value = info.pool_canister.map((pair: [string, string]): PoolRowRaw | null => {
           let [t0, t1] = pair
           if (BASE_TOKENS.has(t0) && !BASE_TOKENS.has(t1)) { ;[t0, t1] = [t1, t0] }
           const key = [t0, t1].sort().join('/')
@@ -431,13 +468,16 @@ onMounted(async () => {
           const r0 = amm ? Number(amm.reserve0 ?? 0n) / 10 ** dec0 : 0
           const r1 = amm ? Number(amm.reserve1 ?? 0n) / 10 ** dec1 : 0
           const price = r0 > 0 ? r1 / r0 : 0
-          const r0usd = r0 * store.getTokenPriceUSD(t0)
-          const r1usd = r1 * store.getTokenPriceUSD(t1)
 
           return {
             token0: t0, token1: t1,
             symbol0: info0.symbol ?? t0.slice(0, 5) + '...',
             symbol1: info1.symbol ?? t1.slice(0, 5) + '...',
+            dec0,
+            dec1,
+            reserve0: r0,
+            reserve1: r1,
+            volume24hTok1: 0,
             reserve0Formatted: r0 > 0 ? r0.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—',
             reserve1Formatted: r1 > 0 ? r1.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—',
             priceFormatted: price > 0 ? price.toFixed(6) : '—',
@@ -447,18 +487,12 @@ onMounted(async () => {
               r1 < Number(info1.minimum_amount ?? 0n) * 10 / 10 ** dec1
             ),
             currentPrice: price,
-            reserve0USD: r0usd, reserve1USD: r1usd,
-            totalValueUSD: r0usd + r1usd,
-            volume24hUSD: 0, feeRateBps: Number(store.tradingFeeBps),
-            apr24h: 0, priceChange24h: 0,
+            feeRateBps: Number(store.tradingFeeBps),
+            lpFeeSharePct: LP_FEE_SHARE_PCT_DEFAULT,
+            priceChange24h: 0,
           }
-        }).filter((p: PoolRow | null): p is PoolRow => p !== null)
-
-        pools.value.sort((a, b) => {
-          if (a.hasLiquidity !== b.hasLiquidity) return a.hasLiquidity ? -1 : 1
-          if (b.totalValueUSD !== a.totalValueUSD) return b.totalValueUSD - a.totalValueUSD
-          return b.volume24hUSD - a.volume24hUSD
-        })
+        }).filter((p: PoolRowRaw | null): p is PoolRowRaw => p !== null)
+        rawPools.value.sort((a, b) => (a.hasLiquidity === b.hasLiquidity) ? 0 : (a.hasLiquidity ? -1 : 1))
       }
     }
   } catch (err) {

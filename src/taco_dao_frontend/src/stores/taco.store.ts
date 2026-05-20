@@ -6526,29 +6526,29 @@ export const useTacoStore = defineStore('taco', () => {
                 subaccount: [] // Empty subaccount
             }
 
-            // Sequential, not parallel: the rewards canister forwards each
-            // withdraw to the ICRC-1 ledger, and the ledger dedupes by
-            // (caller, to, amount, created_at_time, memo). When the
-            // withdraws fired via Promise.allSettled in the same JS tick
-            // they hit the ledger with identical receive-times, causing the
-            // second+third calls to be rejected as
-            // `{Duplicate:{duplicate_of:N}}`. Sequencing with a small
-            // inter-call gap gives each transfer a distinct receive-time
-            // so the ledger treats them as separate txs.
-            const INTER_CLAIM_GAP_MS = 150
-            const results: PromiseSettledResult<any>[] = []
+            // Fire-and-collect with submission spacing. The rewards canister
+            // forwards each withdraw to the ICRC-1 ledger, and the ledger
+            // dedupes by (caller, to, amount, created_at_time, memo). The
+            // earlier `Promise.allSettled`-in-one-tick version hit dedup
+            // because every call reached the rewards canister inside one IC
+            // round, so `ic0.time()` (which stamps `created_at_time`) was
+            // identical for all of them. As long as each submission lands in
+            // a different IC round, the ledger sees distinct keys.
+            //
+            // Application-subnet round time is ~1 s, so spacing submissions
+            // by 1 s gives each call a distinct `created_at_time` without
+            // waiting the full ~3 s update-call roundtrip between them.
+            // Promises are collected and awaited together at the end, so a
+            // 20-neuron batch finishes in ~N+2 s instead of ~N×3 s.
+            const SUBMISSION_GAP_MS = 1000
+            const promises: Promise<any>[] = []
             for (let i = 0; i < neuronIds.length; i++) {
-                const id = neuronIds[i]
-                try {
-                    const value = await (rewardsActor.withdraw(account, [id]) as Promise<any>)
-                    results.push({ status: 'fulfilled', value })
-                } catch (reason) {
-                    results.push({ status: 'rejected', reason })
-                }
+                promises.push(rewardsActor.withdraw(account, [neuronIds[i]]) as Promise<any>)
                 if (i < neuronIds.length - 1) {
-                    await new Promise(r => setTimeout(r, INTER_CLAIM_GAP_MS))
+                    await new Promise(r => setTimeout(r, SUBMISSION_GAP_MS))
                 }
             }
+            const results: PromiseSettledResult<any>[] = await Promise.allSettled(promises)
 
             let okCount = 0
             let failCount = 0

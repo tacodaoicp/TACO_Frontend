@@ -91,6 +91,12 @@ export const useExchangeStore = defineStore('exchange', () => {
   const icpPriceUSD = ref(0) // from external APIs (CoinGecko/CoinCap/Binance)
   const externalPricesUSD = ref<Map<string, number>>(new Map()) // known external token prices
   const tokenPricesUSD = ref<Map<string, number>>(new Map())
+  // Last-resort price fallback seeded by `getTokenDetailsWithoutPastPrices` on the
+  // DAO backend (carries priceInUSD for every DAO-known token). Lets totals like
+  // PortfolioView's `lpAggregates` show real USD within seconds of mount, before
+  // the exchange's own `fetchTokenPricesUSD` poll has populated `tokenPricesUSD`
+  // for low-volume tokens.
+  const daoFallbackPrices = ref<Map<string, number>>(new Map())
 
   // Rate limiter
   const rateLimitCalls = ref<number[]>([])  // timestamps of update calls
@@ -573,7 +579,25 @@ export const useExchangeStore = defineStore('exchange', () => {
   function getTokenPriceUSD(address: string): number {
     const p = tokenPricesUSD.value.get(address) ?? 0
     if (p > 0) return p
-    return STABLE_USD_FALLBACK.get(address) ?? 0
+    const stable = STABLE_USD_FALLBACK.get(address) ?? 0
+    if (stable > 0) return stable
+    return daoFallbackPrices.value.get(address) ?? 0
+  }
+
+  // Seed the DAO-backend fallback prices. Called by WalletTab (or anything else
+  // that already fetches `getTokenDetailsWithoutPastPrices`) so the rest of the
+  // app can read DAO-known prices before the exchange's own price feed has
+  // converged. Merges non-zero values onto the existing map.
+  function seedDaoFallbackPrices(entries: Iterable<[string, number]>) {
+    const next = new Map(daoFallbackPrices.value)
+    let changed = false
+    for (const [addr, price] of entries) {
+      if (price > 0 && next.get(addr) !== price) {
+        next.set(addr, price)
+        changed = true
+      }
+    }
+    if (changed) daoFallbackPrices.value = next
   }
 
   let infoPollingTimer: ReturnType<typeof setInterval> | null = null
@@ -1496,6 +1520,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     icpPriceUSD,
     tokenPricesUSD,
     getTokenPriceUSD,
+    seedDaoFallbackPrices,
 
     // Rate limiter
     callsRemaining,

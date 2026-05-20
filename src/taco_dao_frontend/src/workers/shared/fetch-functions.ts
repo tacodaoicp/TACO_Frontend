@@ -993,29 +993,26 @@ export async function fetchUserPerformanceData(
 
   // Leaderboard data starts Feb 2026. For large accounts the full payload
   // exceeds the 2 MiB IC query reply limit and throws a RejectError. Drop the
-  // oldest month and retry until the response fits.
+  // oldest 2 weeks and retry until the response fits.
   const DATA_START_MS = Date.UTC(2026, 1, 1)
-  const MAX_MONTHS_CUTOFF = 36
+  const SHIFT_MS = 14 * 24 * 60 * 60 * 1000 // 2 weeks
+  const MAX_SHIFTS = 200 // safety cap (~7.7 years at 2-week steps)
   const isPayloadTooLargeError = (e: unknown): boolean => {
     const m = e instanceof Error ? e.message : String(e)
     return m.includes('msg_reply_data_append') || m.includes('payload size')
   }
-  const addMonthsUtc = (baseMs: number, months: number): number => {
-    const d = new Date(baseMs)
-    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate())
-  }
 
-  let monthsCutoff = 0
+  let shiftCount = 0
   let result: Awaited<ReturnType<typeof actor.getUserPerformanceGraphData>> | undefined
-  while (monthsCutoff <= MAX_MONTHS_CUTOFF) {
-    const startTimeMs = monthsCutoff === 0 ? 0 : addMonthsUtc(DATA_START_MS, monthsCutoff)
+  while (shiftCount <= MAX_SHIFTS) {
+    const startTimeMs = shiftCount === 0 ? 0 : DATA_START_MS + shiftCount * SHIFT_MS
     const startTime = BigInt(startTimeMs) * BigInt(1_000_000)
     try {
       result = await actor.getUserPerformanceGraphData(principal, startTime, endTime)
       break
     } catch (e) {
       if (!isPayloadTooLargeError(e)) throw e
-      monthsCutoff++
+      shiftCount++
     }
   }
   if (!result) {

@@ -72,7 +72,7 @@
                 v-if="!row.onExchange && isAdmin"
                 class="ex-btn ex-btn--sm ex-btn--primary"
                 @click="addToExchange(row)"
-                :disabled="addingToken"
+                :disabled="addingToken !== false"
               >{{ addingToken === row.address ? 'Adding...' : 'Add to Exchange' }}</button>
             </div>
           </td>
@@ -368,6 +368,14 @@ async function fetchDaoTokens() {
         tokenType: details.tokenType || { ICRC12: null },
       }
     })
+
+    // Seed the exchange store's DAO fallback prices so other surfaces (e.g.
+    // PortfolioView's `lpAggregates` / "Total net worth" hero) can read real
+    // USD values within seconds of mount, instead of waiting up to a minute
+    // for `fetchTokenPricesUSD` polls to fill in every low-volume token.
+    store.seedDaoFallbackPrices(
+      daoTokens.value.map(dt => [dt.address, dt.priceInUSD] as [string, number])
+    )
   } catch (err) {
     console.error('Failed to fetch DAO tokens:', err)
   }

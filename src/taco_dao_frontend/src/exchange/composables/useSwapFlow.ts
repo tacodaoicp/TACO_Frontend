@@ -542,10 +542,29 @@ export function useSwapFlow() {
       // ── UI update — same guards as before ──
       if (newSplitPlan && newSplitPlan.improvement > 0.1) {
         splitPlan.value = newSplitPlan
+
+        // Volume-weighted aggregate impact across the legs. Algebraically equal
+        // to 1 − totalExpectedOut / (totalAmountIn × midPrice) when every leg
+        // shares the same (from, to) pair — which a split swap always does — so
+        // we don't need the mid price; the legs carry it implicitly. Without
+        // this, the displayed impact would inherit the 100% best single-route
+        // value from freshQuote, which is misleadingly higher than the impact
+        // of the split the user actually executes.
+        let aggregateImpact = freshQuote.priceImpact
+        const totalIn = newSplitPlan.legs.reduce((s, l) => s + l.amountIn, 0n)
+        if (totalIn > 0n) {
+          let weighted = 0
+          for (const leg of newSplitPlan.legs) {
+            weighted += leg.priceImpact * (Number(leg.amountIn) / Number(totalIn))
+          }
+          aggregateImpact = weighted
+        }
+
         quote.value = {
           ...freshQuote,
           expectedBuyAmount: newSplitPlan.totalExpectedOut,
           routeDescription: `Split: ${newSplitPlan.legs.map(l => `${l.pctBP / 100}%`).join(' + ')}`,
+          priceImpact: aggregateImpact,
         }
         if (!silent) phase.value = 'quoteReady'
         console.log(`[Swap] Split route found: ${newSplitPlan.improvement.toFixed(2)}% better — ${newSplitPlan.legs.map(l => `${l.pctBP/100}% via ${l.routeKey}`).join(', ')}`)
