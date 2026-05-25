@@ -487,8 +487,12 @@ export const useNachosStore = defineStore('nachos', () => {
         mintEstimateE8s !== undefined ? [mintEstimateE8s] : [],
         burnEstimateE8s !== undefined ? [burnEstimateE8s] : []
       )
-      dashboardData.value = result
-      lastError.value = null
+      // Guard against null/undefined wiping a good cache — mirrors the worker
+      // subscription guard at line 100.
+      if (result) {
+        dashboardData.value = result
+        lastError.value = null
+      }
     } catch (e: any) {
       console.error('Failed to load vault dashboard:', e)
       lastError.value = 'Failed to load vault dashboard'
@@ -520,7 +524,8 @@ export const useNachosStore = defineStore('nachos', () => {
   const loadNAVHistory = async () => {
     try {
       const actor = await createVaultActor(false)
-      navHistory.value = await (actor as any).getNAVHistoryAdaptive()
+      const result = await (actor as any).getNAVHistoryAdaptive()
+      if (result) navHistory.value = result
     } catch (e: any) {
       console.error('Failed to load NAV history:', e)
     }
@@ -529,7 +534,8 @@ export const useNachosStore = defineStore('nachos', () => {
   const loadConfig = async () => {
     try {
       const actor = await createVaultActor(false)
-      vaultConfig.value = await (actor as any).getConfig()
+      const result = await (actor as any).getConfig()
+      if (result) vaultConfig.value = result
     } catch (e: any) {
       console.error('Failed to load vault config:', e)
     }

@@ -733,7 +733,7 @@ export function useSwapFlow() {
         }
         phase.value = 'success'
         removeDepositFromCache(blockNumber.toString())
-        await store.refreshAfterMutation('swap')
+        void store.refreshAfterMutation('swap')
         toast.success('Split Swap Complete', formatTokenAmount(swap.amountOut, Number(tokenTo.value.decimals), tokenTo.value.symbol) + ' received via ' + plan.legs.length + ' routes')
       } else {
         const classified = classifyExchangeError(rawResult.Err, buildSwapCtx())
@@ -751,7 +751,7 @@ export function useSwapFlow() {
         )
         if (status === 'succeeded') {
           removeDepositFromCache(blockNumber.toString())
-          await store.refreshAfterMutation('swap')
+          void store.refreshAfterMutation('swap')
           phase.value = 'success'
           toast.success('Split Swap Complete', 'Network hiccup during submit — confirmed via query.')
           return
@@ -869,7 +869,7 @@ export function useSwapFlow() {
         }
         phase.value = 'success'
         if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
-        await store.refreshAfterMutation('swap')
+        void store.refreshAfterMutation('swap')
         toast.success('Swap Complete', formatTokenAmount(swap.amountOut, Number(tokenTo.value!.decimals), tokenTo.value!.symbol) + ' received')
       } else {
         const classified = classifyExchangeError(rawResult.Err, buildSwapCtx())
@@ -887,7 +887,7 @@ export function useSwapFlow() {
         )
         if (status === 'succeeded') {
           removeDepositFromCache(blockNumber.toString())
-          await store.refreshAfterMutation('swap')
+          void store.refreshAfterMutation('swap')
           phase.value = 'success'
           toast.success('Swap Complete', 'Network hiccup during submit — confirmed via query.')
           return

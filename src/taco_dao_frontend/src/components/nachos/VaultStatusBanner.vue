@@ -15,8 +15,11 @@
       <span>Circuit breaker active. Trading halted due to unusual market conditions.</span>
     </div>
 
-    <!-- genesis not complete -->
-    <div v-if="!nachosStore.genesisComplete" class="vault-status-banner__alert vault-status-banner__alert--warning">
+    <!-- genesis not complete — only show when we actually have dashboard data
+         saying so. Without the dashboardData guard, the missing-data state
+         (dashboardData === null) falsely triggers this banner because
+         genesisComplete defaults to false in the store. -->
+    <div v-if="nachosStore.dashboardData && !nachosStore.genesisComplete" class="vault-status-banner__alert vault-status-banner__alert--warning">
       <i class="fa-solid fa-hourglass-half"></i>
       <span>System not yet initialized. Genesis mint pending.</span>
     </div>

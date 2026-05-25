@@ -575,8 +575,9 @@ export default {
 
         if ('ok' in result) {
           tacoStore.showSuccess('Successfully followed user')
-          await loadUserFollows()
-          await loadFollowerInfo(true) // Refresh follower counts
+          // loadUserFollows populates userFollowsData; loadFollowerInfo refreshes
+          // follower counts on the leaderboard. No data dependency between them.
+          await Promise.all([loadUserFollows(), loadFollowerInfo(true)])
         } else {
           tacoStore.showError(formatFollowError(result.err))
         }
@@ -597,8 +598,7 @@ export default {
 
         if ('ok' in result) {
           tacoStore.showSuccess('Successfully unfollowed user')
-          await loadUserFollows()
-          await loadFollowerInfo(true) // Refresh follower counts
+          await Promise.all([loadUserFollows(), loadFollowerInfo(true)])
         } else {
           tacoStore.showError(formatUnfollowError(result.err))
         }

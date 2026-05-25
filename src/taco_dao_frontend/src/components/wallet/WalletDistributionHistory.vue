@@ -39,14 +39,28 @@
         </button>
       </div>
 
-      <!-- Empty State -->
-      <div v-if="distributions.length === 0 && !loading" class="empty-state">
+      <!-- Error State — surfaces fetch failure so the user doesn't mistake
+           "fetch failed" for "no history". Shown only when the first load
+           failed; subsequent paginated loads keep the existing rows. -->
+      <div v-if="loadError && distributions.length === 0 && !loading" class="empty-state">
+        <i class="fa fa-exclamation-triangle fa-2x mb-2" style="color: var(--dark-orange);"></i>
+        <p>Failed to load distribution history.</p>
+        <button class="btn btn-sm taco-btn taco-btn--green mt-2" @click="fetchDistributions(true)">
+          <i class="fa fa-sync-alt me-1"></i> Retry
+        </button>
+      </div>
+
+      <!-- Empty State — only after a successful first load (hasLoadedOnce)
+           AND no error AND nothing in flight. Prevents the empty message from
+           flashing during the pre-first-fetch window. -->
+      <div v-else-if="distributions.length === 0 && !loading && hasLoadedOnce" class="empty-state">
         <i class="fa fa-inbox fa-2x mb-2"></i>
         <p>No distribution history yet</p>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="loading-state">
+      <!-- Loading State — also shown until the first load completes so the
+           "No distribution history" / error fallbacks don't render too early. -->
+      <div v-if="loading || !hasLoadedOnce" class="loading-state">
         <div class="spinner-border spinner-border-sm" role="status">
           <span class="visually-hidden">Loading...</span>
         </div>
@@ -71,6 +85,8 @@ const tacoStore = useTacoStore()
 // State
 const distributions = ref<any[]>([])
 const loading = ref(false)
+const loadError = ref<string | null>(null)
+const hasLoadedOnce = ref(false)
 const hasMore = ref(false)
 const currentOffset = ref(0)
 const PAGE_SIZE = 5 // Load 5 at a time
@@ -85,6 +101,7 @@ const fetchDistributions = async (reset = false) => {
   }
 
   loading.value = true
+  loadError.value = null
   try {
     const actor = await tacoStore.createRewardsActorAnonymous()
     const result = await actor.getUserDistributionRewards(
@@ -92,6 +109,13 @@ const fetchDistributions = async (reset = false) => {
       BigInt(currentOffset.value),
       BigInt(PAGE_SIZE)
     )
+
+    // Defensive: a malformed canister response (missing/null `records`) would
+    // throw inside the .map below and bubble up as a generic error. Surface it
+    // as a load error and keep previously-shown distributions on screen.
+    if (!result || !Array.isArray(result.records)) {
+      throw new Error('Malformed distribution response (no records array)')
+    }
 
     const newDistributions = result.records.map((record: any) => ({
       distributionId: Number(record.distributionId),
@@ -108,8 +132,10 @@ const fetchDistributions = async (reset = false) => {
     hasMore.value = result.hasMore
   } catch (error) {
     console.error('Error fetching distributions:', error)
+    loadError.value = error instanceof Error ? error.message : 'Failed to load distribution history'
   } finally {
     loading.value = false
+    hasLoadedOnce.value = true
   }
 }
 

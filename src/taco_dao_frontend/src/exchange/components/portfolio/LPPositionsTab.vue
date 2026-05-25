@@ -301,7 +301,7 @@ async function confirmRemove() {
 
     if ('Ok' in result) {
       removeTarget.value = null
-      await store.refreshAfterMutation('lp')
+      void store.refreshAfterMutation('lp')
       toast.success('Liquidity Removed')
     } else {
       const { classifyExchangeError } = await import('../../utils/errors')
@@ -328,7 +328,7 @@ async function confirmRemove() {
       const status = await verifyAfterTransportError(probe)
       if (status === 'succeeded') {
         removeTarget.value = null
-        await store.refreshAfterMutation('lp')
+        void store.refreshAfterMutation('lp')
         toast.success('Liquidity Removed', 'Network hiccup during submit — confirmed via query.')
         return
       }
@@ -358,7 +358,7 @@ async function claimFees(pos: UnifiedPosition) {
       ? await store.claimConcentratedFees(pos.positionId)
       : await store.claimLPFees(pos.token0, pos.token1)
     if ('Ok' in result) {
-      await store.refreshAfterMutation('claim')
+      void store.refreshAfterMutation('claim')
       toast.success('Fees Claimed')
     } else {
       const { classifyExchangeError } = await import('../../utils/errors')
@@ -385,7 +385,7 @@ async function claimFees(pos: UnifiedPosition) {
       }
       const status = await verifyAfterTransportError(probe)
       if (status === 'succeeded') {
-        await store.refreshAfterMutation('claim')
+        void store.refreshAfterMutation('claim')
         toast.success('Fees Claimed', 'Network hiccup during submit — confirmed via query.')
         return
       }
@@ -413,7 +413,7 @@ async function claimAllFees() {
     const result = await store.claimAllLPFees()
     if ('Ok' in result) {
       const ok = result.Ok
-      await store.refreshAfterMutation('claim')
+      void store.refreshAfterMutation('claim')
       const positions = Number(ok.positionsClaimed)
       toast.success('All LP Fees Claimed', `${positions} position${positions === 1 ? '' : 's'}`)
     } else {
@@ -441,7 +441,7 @@ async function claimAllFees() {
       }
       const status = await verifyAfterTransportError(probe)
       if (status === 'succeeded') {
-        await store.refreshAfterMutation('claim')
+        void store.refreshAfterMutation('claim')
         toast.success('All LP Fees Claimed', 'Network hiccup during submit — confirmed via query.')
         return
       }

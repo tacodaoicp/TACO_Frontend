@@ -5,8 +5,9 @@
       <span class="rewards-title">Available Rewards</span>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="loading" class="rewards-loading">
+    <!-- Loading State — also covers the pre-first-load window so the
+         "No rewards available to claim" empty state doesn't flash. -->
+    <div v-if="loading || !hasLoadedOnce" class="rewards-loading">
       <div class="spinner-border spinner-border-sm" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
@@ -52,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineProps, defineEmits } from 'vue'
+import { defineProps, defineEmits, ref, watch, onMounted, onUnmounted } from 'vue'
 
 // Props
 interface Props {
@@ -71,6 +72,39 @@ const emit = defineEmits<{
   'claim-some': []
   'claim-all': []
 }>()
+
+// `hasLoadedOnce` gates the "No rewards available to claim" empty state so it
+// doesn't flash before parent's first load has run. Flips when any of:
+//   1. `totalRewards > 0` arrives (data observed).
+//   2. `loading` transitions true → false (parent finished a load).
+//   3. A mount-time safety timeout fires — needed because the parent
+//      (TokenCard.loadRewards) is called with showLoading=false on the
+//      initial neuron load, so `loading` never goes through `true` for the
+//      first fetch and (1) + (2) alone would leave the spinner forever for
+//      users who legitimately have zero rewards.
+const hasLoadedOnce = ref(false)
+watch(
+  [() => props.totalRewards, () => props.loading],
+  ([rewards, loading], prev) => {
+    if (rewards > 0) hasLoadedOnce.value = true
+    const prevLoading = prev?.[1]
+    if (prevLoading === true && loading === false) hasLoadedOnce.value = true
+  },
+  { immediate: true },
+)
+
+let mountFallbackTimer: ReturnType<typeof setTimeout> | null = null
+onMounted(() => {
+  // 500 ms is well past first paint + a typical canister roundtrip; if the
+  // parent's silent load hasn't delivered data by then, treat the current
+  // state (totalRewards = 0) as authoritative and reveal the empty state.
+  mountFallbackTimer = setTimeout(() => {
+    if (!hasLoadedOnce.value) hasLoadedOnce.value = true
+  }, 500)
+})
+onUnmounted(() => {
+  if (mountFallbackTimer) clearTimeout(mountFallbackTimer)
+})
 
 // Format balance (BigInt to readable decimal)
 function formatBalance(balance: bigint, decimals: number): string {

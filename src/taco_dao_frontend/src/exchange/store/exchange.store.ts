@@ -329,6 +329,13 @@ export const useExchangeStore = defineStore('exchange', () => {
           if (ids.length > 0) {
             console.log(`[Exchange] Found ${ids.length} accepted token IDs, fetching on-chain metadata...`)
             const fetched = await fetchTokenMetadataBatch(ids)
+            // Defensive: fetchTokenMetadataBatch shouldn't return a non-array, but
+            // a malformed response would otherwise throw inside .filter and break
+            // the whole init.
+            if (!Array.isArray(fetched)) {
+              console.warn('[Exchange] fetchTokenMetadataBatch returned non-array, skipping')
+              return
+            }
             // Filter out tokens with failed metadata (symbol = '???' or empty)
             tokens.value = fetched.filter(t => t.symbol && t.symbol !== '???' && t.name)
             console.log(`[Exchange] Built ${tokens.value.length} tokens from on-chain data (${fetched.length - tokens.value.length} failed)`)

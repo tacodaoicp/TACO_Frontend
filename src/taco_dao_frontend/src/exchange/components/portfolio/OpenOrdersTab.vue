@@ -13,7 +13,7 @@
       >Cancel All</button>
     </div>
 
-    <div v-if="loading" class="open-orders-tab__loading">Loading orders...</div>
+    <div v-if="!initialLoadDone || loading" class="open-orders-tab__loading">Loading orders...</div>
 
     <div v-else-if="filteredOrders.length > 0" class="ex-table-wrap">
     <table class="ex-table open-orders-tab__table">
@@ -313,7 +313,7 @@ async function confirmCancel() {
     if ('Ok' in result) {
       orders.value = orders.value.filter(o => o.accesscode !== accessCode)
       cancelTarget.value = null
-      await store.refreshAfterMutation('revoke')
+      void store.refreshAfterMutation('revoke')
       toast.success('Order Cancelled')
     } else {
       const { classifyExchangeError } = await import('../../utils/errors')
@@ -336,7 +336,7 @@ async function confirmCancel() {
       if (status === 'succeeded') {
         orders.value = orders.value.filter(o => o.accesscode !== accessCode)
         cancelTarget.value = null
-        await store.refreshAfterMutation('revoke')
+        void store.refreshAfterMutation('revoke')
         toast.success('Order Cancelled', 'Network hiccup during submit — confirmed via query.')
         return
       }
@@ -391,7 +391,7 @@ async function confirmCancelAll() {
   cancelling.value = false
   cancelAllProgress.value = ''
   showCancelAll.value = false
-  if (completed > 0) await store.refreshAfterMutation('revoke')
+  if (completed > 0) void store.refreshAfterMutation('revoke')
   toast.success('Orders Cancelled', completed + ' of ' + total + ' cancelled')
 }
 
@@ -404,16 +404,19 @@ function shareOrder(order: TradePrivate2) {
   toast.info('Link Copied')
 }
 
-let initialLoadDone = false
+const initialLoadDone = ref(false)
 async function loadOrders() {
-  if (!initialLoadDone) loading.value = true
+  if (!initialLoadDone.value) loading.value = true
   try {
-    orders.value = await store.getUserTrades()
+    const result = await store.getUserTrades()
+    // Don't blank good data on a nullish result (defensive — matches the
+    // cachedQuery.ts guard one layer down).
+    if (result != null) orders.value = result
   } catch (err) {
     console.error('[OpenOrdersTab] Load error:', err)
   } finally {
     loading.value = false
-    initialLoadDone = true
+    initialLoadDone.value = true
   }
 }
 

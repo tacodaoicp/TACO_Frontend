@@ -17,8 +17,10 @@
           <p class="fol-muted">Log in to see who you're following</p>
         </div>
 
-        <!-- Loading State -->
-        <div v-else-if="isLoading" class="text-center py-4">
+        <!-- Loading State — also shown until we've observed at least one
+             non-empty follows payload or isLoading flipped false, so the
+             empty state can't flash before the follows fetch lands. -->
+        <div v-else-if="isLoading || !hasLoadedOnce" class="text-center py-4">
           <div class="spinner-border spinner-border-sm" role="status" style="color: var(--brown);">
             <span class="visually-hidden">Loading...</span>
           </div>
@@ -108,8 +110,8 @@
 
   <!-- Inline mode (no wrapper, parent provides container + header) -->
   <div v-else class="my-following-inline">
-    <!-- Loading State -->
-    <div v-if="isLoading" class="text-center py-3">
+    <!-- Loading State — gated on hasLoadedOnce; see comment in full mode above. -->
+    <div v-if="isLoading || !hasLoadedOnce" class="text-center py-3">
       <div class="spinner-border spinner-border-sm" role="status" style="color: var(--brown);">
         <span class="visually-hidden">Loading...</span>
       </div>
@@ -191,7 +193,7 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import PerformanceChart from './PerformanceChart.vue'
 
 export default {
@@ -236,6 +238,36 @@ export default {
   setup(props) {
     // Track expanded cards
     const expandedPrincipal = ref(null)
+
+    // Parent fetches follows inside the userPerformance subscription callback;
+    // until that runs once, `follows` is the default `[]` and the empty state
+    // would flash. `hasLoadedOnce` flips once we either see a non-empty array
+    // or watch isLoading transition true → false (the "we tried and got nothing"
+    // signal).
+    const hasLoadedOnce = ref(false)
+    watch(
+      [() => props.follows, () => props.isLoading],
+      ([follows, loading], prev) => {
+        if (Array.isArray(follows) && follows.length > 0) hasLoadedOnce.value = true
+        const prevLoading = prev?.[1]
+        if (prevLoading === true && loading === false) hasLoadedOnce.value = true
+      },
+      { immediate: true },
+    )
+
+    // Safety net: if parent never transitions isLoading true → false (e.g. a
+    // silent background fetch that uses showLoading=false) and the user has
+    // zero follows, the spinner would stay forever. After 500 ms, reveal the
+    // empty state.
+    let mountFallbackTimer = null
+    onMounted(() => {
+      mountFallbackTimer = setTimeout(() => {
+        if (!hasLoadedOnce.value) hasLoadedOnce.value = true
+      }, 500)
+    })
+    onUnmounted(() => {
+      if (mountFallbackTimer) clearTimeout(mountFallbackTimer)
+    })
 
     const toggleExpanded = (principal) => {
       // Debug logging (only on localhost/192.168.* hosts)
@@ -305,6 +337,7 @@ export default {
 
     return {
       expandedPrincipal,
+      hasLoadedOnce,
       toggleExpanded,
       isExpanded,
       getLeaderboardEntry,

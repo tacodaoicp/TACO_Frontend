@@ -31,7 +31,7 @@
       </div>
     </div>
 
-    <div v-if="loading" class="trade-history-tab__loading">Loading trade history...</div>
+    <div v-if="!initialLoadDone || loading" class="trade-history-tab__loading">Loading trade history...</div>
 
     <div v-else-if="filteredTrades.length > 0" class="ex-table-wrap">
     <table class="ex-table trade-history-tab__table">
@@ -272,16 +272,17 @@ function exportCSV() {
   URL.revokeObjectURL(url)
 }
 
-let initialLoadDone = false
+const initialLoadDone = ref(false)
 async function loadHistory() {
-  if (!initialLoadDone) loading.value = true
+  if (!initialLoadDone.value) loading.value = true
   try {
-    rawSwaps.value = await store.getUserSwapHistory(200n)
+    const result = await store.getUserSwapHistory(200n)
+    if (result != null) rawSwaps.value = result
   } catch (err) {
     console.error('[TradeHistoryTab] Load error:', err)
   } finally {
     loading.value = false
-    initialLoadDone = true
+    initialLoadDone.value = true
   }
 }
 

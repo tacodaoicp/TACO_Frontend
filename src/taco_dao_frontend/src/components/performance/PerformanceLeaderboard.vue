@@ -45,8 +45,10 @@
       </div>
 
       <div>
-        <!-- Loading State -->
-        <div v-if="isLoading" class="text-center py-5">
+        <!-- Loading State — also shown until we've observed at least one
+             non-empty payload or seen isLoading flip false, so the empty state
+             can't flash before the worker delivers. -->
+        <div v-if="isLoading || !hasLoadedOnce" class="text-center py-5">
           <div class="spinner-border" role="status" style="color: var(--brown);">
             <span class="visually-hidden">Loading...</span>
           </div>
@@ -209,7 +211,7 @@
 </template>
 
 <script>
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useTacoStore } from "../../stores/taco.store"
 import { storeToRefs } from "pinia"
 import PerformanceChart from './PerformanceChart.vue'
@@ -261,6 +263,39 @@ export default {
 
     // Track which row is expanded (only one at a time)
     const expandedPrincipal = ref(null)
+
+    // The worker subscription delivers leaderboard entries asynchronously, but
+    // the parent's `isLoading` prop is driven by `leaderboardLoading` which is
+    // never set to true anywhere (dead ref). Without this watcher, the empty
+    // state ("No Leaderboard Data Yet") would render on first paint before the
+    // worker delivers, then disappear once data arrives. We flip `hasLoadedOnce`
+    // once we either receive entries OR see isLoading transition true → false
+    // (covers the truly-empty case), so the empty state only shows after a
+    // genuine "finished loading and got nothing" event.
+    const hasLoadedOnce = ref(false)
+    watch(
+      [() => props.leaderboardEntries, () => props.isLoading],
+      ([entries, loading], prev) => {
+        if (Array.isArray(entries) && entries.length > 0) hasLoadedOnce.value = true
+        const prevLoading = prev?.[1]
+        if (prevLoading === true && loading === false) hasLoadedOnce.value = true
+      },
+      { immediate: true },
+    )
+
+    // Safety net: the parent's leaderboardLoading is a dead ref (permanently
+    // false), so the watcher above can only flip hasLoadedOnce when entries
+    // arrive non-empty. For a truly-empty leaderboard the spinner would stay
+    // forever. After 500 ms, reveal the empty state.
+    let mountFallbackTimer = null
+    onMounted(() => {
+      mountFallbackTimer = setTimeout(() => {
+        if (!hasLoadedOnce.value) hasLoadedOnce.value = true
+      }, 500)
+    })
+    onUnmounted(() => {
+      if (mountFallbackTimer) clearTimeout(mountFallbackTimer)
+    })
 
     // Toggle expanded row
     const toggleExpanded = (principal) => {
@@ -398,6 +433,7 @@ export default {
       priceTypes,
       userPrincipal,
       expandedPrincipal,
+      hasLoadedOnce,
       toggleExpanded,
       isExpanded,
       isCurrentUser,

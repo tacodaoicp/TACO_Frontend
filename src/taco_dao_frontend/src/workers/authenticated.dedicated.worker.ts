@@ -817,13 +817,25 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
       error: errorMsg,
     })
 
-    if (item.retryCount < 5) {
+    // Most keys give up after 5 retries; user-facing vault data keeps retrying
+    // forever (paced by `backoff.canRetry`) so a transient canister outage can't
+    // leave /vault permanently stuck on "Loading dashboard data…".
+    if (item.retryCount < 5 || KEEP_TRYING.includes(item.dataKey)) {
       queue.retry(item.dataKey)
     } else {
       queue.complete(item.dataKey)
     }
   }
 }
+
+// Keys we never permanently give up on — these power user-facing pages where a
+// stuck null state is much worse than continuous exponential-backoff retries.
+const KEEP_TRYING: DataKey[] = [
+  'nachosVaultDashboard',
+  'nachosConfig',
+  'nachosNavHistory',
+  'cryptoPrices',
+]
 
 // ============================================================================
 // Composite Query Coalescing (from merged public worker)

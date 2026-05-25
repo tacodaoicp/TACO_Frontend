@@ -219,10 +219,14 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   userPerformance: 300_000,
   // Swap dashboard - 60 seconds (swap state can change fast)
   swapDashboard: 60_000,
-  // Nachos vault - varying staleness based on data type
-  nachosVaultDashboard: 30_000,  // 30s - Market-sensitive (NAV depends on token prices)
-  nachosConfig: 300_000,          // 5min - Rarely changes (admin-configured)
-  nachosNavHistory: 60_000,       // 1min - Periodic updates (snapshots during operations)
+  // Nachos vault — cache is always delivered first regardless of staleness; these
+  // thresholds only gate how often the worker fires a background revalidation.
+  // "No expiry" comes from the cache-first delivery (state.data always broadcast),
+  // not from a long TTL — so live data can stay short for freshness while still
+  // never blanking the UI when a fetch fails.
+  nachosVaultDashboard: 60_000,   // 1min - revalidate frequently; cache still shown immediately
+  nachosConfig: 3_600_000,         // 1h - Admin-set, rarely changes
+  nachosNavHistory: 60_000,        // 1min - keep chart fresh against new snapshots
 }
 
 // Background tab multiplier (3x slower)

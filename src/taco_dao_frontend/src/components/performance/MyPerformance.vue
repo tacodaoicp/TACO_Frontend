@@ -28,8 +28,9 @@
       </div>
 
       <div>
-        <!-- Loading State -->
-        <div v-if="isLoading" class="text-center py-4">
+        <!-- Loading State — also covers the pre-first-load window so the
+             "No performance data available yet" empty state doesn't flash. -->
+        <div v-if="isLoading || !hasLoadedOnce" class="text-center py-4">
           <div class="spinner-border" role="status" style="color: var(--brown);">
             <span class="visually-hidden">Loading...</span>
           </div>
@@ -242,7 +243,7 @@
 </template>
 
 <script>
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 
 // Lazy-load: lightweight-charts is heavy enough to warrant its own chunk.
 const PerformanceChart = defineAsyncComponent(() => import('./PerformanceChart.vue'))
@@ -282,9 +283,38 @@ export default {
   },
   emits: ['refresh'],
 
-  setup() {
+  setup(props) {
     // Toggle chart visibility
     const showChart = ref(true)
+
+    // Parent's `isLoading` (= `isLoadingUserPerformance`) only flips to true
+    // inside `refreshAllData()` AFTER the Vue render tick. So during the brief
+    // window between mount and that flip, isLoading=false && userPerformance=null
+    // and the "No performance data available yet" message flashes. `hasLoadedOnce`
+    // flips once we see userPerformance arrive OR isLoading transition true→false.
+    const hasLoadedOnce = ref(false)
+    watch(
+      [() => props.userPerformance, () => props.isLoading],
+      ([perf, loading], prev) => {
+        if (perf) hasLoadedOnce.value = true
+        const prevLoading = prev?.[1]
+        if (prevLoading === true && loading === false) hasLoadedOnce.value = true
+      },
+      { immediate: true },
+    )
+
+    // Safety net: matches the WalletRewardsSummary pattern. If parent never
+    // transitions isLoading true → false (e.g. logged out, or silent fetch),
+    // reveal the empty state after 500 ms.
+    let mountFallbackTimer = null
+    onMounted(() => {
+      mountFallbackTimer = setTimeout(() => {
+        if (!hasLoadedOnce.value) hasLoadedOnce.value = true
+      }, 500)
+    })
+    onUnmounted(() => {
+      if (mountFallbackTimer) clearTimeout(mountFallbackTimer)
+    })
     // Format performance score to percentage
     const formatPerformance = (score) => {
       if (score === null || score === undefined) return 'N/A'
@@ -339,6 +369,7 @@ export default {
 
     return {
       showChart,
+      hasLoadedOnce,
       formatPerformance,
       getPerformanceClass,
       formatVotingPower,

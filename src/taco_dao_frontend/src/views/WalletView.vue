@@ -176,6 +176,15 @@
                       @unregister="unregisterToken" />
                   </div>
 
+                  <!-- Loading State — shown until the first fetch resolves so
+                       the "No registered tokens" empty state can't flash
+                       before fetchUserRegisteredTokens() lands. -->
+                  <div v-else-if="!hasFetchedRegisteredOnce" class="text-center py-4" style="opacity: 0.6;">
+                    <div class="spinner-border spinner-border-sm" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                  </div>
+
                   <!-- No Registered Tokens Message -->
                   <div v-else class="text-center py-4" style="opacity: 0.6;">
                     <i class="fa fa-coins fa-2x mb-2"></i>
@@ -547,6 +556,10 @@ const swapConfirmData = ref<any | null>(null)
 const swapDialogRef = ref<any>(null)
 const allTokenBalances = ref<Map<string, bigint>>(new Map())
 const userRegisteredTokenPrincipals = ref<string[]>([])
+// Flips true after the first `fetchUserRegisteredTokens()` resolves (success
+// OR error). Until then, the "No registered tokens" empty state stays hidden
+// behind a loading spinner so it can't flash before the fetch lands.
+const hasFetchedRegisteredOnce = ref(false)
 const customTokenMetadata = ref<Map<string, any>>(new Map())
 const newTokenPrincipal = ref('')
 const registeringToken = ref(false)
@@ -851,13 +864,17 @@ const loadWalletData = async (showSpinner = true) => {
 const fetchUserRegisteredTokens = async () => {
   try {
     const registeredTokens = await tacoStore.getUserRegisteredTokens()
-    userRegisteredTokenPrincipals.value = registeredTokens.map(p => p.toString())
-    
+    if (Array.isArray(registeredTokens)) {
+      userRegisteredTokenPrincipals.value = registeredTokens.map(p => p.toString())
+    }
+
     // Load metadata for custom tokens
     await loadCustomTokenMetadata()
   } catch (error) {
     console.error('Error fetching user registered tokens:', error)
-    userRegisteredTokenPrincipals.value = []
+    // Keep the previous list visible on transient failure.
+  } finally {
+    hasFetchedRegisteredOnce.value = true
   }
 }
 

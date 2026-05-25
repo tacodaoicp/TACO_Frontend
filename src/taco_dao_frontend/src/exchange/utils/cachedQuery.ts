@@ -122,6 +122,11 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
           : await opts.fetcher()
         // Drop late results if principal flipped mid-flight.
         if ((opts.principalRef?.value ?? null) !== principalAtStart) return null
+        // Defensive: nullish results must not blank good cache (or be persisted
+        // by writeCache below — turning a transient hiccup into a sticky empty
+        // state on reload). Uses `!= null` so legitimately-falsy values like
+        // `0n`, `0`, `''`, `[]`, `false` still write through.
+        if (fetched == null) return dataRef.value
         dataRef.value = fetched
         lastFetchedAt.value = Date.now()
         if (opts.persist) writeCache(persistKey(), fetched)

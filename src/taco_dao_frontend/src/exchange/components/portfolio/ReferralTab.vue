@@ -147,7 +147,7 @@ async function claimAll() {
       }).join(', ')
       claimResult.value = `Claimed: ${claimed}`
       rawEarnings.value = []
-      await store.refreshAfterMutation('referral')
+      void store.refreshAfterMutation('referral')
       toast.success('Referral Fees Claimed', claimed)
     } else {
       claimResult.value = 'Nothing to claim.'
@@ -169,7 +169,7 @@ async function claimAll() {
       if (status === 'succeeded') {
         claimResult.value = 'Referral fees claimed (confirmed via query after network hiccup).'
         rawEarnings.value = []
-        await store.refreshAfterMutation('referral')
+        void store.refreshAfterMutation('referral')
         toast.success('Referral Fees Claimed', 'Network hiccup during submit — confirmed via query.')
         return
       }

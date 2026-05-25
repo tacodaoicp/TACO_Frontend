@@ -7,7 +7,7 @@
       </label>
     </div>
 
-    <div v-if="loading && displayRows.length === 0" class="wallet-tab__loading">Loading balances...</div>
+    <div v-if="!initialLoadDone || (loading && displayRows.length === 0)" class="wallet-tab__loading">Loading balances...</div>
 
     <div v-else class="ex-table-wrap">
     <table class="ex-table wallet-tab__table">
@@ -77,7 +77,7 @@
             </div>
           </td>
         </tr>
-        <tr v-if="displayRows.length === 0">
+        <tr v-if="displayRows.length === 0 && initialLoadDone">
           <td colspan="7" class="wallet-tab__empty">
             {{ hideZero ? 'No tokens with balance.' : 'No tokens found.' }}
           </td>
@@ -381,7 +381,7 @@ async function fetchDaoTokens() {
   }
 }
 
-async function refreshBalances() {
+async function refreshBalances(addresses?: string[], opts: { merge?: boolean } = {}) {
   const agent = await getCachedAgent()
   if (!agent) return
 
@@ -390,13 +390,20 @@ async function refreshBalances() {
 
   const owner = identity.getPrincipal()
 
-  // Collect all unique token addresses
-  const allAddresses = new Set<string>()
-  for (const t of store.tokens) allAddresses.add(t.address)
-  for (const d of daoTokens.value) if (d.active) allAddresses.add(d.address)
+  // When called without an explicit address list, fall back to the previous
+  // behaviour: every exchange token + every active DAO token.
+  let targetAddresses: string[]
+  if (addresses) {
+    targetAddresses = addresses
+  } else {
+    const set = new Set<string>()
+    for (const t of store.tokens) set.add(t.address)
+    for (const d of daoTokens.value) if (d.active) set.add(d.address)
+    targetAddresses = Array.from(set)
+  }
 
   const results = await Promise.all(
-    Array.from(allAddresses).map(async address => {
+    targetAddresses.map(async address => {
       try {
         const tokenActor = Actor.createActor(icrc1BalanceIdl, { agent, canisterId: address })
         const balance = await tokenActor.icrc1_balance_of({ owner, subaccount: [] })
@@ -407,20 +414,48 @@ async function refreshBalances() {
     })
   )
 
-  const newBalances = new Map<string, bigint>()
-  for (const r of results) newBalances.set(r.address, r.balance)
-  balances.value = newBalances
+  if (opts.merge) {
+    // Merge mode: preserve existing entries, only overwrite ones we just fetched.
+    const next = new Map(balances.value)
+    for (const r of results) next.set(r.address, r.balance)
+    balances.value = next
+  } else {
+    const next = new Map<string, bigint>()
+    for (const r of results) next.set(r.address, r.balance)
+    balances.value = next
+  }
 }
 
-let initialLoadDone = false
+const initialLoadDone = ref(false)
 async function refreshAll() {
-  if (!initialLoadDone) loading.value = true
+  if (!initialLoadDone.value) loading.value = true
   try {
-    await fetchDaoTokens()
-    if (store.isAuthenticated) await refreshBalances()
+    // Stage 1: fetch DAO tokens AND exchange-token balances in parallel.
+    // Exchange-token addresses are already known from store.tokens, so we don't
+    // need to wait for fetchDaoTokens to start the balance fetch.
+    const exchangeAddresses = store.tokens.map(t => t.address)
+    await Promise.all([
+      fetchDaoTokens(),
+      store.isAuthenticated && exchangeAddresses.length > 0
+        ? refreshBalances(exchangeAddresses)
+        : Promise.resolve(),
+    ])
+
+    // Stage 2: catch DAO-only tokens (tokens registered in the DAO but not
+    // listed on the exchange). Merge into the existing balance map so we
+    // don't clobber the stage-1 results.
+    if (store.isAuthenticated) {
+      const exchangeSet = new Set(exchangeAddresses)
+      const daoOnly = daoTokens.value
+        .filter(d => d.active && !exchangeSet.has(d.address))
+        .map(d => d.address)
+      if (daoOnly.length > 0) {
+        await refreshBalances(daoOnly, { merge: true })
+      }
+    }
   } finally {
     loading.value = false
-    initialLoadDone = true
+    initialLoadDone.value = true
   }
 }
 

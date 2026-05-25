@@ -1013,7 +1013,7 @@ async function submitFullRange() {
       phase.value = 'success'
       amount0.value = ''
       amount1.value = ''
-      await store.refreshAfterMutation('lp')
+      void store.refreshAfterMutation('lp')
       toast.success('Liquidity Added', 'LP tokens minted: ' + lpMinted.value)
     } else {
       const { classifyExchangeError, isAutoRefundError } = await import('../../utils/errors')
@@ -1056,7 +1056,7 @@ async function submitFullRange() {
         phase.value = 'success'
         amount0.value = ''
         amount1.value = ''
-        await store.refreshAfterMutation('lp')
+        void store.refreshAfterMutation('lp')
         toast.success('Liquidity Added', 'Network hiccup during submit — confirmed via query.')
         return
       }
@@ -1140,7 +1140,7 @@ async function submitConcentrated() {
       phase.value = 'success'
       amount0.value = ''
       amount1.value = ''
-      await store.refreshAfterMutation('lp')
+      void store.refreshAfterMutation('lp')
       toast.success('Position Created', 'Position ID: #' + resultPositionId.value.toString())
     } else {
       const { classifyExchangeError, isAutoRefundError } = await import('../../utils/errors')
@@ -1173,7 +1173,7 @@ async function submitConcentrated() {
         phase.value = 'success'
         amount0.value = ''
         amount1.value = ''
-        await store.refreshAfterMutation('lp')
+        void store.refreshAfterMutation('lp')
         toast.success('Position Created', 'Network hiccup during submit — confirmed via query.')
         return
       }
