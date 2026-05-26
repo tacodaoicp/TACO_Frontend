@@ -9,7 +9,8 @@
       <div class="vault-dashboard__metric-card taco-container taco-container--l1">
         <span class="vault-dashboard__metric-label">NAV per NACHO</span>
         <span class="vault-dashboard__metric-value">
-          {{ nav ? nachosStore.formatE8s(nav.navPerTokenE8s) : '—' }} ICP
+          <span v-if="loading" class="vault-dashboard__skeleton"></span>
+          <template v-else>{{ nav ? nachosStore.formatE8s(nav.navPerTokenE8s) : '—' }} ICP</template>
         </span>
         <span v-if="navUSD !== null" class="vault-dashboard__metric-sub">
           ~${{ navUSD }} USD
@@ -34,7 +35,8 @@
       <div class="vault-dashboard__metric-card taco-container taco-container--l1">
         <span class="vault-dashboard__metric-label">Portfolio Value</span>
         <span class="vault-dashboard__metric-value">
-          {{ nachosStore.formatE8s(nachosStore.portfolioValueICP) }} ICP
+          <span v-if="loading" class="vault-dashboard__skeleton"></span>
+          <template v-else>{{ nachosStore.formatE8s(nachosStore.portfolioValueICP) }} ICP</template>
         </span>
         <span v-if="nachosStore.icpPriceUsd" class="vault-dashboard__metric-sub">
           ~${{ portfolioUSD }}
@@ -45,7 +47,8 @@
       <div class="vault-dashboard__metric-card taco-container taco-container--l1">
         <span class="vault-dashboard__metric-label">NACHO Supply</span>
         <span class="vault-dashboard__metric-value">
-          {{ nachosStore.formatE8s(nachosStore.nachosSupply) }}
+          <span v-if="loading" class="vault-dashboard__skeleton"></span>
+          <template v-else>{{ nachosStore.formatE8s(nachosStore.nachosSupply) }}</template>
         </span>
       </div>
 
@@ -53,16 +56,12 @@
       <div class="vault-dashboard__metric-card taco-container taco-container--l1">
         <span class="vault-dashboard__metric-label">Fees</span>
         <span class="vault-dashboard__metric-value">
-          Mint {{ nachosStore.formatBasisPoints(nachosStore.mintFeeBasisPoints) }} /
-          Burn {{ nachosStore.formatBasisPoints(nachosStore.burnFeeBasisPoints) }}
+          <span v-if="loading" class="vault-dashboard__skeleton"></span>
+          <template v-else>Mint {{ nachosStore.formatBasisPoints(nachosStore.mintFeeBasisPoints) }} /
+          Burn {{ nachosStore.formatBasisPoints(nachosStore.burnFeeBasisPoints) }}</template>
         </span>
       </div>
 
-    </div>
-
-    <!-- no data -->
-    <div v-if="!nachosStore.dashboardData" class="vault-dashboard__loading">
-      Loading dashboard data...
     </div>
 
   </div>
@@ -76,6 +75,12 @@ import { useNachosStore } from '../../stores/nachos.store'
 const nachosStore = useNachosStore()
 
 const nav = computed(() => nachosStore.nav)
+
+// True until the dashboard payload arrives. Drives skeleton placeholders so the
+// page paints its full structure instantly instead of gating on a "Loading…"
+// message. Cached data (warm visits) clears this immediately; cold visits show
+// shimmering skeletons that fill in when the fetch lands.
+const loading = computed(() => !nachosStore.dashboardData)
 
 // 24h NAV change — computed from navHistory, skipping the first (genesis) snapshot
 const navChange24h = computed(() => {
@@ -224,11 +229,23 @@ const navChangeClassUSD = computed(() => {
     opacity: 0.6;
   }
 
-  &__loading {
-    text-align: center;
-    padding: 2rem;
-    opacity: 0.75;
-    font-family: 'Space Mono', monospace;
+  &__skeleton {
+    display: inline-block;
+    min-width: 4.5rem;
+    height: 1.05em;
+    border-radius: 5px;
+    vertical-align: middle;
+    background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.06) 25%,
+      rgba(255, 255, 255, 0.18) 37%,
+      rgba(255, 255, 255, 0.06) 63%);
+    background-size: 400% 100%;
+    animation: vault-dashboard-shimmer 1.4s ease infinite;
   }
+}
+
+@keyframes vault-dashboard-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
 }
 </style>

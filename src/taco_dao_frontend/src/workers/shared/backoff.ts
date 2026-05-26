@@ -1,7 +1,10 @@
 /**
  * Exponential Backoff for SharedWorker Retry Logic
  *
- * Progression: 1s -> 2s -> 4s -> 8s -> 16s -> 32s -> 50s (max)
+ * Progression: 1s -> 2s -> 4s -> 8s (max)
+ * Capped low (8s) so user-facing keys (vault/prices) retry quickly after a
+ * transient failure instead of stalling up to ~50s. Cache-first delivery keeps
+ * stale data on screen meanwhile, so frequent retries don't blank the UI.
  */
 
 import type { DataKey } from '../types'
@@ -15,7 +18,7 @@ export interface BackoffConfig {
 
 const DEFAULT_CONFIG: BackoffConfig = {
   initialDelayMs: 1000,    // 1 second
-  maxDelayMs: 50000,       // 50 seconds (as specified)
+  maxDelayMs: 8000,        // 8 seconds (was 50s — too long for user-facing retries)
   multiplier: 2,
   jitter: true,            // Add randomness to prevent thundering herd
 }

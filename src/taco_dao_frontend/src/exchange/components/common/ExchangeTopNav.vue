@@ -29,7 +29,7 @@
         @pointerenter="warmDestination(item.route)"
         @focus="warmDestination(item.route)"
         @touchstart.passive="warmDestination(item.route)"
-        @click="navigate(item.route)"
+        @click="selectTab(item)"
       >
         {{ item.label }}
       </button>
@@ -53,7 +53,7 @@ import { useExchangeStore } from '../../store/exchange.store'
 // be warmed when the user signals intent (hover/focus/touch). Each
 // .prefetch() is a no-op if the cached query is already fresh.
 const routeMeta: Record<string, { name: string; warm?: () => void }> = {
-  '/':          { name: 'ProTrade' },
+  '/':          { name: 'ProTrade', warm: () => { useExchangeStore().prefetchProPair() } },
   '/trade':     { name: 'MobileTrade' },
   '/easy':      { name: 'EasySwap' },
   '/pool':      { name: 'Pool' },
@@ -85,6 +85,16 @@ function navigate(target: string) {
     return
   }
   router.push(target)
+}
+
+// Tab clicks persist the Easy/Pro choice so it sticks across visits — the
+// router guard defaults `/` to `/easy` unless `taco_exchange_mode === 'pro'`,
+// so without this an explicit Pro click would bounce straight back to Easy.
+// Other tabs (otc/pool/portfolio) and the brand link don't touch the mode.
+function selectTab(item: { key: string; route: string }) {
+  if (item.key === 'pro') localStorage.setItem('taco_exchange_mode', 'pro')
+  else if (item.key === 'easy') localStorage.setItem('taco_exchange_mode', 'easy')
+  navigate(item.route)
 }
 
 withDefaults(defineProps<{

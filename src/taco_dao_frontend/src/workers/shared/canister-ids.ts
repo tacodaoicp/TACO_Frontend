@@ -49,9 +49,14 @@ export function getNetwork(): 'ic' | 'staging' | 'local' {
     }
   }
 
-  // Fall back to environment variable
-  // @ts-ignore - Vite injects these
-  const envNetwork = import.meta.env?.DFX_NETWORK || import.meta.env?.VITE_DFX_NETWORK
+  // Fall back to build-time env. NOTE: vite-plugin-environment injects
+  // `process.env.DFX_NETWORK` (NOT `import.meta.env`) into both the main and
+  // worker bundles, so read process.env first — the old import.meta.env read was
+  // always undefined here, which is why the worker fell through to the default.
+  let envNetwork: string | undefined
+  try { envNetwork = process.env.DFX_NETWORK } catch { /* process undefined if not injected */ }
+  // @ts-ignore - Vite may inject these in some setups
+  if (!envNetwork) envNetwork = import.meta.env?.DFX_NETWORK || import.meta.env?.VITE_DFX_NETWORK
   if (envNetwork === 'ic' || envNetwork === 'staging') {
     return envNetwork
   }
@@ -69,8 +74,9 @@ export function getNetwork(): 'ic' | 'staging' | 'local' {
     }
   }
 
-  // Default to staging (matches .env DFX_NETWORK='staging')
-  return 'staging'
+  // Default to IC mainnet (production). Previously defaulted to 'staging', which
+  // silently served the staging vault whenever env/SET_NETWORK didn't resolve.
+  return 'ic'
 }
 
 /**

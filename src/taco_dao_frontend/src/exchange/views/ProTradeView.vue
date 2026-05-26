@@ -100,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onActivated, onDeactivated } from 'vue'
 import { useRouter } from 'vue-router'
 import ProLayout from '../components/layout/ProLayout.vue'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
@@ -120,7 +120,7 @@ const router = useRouter()
 const layoutRef = ref<InstanceType<typeof ProLayout> | null>(null)
 const datafeed = useExchangeKlineDatafeed()
 
-// Pair selection — reads from store (shared with ExchangeHeader)
+// Pair selection — reads from store (shared across exchange views)
 const selectedToken0 = computed(() => store.selectedToken0)
 const selectedToken1 = computed(() => store.selectedToken1)
 const decimals0 = computed(() => {
@@ -158,36 +158,53 @@ function onTradeFromWallet(address: string) {
   if (address !== store.selectedToken0 && address !== store.selectedToken1) {
     store.selectedToken0 = address
   }
+  // Snap to a canonical, tradable pair (pool-native order, base token as quote)
+  // so the chart/orderbook stay consistent — see resolveProPair.
+  syncProPair()
 }
 
-function initDefaultPair() {
-  if (store.selectedToken0) return // already set
-  if (store.tokens.length >= 2) {
-    const taco = store.tokens.find(t => t.symbol === 'TACO')
-    const icp = store.tokens.find(t => t.address === 'ryjl3-tyaaa-aaaaa-aaaba-cai')
-    if (taco && icp) {
-      store.selectedToken0 = taco.address
-      store.selectedToken1 = icp.address
-    } else {
-      store.selectedToken0 = store.tokens[0].address
-      store.selectedToken1 = store.tokens[1].address
-    }
-  }
+// Normalize the carried-over pair to Pro's canonical orientation (base token as
+// quote, e.g. TACO/ICP not ICP/TACO) and ensure it maps to a live pool, falling
+// back to <token>/ICP then TACO/ICP. Easy mode stores the raw swap from/to order,
+// so without this Pro would render the wrong direction (or a dead chart) after a
+// mode switch. Idempotent for an already-canonical pair, so it won't fight a
+// manual PairSelector choice. resolveProPair returns null until pool data loads.
+//
+// Gated on isActive: ExchangeApp keeps views alive, so without the guard the
+// watcher below would keep firing on the 15 s exchangeInfoData poll and could
+// canonicalize the pair while the user is back in Easy mode — flipping the
+// direction of their swap.
+const isActive = ref(false)
+
+function syncProPair() {
+  if (!isActive.value) return
+  const pair = store.resolveProPair()
+  if (!pair) return
+  if (store.selectedToken0 !== pair[0]) store.selectedToken0 = pair[0]
+  if (store.selectedToken1 !== pair[1]) store.selectedToken1 = pair[1]
 }
 
-// Watch for tokens loading (async init may complete after mount)
-watch(() => store.tokens.length, () => initDefaultPair())
+// Re-resolve once tokens/pool data finish loading after entry (async init may
+// land while Pro is already shown).
+watch(
+  () => [store.tokens.length, store.exchangeInfoData?.pool_canister?.length ?? 0],
+  () => syncProPair(),
+)
 
-// Pro layout is desktop-only. Cross-viewport redirects are handled
-// globally in ExchangeApp.vue so they don't leak across views under
-// keep-alive caching. Here we just handle initial-mount redirect.
+// Pro layout is desktop-only. Cross-viewport redirects are handled globally in
+// ExchangeApp.vue; here we handle the initial-mount redirect.
 onMounted(() => {
-  if (window.matchMedia('(max-width: 767px)').matches) {
-    router.replace('/trade')
-    return
-  }
-  initDefaultPair()
+  if (window.matchMedia('(max-width: 767px)').matches) router.replace('/trade')
 })
+
+// onActivated fires on first show (after onMounted) and on every keep-alive
+// re-entry — the right hook to normalize the pair when entering Pro.
+onActivated(() => {
+  if (window.matchMedia('(max-width: 767px)').matches) return
+  isActive.value = true
+  syncProPair()
+})
+onDeactivated(() => { isActive.value = false })
 </script>
 
 <style scoped lang="scss">

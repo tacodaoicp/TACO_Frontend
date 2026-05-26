@@ -405,6 +405,9 @@ async function init(): Promise<void> {
     identity: getFrontendIdentity(),
     host: getHost(),
     fetchRootKey: shouldFetchRootKey(),
+    // Public read-only data — skip per-query signature verification (saves a
+    // read_state + BLS verify on first query). Authenticated agent stays verified.
+    verifyQuerySignatures: false,
   })
 
   isInitialized = true
@@ -467,6 +470,9 @@ function handleMessage(message: WorkerRequest): void {
           const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
           const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
           if (canFetch && (!state?.data || isStale(key, state.lastUpdated))) {
+            // User explicitly navigated here — clear any leftover backoff so the
+            // fetch fires immediately instead of honoring a stale (≤8s) window.
+            backoff.reset(key)
             queue.enqueue(key, 'critical')
           }
         }
@@ -705,6 +711,9 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
     identity: getFrontendIdentity(),
     host: getHost(),
     fetchRootKey: shouldFetchRootKey(),
+    // Public read-only data — skip per-query signature verification (saves a
+    // read_state + BLS verify on first query). Authenticated agent stays verified.
+    verifyQuerySignatures: false,
   })
 
   // If authenticated, recreate authenticated agent with new network settings
@@ -783,12 +792,40 @@ async function processQueue(): Promise<void> {
   }
 }
 
+// Per-key fetch timeout. A hung IC query/connection (browser fetch has no default
+// timeout) must fail fast so the KEEP_TRYING/backoff machinery can retry on a fresh
+// connection, instead of leaving the page stuck for tens of seconds.
+const DEFAULT_FETCH_TIMEOUT_MS = 8_000
+const FETCH_TIMEOUT_MS: Partial<Record<DataKey, number>> = {
+  cryptoPrices: 20_000, // sequential multi-API fallback chain needs more headroom
+}
+function withFetchTimeout<T>(dataKey: DataKey, p: Promise<T>): Promise<T> {
+  const ms = FETCH_TIMEOUT_MS[dataKey] ?? DEFAULT_FETCH_TIMEOUT_MS
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`fetch timeout after ${ms}ms: ${dataKey}`)), ms)
+    p.then(
+      (v) => { clearTimeout(timer); resolve(v) },
+      (e) => { clearTimeout(timer); reject(e) },
+    )
+  })
+}
+
 async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }): Promise<void> {
+  const startedAt = performance.now()
   try {
     backoff.recordAttempt(item.dataKey)
-    await fetchData(item.dataKey)
+    await withFetchTimeout(item.dataKey, fetchData(item.dataKey))
     backoff.recordSuccess(item.dataKey)
     queue.complete(item.dataKey)
+
+    if (debugEnabled) {
+      try {
+        const ms = (performance.now() - startedAt).toFixed(0)
+        const d = dataStates.get(item.dataKey)?.data
+        const bytes = d != null ? JSON.stringify(d, (_k, v) => typeof v === 'bigint' ? v.toString() : v).length : 0
+        console.log(`[AuthWorker-Dedicated] fetch OK ${item.dataKey} in ${ms}ms (~${bytes}B)`)
+      } catch { /* telemetry must never break the fetch path */ }
+    }
 
     if (ADMIN_KEYS.includes(item.dataKey) && !isAdmin) {
       isAdmin = true

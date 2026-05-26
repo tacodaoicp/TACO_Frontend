@@ -21,7 +21,7 @@
     <div class="footer-bar__right">
 
       <!-- version number -->
-      <span class="footer-bar__version">v2.0.0</span>
+      <span class="footer-bar__version">v2.1.0</span>
 
     </div>
 

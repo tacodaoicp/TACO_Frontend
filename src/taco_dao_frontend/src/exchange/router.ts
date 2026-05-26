@@ -72,13 +72,12 @@ const exchangeRouter = createRouter({
   routes,
 })
 
-// On mobile, default to easy mode unless user has explicitly chosen pro
+// Default to easy mode for everyone (all viewports) unless the user has
+// explicitly chosen pro. The Pro/Easy tabs in ExchangeTopNav persist that
+// choice to localStorage, so an explicit Pro pick sticks across visits.
 exchangeRouter.beforeEach((to) => {
-  if (to.path === '/' && window.innerWidth <= 767) {
-    const saved = localStorage.getItem('taco_exchange_mode')
-    if (saved !== 'pro') {
-      return '/easy'
-    }
+  if (to.path === '/' && localStorage.getItem('taco_exchange_mode') !== 'pro') {
+    return '/easy'
   }
 })
 

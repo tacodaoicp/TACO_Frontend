@@ -12,6 +12,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { Actor } from '@dfinity/agent'
+import { ICP_LEDGER_ID, isBaseToken } from '../constants/tokens'
 import { Principal } from '@dfinity/principal'
 import { idlFactory } from 'declarations/OTC_backend/OTC_backend.did.js'
 import type {
@@ -878,6 +879,73 @@ export const useExchangeStore = defineStore('exchange', () => {
     return BigInt(r0[idx] as any) > 0n && BigInt(r1[idx] as any) > 0n
   }
 
+  /**
+   * Resolve the pair to show in Pro mode from the currently-selected pair.
+   *
+   * Easy mode stores the raw swap from/to order (selectedToken0 = "from"), which
+   * can leave a base token like ICP as token0 — Pro would then render ICP/TACO
+   * instead of the canonical TACO/ICP, and an Easy pair that only routes multi-hop
+   * (no direct AMM pool) would load a dead chart. This:
+   *   1. keeps the current pair if it has a direct pool, canonicalized so the base
+   *      token (ICP/ck-stables) is the quote (token1);
+   *   2. else falls back to the non-base token's /ICP pool;
+   *   3. else falls back to TACO/ICP;
+   *   4. else returns null (Pro shows its "Select a trading pair" placeholder).
+   * Mirrors the canonical orientation PairSelector already writes on manual select.
+   */
+  function resolveProPair(): [string, string] | null {
+    // Map a pair to the pool's STORED (native) order, then force any base token
+    // (ICP/ck-stables) into the quote slot. Snapping to native order keeps the
+    // chart, orderbook and last-price consistent — they all read pool-native data
+    // and only the chart re-orients (via isInverted), so display must equal the
+    // stored order for non-base pairs to line up.
+    const poolNativeOrder = (a: string, b: string): [string, string] => {
+      const list = (exchangeInfoData.value as any)?.pool_canister as Array<[string, string]> | undefined
+      if (list) for (const [x, y] of list) {
+        if ((x === a && y === b) || (x === b && y === a)) return [x, y]
+      }
+      return [a, b]
+    }
+    const canonicalize = (a: string, b: string): [string, string] => {
+      const [p0, p1] = poolNativeOrder(a, b)
+      return isBaseToken(p0) && !isBaseToken(p1) ? [p1, p0] : [p0, p1]
+    }
+
+    const t0 = selectedToken0.value
+    const t1 = selectedToken1.value
+
+    if (t0 && t1 && hasAMMPool(t0, t1)) return canonicalize(t0, t1)
+
+    // No direct pool — fall back to the non-base token's /ICP pool
+    // (prefer t0, the Easy "from" token).
+    const primary = [t0, t1].find(t => t && t !== ICP_LEDGER_ID)
+    if (primary && hasAMMPool(primary, ICP_LEDGER_ID)) return [primary, ICP_LEDGER_ID]
+
+    const taco = tokens.value.find(t => t.symbol === 'TACO')?.address
+    if (taco && hasAMMPool(taco, ICP_LEDGER_ID)) return [taco, ICP_LEDGER_ID]
+
+    return null
+  }
+
+  /**
+   * Speculatively warm the data a Pro view paints on entry, for the pair the user
+   * has settled on in Easy mode — so the Easy→Pro switch is near-instant. Resolves
+   * the canonical Pro pair (so cache keys match what the chart will request), then
+   * fire-and-forget warms the chart's initial history (heaviest), the 24h stat
+   * candle, and the tail-poll seed. All calls are no-ops when already fresh and
+   * are error-safe (cachedQuery swallows fetch failures). `timeframe` must match
+   * the target view's chart default — hour on desktop, fivemin on mobile.
+   */
+  function prefetchProPair(timeframe: TimeFrame = { hour: null }): void {
+    const pair = resolveProPair()
+    if (!pair) return
+    const [t0, t1] = pair
+    // Mirrors TradingChart.loadInitialData: getRange(t0, t1, tf, [], 2500n).
+    void getKlineDataRange(t0, t1, timeframe, [], 2500n)
+    void getKlineData(t0, t1, { day: null }, true)
+    void getKlineData(t0, t1, timeframe, true)
+  }
+
   async function getAllAMMPools() {
     const actor = await getQueryActor()
     return actor.getAllAMMPools()
@@ -935,6 +1003,34 @@ export const useExchangeStore = defineStore('exchange', () => {
     return (await klineQuery(key).ensure()) ?? []
   }
 
+  // Caches ONLY the chart's initial-history paint (before=[]), which is the same
+  // request every consumer of a freshly-opened pair makes — so it can be warmed
+  // ahead of an Easy→Pro switch (see prefetchProPair). Scroll-back pages vary per
+  // cursor and stay uncached. 30 s TTL: history is stable and the live tail is
+  // patched by TradingChart's 5 s getLatest poll; stale-while-revalidate keeps the
+  // switch instant even if the warmed cache has aged.
+  const klineRangeQuery = createKeyedQueryFactory<string, KlineData[]>((compositeKey) => {
+    const [token1, token2, tfKey, limitStr] = compositeKey.split('|')
+    const tfMap: Record<string, TimeFrame> = {
+      fivemin:   { fivemin: null },
+      hour:      { hour: null },
+      fourHours: { fourHours: null },
+      day:       { day: null },
+      week:      { week: null },
+    }
+    return createCachedQuery({
+      key: `klineRange:${compositeKey}`,
+      fetcher: async () => {
+        const actor = await getQueryActor()
+        return actor.getKlineDataRange(token1, token2, tfMap[tfKey] ?? { day: null }, [], BigInt(limitStr))
+      },
+      persist: false,
+      maxAgeMs: 30_000,
+      shallow: true,
+      timeoutMs: 15_000,
+    })
+  })
+
   async function getKlineDataRange(
     token1: string,
     token2: string,
@@ -942,6 +1038,12 @@ export const useExchangeStore = defineStore('exchange', () => {
     before: [] | [bigint],
     limit: bigint,
   ): Promise<KlineData[]> {
+    // Initial paint (before=[]) routes through the cache so it can be prefetched
+    // and dedup'd; scroll-back pages (before=[ts]) fetch directly.
+    if (before.length === 0) {
+      const key = `${token1}|${token2}|${timeframeKey(timeframe)}|${limit.toString()}`
+      return (await klineRangeQuery(key).ensure()) ?? []
+    }
     const actor = await getQueryActor()
     return actor.getKlineDataRange(token1, token2, timeframe, before, limit)
   }
@@ -1559,6 +1661,8 @@ export const useExchangeStore = defineStore('exchange', () => {
     getCurrentLiquidityForeignPools,
     getAMMPoolInfo,
     hasAMMPool,
+    resolveProPair,
+    prefetchProPair,
     getAllAMMPools,
     getPoolStats,
     getAllPoolStats,

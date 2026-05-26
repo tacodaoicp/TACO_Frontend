@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onActivated, onDeactivated } from 'vue'
 import { useExchangeStore } from '../store/exchange.store'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import OrderbookPanel from '../components/orderbook/OrderbookPanel.vue'
@@ -124,20 +124,27 @@ function onPriceClick(price: number, side: 'buy' | 'sell', cumulativeBase: numbe
 // Cross-viewport redirects are handled globally in ExchangeApp.vue so they
 // don't leak across views under keep-alive caching.
 
-// Set default pair if none selected
-onMounted(() => {
-  if (!store.selectedToken0 && store.tokens.length >= 2) {
-    const taco = store.tokens.find(t => t.symbol === 'TACO')
-    const icp = store.tokens.find(t => t.address === 'ryjl3-tyaaa-aaaaa-aaaba-cai')
-    if (taco && icp) {
-      store.selectedToken0 = taco.address
-      store.selectedToken1 = icp.address
-    } else {
-      store.selectedToken0 = store.tokens[0].address
-      store.selectedToken1 = store.tokens[1].address
-    }
-  }
-})
+// Normalize the carried-over pair to Pro's canonical orientation and a live
+// pool (see ProTradeView for the full rationale). Gated on isActive because
+// ExchangeApp keeps views alive — otherwise the watcher would fire on the 15 s
+// poll and flip the pair while the user is back in Easy mode.
+const isActive = ref(false)
+
+function syncProPair() {
+  if (!isActive.value) return
+  const pair = store.resolveProPair()
+  if (!pair) return
+  if (store.selectedToken0 !== pair[0]) store.selectedToken0 = pair[0]
+  if (store.selectedToken1 !== pair[1]) store.selectedToken1 = pair[1]
+}
+
+watch(
+  () => [store.tokens.length, store.exchangeInfoData?.pool_canister?.length ?? 0],
+  () => syncProPair(),
+)
+
+onActivated(() => { isActive.value = true; syncProPair() })
+onDeactivated(() => { isActive.value = false })
 </script>
 
 <style scoped lang="scss">

@@ -1,6 +1,7 @@
 import { computed } from 'vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { formatUSD } from '../utils/format'
+import { isBaseToken } from '../constants/tokens'
 
 export interface PairOption {
   base: string
@@ -15,19 +16,11 @@ export interface PairOption {
 }
 
 // Canonical base/quote orientation — display non-base on the LEFT
-// (e.g. TACO/ICP, not ICP/TACO).
-const BASE_TOKEN_IDS = new Set([
-  'ryjl3-tyaaa-aaaaa-aaaba-cai',  // ICP
-  'xevnm-gaaaa-aaaar-qafnq-cai',  // ckUSDC
-  'cngnf-vqaaa-aaaar-qag4q-cai',  // ckUSDT
-])
+// (e.g. TACO/ICP, not ICP/TACO). BASE_TOKEN_IDS / isBaseToken live in
+// ../constants/tokens so the store's resolveProPair shares the same rule.
 
 export function useExchangePairs() {
   const store = useExchangeStore()
-
-  function isBaseToken(addr: string): boolean {
-    return BASE_TOKEN_IDS.has(addr)
-  }
 
   const availablePairs = computed((): PairOption[] => {
     const info = store.exchangeInfoData

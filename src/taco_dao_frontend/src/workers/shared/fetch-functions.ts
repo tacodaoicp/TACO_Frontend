@@ -273,6 +273,17 @@ export async function fetchCryptoPricesData(): Promise<CryptoPrices> {
   let tacoUsd = 0
   let tacoIcp = 0
 
+  // Kick off the TACO price fetch immediately so it runs IN PARALLEL with the
+  // CoinGecko call + conditional fallbacks below (they're independent of TACO).
+  // Resolved near the end. Previously this ran strictly after everything else,
+  // adding its full latency on top of the chain.
+  const tacoController = new AbortController()
+  const tacoTimeoutId = setTimeout(() => tacoController.abort(), 10000)
+  const tacoPromise = fetch(
+    'https://api.geckoterminal.com/api/v2/networks/icp/pools/vhoia-myaaa-aaaar-qbmja-cai',
+    { signal: tacoController.signal }
+  ).then(r => (r.ok ? r.json() : null)).catch(() => null)
+
   // PRIMARY: Fetch ICP, BTC, and DKP from CoinGecko (with timeout)
   try {
     const coingeckoController = new AbortController()
@@ -364,25 +375,17 @@ export async function fetchCryptoPricesData(): Promise<CryptoPrices> {
     }
   }
 
-  // Fetch TACO price from GeckoTerminal (with timeout)
+  // Resolve the TACO price fetch that was started in parallel at the top.
   try {
-    const tacoController = new AbortController()
-    const tacoTimeout = setTimeout(() => tacoController.abort(), 10000)
-
-    const tacoResponse = await fetch(
-      'https://api.geckoterminal.com/api/v2/networks/icp/pools/vhoia-myaaa-aaaar-qbmja-cai',
-      { signal: tacoController.signal }
-    )
-    clearTimeout(tacoTimeout)
-
-    if (tacoResponse.ok) {
-      const tacoData = await tacoResponse.json()
+    const tacoData = await tacoPromise
+    clearTimeout(tacoTimeoutId)
+    if (tacoData) {
       tacoUsd = Number(tacoData.data?.attributes?.base_token_price_usd || 0)
       tacoIcp = Number(tacoData.data?.attributes?.base_token_price_quote_token || 0)
     }
   } catch (err) {
     // GeckoTerminal fetch failed - continue with zeros
-    console.warn('[fetchCryptoPricesData] GeckoTerminal fetch failed:', err)
+    console.warn('[fetchCryptoPricesData] GeckoTerminal TACO fetch failed:', err)
   }
 
   // Only throw if ALL prices are zero (complete failure)

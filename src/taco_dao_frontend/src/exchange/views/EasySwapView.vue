@@ -32,9 +32,37 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch, onActivated, onDeactivated } from 'vue'
 import SwapCard from '../components/swap/SwapCard.vue'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
+import type { TimeFrame } from '../../components/charts/types'
+import { useExchangeStore } from '../store/exchange.store'
+import { preloadRoute } from '../router'
+
+// Prefetch Pro-mode data for the pair the user settles on, so switching Easy→Pro
+// is near-instant. Only fires once the pair has been stable for 2 s (reset on
+// every change) and only while Easy is the active view (it's kept-alive). The
+// store action resolves the canonical Pro pair so the warmed cache keys match
+// what the Pro chart will request; viewport picks the right route chunk + chart
+// timeframe (desktop / = ProTrade/hour, mobile /trade = MobileTrade/fivemin).
+const store = useExchangeStore()
+const isActive = ref(false)
+let timer: ReturnType<typeof setTimeout> | null = null
+
+function schedule() {
+  if (timer) clearTimeout(timer)
+  if (!isActive.value || !store.selectedToken0 || !store.selectedToken1) return
+  timer = setTimeout(() => {
+    const mobile = window.matchMedia('(max-width: 767px)').matches
+    preloadRoute(mobile ? 'MobileTrade' : 'ProTrade')
+    store.prefetchProPair((mobile ? { fivemin: null } : { hour: null }) as TimeFrame)
+  }, 2000)
+}
+
+watch([() => store.selectedToken0, () => store.selectedToken1], schedule)
+onActivated(() => { isActive.value = true; schedule() })
+onDeactivated(() => { isActive.value = false; if (timer) clearTimeout(timer) })
 </script>
 
 <style scoped lang="scss">
