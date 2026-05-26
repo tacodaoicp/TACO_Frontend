@@ -2786,11 +2786,12 @@ export const useTacoStore = defineStore('taco', () => {
                 return version === 'v2' ? 'https://id.ai' : 'https://identity.ic0.app'
             }
 
-            // Share principals across the custom subdomains (exchange.tacodao.com +
-            // ic0.io vanity domains) by anchoring derivation to the apex. On tacodao.com
-            // itself this is the default (undefined). Origins listed in ii-alternative-origins.
+            // Share principals with the exchange subdomain by anchoring derivation to the apex.
+            // Only applied on exchange.tacodao.com — on tacodao.com itself this is the default.
+            // Never anchor third-party-DNS domains (*.ic0.io etc): an ii-alternative-origin can
+            // mint delegations for the user's TACO principal, so only fully-owned origins qualify.
             const derivationOrigin =
-                ['exchange.tacodao.com', 'exchange.ic0.io', 'taco.ic0.io'].includes(window.location.hostname)
+                window.location.hostname === 'exchange.tacodao.com'
                     ? 'https://tacodao.com'
                     : undefined
 

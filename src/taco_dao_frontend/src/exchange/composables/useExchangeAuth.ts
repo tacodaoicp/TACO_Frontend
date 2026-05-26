@@ -81,11 +81,12 @@ export function useExchangeAuth() {
       const { getCachedAuthClient } = await import('../../shared/auth-cache')
       const authClient = await getCachedAuthClient()
 
-      // Anchor to tacodao.com on the custom subdomains (incl. ic0.io vanity domains)
-      // so the principal matches the DAO app. These origins are listed in
-      // /.well-known/ii-alternative-origins served at tacodao.com.
+      // Anchor to tacodao.com on the custom subdomain so the principal matches the DAO app.
+      // ONLY exchange.tacodao.com (DNS + content fully controlled by us) is anchored here.
+      // Do NOT add third-party-DNS domains (e.g. *.ic0.io) — listing them in
+      // ii-alternative-origins would let that origin mint delegations for users' TACO principals.
       const derivationOrigin =
-        ['exchange.tacodao.com', 'exchange.ic0.io', 'taco.ic0.io'].includes(window.location.hostname)
+        window.location.hostname === 'exchange.tacodao.com'
           ? 'https://tacodao.com'
           : undefined
 

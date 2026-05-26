@@ -182,6 +182,9 @@ export function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
       return 'staging'
     }
     // Production domains
+    // .ic0.io = served-directly vanity domains (mainnet). NOTE: these are NOT
+    // principal-anchored to tacodao.com (see ii-alternative-origins / derivationOrigin):
+    // their DNS is third-party-controlled, so they get isolated principals.
     if (hostname === 'tacodao.com' || hostname.endsWith('.tacodao.com') || hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app') || hostname.endsWith('.ic0.io')) {
       return 'ic'
     }
