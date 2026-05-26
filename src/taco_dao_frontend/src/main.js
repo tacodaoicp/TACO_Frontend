@@ -8,6 +8,7 @@ import { createApp } from 'vue'
 const hostname = window.location.hostname
 const isExchange =
   hostname === 'exchange.tacodao.com' ||
+  hostname === 'exchange.ic0.io' ||
   window.location.pathname.startsWith('/exchange')
 
 if (isExchange) {

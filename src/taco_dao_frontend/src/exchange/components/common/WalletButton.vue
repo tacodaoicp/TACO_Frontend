@@ -94,9 +94,10 @@ async function connectWallet() {
     const { getCachedAuthClient } = await import('../../../shared/auth-cache')
     const authClient = await getCachedAuthClient()
 
-    // Anchor to tacodao.com on the custom subdomain so the principal matches the DAO app.
+    // Anchor to tacodao.com on the custom subdomains (incl. ic0.io vanity domains)
+    // so the principal matches the DAO app.
     const derivationOrigin =
-      window.location.hostname === 'exchange.tacodao.com'
+      ['exchange.tacodao.com', 'exchange.ic0.io', 'taco.ic0.io'].includes(window.location.hostname)
         ? 'https://tacodao.com'
         : undefined
 

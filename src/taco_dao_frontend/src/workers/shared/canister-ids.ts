@@ -69,7 +69,7 @@ export function getNetwork(): 'ic' | 'staging' | 'local' {
       return 'staging'
     }
     // Production domains
-    if (hostname === 'tacodao.com' || hostname.endsWith('.tacodao.com') || hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app')) {
+    if (hostname === 'tacodao.com' || hostname.endsWith('.tacodao.com') || hostname.endsWith('.icp0.io') || hostname.endsWith('.ic0.app') || hostname.endsWith('.ic0.io')) {
       return 'ic'
     }
   }

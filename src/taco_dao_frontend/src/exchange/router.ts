@@ -64,7 +64,7 @@ const routes = [
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
-const isHostnameBased = window.location.hostname === 'exchange.tacodao.com'
+const isHostnameBased = ['exchange.tacodao.com', 'exchange.ic0.io'].includes(window.location.hostname)
 const base = isHostnameBased ? '/' : '/exchange'
 
 const exchangeRouter = createRouter({
