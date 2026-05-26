@@ -346,7 +346,8 @@ const icrc1BalanceIdl = ({ IDL }: { IDL: any }) => {
 
 async function fetchDaoTokens() {
   try {
-    const agent = new HttpAgent({ host: getNetworkHost() })
+    // Anonymous public DAO token list — skip per-query signature verification.
+    const agent = new HttpAgent({ host: getNetworkHost(), verifyQuerySignatures: false })
     const daoActor = Actor.createActor(daoBackendIDL, {
       agent,
       canisterId: getCanisterId('dao_backend'),

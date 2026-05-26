@@ -344,10 +344,15 @@ async function getAnonymousAgent() {
     }
 
     // Create new agent and cache it
+    // Anonymous, public/display reads only (DAO public data, vault balances,
+    // dashboards). Skip per-query signature verification (~200ms off the first
+    // query) — same trust model the data workers use. This agent never carries
+    // the user's identity; the authenticated agent keeps verification on.
     _cachedAnonymousAgent = await createAgent({
         identity: getFrontendIdentity(),
         host,
         fetchRootKey: shouldFetchRootKey(),
+        verifyQuerySignatures: false,
     })
     _cachedAnonymousAgentHost = host
 

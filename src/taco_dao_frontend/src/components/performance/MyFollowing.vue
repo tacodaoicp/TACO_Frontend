@@ -430,6 +430,7 @@ export default {
 
 .fol-muted {
   color: var(--dark-brown-to-white);
+  font-family: 'Space Mono', monospace;
 }
 
 .perf-value {

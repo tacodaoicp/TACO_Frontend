@@ -243,11 +243,58 @@ import { useTacoStore } from "../stores/taco.store"
 import { storeToRefs } from "pinia"
 import workerBridge from '../stores/worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
+import { yieldToMain } from '../utils/yieldToMain'
 import DfinityLogo from "../assets/images/dfinityLogo.vue"
 import MyPerformance from "../components/performance/MyPerformance.vue"
 import PerformanceLeaderboard from "../components/performance/PerformanceLeaderboard.vue"
 import MyFollowing from "../components/performance/MyFollowing.vue"
 import MyDistributionRewards from "../components/performance/MyDistributionRewards.vue"
+
+// Cooperative deserialize for the (potentially large) performance graph. Same
+// output as deserializeFromTransfer(data), but yields to the event loop between
+// chunks of checkpoints so a big payload doesn't freeze the page on load. The
+// per-checkpoint work stays synchronous (bounded); we only yield per chunk and
+// per neuron, so promise overhead is negligible. Falls back to the plain sync
+// deserialize for any non-graph shape.
+async function deserializePerformanceCooperative(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return deserializeFromTransfer(data)
+  }
+  const out = {}
+  for (const key of Object.keys(data)) {
+    if (key === 'neurons' && Array.isArray(data[key])) {
+      const neuronsIn = data[key]
+      const neuronsOut = new Array(neuronsIn.length)
+      for (let n = 0; n < neuronsIn.length; n++) {
+        const neuron = neuronsIn[n]
+        if (!neuron || typeof neuron !== 'object') {
+          neuronsOut[n] = deserializeFromTransfer(neuron)
+          continue
+        }
+        const dn = {}
+        for (const nkey of Object.keys(neuron)) {
+          if (nkey === 'checkpoints' && Array.isArray(neuron[nkey])) {
+            const cpsIn = neuron[nkey]
+            const cpsOut = new Array(cpsIn.length)
+            for (let i = 0; i < cpsIn.length; i++) {
+              cpsOut[i] = deserializeFromTransfer(cpsIn[i])
+              if ((i + 1) % 100 === 0) await yieldToMain()
+            }
+            dn[nkey] = cpsOut
+          } else {
+            dn[nkey] = deserializeFromTransfer(neuron[nkey])
+          }
+        }
+        neuronsOut[n] = dn
+        await yieldToMain()
+      }
+      out[key] = neuronsOut
+    } else {
+      out[key] = deserializeFromTransfer(data[key])
+    }
+  }
+  return out
+}
 
 export default {
   name: 'PerformanceView',
@@ -408,23 +455,31 @@ export default {
     // Worker subscription for user performance data
     // Worker handles all the data fetching, weighted averaging, and caching
     let unsubscribePerformance = null
+    // Guards against a stale cooperative-deserialize finishing after a newer
+    // userPerformance payload has arrived.
+    let perfSeq = 0
 
     const setupPerformanceSubscription = () => {
       // Subscribe to worker data - automatically updates when worker has fresh data
       unsubscribePerformance = workerBridge.subscribe('userPerformance', (data, state) => {
         if (data) {
-          try {
-            const deserialized = deserializeFromTransfer(data)
-            userPerformance.value = deserialized
-            isLoadingUserPerformance.value = false
-            userPerformanceError.value = ''
-            // Also load user's follows list when performance data arrives
-            loadUserFollows()
-          } catch (error) {
-            console.error('Error deserializing performance data:', error)
-            userPerformanceError.value = 'Failed to load performance data'
-            isLoadingUserPerformance.value = false
-          }
+          // Deserialize cooperatively so a large graph doesn't freeze the page.
+          const seq = ++perfSeq
+          deserializePerformanceCooperative(data)
+            .then((deserialized) => {
+              if (seq !== perfSeq) return // a newer payload superseded this one
+              userPerformance.value = deserialized
+              isLoadingUserPerformance.value = false
+              userPerformanceError.value = ''
+              // Also load user's follows list when performance data arrives
+              loadUserFollows()
+            })
+            .catch((error) => {
+              if (seq !== perfSeq) return
+              console.error('Error deserializing performance data:', error)
+              userPerformanceError.value = 'Failed to load performance data'
+              isLoadingUserPerformance.value = false
+            })
         } else if (state && state.error) {
           // Worker reported an error — stop loading spinner
           isLoadingUserPerformance.value = false
@@ -826,6 +881,7 @@ export default {
 /* Theme text helpers */
 .perf-muted {
   color: var(--dark-brown-to-white);
+  font-family: 'Space Mono', monospace;
 }
 
 /* Theme alert boxes */

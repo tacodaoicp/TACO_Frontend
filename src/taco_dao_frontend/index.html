@@ -48,9 +48,74 @@
   <meta name="twitter:title" content="Taco Dao" />
   <meta name="twitter:description" content="The tastiest entry point in crypto" />
   <meta name="google-site-verification" content="OjOq1Il_nYh50yhQlF1pia4Pj19I-ClPVH_CiI3Ys2w" />
+  <!-- Exchange boot spinner: pure CSS so it paints the instant the (blank) tab
+       opens, before any JS/font/asset loads. Shown only for the Exchange app
+       (see inline script in <body>); the DAO app keeps its own loader. -->
+  <style>
+    #ex-boot {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      display: none; /* shown only for the exchange app via inline script */
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      background: #0e0b08;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
+    #ex-boot .ring {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 4px solid rgba(242, 139, 58, 0.18);
+      border-top-color: #f28b3a; /* --tx-orange */
+      animation: ex-boot-spin 0.8s linear infinite;
+    }
+    #ex-boot p {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      color: #f28b3a;
+      opacity: 0.85;
+    }
+    #ex-boot.ex-boot--hide {
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+    @keyframes ex-boot-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      #ex-boot .ring { animation-duration: 1.6s; }
+    }
+  </style>
 </head>
 
 <body>
+  <div id="ex-boot" aria-hidden="true">
+    <div class="ring"></div>
+    <p>Loading exchange…</p>
+  </div>
+  <script>
+    // Show the boot spinner only for the Exchange app. Runs synchronously
+    // during parse (before the deferred module script), using the same host/
+    // path detection as main.js, so the DAO app never flashes it.
+    (function () {
+      var h = location.hostname, p = location.pathname;
+      var isExchange = h === 'exchange.tacodao.com' || h === 'exchange.ic0.io' || p.indexOf('/exchange') === 0;
+      if (!isExchange) return;
+      var el = document.getElementById('ex-boot');
+      if (!el) return;
+      el.style.display = 'flex';
+      // Safety net: never trap the user on the spinner if the bundle fails to
+      // load. Normal teardown happens in bootExchange() within ~1-2s.
+      setTimeout(function () {
+        var n = document.getElementById('ex-boot');
+        if (n) n.remove();
+      }, 20000);
+    })();
+  </script>
   <div id="app"></div>
   <script src="/src/main.js" type="module"></script>
 </body>

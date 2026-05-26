@@ -27,7 +27,8 @@ let _poolPromise: Promise<void> | null = null
 
 async function getActor(): Promise<_SERVICE> {
   if (_actor) return _actor
-  const agent = new HttpAgent({ host: getNetworkHost() })
+  // Anonymous public chart/kline data — skip per-query signature verification.
+  const agent = new HttpAgent({ host: getNetworkHost(), verifyQuerySignatures: false })
   if (getEffectiveNetwork() === 'local') {
     await agent.fetchRootKey()
   }

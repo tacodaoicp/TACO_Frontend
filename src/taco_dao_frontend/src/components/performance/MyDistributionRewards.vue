@@ -100,7 +100,7 @@
                               {{ formatPerformanceScore(nr.performanceScoreICP?.length > 0 ? nr.performanceScoreICP[0] : null) }}
                             </td>
                             <td>{{ formatVotingPower(nr.votingPower) }}</td>
-                            <td>{{ nr.rewardScore.toFixed(4) }}</td>
+                            <td>{{ formatRewardScore(nr.rewardScore) }}</td>
                           </tr>
                         </tbody>
                       </table>
@@ -299,6 +299,19 @@ export default {
       return value.toFixed(2)
     }
 
+    // Reward Score can reach the trillions — abbreviate K/M/B/T (raw number,
+    // not e8s) instead of printing the full decimal.
+    const formatRewardScore = (score) => {
+      if (score === null || score === undefined) return 'N/A'
+      const v = Number(score)
+      const abs = Math.abs(v)
+      if (abs >= 1e12) return (v / 1e12).toFixed(2) + 'T'
+      if (abs >= 1e9) return (v / 1e9).toFixed(2) + 'B'
+      if (abs >= 1e6) return (v / 1e6).toFixed(2) + 'M'
+      if (abs >= 1e3) return (v / 1e3).toFixed(2) + 'K'
+      return v.toFixed(2)
+    }
+
     const formatPerformanceScore = (score) => {
       if (score === null || score === undefined) return 'N/A'
       const pct = (score - 1.0) * 100
@@ -329,6 +342,7 @@ export default {
       formatDate,
       formatDateRange,
       formatVotingPower,
+      formatRewardScore,
       formatPerformanceScore,
       getPerformanceClass
     }
@@ -344,8 +358,11 @@ export default {
   font-size: 0.85rem;
 }
 
-.rewards-table thead th {
+.rewards-table thead tr {
   background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+}
+
+.rewards-table thead th {
   border-bottom: 2px solid var(--card-border);
   color: var(--text-cream);
   padding: 0.6rem 0.75rem;
@@ -401,8 +418,12 @@ export default {
   font-size: 0.8rem;
 }
 
+.neuron-detail-table thead tr {
+  background: linear-gradient(135deg, var(--card-active-from), var(--card-active-to));
+}
+
 .neuron-detail-table thead th {
-  color: var(--dark-brown-to-white);
+  color: var(--text-cream);
   padding: 0.4rem 0.6rem;
   font-size: 0.7rem;
   font-weight: 600;
@@ -439,6 +460,7 @@ export default {
 
 .rewards-muted {
   color: var(--dark-brown-to-white);
+  font-family: 'Space Mono', monospace;
 }
 
 .text-success {

@@ -997,7 +997,15 @@ export async function fetchUserPerformanceData(
   // Leaderboard data starts Feb 2026. For large accounts the full payload
   // exceeds the 2 MiB IC query reply limit and throws a RejectError. Drop the
   // oldest 2 weeks and retry until the response fits.
-  const DATA_START_MS = Date.UTC(2026, 1, 1)
+  // Default chart window starts Feb 1, 2026 (when leaderboard data begins).
+  // Specific large accounts whose history exceeds the 2 MiB query-reply limit
+  // start later to shrink the payload. NOTE: Date.UTC months are 0-indexed —
+  // 0 = Jan, 1 = Feb.
+  const PRINCIPAL_START_OVERRIDES: Record<string, number> = {
+    // dzokeris — very large history; start Feb 10, 2026
+    'tvjs2-edxbo-q4pb6-5sitr-2ww7d-au4ky-pl7d5-wx7ai-dia5c-5xcbh-kae': Date.UTC(2026, 1, 10),
+  }
+  const DATA_START_MS = PRINCIPAL_START_OVERRIDES[principal.toText()] ?? Date.UTC(2026, 1, 1)
   const SHIFT_MS = 14 * 24 * 60 * 60 * 1000 // 2 weeks
   const MAX_SHIFTS = 200 // safety cap (~7.7 years at 2-week steps)
   const isPayloadTooLargeError = (e: unknown): boolean => {
@@ -1008,7 +1016,8 @@ export async function fetchUserPerformanceData(
   let shiftCount = 0
   let result: Awaited<ReturnType<typeof actor.getUserPerformanceGraphData>> | undefined
   while (shiftCount <= MAX_SHIFTS) {
-    const startTimeMs = shiftCount === 0 ? 0 : DATA_START_MS + shiftCount * SHIFT_MS
+    // Begin at the account's start date; only shift forward if the payload still exceeds 2 MiB.
+    const startTimeMs = DATA_START_MS + shiftCount * SHIFT_MS
     const startTime = BigInt(startTimeMs) * BigInt(1_000_000)
     try {
       result = await actor.getUserPerformanceGraphData(principal, startTime, endTime)

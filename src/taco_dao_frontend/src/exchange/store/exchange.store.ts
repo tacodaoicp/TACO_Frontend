@@ -122,7 +122,12 @@ export const useExchangeStore = defineStore('exchange', () => {
     if (_queryActor) return _queryActor
 
     const { HttpAgent } = await import('@dfinity/agent')
-    const agent = new HttpAgent({ host: getNetworkHost() })
+    // Anonymous, read-only data (tokens / prices / reserves / fees). Skipping
+    // per-query signature verification removes a subnet-key read_state
+    // round-trip + BLS verify on the first query (~200ms saved) — same trust
+    // model the data worker already uses. The authenticated getUpdateActor()
+    // below keeps verification on.
+    const agent = new HttpAgent({ host: getNetworkHost(), verifyQuerySignatures: false })
 
     if (getEffectiveNetwork() === 'local') {
       await agent.fetchRootKey()
@@ -263,15 +268,6 @@ export const useExchangeStore = defineStore('exchange', () => {
     } catch { /* best-effort hydration */ }
 
     try {
-      // Check frozen status first — if frozen, don't proceed
-      const frozen = await checkFrozenStatus()
-      if (frozen) {
-        initError.value = 'Exchange is currently frozen. Retrying every 30 seconds...'
-        console.log('[Exchange] Exchange is frozen — waiting for unfreeze')
-        startFrozenPolling()
-        return
-      }
-
       const actor = await getQueryActor()
       console.log('[Exchange] Init: canister =', getExchangeCanisterId())
 
@@ -283,7 +279,10 @@ export const useExchangeStore = defineStore('exchange', () => {
         .then(() => fetchTokenPricesUSD())
         .catch(() => { /* prices best-effort */ })
 
-      // Fetch each independently so one failure doesn't kill everything
+      // Fetch each independently so one failure doesn't kill everything. The
+      // frozen check (slot 8) is folded into this parallel batch rather than
+      // awaited serially before it — saves one canister round-trip on every
+      // cold load.
       const results = await Promise.allSettled([
         actor.getAcceptedTokensInfo(),   // 0
         actor.getPausedTokens(),          // 1
@@ -293,7 +292,26 @@ export const useExchangeStore = defineStore('exchange', () => {
         actor.hmRevokeFee(),              // 5
         actor.hmRefFee(),                 // 6
         actor.exchangeInfo(),             // 7
+        actor.isExchangeFrozen(),         // 8
       ])
+
+      // Frozen short-circuit — mirrors checkFrozenStatus() error semantics:
+      // missing method ⇒ not frozen; any other failure ⇒ treat as frozen.
+      const frozenSettled = results[8]
+      let frozen: boolean
+      if (frozenSettled.status === 'fulfilled') {
+        frozen = Boolean(frozenSettled.value)
+      } else {
+        const msg = (frozenSettled.reason as any)?.message || String(frozenSettled.reason)
+        frozen = !(msg.includes('has no query method') || msg.includes('method not found') || msg.includes('IC0536'))
+      }
+      isFrozen.value = frozen
+      if (frozen) {
+        initError.value = 'Exchange is currently frozen. Retrying every 30 seconds...'
+        console.log('[Exchange] Exchange is frozen — waiting for unfreeze')
+        startFrozenPolling()
+        return
+      }
 
       const get = <T>(i: number): T | null => {
         const r = results[i]
@@ -735,7 +753,10 @@ export const useExchangeStore = defineStore('exchange', () => {
     const identity = await getCachedIdentity()
     if (!identity || identity.getPrincipal().isAnonymous()) return 0n
     const { HttpAgent } = await import('@dfinity/agent')
-    const agent = new HttpAgent({ host: getNetworkHost() })
+    // Anonymous read (icrc1_balance_of takes the principal as an arg). Skip
+    // per-query signature verification — an advisory display value; the ledger
+    // enforces the real balance on the (verified) transfer/swap update call.
+    const agent = new HttpAgent({ host: getNetworkHost(), verifyQuerySignatures: false })
     if (getEffectiveNetwork() === 'local') await agent.fetchRootKey()
     const tokenActor = Actor.createActor(_icrc1BalanceIdl, { agent, canisterId: address })
     const balance = await tokenActor.icrc1_balance_of({
@@ -1551,7 +1572,8 @@ export const useExchangeStore = defineStore('exchange', () => {
   /** Fetch ICRC-1 metadata for a batch of token canister IDs, building TokenInfo objects */
   async function fetchTokenMetadataBatch(ids: string[]): Promise<TokenInfo[]> {
     const { HttpAgent } = await import('@dfinity/agent')
-    const agent = new HttpAgent({ host: getNetworkHost() })
+    // Anonymous public token metadata — skip per-query signature verification.
+    const agent = new HttpAgent({ host: getNetworkHost(), verifyQuerySignatures: false })
 
     const results = await Promise.allSettled(ids.map(async (canisterId) => {
       const tokenActor = Actor.createActor(_icrc1MetadataIdl, { agent, canisterId })

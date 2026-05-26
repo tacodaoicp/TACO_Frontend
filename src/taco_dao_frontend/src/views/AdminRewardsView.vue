@@ -301,7 +301,9 @@ export default {
       this.rewardsActor = createRewardsActor(canisterId, {
         agentOptions: {
           identity: getFrontendIdentity(),
-          host
+          host,
+          // Anonymous public read — skip per-query signature verification.
+          verifyQuerySignatures: false
         }
       })
       // Load token metadata

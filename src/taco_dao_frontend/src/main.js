@@ -24,7 +24,26 @@ async function bootExchange() {
     import('./exchange/router'),
   ])
   const app = createApp(ExchangeApp)
-  app.use(exchangeRouter).use(createPinia()).mount('#app')
+  app.use(exchangeRouter).use(createPinia())
+  // Resolve the initial route (the / → /easy redirect and its lazy chunk)
+  // before mounting, so the first paint is real content rather than an empty
+  // router-view. The #ex-boot spinner (index.html) covers this whole window.
+  try {
+    await exchangeRouter.isReady()
+  } catch (err) {
+    console.error('[Exchange] initial route failed to resolve:', err)
+  }
+  app.mount('#app')
+  hideBootSpinner()
+}
+
+// Tear down the static boot spinner from index.html once the exchange has
+// mounted. Fades out, then removes the node.
+function hideBootSpinner() {
+  const el = document.getElementById('ex-boot')
+  if (!el) return
+  el.classList.add('ex-boot--hide')
+  setTimeout(() => el.remove(), 300)
 }
 
 // ─── DAO App (original code, lazily loaded when not on exchange) ──────

@@ -425,7 +425,9 @@ export default {
         cachedRewardsActor = createRewardsActor(canisterId, {
           agentOptions: {
             identity: getFrontendIdentity(),
-            host
+            host,
+            // Anonymous public read — skip per-query signature verification.
+            verifyQuerySignatures: false
           }
         })
 
