@@ -15,6 +15,8 @@ import { Actor } from '@dfinity/agent'
 import { ICP_LEDGER_ID, isBaseToken } from '../constants/tokens'
 import { Principal } from '@dfinity/principal'
 import { idlFactory } from 'declarations/OTC_backend/OTC_backend.did.js'
+import { idlFactory as daoBackendIDL } from 'declarations/dao_backend/DAO_backend.did.js'
+import { callExchangeQuery, warmExchangeWorker, setExchangeWorkerIdentity, clearExchangeWorkerIdentity } from '../../workers/exchange-worker-client'
 import type {
   _SERVICE,
   TokenInfo,
@@ -238,6 +240,7 @@ export const useExchangeStore = defineStore('exchange', () => {
 
   async function initExchange() {
     initError.value = ''
+    warmExchangeWorker() // spin up the query worker now so first reads don't pay its cold-start
 
     // Stale-while-revalidate: hydrate from localStorage so views see populated
     // state on the first paint after F5. Fresh canister fetches below
@@ -279,19 +282,24 @@ export const useExchangeStore = defineStore('exchange', () => {
         .then(() => fetchTokenPricesUSD())
         .catch(() => { /* prices best-effort */ })
 
+      // Seed DAO-backend prices in parallel (getTokenDetailsWithoutPastPrices) —
+      // prices ~all DAO-listed tokens directly + anchors ICP, so TVL / portfolio $
+      // are correct fast without depending on the slow external price chain.
+      const daoPricesPromise = fetchDaoPrices().catch(() => { /* best-effort */ })
+
       // Fetch each independently so one failure doesn't kill everything. The
       // frozen check (slot 8) is folded into this parallel batch rather than
       // awaited serially before it — saves one canister round-trip on every
       // cold load.
       const results = await Promise.allSettled([
-        actor.getAcceptedTokensInfo(),   // 0
+        callExchangeQuery('getAcceptedTokensInfo'), // 0 — heavy token list, decode off-thread
         actor.getPausedTokens(),          // 1
         actor.p2acannister(),             // 2
         actor.returncontractprincipal(),  // 3
         actor.hmFee(),                    // 4
         actor.hmRevokeFee(),              // 5
         actor.hmRefFee(),                 // 6
-        actor.exchangeInfo(),             // 7
+        callExchangeQuery('exchangeInfo'), // 7 — heavy pool struct, decode off-thread
         actor.isExchangeFrozen(),         // 8
       ])
 
@@ -364,6 +372,15 @@ export const useExchangeStore = defineStore('exchange', () => {
         }
       }
 
+      // On-chain-first price oracle: build pool-derived prices now so TVL /
+      // portfolio $ are correct within ~1s instead of waiting on the external ICP
+      // price chain (up to ~15s). estimateIcpFromPool anchors ICP from the
+      // ICP/ckUSDC pool; fetchDaoPrices (fired in parallel above) also anchors ICP
+      // and seeds DAO prices that already price most tokens directly. The external
+      // cryptoPricesPromise still runs and re-runs fetchTokenPricesUSD to refine.
+      if (icpPriceUSD.value <= 0) estimateIcpFromPool()
+      void fetchTokenPricesUSD()
+
       console.log(`[Exchange] Init complete: ${tokens.value.length} tokens, info=${!!exchangeInfoData.value}`)
 
       // Persist fresh state to localStorage so the next F5 hydrates instantly.
@@ -384,6 +401,7 @@ export const useExchangeStore = defineStore('exchange', () => {
       // Promise.allSettled. Just keep the in-flight handle around so any
       // tests / hot reloads that await initExchange see prices resolve too.
       void cryptoPricesPromise
+      void daoPricesPromise
 
       // Start periodic exchangeInfo refresh (every 15s)
       startExchangeInfoPolling()
@@ -525,8 +543,7 @@ export const useExchangeStore = defineStore('exchange', () => {
 
     // Try backend first
     try {
-      const actor = await getQueryActor()
-      const result = await actor.getTokenUSDPrices(icpPriceUSD.value, 1.0)
+      const result = await callExchangeQuery<Awaited<ReturnType<_SERVICE['getTokenUSDPrices']>>>('getTokenUSDPrices', [icpPriceUSD.value, 1.0])
       const res = result[0]
       if (res && !res.error) {
         for (const [, entry] of res.data) {
@@ -566,6 +583,42 @@ export const useExchangeStore = defineStore('exchange', () => {
       tokenPricesUSD.value = map
       console.log('[Exchange] Token USD prices updated:', Object.fromEntries(map))
       writeCache('prices', Array.from(map.entries()))
+    }
+  }
+
+  // Seed prices from the DAO backend's getTokenDetailsWithoutPastPrices (returns
+  // priceInUSD per token). A single fast canister query that prices ~all
+  // DAO-listed tokens DIRECTLY — no pool derivation, no external API — so TVL /
+  // portfolio $ are correct within ~1s on first load (via the daoFallback tier
+  // of getTokenPriceUSD). Also anchors icpPriceUSD from the DAO ICP price so the
+  // pool-derived oracle can build even without a liquid ICP/ckUSDC pool.
+  async function fetchDaoPrices() {
+    try {
+      const { HttpAgent } = await import('@dfinity/agent')
+      const agent = new HttpAgent({ host: getNetworkHost(), verifyQuerySignatures: false })
+      if (getEffectiveNetwork() === 'local') await agent.fetchRootKey()
+      const daoActor: any = Actor.createActor(daoBackendIDL, { agent, canisterId: getCanisterId('dao_backend') })
+      const result = await daoActor.getTokenDetailsWithoutPastPrices()
+      if (!Array.isArray(result)) return
+      const ICP = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
+      const entries: [string, number][] = []
+      for (const entry of result) {
+        const [principal, details] = entry
+        const addr = principal?.toText ? principal.toText() : String(principal)
+        const price = Number(details?.priceInUSD ?? 0)
+        if (price > 0) {
+          entries.push([addr, price])
+          if (addr === ICP && icpPriceUSD.value <= 0) icpPriceUSD.value = price
+        }
+      }
+      if (entries.length > 0) {
+        seedDaoFallbackPrices(entries)
+        // With an ICP anchor + DAO prices in hand, (re)build the pool-derived
+        // oracle so exchange-native tokens (not on the DAO list) are priced too.
+        void fetchTokenPricesUSD()
+      }
+    } catch (err) {
+      console.warn('[Exchange] DAO price seed failed:', err)
     }
   }
 
@@ -653,14 +706,22 @@ export const useExchangeStore = defineStore('exchange', () => {
   // Query Methods (free, unlimited)
   // ═══════════════════════════════════════════
 
+  // Cheap change-signature over only the volatile arrays (pool count + prices +
+  // reserves). The previous full `JSON.stringify` of the whole nested pool
+  // struct (twice, every 15s) cost ~100-300ms of main-thread jank on mobile.
+  let _lastInfoSig = ''
+  function exchangeInfoSig(p: pool | null): string {
+    if (!p) return ''
+    return `${p.pool_canister?.length ?? 0}|${(p.last_traded_price ?? []).join(',')}|${(p.amm_reserve0 ?? []).join(',')}|${(p.amm_reserve1 ?? []).join(',')}`
+  }
   async function refreshExchangeInfo() {
-    const actor = await getQueryActor()
-    const result = await actor.exchangeInfo()
+    // exchangeInfo is a large struct decoded every 15s — off the main thread.
+    const result = await callExchangeQuery<[] | [pool]>('exchangeInfo')
     if (result.length > 0) {
       const fresh = result[0] ?? null
-      // Only update if data actually changed (avoids unnecessary re-renders)
-      const replacer = (_: string, v: any) => typeof v === 'bigint' ? v.toString() : v
-      if (JSON.stringify(fresh, replacer) !== JSON.stringify(exchangeInfoData.value, replacer)) {
+      const sig = exchangeInfoSig(fresh)
+      if (sig !== _lastInfoSig) {
+        _lastInfoSig = sig
         exchangeInfoData.value = fresh
         if (fresh) writeCache('info', fresh)
       }
@@ -702,9 +763,40 @@ export const useExchangeStore = defineStore('exchange', () => {
   // subscriptions that previously fanned out across PortfolioView, LPPositionsTab
   // and friends.
 
+  // Push the user's delegated identity to the query worker (idempotent — only
+  // re-sends when the principal changes) so authenticated reads decode off the
+  // main thread. Mirrors the DAO app's sendIdentityToWorker.
+  let _lastSentChainJson = ''
+  async function ensureExchangeWorkerIdentity(): Promise<void> {
+    try {
+      const id = await getCachedIdentity()
+      if (!id || id.getPrincipal().isAnonymous()) {
+        if (_lastSentChainJson) { clearExchangeWorkerIdentity(); _lastSentChainJson = '' }
+        return
+      }
+      const { DelegationIdentity } = await import('@dfinity/identity')
+      if (!(id instanceof DelegationIdentity)) return
+      // Re-send only when the delegation actually changes (login or refresh), so
+      // the worker's authed actor isn't rebuilt on every poll.
+      const chainJson = JSON.stringify(id.getDelegation().toJSON())
+      if (chainJson === _lastSentChainJson) return
+      const authMod: any = await import('@dfinity/auth-client')
+      const storedKey = await new authMod.IdbStorage().get(authMod.KEY_STORAGE_KEY)
+      if (storedKey && typeof storedKey === 'string') {
+        setExchangeWorkerIdentity({ delegationChainJson: chainJson, sessionKeyJson: storedKey })
+        _lastSentChainJson = chainJson
+      }
+    } catch (err) {
+      console.warn('[Exchange] ensureExchangeWorkerIdentity failed:', err)
+    }
+  }
+
   const userLpQuery: CachedQuery<DetailedLiquidityPosition[]> = createCachedQuery({
     key: 'user.lp',
-    fetcher: async () => (await getUpdateActor()).getUserLiquidityDetailed(),
+    fetcher: async () => {
+      await ensureExchangeWorkerIdentity()
+      return callExchangeQuery<DetailedLiquidityPosition[]>('getUserLiquidityDetailed', [], { auth: true })
+    },
     persist: true,
     maxAgeMs: 15_000,
     principalRef: principalText,
@@ -714,7 +806,10 @@ export const useExchangeStore = defineStore('exchange', () => {
 
   const userTradesQuery: CachedQuery<TradePrivate2[]> = createCachedQuery({
     key: 'user.trades',
-    fetcher: async () => (await getUpdateActor()).getUserTrades(),
+    fetcher: async () => {
+      await ensureExchangeWorkerIdentity()
+      return callExchangeQuery<TradePrivate2[]>('getUserTrades', [], { auth: true })
+    },
     persist: true,
     maxAgeMs: 5_000,
     principalRef: principalText,
@@ -978,13 +1073,12 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
 
   async function getAllPoolStats() {
-    const actor = await getQueryActor()
-    return actor.getAllPoolStats()
+    // Heavy decode (all pools' stats) — run it off the main thread.
+    return callExchangeQuery<Awaited<ReturnType<_SERVICE['getAllPoolStats']>>>('getAllPoolStats')
   }
 
   async function getOrderbookCombined(token0: string, token1: string, numLevels: bigint, stepPercent: bigint) {
-    const actor = await getQueryActor()
-    return actor.getOrderbookCombined(token0, token1, numLevels, stepPercent)
+    return callExchangeQuery<Awaited<ReturnType<_SERVICE['getOrderbookCombined']>>>('getOrderbookCombined', [token0, token1, numLevels, stepPercent])
   }
 
   // Kline factory: each unique (pair, timeframe, initialGet) tuple gets its
@@ -1005,10 +1099,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
     return createCachedQuery({
       key: `kline:${compositeKey}`,
-      fetcher: async () => {
-        const actor = await getQueryActor()
-        return actor.getKlineData(token1, token2, tfMap[tfKey] ?? { day: null }, initialGetStr === 'true')
-      },
+      fetcher: () => callExchangeQuery<KlineData[]>('getKlineData', [token1, token2, tfMap[tfKey] ?? { day: null }, initialGetStr === 'true']),
       persist: false,
       // Keep below the TradingChart 5s poll so periodic refreshes still fetch
       // fresh data, while concurrent consumers (Header stats24h + PairStatsCluster
@@ -1041,10 +1132,8 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
     return createCachedQuery({
       key: `klineRange:${compositeKey}`,
-      fetcher: async () => {
-        const actor = await getQueryActor()
-        return actor.getKlineDataRange(token1, token2, tfMap[tfKey] ?? { day: null }, [], BigInt(limitStr))
-      },
+      // Heavy decode (up to 2500 candles) — off the main thread.
+      fetcher: () => callExchangeQuery<KlineData[]>('getKlineDataRange', [token1, token2, tfMap[tfKey] ?? { day: null }, [], BigInt(limitStr)]),
       persist: false,
       maxAgeMs: 30_000,
       shallow: true,
@@ -1081,9 +1170,8 @@ export const useExchangeStore = defineStore('exchange', () => {
     fetcher: async () => {
       const addrs = sortedJoinedKey.split('|').filter(Boolean)
       if (addrs.length === 0) return []
-      const actor = await getQueryActor()
       const principals = addrs.map(addr => Principal.fromText(addr))
-      const result = await actor.get_token_trends_7d(principals)
+      const result = await callExchangeQuery<Awaited<ReturnType<_SERVICE['get_token_trends_7d']>>>('get_token_trends_7d', [principals])
       if ('err' in result) {
         console.warn('[Exchange] get_token_trends_7d error:', result.err)
         return []
@@ -1109,8 +1197,7 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
 
   async function getPoolHistory(token1: string, token2: string, limit: bigint) {
-    const actor = await getQueryActor()
-    return actor.getPoolHistory(token1, token2, limit)
+    return callExchangeQuery<Awaited<ReturnType<_SERVICE['getPoolHistory']>>>('getPoolHistory', [token1, token2, limit])
   }
 
   async function getPrivateTrade(accesscode: string): Promise<[] | [TradePosition]> {
@@ -1127,18 +1214,18 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
 
   async function getUserPreviousTrades(token1: string, token2: string) {
-    const actor = await getUpdateActor()
-    return actor.getUserPreviousTrades(token1, token2)
+    await ensureExchangeWorkerIdentity()
+    return callExchangeQuery<Awaited<ReturnType<_SERVICE['getUserPreviousTrades']>>>('getUserPreviousTrades', [token1, token2], { auth: true })
   }
 
   async function getUserTradeHistory(limit: bigint) {
-    const actor = await getUpdateActor()
-    return actor.getUserTradeHistory(limit)
+    await ensureExchangeWorkerIdentity()
+    return callExchangeQuery<Awaited<ReturnType<_SERVICE['getUserTradeHistory']>>>('getUserTradeHistory', [limit], { auth: true })
   }
 
   async function getUserSwapHistory(limit: bigint) {
-    const actor = await getUpdateActor()
-    return actor.getUserSwapHistory(limit)
+    await ensureExchangeWorkerIdentity()
+    return callExchangeQuery<Awaited<ReturnType<_SERVICE['getUserSwapHistory']>>>('getUserSwapHistory', [limit], { auth: true })
   }
 
   async function getUserLiquidityDetailed(): Promise<DetailedLiquidityPosition[]> {

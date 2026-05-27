@@ -239,6 +239,8 @@ interface WalletRow {
 
 const allRows = computed((): WalletRow[] => {
   const exchangeAddresses = new Set(store.tokens.map(t => t.address))
+  // Index DAO tokens by address once — was an O(n) .find per token (O(n²) total).
+  const daoByAddr = new Map(daoTokens.value.map(d => [d.address, d]))
 
   // Start with exchange tokens
   const rows: WalletRow[] = store.tokens.map(token => {
@@ -249,7 +251,7 @@ const allRows = computed((): WalletRow[] => {
     // pool from ICP/ckUSDC anchors, so tokens with only a /ckUSDC pool still
     // get priced. Fall back to the DAO backend's /ICP-pool-only value.
     const storePrice = store.getTokenPriceUSD(token.address)
-    const daoToken = daoTokens.value.find(d => d.address === token.address)
+    const daoToken = daoByAddr.get(token.address)
     const unitPrice = storePrice > 0 ? storePrice : (daoToken?.priceInUSD ?? 0)
     const usdValue = balanceNum * unitPrice
 
