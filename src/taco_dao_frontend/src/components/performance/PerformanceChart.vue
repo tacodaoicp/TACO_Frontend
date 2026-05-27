@@ -101,14 +101,12 @@ import {
 import { useTacoStore } from '../../stores/taco.store'
 import { storeToRefs } from 'pinia'
 import { createChartPort } from '../../workers/chart-worker-port'
-import { yieldToMain } from '../../utils/yieldToMain'
 import { fetchPerformanceGraph } from '../../workers/performance-graph-client'
 import { getNetworkHost } from '../../shared/auth-cache'
 import { getEffectiveNetwork } from '../../config/network-config'
 import { getCanisterId } from '../../constants/canisterIds'
 
-// Module-level cache for getUserPerformanceGraphData results by principal
-// Used only when data is not provided via props (leaderboard/following cases)
+// Module-level cache for getUserPerformanceGraphData results by principal (TTL'd).
 const performanceDataCache = new Map()
 const CACHE_TTL_MS = 60_000 // 60 seconds
 
@@ -130,15 +128,11 @@ function withAlpha(hex, a) {
   return hex + n.toString(16).padStart(2, '0')
 }
 
-// How many checkpoints to transform per synchronous chunk before yielding.
-const CHUNK_SIZE = 200
-
 export default {
   name: 'PerformanceChart',
   props: {
     principal: { type: String, required: true },
     height: { type: [Number, String], default: 250 },
-    performanceData: { type: Object, default: null },
   },
 
   setup(props) {
@@ -241,36 +235,6 @@ export default {
     const heightCss = computed(() => typeof props.height === 'number' ? `${props.height}px` : props.height)
 
     // ----- Worker dispatch -----
-
-    // Chunked + cooperative: serializing every checkpoint's allocations/prices
-    // (each a Principal.toText()) over a large payload would block the main
-    // thread for hundreds of ms. Yield every CHUNK_SIZE checkpoints so the page
-    // stays scrollable; bail (return null) if a newer load superseded this one.
-    const serializeCheckpoints = async (cps, seq) => {
-      const out = []
-      for (let i = 0; i < cps.length; i++) {
-        const cp = cps[i]
-        out.push({
-          timestamp: Number(cp.timestamp),
-          allocations: (cp.allocations || []).map(a => ({
-            token: a.token?.toText ? a.token.toText() : a.token?.toString() || '',
-            basisPoints: Number(a.basisPoints)
-          })),
-          pricesUsed: (cp.pricesUsed || []).map(([p, info]) => [
-            p?.toText ? p.toText() : p?.toString() || '',
-            { usdPrice: info.usdPrice, icpPrice: Number(info.icpPrice) }
-          ]),
-          totalPortfolioValueUSD: Number(cp.totalPortfolioValueUSD),
-          totalPortfolioValueICP: Number(cp.totalPortfolioValueICP),
-          reason: (cp.reason || []).map(r => r || '')
-        })
-        if ((i + 1) % CHUNK_SIZE === 0) {
-          await yieldToMain()
-          if (seq !== loadSeq) return null
-        }
-      }
-      return out
-    }
 
     const dispatchToWorker = () => {
       if (!serializedCheckpoints.value.length) return
@@ -572,45 +536,6 @@ export default {
 
     // ----- Data load (canister or prop) -----
 
-    // Pick the neuron with the most checkpoints (tie-break on all-time ICP score).
-    const selectBestNeuron = (neurons) => {
-      if (!neurons || neurons.length === 0) return null
-      return neurons.reduce((best, curr) => {
-        const bestLen = best.checkpoints?.length ?? 0
-        const currLen = curr.checkpoints?.length ?? 0
-        if (currLen > bestLen) return curr
-        if (currLen === bestLen) {
-          const bestIcp = best.performanceScoreICP?.[0] ?? -Infinity
-          const currIcp = curr.performanceScoreICP?.[0] ?? -Infinity
-          return currIcp > bestIcp ? curr : best
-        }
-        return best
-      })
-    }
-
-    // Cooperative (chunked) reshape of an already-decoded neuron's checkpoints.
-    // Only used on the self path (props.performanceData), where the data was
-    // already fetched + decoded off-thread by the data worker.
-    const processCheckpoints = async (neuron, loadId) => {
-      if (!neuron || !neuron.checkpoints || neuron.checkpoints.length === 0) return []
-      const src = neuron.checkpoints
-      const cps = []
-      for (let i = 0; i < src.length; i++) {
-        const cp = src[i]
-        cps.push({
-          ...cp,
-          totalPortfolioValueUSD: cp.totalPortfolioValue,
-          totalPortfolioValueICP: cp.totalPortfolioValueICP ?? 0
-        })
-        if ((i + 1) % CHUNK_SIZE === 0) {
-          await yieldToMain()
-          if (loadId !== loadSeq) return null
-        }
-      }
-      cps.sort((a, b) => Number(a.timestamp) - Number(b.timestamp))
-      return cps
-    }
-
     const loadPerformanceData = async () => {
       if (!props.principal) return
 
@@ -621,48 +546,31 @@ export default {
       icpCheckpoints.value = []
 
       try {
-        if (props.performanceData) {
-          // Self path: data was already fetched + DECODED off-thread by the data
-          // worker and handed in as a prop, so there's no heavy decode here. Just
-          // reshape + serialize cooperatively for the chart.
-          const selectedNeuron = selectBestNeuron(props.performanceData.neurons || [])
-          const cps = await processCheckpoints(selectedNeuron, seq)
-          if (cps === null || seq !== loadSeq) return // superseded
-          if (cps.length === 0) { error.value = 'No checkpoint data available'; return }
-          const serialized = await serializeCheckpoints(cps, seq)
-          if (serialized === null || seq !== loadSeq) return // superseded
-          usdCheckpoints.value = cps
-          icpCheckpoints.value = cps
-          serializedCheckpoints.value = serialized
-          baselineIndex.value = 0
+        // The graph can approach the 2 MiB query-reply limit, and decoding ~2 MiB
+        // of Candid on the main thread froze the page for tens of seconds. Do the
+        // fetch + DECODE + serialize entirely inside a DedicatedWorker; we receive
+        // only chart-ready serialized checkpoints, so the page stays responsive.
+        let serialized
+        const cached = performanceDataCache.get(props.principal)
+        if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
+          serialized = cached.data
         } else {
-          // Other-user path (leaderboard / following): the graph can approach the
-          // 2 MiB query-reply limit, and decoding ~2 MiB of Candid on the main
-          // thread froze the page for tens of seconds. Do the fetch + DECODE +
-          // serialize entirely inside a DedicatedWorker; we receive only
-          // chart-ready serialized checkpoints, so the page stays responsive.
-          let serialized
-          const cached = performanceDataCache.get(props.principal)
-          if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
-            serialized = cached.data
-          } else {
-            const res = await fetchPerformanceGraph({
-              principal: props.principal,
-              host: getNetworkHost(),
-              canisterId: getCanisterId('rewards'),
-              fetchRootKey: getEffectiveNetwork() === 'local',
-            })
-            if (seq !== loadSeq) return // superseded
-            if (res.error) { error.value = res.error; return }
-            serialized = res.checkpoints || []
-            performanceDataCache.set(props.principal, { data: serialized, timestamp: Date.now() })
-          }
-          if (!serialized.length) { error.value = 'No checkpoint data available'; return }
-          usdCheckpoints.value = serialized
-          icpCheckpoints.value = serialized
-          serializedCheckpoints.value = serialized
-          baselineIndex.value = 0
+          const res = await fetchPerformanceGraph({
+            principal: props.principal,
+            host: getNetworkHost(),
+            canisterId: getCanisterId('rewards'),
+            fetchRootKey: getEffectiveNetwork() === 'local',
+          })
+          if (seq !== loadSeq) return // superseded
+          if (res.error) { error.value = res.error; return }
+          serialized = res.checkpoints || []
+          performanceDataCache.set(props.principal, { data: serialized, timestamp: Date.now() })
         }
+        if (!serialized.length) { error.value = 'No checkpoint data available'; return }
+        usdCheckpoints.value = serialized
+        icpCheckpoints.value = serialized
+        serializedCheckpoints.value = serialized
+        baselineIndex.value = 0
       } catch (err) {
         console.error('Error loading performance chart data:', err)
         const msg = err?.message || String(err)
@@ -689,7 +597,6 @@ export default {
     }
 
     watch(() => props.principal, () => { loadPerformanceData() }, { immediate: false })
-    watch(() => props.performanceData, (newData) => { if (newData) loadPerformanceData() }, { deep: true })
 
     // hasData controls v-else-if rendering of the chart container, so we need
     // to wait for the DOM to settle before calling setupChart.
