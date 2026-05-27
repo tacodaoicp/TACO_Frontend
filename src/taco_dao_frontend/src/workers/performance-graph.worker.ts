@@ -58,6 +58,7 @@ self.onmessage = async (e: MessageEvent<FetchReq>) => {
       'tvjs2-edxbo-q4pb6-5sitr-2ww7d-au4ky-pl7d5-wx7ai-dia5c-5xcbh-kae': Date.UTC(2026, 1, 10),
     }
     const DATA_START_MS = PRINCIPAL_START_OVERRIDES[principal] ?? Date.UTC(2026, 1, 1)
+    const hasOverride = principal in PRINCIPAL_START_OVERRIDES
     const SHIFT_MS = 14 * 24 * 60 * 60 * 1000
     const MAX_SHIFTS = 200
     const tooLarge = (err: any) => {
@@ -68,9 +69,9 @@ self.onmessage = async (e: MessageEvent<FetchReq>) => {
     let result: any
     let shift = 0
     while (shift <= MAX_SHIFTS) {
-      // Begin at the account's start date; only shift forward (dropping more
-      // early history) if the payload still exceeds the 2 MiB query-reply limit.
-      const startMs = DATA_START_MS + shift * SHIFT_MS
+      // First try full history (startTime 0); override principals start at their override
+      // date. On 2 MiB overflow, shift forward 2 weeks from the base date and retry.
+      const startMs = (shift === 0 && !hasOverride) ? 0 : DATA_START_MS + shift * SHIFT_MS
       const startTime = BigInt(startMs) * 1_000_000n
       try {
         result = await actor.getUserPerformanceGraphData(Principal.fromText(principal), startTime, now)

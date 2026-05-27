@@ -1006,6 +1006,7 @@ export async function fetchUserPerformanceData(
     'tvjs2-edxbo-q4pb6-5sitr-2ww7d-au4ky-pl7d5-wx7ai-dia5c-5xcbh-kae': Date.UTC(2026, 1, 10),
   }
   const DATA_START_MS = PRINCIPAL_START_OVERRIDES[principal.toText()] ?? Date.UTC(2026, 1, 1)
+  const hasOverride = principal.toText() in PRINCIPAL_START_OVERRIDES
   const SHIFT_MS = 14 * 24 * 60 * 60 * 1000 // 2 weeks
   const MAX_SHIFTS = 200 // safety cap (~7.7 years at 2-week steps)
   const isPayloadTooLargeError = (e: unknown): boolean => {
@@ -1016,8 +1017,9 @@ export async function fetchUserPerformanceData(
   let shiftCount = 0
   let result: Awaited<ReturnType<typeof actor.getUserPerformanceGraphData>> | undefined
   while (shiftCount <= MAX_SHIFTS) {
-    // Begin at the account's start date; only shift forward if the payload still exceeds 2 MiB.
-    const startTimeMs = DATA_START_MS + shiftCount * SHIFT_MS
+    // First try full history (startTime 0); override principals start at their override
+    // date. On 2 MiB overflow, shift forward 2 weeks from the base date and retry.
+    const startTimeMs = (shiftCount === 0 && !hasOverride) ? 0 : DATA_START_MS + shiftCount * SHIFT_MS
     const startTime = BigInt(startTimeMs) * BigInt(1_000_000)
     try {
       result = await actor.getUserPerformanceGraphData(principal, startTime, endTime)
