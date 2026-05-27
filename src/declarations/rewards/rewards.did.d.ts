@@ -49,6 +49,12 @@ export interface DistributionRecord {
   'neuronRewards' : Array<NeuronReward>,
   'failedNeurons' : Array<FailedNeuron>,
 }
+export interface DistributionStats {
+  'icp' : [] | [PerfStats],
+  'usd' : PerfStats,
+  'participantCount' : bigint,
+  'distributionId' : bigint,
+}
 export type DistributionStatus = { 'Failed' : string } |
   {
     'PartiallyCompleted' : {
@@ -157,6 +163,15 @@ export interface NeuronRewardSummary {
   'neuronId' : Uint8Array | number[],
   'performanceScoreICP' : [] | [number],
 }
+export interface PerfStats {
+  'neuronCountAvg' : number,
+  'histBinCount' : bigint,
+  'histogram' : Array<bigint>,
+  'histMaxPercent' : number,
+  'vpWeightedAvg' : number,
+  'histMinPercent' : number,
+  'median' : number,
+}
 export interface PerformanceResult {
   'startTime' : bigint,
   'endTime' : bigint,
@@ -220,6 +235,7 @@ export interface Rewards {
     [Array<Uint8Array | number[]>, bigint],
     Result__1
   >,
+  'admin_generateDistributionStats' : ActorMethod<[bigint], Result__1>,
   'admin_recalculateAllIcpPerformance' : ActorMethod<[], Result__1>,
   'admin_recalculateDistributionPerformance' : ActorMethod<[bigint], Result__1>,
   'admin_recalculateIcpPerformanceForDistribution' : ActorMethod<
@@ -331,6 +347,10 @@ export interface Rewards {
       'hasMore' : boolean,
       'records' : Array<DistributionRecord>,
     }
+  >,
+  'getDistributionStats' : ActorMethod<
+    [Array<bigint>],
+    Array<DistributionStats>
   >,
   'getDistributionsSince' : ActorMethod<[bigint, bigint], Result__1_9>,
   'getLeaderboard' : ActorMethod<

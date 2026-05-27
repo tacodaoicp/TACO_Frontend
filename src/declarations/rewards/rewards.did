@@ -119,6 +119,7 @@ type Rewards =
     (Result__1_12);
    admin_backfillMissingNeurons: (neuronIds: vec blob, afterTimestamp:
     int) -> (Result__1);
+   admin_generateDistributionStats: (newestX: nat) -> (Result__1);
    admin_recalculateAllIcpPerformance: () -> (Result__1);
    admin_recalculateDistributionPerformance: (afterTimestamp: int) ->
     (Result__1);
@@ -214,6 +215,8 @@ type Rewards =
        records: vec DistributionRecord;
        total: nat;
      }) query;
+   getDistributionStats: (distributionIds: vec nat) ->
+    (vec DistributionStats) query;
    getDistributionsSince: (sinceTimestamp: int, limit: nat) ->
     (Result__1_9) query;
    getLeaderboard: (timeframe: LeaderboardTimeframe, priceType:
@@ -409,6 +412,16 @@ type PerformanceResult =
    preTimespanAllocation: opt NeuronAllocationChangeBlockData;
    startTime: int;
  };
+type PerfStats = 
+ record {
+   histBinCount: nat;
+   histMaxPercent: float64;
+   histMinPercent: float64;
+   histogram: vec nat;
+   median: float64;
+   neuronCountAvg: float64;
+   vpWeightedAvg: float64;
+ };
 type NeuronRewardSummary = 
  record {
    neuronId: blob;
@@ -545,6 +558,13 @@ type DistributionStatus =
                          failedNeurons: nat;
                          successfulNeurons: nat;
                        };
+ };
+type DistributionStats = 
+ record {
+   distributionId: nat;
+   icp: opt PerfStats;
+   participantCount: nat;
+   usd: PerfStats;
  };
 type DistributionRecord = 
  record {

@@ -58,11 +58,11 @@
             <!-- MY PERFORMANCE SECTION (logged in users only) -->
             <div id="my-performance">
               <MyPerformance
-                v-if="userLoggedIn"
+                v-if="userLoggedIn || isStagingHost"
                 :userPerformance="userPerformance"
                 :isLoading="isLoadingUserPerformance"
                 :errorMessage="userPerformanceError"
-                :principal="userPrincipal"
+                :principal="isStagingHost ? demoPerfPrincipal : userPrincipal"
                 :selectedPriceType="selectedPriceType"
                 :selectedTimeframe="selectedTimeframe"
                 @refresh="refreshAllData"
@@ -99,8 +99,8 @@
               @unfollow="onUnfollowUser"
             />
 
-            <!-- MY DISTRIBUTION REWARDS (logged in users with neuron data) -->
-            <div id="my-distribution-rewards" v-if="userLoggedIn && userPerformance">
+            <!-- MY DISTRIBUTION REWARDS (logged in users with neuron data; on staging always shown with demo data) -->
+            <div id="my-distribution-rewards" v-if="(userLoggedIn && userPerformance) || isStagingHost">
               <MyDistributionRewards
                 :userNeuronIds="userNeuronIds"
                 :isLoadingUserPerformance="isLoadingUserPerformance"
@@ -348,6 +348,12 @@ export default {
     const isLoadingUserPerformance = ref(false)
     const isLoadingFollowerInfo = ref(false)
 
+    // Staging website (served from the staging canister): always render the rewards
+    // table so testers see the demo principal's data even when logged out. Keyed off
+    // the literal hostname — NOT getEffectiveNetwork() (a localStorage override can fake that).
+    const isStagingHost = typeof window !== 'undefined' && window.location.hostname.includes('wxunf-maaaa-aaaab-qbzga-cai')
+    const STAGING_DEMO_PRINCIPAL = 'nfzo4-i26mj-e2tuj-bt3ba-cuco4-vcqxx-ybjw7-gzyzh-kvyp7-wjeyp-hqe'
+
     // Error states
     const errorMessage = ref('')
     const userPerformanceError = ref('')
@@ -462,6 +468,9 @@ export default {
     const setupPerformanceSubscription = () => {
       // Subscribe to worker data - automatically updates when worker has fresh data
       unsubscribePerformance = workerBridge.subscribe('userPerformance', (data, state) => {
+        // On staging we pin the demo principal's performance; ignore the logged-in
+        // worker payload so a tester's own (or empty) data can't overwrite it.
+        if (isStagingHost) return
         if (data) {
           // Deserialize cooperatively so a large graph doesn't freeze the page.
           const seq = ++perfSeq
@@ -490,6 +499,78 @@ export default {
 
     // Initialize subscription immediately
     setupPerformanceSubscription()
+
+    // Staging website: load the demo principal's full performance (numbers + chart)
+    // via the proven anonymous rewards actor. Shaping mirrors the worker's
+    // fetchUserPerformanceData but is inlined here so we DON'T pull that heavy module
+    // (rewards IDL + agent) into the core bundle for every user.
+    const loadStagingDemoPerformance = async () => {
+      try {
+        isLoadingUserPerformance.value = true
+        const { Principal } = await import('@dfinity/principal')
+        const actor = await tacoStore.createRewardsActorAnonymous()
+        const principal = Principal.fromText(STAGING_DEMO_PRINCIPAL)
+        const endTime = BigInt(Date.now()) * BigInt(1_000_000)
+        const startTime = BigInt(Date.UTC(2026, 1, 1)) * BigInt(1_000_000) // Feb 1, 2026 (leaderboard data start)
+        const result = await actor.getUserPerformanceGraphData(principal, startTime, endTime)
+        if (!result || !('ok' in result)) throw new Error('performance graph unavailable')
+        const graphData = result.ok
+        const sorted = [...(graphData.neurons || [])].sort((a, b) =>
+          (b.performanceScoreICP?.[0] ?? -Infinity) - (a.performanceScoreICP?.[0] ?? -Infinity)
+        )
+        const wAvg = (getVal) => {
+          let tw = BigInt(0), ws = 0
+          for (const n of sorted) {
+            const v = getVal(n); const vp = n.votingPower ?? BigInt(0)
+            if (v !== null && v !== undefined && vp > 0) { ws += v * Number(vp); tw += vp }
+          }
+          return tw > 0 ? [ws / Number(tw)] : []
+        }
+        const neurons = sorted.map((nd) => ({
+          neuronId: nd.neuronId,
+          votingPower: nd.votingPower ?? BigInt(0),
+          distributionsParticipated: nd.checkpoints?.length ?? 0,
+          checkpoints: nd.checkpoints ?? [],
+          performanceScoreUSD: nd.performanceScoreUSD,
+          performanceScoreICP: nd.performanceScoreICP,
+          performance: {
+            allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
+            allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
+            oneWeekUSD: nd.oneWeekUSD?.length > 0 ? [nd.oneWeekUSD[0]] : [],
+            oneWeekICP: nd.oneWeekICP?.length > 0 ? [nd.oneWeekICP[0]] : [],
+            oneMonthUSD: nd.oneMonthUSD?.length > 0 ? [nd.oneMonthUSD[0]] : [],
+            oneMonthICP: nd.oneMonthICP?.length > 0 ? [nd.oneMonthICP[0]] : [],
+            oneYearUSD: nd.oneYearUSD?.length > 0 ? [nd.oneYearUSD[0]] : [],
+            oneYearICP: nd.oneYearICP?.length > 0 ? [nd.oneYearICP[0]] : [],
+          },
+        }))
+        const totalCheckpoints = neurons.reduce((s, n) => s + n.distributionsParticipated, 0)
+        const totalVotingPower = neurons.reduce((s, n) => s + (n.votingPower || BigInt(0)), BigInt(0))
+        userPerformance.value = {
+          principal,
+          totalVotingPower,
+          distributionsParticipated: totalCheckpoints,
+          lastActivity: graphData.timeframe.endTime,
+          aggregatedPerformance: {
+            allTimeUSD: wAvg(n => n.performanceScoreUSD),
+            allTimeICP: wAvg(n => n.performanceScoreICP?.[0]),
+            oneWeekUSD: wAvg(n => n.oneWeekUSD?.[0]),
+            oneWeekICP: wAvg(n => n.oneWeekICP?.[0]),
+            oneMonthUSD: wAvg(n => n.oneMonthUSD?.[0]),
+            oneMonthICP: wAvg(n => n.oneMonthICP?.[0]),
+            oneYearUSD: wAvg(n => n.oneYearUSD?.[0]),
+            oneYearICP: wAvg(n => n.oneYearICP?.[0]),
+          },
+          neurons,
+        }
+        userPerformanceError.value = ''
+      } catch (e) {
+        console.error('staging demo performance load failed', e)
+        userPerformanceError.value = 'Failed to load demo performance data'
+      } finally {
+        isLoadingUserPerformance.value = false
+      }
+    }
 
     // Load user's follow list (who they follow)
     const loadUserFollows = async () => {
@@ -787,6 +868,7 @@ export default {
         isLoadingUserPerformance.value = false
       }
       await refreshAllData()
+      if (isStagingHost) loadStagingDemoPerformance()
       loadDisplayName()
     })
 
@@ -814,6 +896,8 @@ export default {
       userFollowsData,
       userFollowPrincipals,
       userNeuronIds,
+      isStagingHost,
+      demoPerfPrincipal: STAGING_DEMO_PRINCIPAL,
       selectedTimeframe,
       selectedPriceType,
 

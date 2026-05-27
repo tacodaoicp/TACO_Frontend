@@ -156,6 +156,21 @@ export const idlFactory = ({ IDL }) => {
     'neuronRewards' : IDL.Vec(NeuronReward),
     'failedNeurons' : IDL.Vec(FailedNeuron),
   });
+  const PerfStats = IDL.Record({
+    'neuronCountAvg' : IDL.Float64,
+    'histBinCount' : IDL.Nat,
+    'histogram' : IDL.Vec(IDL.Nat),
+    'histMaxPercent' : IDL.Float64,
+    'vpWeightedAvg' : IDL.Float64,
+    'histMinPercent' : IDL.Float64,
+    'median' : IDL.Float64,
+  });
+  const DistributionStats = IDL.Record({
+    'icp' : IDL.Opt(PerfStats),
+    'usd' : PerfStats,
+    'participantCount' : IDL.Nat,
+    'distributionId' : IDL.Nat,
+  });
   const Result__1_9 = IDL.Variant({
     'ok' : IDL.Record({ 'distributions' : IDL.Vec(DistributionRecord) }),
     'err' : RewardsError,
@@ -340,6 +355,7 @@ export const idlFactory = ({ IDL }) => {
         [Result__1],
         [],
       ),
+    'admin_generateDistributionStats' : IDL.Func([IDL.Nat], [Result__1], []),
     'admin_recalculateAllIcpPerformance' : IDL.Func([], [Result__1], []),
     'admin_recalculateDistributionPerformance' : IDL.Func(
         [IDL.Int],
@@ -478,6 +494,11 @@ export const idlFactory = ({ IDL }) => {
             'records' : IDL.Vec(DistributionRecord),
           }),
         ],
+        ['query'],
+      ),
+    'getDistributionStats' : IDL.Func(
+        [IDL.Vec(IDL.Nat)],
+        [IDL.Vec(DistributionStats)],
         ['query'],
       ),
     'getDistributionsSince' : IDL.Func(

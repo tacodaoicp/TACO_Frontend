@@ -6040,6 +6040,26 @@ export const useTacoStore = defineStore('taco', () => {
         return await getAnonymousActor(canisterId, () => idlFactory);
     }
 
+    // Anonymous lookup of the neuron-id blobs owned by ANY principal (public query).
+    // Used e.g. to always show a fixed demo principal's rewards on the staging website.
+    const getNeuronIdsForPrincipal = async (principalText: string): Promise<Uint8Array[]> => {
+        try {
+            const gov: any = await createSnsGovernanceActorAnonymous('lhdfz-wqaaa-aaaaq-aae3q-cai');
+            const res: any = await gov.list_neurons({
+                of_principal: [Principal.fromText(principalText)],
+                limit: 1000,
+                start_page_at: [],
+            });
+            // NeuronId is a Candid optional record { id : blob }; pull the blob out.
+            return (res.neurons || [])
+                .map((n: any) => n.id?.[0]?.id)
+                .filter((id: any): id is Uint8Array => !!id);
+        } catch (e) {
+            console.error('getNeuronIdsForPrincipal failed', e);
+            return [];
+        }
+    }
+
     // Determine neuron relationship to user
     const getNeuronRelationship = (neuron: any, userPrincipalStr: string) => {
         const userPrincipal = Principal.fromText(userPrincipalStr);
@@ -9154,6 +9174,7 @@ export const useTacoStore = defineStore('taco', () => {
         tacoSwapCanisterId,
         createSnsGovernanceActorPublic,
         createSnsGovernanceActorAnonymous,
+        getNeuronIdsForPrincipal,
         claimNeuronRewards,
         claimAllNeuronRewards,
         formatNeuronIdForMap,
