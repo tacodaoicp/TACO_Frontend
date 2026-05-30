@@ -97,25 +97,10 @@
     <div class="ring"></div>
     <p>Loading exchange…</p>
   </div>
-  <script>
-    // Show the boot spinner only for the Exchange app. Runs synchronously
-    // during parse (before the deferred module script), using the same host/
-    // path detection as main.js, so the DAO app never flashes it.
-    (function () {
-      var h = location.hostname, p = location.pathname;
-      var isExchange = h === 'exchange.tacodao.com' || h === 'exchange.ic0.io' || p.indexOf('/exchange') === 0;
-      if (!isExchange) return;
-      var el = document.getElementById('ex-boot');
-      if (!el) return;
-      el.style.display = 'flex';
-      // Safety net: never trap the user on the spinner if the bundle fails to
-      // load. Normal teardown happens in bootExchange() within ~1-2s.
-      setTimeout(function () {
-        var n = document.getElementById('ex-boot');
-        if (n) n.remove();
-      }, 20000);
-    })();
-  </script>
+  <!-- Boot spinner kicker — extracted to /public so it loads under CSP 'self'
+       (script-src 'self' 'wasm-unsafe-eval'). Non-defer / non-async so it
+       still runs synchronously during parse, before the deferred module. -->
+  <script src="/boot-spinner.js"></script>
   <div id="app"></div>
   <script src="/src/main.js" type="module"></script>
 </body>

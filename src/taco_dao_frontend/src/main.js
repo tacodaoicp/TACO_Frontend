@@ -60,17 +60,19 @@ async function bootDAO() {
     import('vue3-click-away'),
   ])
 
-  // DAO stylesheets
+  // Pre-mount stylesheets. ORDER MATTERS — at equal specificity, the LAST
+  // <link> wins. taco.scss (loaded via index.scss) overrides bootstrap on
+  // shared selectors like .btn / .taco-nav-btn, so index.scss MUST come last.
+  // (See the matching comment in App.vue: "loads before taco.scss for correct
+  // cascade".) Truly non-critical sheets (FA4 legacy, FA Pro duotone,
+  // animate.css) are deferred post-mount below.
   await Promise.all([
     import('bootstrap/dist/css/bootstrap.css'),
-    import('font-awesome/css/font-awesome.min.css'),
     import('@fortawesome/fontawesome-pro/css/fontawesome.css'),
     import('@fortawesome/fontawesome-pro/css/light.css'),
     import('@fortawesome/fontawesome-pro/css/regular.css'),
     import('@fortawesome/fontawesome-pro/css/solid.css'),
-    import('@fortawesome/fontawesome-pro/css/duotone.css'),
     import('./index.scss'),
-    import('animate.css'),
   ])
 
   // Lazy-loaded views - reduces initial bundle size significantly
@@ -208,4 +210,19 @@ async function bootDAO() {
   const app = createApp(App)
 
   app.use(router).use(createPinia()).use(VueApexCharts).use(VueClickAway).mount('#app')
+
+  // Fire-and-forget the genuinely non-critical CSS post-mount: legacy FA4
+  // (incomplete migration), FA duotone (not used above the fold), and
+  // animate.css. Saves ~120 KB off the critical path without FOUC risk.
+  const idle = (cb) =>
+    typeof requestIdleCallback === 'function'
+      ? requestIdleCallback(cb, { timeout: 1500 })
+      : setTimeout(cb, 200)
+  idle(() => {
+    void Promise.all([
+      import('font-awesome/css/font-awesome.min.css'),
+      import('@fortawesome/fontawesome-pro/css/duotone.css'),
+      import('animate.css'),
+    ]).catch(() => {})
+  })
 }

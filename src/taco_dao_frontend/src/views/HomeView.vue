@@ -2279,7 +2279,13 @@
   // kline history for that pair. Probe once on mount; if it errors or
   // returns empty, the user only sees the TACO/ICP option.
   const hasCkusdcKlines = ref(false)
-  ;(async () => {
+  // Defer the OTC probe off the homepage critical path. The toggle it gates
+  // is only visible inside the chart modal, so the ~200 ms delay is invisible
+  // to the user and saves a round-trip during first paint.
+  const idleProbeCkusdc = typeof window !== 'undefined' && window.requestIdleCallback
+    ? window.requestIdleCallback
+    : (cb) => setTimeout(cb, 200)
+  idleProbeCkusdc(async () => {
     try {
       const data = await chartDatafeed.getRange(
         TACO_PRINCIPAL, CKUSDC_PRINCIPAL, { hour: null }, [], 5n,
@@ -2288,7 +2294,7 @@
     } catch {
       hasCkusdcKlines.value = false
     }
-  })()
+  })
 
   // Route for watching navigation
   const route = useRoute()
@@ -2583,9 +2589,16 @@
 
     }
 
-    // Load heavy iframes immediately (high priority)
-    shouldLoadDex.value = true
-    shouldLoadYouTube.value = true  
+    // Defer the heavy DEX/YouTube iframes off the homepage critical path.
+    // They're below the fold; loading them in an idle tick keeps first paint
+    // snappy. (was eager `shouldLoadDex/YouTube = true` here.)
+    const idleIframes = typeof window !== 'undefined' && window.requestIdleCallback
+      ? window.requestIdleCallback
+      : (cb) => setTimeout(cb, 200)
+    idleIframes(() => {
+      shouldLoadDex.value = true
+      shouldLoadYouTube.value = true
+    })
 
   })
 

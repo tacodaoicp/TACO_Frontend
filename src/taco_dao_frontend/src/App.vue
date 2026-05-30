@@ -224,6 +224,12 @@
     // This ensures /admin gets admin data prioritized, not homepage data
     await router.isReady()
 
+    // Worker bridge, network config, subscriptions, identity, and crypto prices
+    // run synchronously after router.isReady() — deferring them races against
+    // login restoration (sendIdentityToWorker / setUserPrincipal silently no-op
+    // if mainWorker is still null), and against any onMounted in deep routes
+    // (/performance, /admin, /wallet) that immediately calls workerBridge.fetch.
+
     // Initialize SharedWorkers with the current route for correct priority loading
     initWorkerBridge(route.path)
 
@@ -236,21 +242,21 @@
     // Setup store subscriptions to worker updates
     setupWorkerSubscriptions()
 
-    // Start loading @dfinity shims in background (don't block UI)
-    // Functions that need shims will await initializeShims() themselves
-    tacoStore.initializeShims()
-
-    // check if user is logged in (this will trigger name loading if logged in)
-    // Note: checkIfLoggedIn internally calls initializeShims if needed
-    // Non-blocking: UI will reactively update when userLoggedIn.value changes
+    // Check if user is logged in (calls initializeShims internally if needed);
+    // UI reactively updates when userLoggedIn changes.
     checkIfLoggedIn().catch(console.error)
 
-    // fetch crypto prices (now triggers worker fetch)
+    // Fetch crypto prices (triggers worker fetch)
     fetchCryptoPrices()
 
-    // Preload chart compute worker during idle time (warm before Performance tab)
-    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000))
-    idle(() => {
+    // Only `initializeShims()` is safe to defer — it's a parallel preload of
+    // IDL factories that everything else awaits internally on first use.
+    const idleShims = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
+    idleShims(() => { tacoStore.initializeShims() })
+
+    // Deeper idle: warm the chart compute worker + commonly-navigated views.
+    const idleDeep = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000))
+    idleDeep(() => {
       import('./workers/chart-worker-port').then(m => m.getChartPort())
 
       // Preload commonly-used route components (in navigation, frequently accessed)
