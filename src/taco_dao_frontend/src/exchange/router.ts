@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const ProTradeView = () => import('./views/ProTradeView.vue')
 const EasySwapView = () => import('./views/EasySwapView.vue')
+const CrossDexView = () => import('./views/CrossDexView.vue')
 const PortfolioView = () => import('./views/PortfolioView.vue')
 const PoolView = () => import('./views/PoolView.vue')
 const OTCView = () => import('./views/OTCView.vue')
@@ -17,6 +18,7 @@ const routeChunkLoaders: Record<string, () => Promise<unknown>> = {
   ProTrade:      ProTradeView,
   MobileTrade:   MobileTradeView,
   EasySwap:      EasySwapView,
+  CrossDEX:      CrossDexView,
   Portfolio:     PortfolioView,
   Pool:          PoolView,
   OTC:           OTCView,
@@ -43,6 +45,7 @@ function initialRouteName(): string {
     path = path.slice('/exchange'.length) || '/'
   }
   if (path.startsWith('/easy')) return 'EasySwap'
+  if (path.startsWith('/crossdex')) return 'CrossDEX'
   if (path.startsWith('/portfolio')) return 'Portfolio'
   if (path.startsWith('/pool')) return 'Pool'
   if (path.startsWith('/otc')) return 'OTC'
@@ -86,6 +89,7 @@ const routes = [
   { path: '/', name: 'ProTrade', component: ProTradeView, meta: { mode: 'pro' } },
   { path: '/trade', name: 'MobileTrade', component: MobileTradeView, meta: { mode: 'trade' } },
   { path: '/easy', name: 'EasySwap', component: EasySwapView, meta: { mode: 'easy' } },
+  { path: '/crossdex', name: 'CrossDEX', component: CrossDexView, meta: { mode: 'crossdex' } },
   { path: '/portfolio', name: 'Portfolio', component: PortfolioView },
   { path: '/pool', name: 'Pool', component: PoolView },
   { path: '/otc/:code?', name: 'OTC', component: OTCView },

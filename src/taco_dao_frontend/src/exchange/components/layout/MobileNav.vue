@@ -8,7 +8,7 @@
       :class="{ 'mobile-nav__item--active': isActive(item.path) }"
       :aria-label="item.label"
     >
-      <svg class="mobile-nav__icon" width="20" height="20" viewBox="0 0 20 20" v-html="item.icon" />
+      <svg class="mobile-nav__icon" width="22" height="22" viewBox="0 0 20 20" v-html="item.icon" />
       <span class="mobile-nav__label">{{ item.label }}</span>
     </router-link>
   </nav>
@@ -29,6 +29,11 @@ const navItems = [
     path: '/trade',
     label: 'Trade',
     icon: '<path d="M3 17V7l4 4 3-6 4 3 3-5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  },
+  {
+    path: '/crossdex',
+    label: 'CrossDEX',
+    icon: '<path d="M3 6h3l11 8h1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 4l3 2-3 2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14h3l11-8h1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 12l3 2-3 2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   },
   {
     path: '/otc',
@@ -61,7 +66,7 @@ function isActive(path: string): boolean {
   left: 0;
   right: 0;
   z-index: 1000;
-  height: 56px;
+  height: 60px;
   background: var(--tx-surface-2);
   border-top: 1px solid var(--tx-line);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);
@@ -74,11 +79,13 @@ function isActive(path: string): boolean {
 
   &__item {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 3px;
+    padding: 4px 2px;
     text-decoration: none;
     color: var(--tx-ink-3);
     border-top: 2px solid transparent;
@@ -93,13 +100,14 @@ function isActive(path: string): boolean {
   }
 
   &__icon {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
   }
 
   &__label {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
+    white-space: nowrap;
   }
 }
 </style>

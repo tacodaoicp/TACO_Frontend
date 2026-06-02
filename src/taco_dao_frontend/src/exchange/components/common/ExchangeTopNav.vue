@@ -25,6 +25,7 @@
         v-for="item in items"
         :key="item.route"
         class="tx-tab"
+        :class="{ 'tx-tab--mobile-hide': item.key === 'crossdex' }"
         :aria-selected="active === item.key || route.path === item.route"
         @pointerenter="warmDestination(item.route)"
         @focus="warmDestination(item.route)"
@@ -98,7 +99,7 @@ function selectTab(item: { key: string; route: string }) {
 }
 
 withDefaults(defineProps<{
-  active?: 'easy' | 'pro' | 'pool' | 'portfolio' | 'otc'
+  active?: 'easy' | 'pro' | 'crossdex' | 'pool' | 'portfolio' | 'otc'
   items?: Array<{ key: string; label: string; route: string }>
   showPair?: boolean
   showStats?: boolean
@@ -110,6 +111,7 @@ withDefaults(defineProps<{
   items: () => [
     { key: 'easy',      label: 'Easy',      route: '/easy' },
     { key: 'pro',       label: 'Pro',       route: '/' },
+    { key: 'crossdex',  label: 'CrossDEX',  route: '/crossdex' },
     { key: 'otc',       label: 'OTC',       route: '/otc' },
     { key: 'pool',      label: 'Pool',      route: '/pool' },
     { key: 'portfolio', label: 'Portfolio', route: '/portfolio' },
@@ -123,6 +125,12 @@ const router = useRouter()
 <style scoped>
 /* Single-row header. When the viewport gets too narrow we hide content
    (stats → brand text → etc) in that order rather than wrapping. */
+
+/* CrossDEX lives in the mobile bottom nav, so drop it from the top bar on
+   phones (desktop keeps both CrossDEX and OTC). */
+@media (max-width: 767px) {
+  .tx-tab--mobile-hide { display: none; }
+}
 .tx-topnav {
   margin-bottom: 20px;
   min-width: 0;

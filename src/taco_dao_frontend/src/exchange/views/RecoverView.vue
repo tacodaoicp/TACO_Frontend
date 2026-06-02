@@ -95,6 +95,72 @@
         </table>
       </section>
 
+      <!-- ICPSwap Recovery (sweep stranded pool funds) -->
+      <section class="recover-view__section">
+        <h2 class="recover-view__subtitle">ICPSwap Recovery</h2>
+        <p class="recover-view__desc">
+          If a CrossDEX swap was interrupted (for example you closed the tab mid-swap), tokens can be left inside
+          an ICPSwap pool. Sweep pulls any stranded balance back to your wallet.
+        </p>
+
+        <!-- Auto-detected pending CrossDEX swaps -->
+        <div v-if="pendingSwaps.length > 0" class="recover-view__stuck-list">
+          <div v-for="p in pendingSwaps" :key="p.sell + p.buy" class="recover-view__stuck-item">
+            <div class="recover-view__stuck-info">
+              <span>{{ getTokenSymbol(p.sell) }} → {{ getTokenSymbol(p.buy) }}</span>
+              <span class="recover-view__stuck-reason">Interrupted {{ formatDepositAge(p.timestamp) }}</span>
+            </div>
+            <button
+              class="ex-btn ex-btn--sm ex-btn--primary"
+              @click="sweepPending(p)"
+              :disabled="sweeping === p.sell + p.buy"
+            >{{ sweeping === (p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
+          </div>
+        </div>
+
+        <!-- Manual sweep by pair -->
+        <div class="recover-view__field">
+          <label class="recover-view__label">Token A Canister ID</label>
+          <input v-model="sweepTokenA" type="text" class="ex-input" placeholder="e.g., ryjl3-tyaaa-aaaaa-aaaba-cai" />
+        </div>
+        <div class="recover-view__field">
+          <label class="recover-view__label">Token B Canister ID</label>
+          <input v-model="sweepTokenB" type="text" class="ex-input" placeholder="The other token in the pair" />
+        </div>
+        <div v-if="sweepError" class="ex-error-box">{{ sweepError }}</div>
+        <div v-if="sweepSuccess" class="ex-success-box">Sweep complete. Any stranded funds were returned to your wallet.</div>
+        <button class="ex-btn ex-btn--outline" :disabled="!canSweepManual" @click="sweepManual">
+          {{ sweeping === 'manual' ? 'Sweeping...' : 'Sweep ICPSwap Pool' }}
+        </button>
+      </section>
+
+      <!-- Neutrinite Recovery (sweep pylon virtual balance) -->
+      <section class="recover-view__section">
+        <h2 class="recover-view__subtitle">Neutrinite Recovery</h2>
+        <p class="recover-view__desc">
+          If a CrossDEX swap via Neutrinite was interrupted, your tokens may sit as a balance inside the
+          Neutrinite pylon under your account. Sweep returns them to your wallet.
+        </p>
+
+        <div v-if="pendingNeu.length > 0" class="recover-view__stuck-list">
+          <div v-for="p in pendingNeu" :key="p.sell + p.buy" class="recover-view__stuck-item">
+            <div class="recover-view__stuck-info">
+              <span>{{ getTokenSymbol(p.sell) }} → {{ getTokenSymbol(p.buy) }}</span>
+              <span class="recover-view__stuck-reason">Interrupted {{ formatDepositAge(p.timestamp) }}</span>
+            </div>
+            <button
+              class="ex-btn ex-btn--sm ex-btn--primary"
+              @click="sweepNeuPending(p)"
+              :disabled="sweeping === ('neu:' + p.sell + p.buy)"
+            >{{ sweeping === ('neu:' + p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
+          </div>
+        </div>
+
+        <button class="ex-btn ex-btn--outline" :disabled="!canSweepManual" @click="sweepNeuManual">
+          {{ sweeping === 'neu-manual' ? 'Sweeping...' : 'Sweep Neutrinite (uses the two token IDs above)' }}
+        </button>
+      </section>
+
       <!-- Recover Wrongly-Sent Tokens (manual) -->
       <section class="recover-view__section">
         <h2 class="recover-view__subtitle">Manual Recovery</h2>
@@ -144,6 +210,8 @@ import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { getDepositHistory, removeDepositFromCache } from '../utils/deposit'
 import { useExchangeToast } from '../composables/useExchangeToast'
+import * as icpswap from '../services/icpswap'
+import * as neutrinite from '../services/neutrinite'
 
 const store = useExchangeStore()
 const toast = useExchangeToast()
@@ -373,7 +441,115 @@ async function recoverTokens() {
   }
 }
 
-onMounted(loadCachedDeposits)
+// ── ICPSwap sweep ──
+const pendingSwaps = ref<icpswap.PendingIcpSwap[]>([])
+const sweeping = ref('') // key of the row being swept, or 'manual'
+const sweepTokenA = ref('')
+const sweepTokenB = ref('')
+const sweepError = ref('')
+const sweepSuccess = ref(false)
+
+function loadPendingSwaps() {
+  pendingSwaps.value = icpswap.getPendingSwaps()
+}
+
+const canSweepManual = computed(() =>
+  store.isAuthenticated && !!sweepTokenA.value.trim() && !!sweepTokenB.value.trim() && !sweeping.value,
+)
+
+async function sweepPending(p: icpswap.PendingIcpSwap) {
+  if (!store.isAuthenticated) { sweepError.value = 'Connect your wallet first'; return }
+  sweeping.value = p.sell + p.buy
+  sweepError.value = ''
+  sweepSuccess.value = false
+  try {
+    await icpswap.sweep({ token0Principal: p.sell, token1Principal: p.buy })
+    icpswap.removePendingSwap(p.sell, p.buy)
+    pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
+    sweepSuccess.value = true
+    toast.success('Sweep Complete')
+  } catch (err: any) {
+    sweepError.value = err.message || 'Sweep failed'
+    toast.error('Sweep Failed', sweepError.value)
+  } finally {
+    sweeping.value = ''
+  }
+}
+
+async function sweepManual() {
+  if (!canSweepManual.value) return
+  sweeping.value = 'manual'
+  sweepError.value = ''
+  sweepSuccess.value = false
+  try {
+    await icpswap.sweep({ token0Principal: sweepTokenA.value.trim(), token1Principal: sweepTokenB.value.trim() })
+    sweepSuccess.value = true
+    toast.success('Sweep Complete')
+  } catch (err: any) {
+    sweepError.value = err.message || 'Sweep failed'
+    toast.error('Sweep Failed', sweepError.value)
+  } finally {
+    sweeping.value = ''
+  }
+}
+
+// ── Neutrinite sweep ──
+const pendingNeu = ref<neutrinite.PendingNeutrinite[]>([])
+function loadPendingNeu() {
+  pendingNeu.value = neutrinite.getPendingSwaps()
+}
+
+async function sweepNeuPending(p: neutrinite.PendingNeutrinite) {
+  if (!store.isAuthenticated) { sweepError.value = 'Connect your wallet first'; return }
+  sweeping.value = 'neu:' + p.sell + p.buy
+  sweepError.value = ''
+  sweepSuccess.value = false
+  try {
+    const recovered = await neutrinite.sweep(p.sell, p.buy)
+    if (recovered) {
+      neutrinite.removePendingSwap(p.sell, p.buy)
+      pendingNeu.value = pendingNeu.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
+      sweepSuccess.value = true
+      toast.success('Sweep Complete')
+    } else {
+      sweepError.value = 'Nothing to recover yet. If you just swapped, the deposit may still be crediting — try again in a few seconds.'
+      toast.warning('Nothing to sweep yet', sweepError.value)
+    }
+  } catch (err: any) {
+    sweepError.value = err.message || 'Sweep failed'
+    toast.error('Sweep Failed', sweepError.value)
+  } finally {
+    sweeping.value = ''
+  }
+}
+
+async function sweepNeuManual() {
+  if (!canSweepManual.value) return
+  sweeping.value = 'neu-manual'
+  sweepError.value = ''
+  sweepSuccess.value = false
+  try {
+    const recovered = await neutrinite.sweep(sweepTokenA.value.trim(), sweepTokenB.value.trim())
+    if (recovered) {
+      sweepSuccess.value = true
+      toast.success('Sweep Complete')
+    } else {
+      sweepError.value = 'Nothing to recover for this pair (no stranded balance in the Neutrinite pylon).'
+      toast.warning('Nothing to sweep', sweepError.value)
+    }
+  } catch (err: any) {
+    sweepError.value = err.message || 'Sweep failed'
+    toast.error('Sweep Failed', sweepError.value)
+  } finally {
+    sweeping.value = ''
+  }
+}
+
+onMounted(() => {
+  loadCachedDeposits()
+  loadPendingNeu()
+  loadPendingSwaps()
+})
 </script>
 
 <style scoped lang="scss">

@@ -29,6 +29,7 @@ import { ADMIN_PRINCIPALS } from './composables/useAdminCheck'
 import MobileNav from './exchange/components/layout/MobileNav.vue'
 import ExchangeToastContainer from './exchange/components/shared/ExchangeToastContainer.vue'
 import HelpModal from './exchange/components/common/HelpModal.vue'
+import * as neutrinite from './exchange/services/neutrinite'
 
 const exchangeStore = useExchangeStore()
 const tacoStore = useTacoStore()
@@ -75,6 +76,13 @@ onMounted(() => {
 watch(() => tacoStore.exchangeTheme, (v) => {
   document.documentElement.dataset.txTheme = v
 })
+
+// Pre-register the user's account with the Neutrinite pylon in the background as
+// soon as they're authenticated (login or restored session), so the first
+// CrossDEX swap doesn't pay the registration round-trip. Idempotent + cached.
+watch(() => exchangeStore.isAuthenticated, (authed) => {
+  if (authed) void neutrinite.register()
+}, { immediate: true })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)

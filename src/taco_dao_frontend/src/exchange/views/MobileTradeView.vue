@@ -179,7 +179,7 @@ onDeactivated(() => { isActive.value = false })
 
     // Reserve space for MobileNav only when it's actually showing.
     @media (max-width: 767px) {
-      padding-bottom: 56px;
+      padding-bottom: 60px;
     }
   }
 

@@ -95,6 +95,11 @@
           <span class="header-bar__rl-span">Buy</span>
         </router-link>
 
+        <!-- crossdex swap - external link to the exchange app -->
+        <a :href="crossDexUrl" class="header-bar__rl">
+          <span class="header-bar__rl-span">CrossDEX Swap</span>
+        </a>
+
         <!-- wizard - router link -->
         <a v-if="localNeuronsCount < 1" href="#" @click="toggleTacoWizard()" class="header-bar__rl">
 
@@ -302,6 +307,11 @@
         <router-link @click="togglePagesMenu()" to="/buy" class="list-group-item">
           <span>Buy</span>
         </router-link>
+
+        <!-- crossdex swap - external link to the exchange app -->
+        <a :href="crossDexUrl" @click="togglePagesMenu()" class="list-group-item">
+          <span>CrossDEX Swap</span>
+        </a>
 
         <!-- vault - router link — positioned last -->
         <router-link @click="togglePagesMenu()" to="/vault" class="list-group-item">
@@ -720,7 +730,7 @@
   // Imports //
   /////////////
 
-  import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+  import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
   import { useRouter, useRoute } from 'vue-router'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
@@ -771,6 +781,16 @@
 
   // neurons count
   const localNeuronsCount = ref(0)
+
+  // CrossDEX swap link → exchange app. Staging serves the exchange under the
+  // /exchange path; production uses the exchange.tacodao.com subdomain.
+  const crossDexUrl = computed(() => {
+    const host = window.location.hostname
+    if (host.includes('wxunf') || host.includes('localhost') || host.includes('192.168')) {
+      return '/exchange/crossdex'
+    }
+    return 'https://exchange.tacodao.com/crossdex'
+  })
 
   ///////////////////
   // Local Methods //

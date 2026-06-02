@@ -13,6 +13,7 @@ import { depositToken, removeDepositFromCache } from '../utils/deposit'
 import { classifyExchangeError, classifyTransportReject, isTransportError, verifyAfterTransportError, type ClassifyContext, type VerifyStatus } from '../utils/errors'
 import { formatTokenAmount } from '../utils/format'
 import { useExchangeToast } from './useExchangeToast'
+import { buildTacoSplitPlan } from '../utils/tacoSplitOptimizer'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
 /**
@@ -20,7 +21,7 @@ import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
  * in the user's history matching the tokenIn/tokenOut pair, a near-match on
  * amountIn, and a recent timestamp. Used only after a transport-level throw.
  */
-async function probeSwapLanded(
+export async function probeSwapLanded(
   store: ReturnType<typeof useExchangeStore>,
   tokenIn: string,
   tokenOut: string,
@@ -64,17 +65,6 @@ function buildRoute(tokenIn: string, tokenOut: string, hopDetails: any[]): SwapH
     return hopDetails.map((h: any) => ({ tokenIn: h.tokenIn, tokenOut: h.tokenOut }))
   }
   return [{ tokenIn, tokenOut }]
-}
-
-// ── Routekey helper for cross-fraction matching ────────────────────────────
-// `routeTokens` is the canonical [tokenSell, …intermediates, tokenBuy] array
-// the canister returns alongside each route. Joining it produces a stable
-// identifier so the split engine's `routeSet.size < legs.length` filter
-// correctly rejects two legs whose actual on-chain path is identical (using
-// the same physical pools), regardless of which fraction they came from.
-function routeKeyFromTokens(routeTokens: readonly string[] | undefined, fallback: string): string {
-  if (routeTokens && routeTokens.length >= 2) return routeTokens.join('→')
-  return fallback
 }
 
 function quoteFromBatchResult(
@@ -376,165 +366,19 @@ export function useSwapFlow() {
         potentialOrderDetails: null, isMultiHop: false, route: null, hops: 0, hopDetails: [],
       }
 
-      // ── Split-route evaluation across the full route × fraction grid ──
+      // ── Split-route evaluation (shared generalized optimizer at 100%) ──
+      // The within-TACO multi-route search lives in tacoSplitOptimizer so the
+      // CrossDEX mode reuses the exact same algorithm at arbitrary fractions.
       const fullOut = freshQuote.expectedBuyAmount
       let newSplitPlan: SplitPlan | null = null
 
       if (fullOut > 0n && batchResults.length > 1) {
-        type QuoteEntry = { bp: number; amountIn: bigint; expectedOut: bigint; route: any; routeKey: string; hopDetails: HopDetailDisplay[]; priceImpact: number; edgeKeys: string[] }
-
-        // Canonical pool-edge key (unordered token pair) so that legs which
-        // touch the same physical pool — even via different overall paths —
-        // are detected as conflicts. Without this, a split like
-        //   10% via [cICP→ckUSDC→ckBTC→ICP]  +  60% via [cICP→ckUSDC→ICP]
-        // would pass the path-level routeKey filter (different full paths)
-        // but BOTH legs go through the cICP/ckUSDC pool on their first hop,
-        // so the second leg would actually execute against depleted state
-        // and deliver less than its quote promised.
-        function edgeKey(a: string, b: string): string {
-          return a < b ? `${a}|${b}` : `${b}|${a}`
-        }
-        function edgesOf(hops: HopDetailDisplay[]): string[] {
-          return hops.map(h => edgeKey(h.tokenIn, h.tokenOut))
-        }
-
-        // Flatten: one QuoteEntry per (fraction, route) pair. The combine
-        // engine then has the full grid and can pair any two distinct routes
-        // at any fraction-pair summing to 100%.
-        const allQuotes: QuoteEntry[] = []
-        for (let reqIdx = 0; reqIdx < requests.length; reqIdx++) {
-          const req = requests[reqIdx]
-          const routes = (batchResults[reqIdx]?.routes ?? []) as any[]
-          for (const r of routes) {
-            const out = (r?.expectedBuyAmount ?? 0n) as bigint
-            if (out <= 0n) continue
-            const rawHops = (r.hopDetails ?? []) as any[]
-            const hops = rawHops.length > 0 ? rawHops : [{
-              tokenIn: fromAddr, tokenOut: toAddr,
-              amountIn: req.amt, amountOut: out,
-              fee: r.fee ?? 0n, priceImpact: r.priceImpact ?? 0,
-            }]
-            const normalizedHops = hops.map((h: any) => ({
-              ...h,
-              priceImpact: h.priceImpact > 0 && h.priceImpact <= 1 ? h.priceImpact * 100 : h.priceImpact,
-            })) as HopDetailDisplay[]
-            allQuotes.push({
-              bp: Number(req.bp),
-              amountIn: req.amt,
-              expectedOut: out,
-              route: buildRoute(fromAddr, toAddr, rawHops),
-              // Use the canister's stable routeTokens identifier so that the
-              // same physical path produces the same routeKey across every
-              // fraction — this is what makes the routeSet duplicate filter
-              // work for cross-fraction matching.
-              routeKey: routeKeyFromTokens(r.routeTokens, r.routeDescription ?? 'direct'),
-              hopDetails: normalizedHops,
-              priceImpact: (r.priceImpact ?? 0) * 100,
-              edgeKeys: edgesOf(normalizedHops),
-            })
-          }
-        }
-
-        let bestPlanOut = 0n
-        let bestPlanLegs: QuoteEntry[] | null = null
-        let bestPlanImprovement = 0
-
-        function tryPlan(legs: QuoteEntry[]) {
-          // Stricter than path-level dedup: any TWO legs that share a single
-          // pool edge would interfere on execution (second leg sees depleted
-          // state). Reject any plan with overlapping edges.
-          const seenEdges = new Set<string>()
-          for (const leg of legs) {
-            for (const e of leg.edgeKeys) {
-              if (seenEdges.has(e)) return
-              seenEdges.add(e)
-            }
-          }
-          const totalOut = legs.reduce((s, l) => s + l.expectedOut, 0n)
-          if (totalOut <= fullOut) return
-          if (totalOut > bestPlanOut) {
-            bestPlanOut = totalOut
-            bestPlanLegs = legs
-            bestPlanImprovement = Number((totalOut - fullOut) * 10000n / fullOut) / 100
-          }
-        }
-
-        // byBpMap holds ALL entries per bp (canister + alts), letting splits
-        // pair routes that the canister-only map could never combine.
-        const byBpMap = new Map<number, QuoteEntry[]>()
-        for (const q of allQuotes) {
-          const arr = byBpMap.get(q.bp)
-          if (arr) arr.push(q)
-          else byBpMap.set(q.bp, [q])
-        }
-
-        // 2-way splits
-        for (let i = 0; i < allQuotes.length; i++) {
-          const rem = 10000 - allQuotes[i].bp
-          const others = byBpMap.get(rem)
-          if (!others) continue
-          for (const j of others) {
-            if (j === allQuotes[i]) continue
-            tryPlan([allQuotes[i], j])
-          }
-        }
-
-        // 3-way splits
-        for (let i = 0; i < allQuotes.length; i++) {
-          for (let j = i; j < allQuotes.length; j++) {
-            const rem = 10000 - allQuotes[i].bp - allQuotes[j].bp
-            if (rem <= 0 || rem >= 10000) continue
-            const others = byBpMap.get(rem)
-            if (!others) continue
-            for (const k of others) {
-              if (k === allQuotes[i] || k === allQuotes[j]) continue
-              tryPlan([allQuotes[i], allQuotes[j], k])
-            }
-          }
-        }
-
-        // 4-way splits
-        for (let i = 0; i < allQuotes.length; i++) {
-          for (let j = i; j < allQuotes.length; j++) {
-            for (let k = j; k < allQuotes.length; k++) {
-              const rem = 10000 - allQuotes[i].bp - allQuotes[j].bp - allQuotes[k].bp
-              if (rem <= 0 || rem >= 10000) continue
-              const others = byBpMap.get(rem)
-              if (!others) continue
-              for (const l of others) {
-                if (l === allQuotes[i] || l === allQuotes[j] || l === allQuotes[k]) continue
-                tryPlan([allQuotes[i], allQuotes[j], allQuotes[k], l])
-              }
-            }
-          }
-        }
-
-        // 5-way splits
-        for (let i = 0; i < allQuotes.length; i++) {
-          for (let j = i; j < allQuotes.length; j++) {
-            for (let k = j; k < allQuotes.length; k++) {
-              for (let l = k; l < allQuotes.length; l++) {
-                const rem = 10000 - allQuotes[i].bp - allQuotes[j].bp - allQuotes[k].bp - allQuotes[l].bp
-                if (rem <= 0 || rem >= 10000) continue
-                const others = byBpMap.get(rem)
-                if (!others) continue
-                for (const m of others) {
-                  if (m === allQuotes[i] || m === allQuotes[j] || m === allQuotes[k] || m === allQuotes[l]) continue
-                  tryPlan([allQuotes[i], allQuotes[j], allQuotes[k], allQuotes[l], m])
-                }
-              }
-            }
-          }
-        }
-
-        if (bestPlanLegs && bestPlanImprovement > 0.1) {
+        const res = buildTacoSplitPlan(batchResults, requests, fromAddr, toAddr, 10000)
+        if (res.bestLegs.length > 1 && res.improvement > 0.1) {
           newSplitPlan = {
-            legs: (bestPlanLegs as QuoteEntry[]).map(l => ({
-              pctBP: l.bp, amountIn: l.amountIn, expectedOut: l.expectedOut,
-              route: l.route, routeKey: l.routeKey, hopDetails: l.hopDetails, priceImpact: l.priceImpact,
-            })),
-            totalExpectedOut: bestPlanOut,
-            improvement: bestPlanImprovement,
+            legs: res.bestLegs,
+            totalExpectedOut: res.bestOut,
+            improvement: res.improvement,
           }
         }
       }
