@@ -105,7 +105,7 @@ import { ref, computed, watch } from 'vue'
 import { useStaleAwareLoad } from '../../composables/useStaleAwareLoad'
 import { Actor, HttpAgent } from '@dfinity/agent'
 import { useExchangeStore, type TokenTrend7d } from '../../store/exchange.store'
-import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../../shared/auth-cache'
+import { getNetworkHost } from '../../../shared/auth-cache'
 import { getTokenIcon } from '../../utils/token-icons'
 import { ADMIN_PRINCIPALS } from '../../../composables/useAdminCheck'
 import { idlFactory as daoBackendIDL } from 'declarations/dao_backend/DAO_backend.did.js'
@@ -198,7 +198,6 @@ const toast = useExchangeToast()
 
 const loading = ref(false)
 const hideZero = ref(false)
-const balances = ref<Map<string, bigint>>(new Map())
 const addingToken = ref<string | false>(false)
 const addResult = ref('')
 const showTransfer = ref(false)
@@ -220,6 +219,19 @@ interface DaoToken {
   tokenType: { ICP: null } | { ICRC12: null } | { ICRC3: null }
 }
 const daoTokens = ref<DaoToken[]>([])
+
+// Balances are derived reactively from the store's single userBalanceQuery cache
+// (the same source SwapCard / order forms read), so this panel and the swap views
+// can never disagree, and any mutation refreshes them together. refreshBalances()
+// below just triggers store-query refreshes for the tokens shown here.
+const balances = computed<Map<string, bigint>>(() => {
+  const m = new Map<string, bigint>()
+  for (const t of store.tokens) m.set(t.address, store.userBalanceQuery(t.address).data.value ?? 0n)
+  for (const d of daoTokens.value) {
+    if (d.active && !m.has(d.address)) m.set(d.address, store.userBalanceQuery(d.address).data.value ?? 0n)
+  }
+  return m
+})
 
 const isAdmin = computed(() => ADMIN_PRINCIPALS.includes(store.principalText))
 
@@ -335,17 +347,6 @@ watch(
   { immediate: true, deep: true },
 )
 
-// Minimal ICRC1 IDL for balance query
-const icrc1BalanceIdl = ({ IDL }: { IDL: any }) => {
-  const Account = IDL.Record({
-    owner: IDL.Principal,
-    subaccount: IDL.Opt(IDL.Vec(IDL.Nat8)),
-  })
-  return IDL.Service({
-    icrc1_balance_of: IDL.Func([Account], [IDL.Nat], ['query']),
-  })
-}
-
 async function fetchDaoTokens() {
   try {
     // Anonymous public DAO token list — skip per-query signature verification.
@@ -384,17 +385,12 @@ async function fetchDaoTokens() {
   }
 }
 
-async function refreshBalances(addresses?: string[], opts: { merge?: boolean } = {}) {
-  const agent = await getCachedAgent()
-  if (!agent) return
+// Refresh the per-token balance queries in the store's single cache. The
+// `balances` computed above reads their reactive `.data`, so refreshing here
+// re-renders this panel — and every other balance consumer — at once.
+async function refreshBalances(addresses?: string[]) {
+  if (!store.isAuthenticated) return
 
-  const identity = await getCachedIdentity()
-  if (!identity || identity.getPrincipal().isAnonymous()) return
-
-  const owner = identity.getPrincipal()
-
-  // When called without an explicit address list, fall back to the previous
-  // behaviour: every exchange token + every active DAO token.
   let targetAddresses: string[]
   if (addresses) {
     targetAddresses = addresses
@@ -405,28 +401,7 @@ async function refreshBalances(addresses?: string[], opts: { merge?: boolean } =
     targetAddresses = Array.from(set)
   }
 
-  const results = await Promise.all(
-    targetAddresses.map(async address => {
-      try {
-        const tokenActor = Actor.createActor(icrc1BalanceIdl, { agent, canisterId: address })
-        const balance = await tokenActor.icrc1_balance_of({ owner, subaccount: [] })
-        return { address, balance: balance as bigint }
-      } catch {
-        return { address, balance: 0n }
-      }
-    })
-  )
-
-  if (opts.merge) {
-    // Merge mode: preserve existing entries, only overwrite ones we just fetched.
-    const next = new Map(balances.value)
-    for (const r of results) next.set(r.address, r.balance)
-    balances.value = next
-  } else {
-    const next = new Map<string, bigint>()
-    for (const r of results) next.set(r.address, r.balance)
-    balances.value = next
-  }
+  await Promise.all(targetAddresses.map(a => store.userBalanceQuery(a).refresh()))
 }
 
 const initialLoadDone = ref(false)
@@ -453,7 +428,7 @@ async function refreshAll() {
         .filter(d => d.active && !exchangeSet.has(d.address))
         .map(d => d.address)
       if (daoOnly.length > 0) {
-        await refreshBalances(daoOnly, { merge: true })
+        await refreshBalances(daoOnly)
       }
     }
   } finally {

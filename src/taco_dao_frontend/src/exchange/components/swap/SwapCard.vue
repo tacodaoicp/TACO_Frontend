@@ -241,10 +241,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useExchangeStore } from '../../store/exchange.store'
 import { useSwapFlow } from '../../composables/useSwapFlow'
+import { useTokenBalance } from '../../composables/useTokenBalance'
 import { formatTokenAmount, formatUSD } from '../../utils/format'
 import { getTokenIcon } from '../../utils/token-icons'
 import TokenSelector from './TokenSelector.vue'
@@ -284,21 +285,13 @@ const toIcon = computed(() => {
   return t ? getTokenIcon(t.symbol, t.name) : null
 })
 
-// Balance — queries ICRC-1 on token change
-const fromBalance = ref(0n)
+// Balance — bound reactively to the store's single userBalanceQuery cache, so it
+// updates after any swap/mutation without a reload.
+const fromBalance = useTokenBalance(() => swap.tokenFrom.value?.address)
 const fromBalanceDisplay = computed(() => {
   if (!swap.tokenFrom.value) return '—'
   return formatTokenAmount(fromBalance.value, Number(swap.tokenFrom.value.decimals), swap.tokenFrom.value.symbol)
 })
-
-watch(
-  () => [swap.tokenFrom.value?.address, store.isAuthenticated] as const,
-  async ([addr, authed]) => {
-    if (!addr || !authed) { fromBalance.value = 0n; return }
-    fromBalance.value = await store.getUserBalance(addr)
-  },
-  { immediate: true },
-)
 
 function openTokenSelector(field: 'from' | 'to') {
   tokenSelectorField.value = field

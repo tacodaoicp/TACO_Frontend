@@ -133,6 +133,7 @@ import { ref, computed, watch } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { formatUSD } from '../../utils/format'
 import { useExchangeToast } from '../../composables/useExchangeToast'
+import { useTokenBalance } from '../../composables/useTokenBalance'
 import RouteDisplay from '../shared/RouteDisplay.vue'
 
 const props = defineProps<{
@@ -157,6 +158,10 @@ const pctSlider = ref(0)
 // Sell: user pays token0 (base) to get token1 (quote)
 const fromToken = computed(() => side.value === 'buy' ? props.token1 : props.token0)
 const toToken = computed(() => side.value === 'buy' ? props.token0 : props.token1)
+
+// Pay-token balance — bound to the store's single userBalanceQuery cache so the
+// % max reflects the live balance (and updates after a swap without a reload).
+const fromBalance = useTokenBalance(() => fromToken.value)
 const fromDecimals = computed(() => side.value === 'buy' ? props.decimals1 : props.decimals0)
 const toDecimals = computed(() => side.value === 'buy' ? props.decimals0 : props.decimals1)
 
@@ -435,7 +440,10 @@ async function executeSwap() {
 
     if ('Ok' in result) {
       phase.value = 'success'
-      store.refreshExchangeInfo()
+      // Broadcast the swap so balances (the single userBalanceQuery source),
+      // the Assets panel and trades all refresh — refreshAfterMutation calls
+      // refreshExchangeInfo() internally, so this is a superset.
+      void store.refreshAfterMutation('swap')
       const received = Number(result.Ok.amountOut) / 10 ** toDecimals.value
       toast.success('Swap Complete', received.toFixed(Math.min(toDecimals.value, 6)) + ' ' + toSymbol.value + ' received')
       setTimeout(() => { phase.value = 'idle'; fromAmount.value = ''; expectedOutput.value = ''; quoteData.value = null; multiHopAlt.value = null }, 3000)
@@ -470,9 +478,9 @@ function bigIntToDecimal(amount: bigint, decimals: number, maxFrac: number): str
   return `${whole}.${fracStr}`
 }
 
-async function setPercentage(pct: number) {
+function setPercentage(pct: number) {
   pctSlider.value = pct
-  const balance = await store.getUserBalance(fromToken.value)
+  const balance = fromBalance.value
   if (balance > 0n) {
     const fromInfo = store.getTokenByAddress(fromToken.value)
     const fee = fromInfo ? BigInt(fromInfo.transfer_fee) : 0n

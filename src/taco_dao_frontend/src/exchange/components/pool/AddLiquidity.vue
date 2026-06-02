@@ -404,6 +404,7 @@ import {
 } from '../../utils/concentrated'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { useExchangeToast } from '../../composables/useExchangeToast'
+import { useTokenBalance } from '../../composables/useTokenBalance'
 import { isTransportError, verifyAfterTransportError, type VerifyStatus } from '../../utils/errors'
 
 import CoinIcon from '../common/CoinIcon.vue'
@@ -501,18 +502,14 @@ function colorForSymbol(sym: string): string {
 }
 
 // ── Balances + pool info ──────────────────────────────────────────
-const balance0 = ref(0n)
-const balance1 = ref(0n)
+// Balances — bound to the store's single userBalanceQuery cache so they update
+// after any lp/swap/mutation without a reload.
+const balance0 = useTokenBalance(() => token0.value || undefined)
+const balance1 = useTokenBalance(() => token1.value || undefined)
 const poolInfo = ref<any>(null)
 const poolReserve0 = ref(0n)
 const poolReserve1 = ref(0n)
 const currentPrice = ref(0) // token1-per-token0
-
-async function fetchBalances() {
-  if (!store.isAuthenticated || !token0.value || !token1.value) return
-  balance0.value = await store.getUserBalance(token0.value)
-  balance1.value = await store.getUserBalance(token1.value)
-}
 
 async function loadPoolInfo() {
   if (!token0.value || !token1.value) return
@@ -1296,7 +1293,6 @@ watch(selectedPair, () => {
   rangesRaw.value = []
   chartRange.value = CHART_RANGE_DEFAULT
   loadPoolInfo()
-  fetchBalances()
   loadRanges()
 })
 
@@ -1325,7 +1321,6 @@ watch(() => store.tokens.length, ensureDefaultPair)
 
 onMounted(() => {
   loadPendingDeposit()
-  fetchBalances()
   ensureDefaultPair()
   if (token0.value && token1.value) {
     loadPoolInfo()

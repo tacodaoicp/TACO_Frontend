@@ -745,8 +745,14 @@ function toggleFullscreen() {
 
 onMounted(async () => {
   await nextTick()
+  // Start the candle fetch BEFORE initChart so the canister round-trip
+  // (~1-3 s) overlaps the ~50-100 ms synchronous chart setup instead of
+  // stacking after it. initChart is SYNCHRONOUS, so it completes before the
+  // `await` below yields — meaning candleSeries / volumeSeries are set up by
+  // the time loadInitialData's promise chain calls setData(). No race.
+  const loadPromise = loadInitialData()
   initChart()
-  await loadInitialData()
+  await loadPromise
 })
 
 onUnmounted(() => {

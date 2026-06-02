@@ -159,6 +159,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useLimitOrder } from '../../composables/useLimitOrder'
+import { useTokenBalance } from '../../composables/useTokenBalance'
 import { useExchangeStore } from '../../store/exchange.store'
 import { formatUSD } from '../../utils/format'
 import { toRef } from 'vue'
@@ -232,22 +233,15 @@ const depositSymbol = computed(() =>
   side.value === 'buy' ? quoteSymbol.value : baseSymbol.value
 )
 
-// Fetch deposit token balance
-const depositBalanceRaw = ref(0n)
+// Deposit token balance — bound to the store's single userBalanceQuery cache so
+// it updates after any order/swap/mutation without a reload.
+const depositBalanceRaw = useTokenBalance(() => side.value === 'buy' ? props.token1 : props.token0)
 const depositBalance = computed(() => {
   if (depositBalanceRaw.value <= 0n) return ''
   const dec = side.value === 'buy' ? props.decimals1 : props.decimals0
   const val = Number(depositBalanceRaw.value) / 10 ** dec
   return `${val.toLocaleString(undefined, { maximumFractionDigits: Math.min(dec, 4) })} ${depositSymbol.value}`
 })
-
-async function refreshDepositBalance() {
-  if (!store.isAuthenticated) { depositBalanceRaw.value = 0n; return }
-  const addr = side.value === 'buy' ? props.token1 : props.token0
-  depositBalanceRaw.value = await store.getUserBalance(addr)
-}
-
-watch([() => side.value, () => props.token0, () => props.token1], refreshDepositBalance, { immediate: true })
 
 const priceUSD = computed(() => {
   const p = parseFloat(price.value)

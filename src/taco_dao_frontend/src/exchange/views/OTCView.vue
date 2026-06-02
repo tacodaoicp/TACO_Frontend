@@ -297,6 +297,7 @@ import { useRoute, useRouter } from 'vue-router'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
+import { useTokenBalance } from '../composables/useTokenBalance'
 import { depositToken } from '../utils/deposit'
 import { fillPercentage, orderPrice } from '../utils/price-math'
 import type { TradePosition, TradePrivate2 } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
@@ -368,6 +369,8 @@ async function cancelPrivateOrder(code: string) {
     const result = await store.revokeTrade(code, { Initiator: null })
     if ('Ok' in result) {
       myPrivateOrders.value = myPrivateOrders.value.filter(o => o.accesscode !== code)
+      // Cancelling returns the deposited funds — refresh the single source.
+      void store.refreshAfterMutation('revoke')
       toast.success('Order Cancelled')
     } else {
       const { classifyExchangeError } = await import('../utils/errors')
@@ -394,7 +397,9 @@ const loadingTrade = ref(false)
 const fillAmount = ref('')
 const fillPhase = ref<'idle' | 'depositing' | 'filling' | 'success'>('idle')
 const fillError = ref('')
-const fillBalance = ref(0n)
+// Sell-token balance — bound to the store's single userBalanceQuery cache so it
+// updates after any OTC fill/create/cancel (or other mutation) without a reload.
+const fillBalance = useTokenBalance(() => trade.value?.token_sell_identifier)
 const fillPctSlider = ref(0)
 
 // Max fill: min of (remaining wanted amount, user balance minus fees)
@@ -411,12 +416,6 @@ const maxFillByBalance = computed(() => {
   return available
 })
 
-async function loadFillBalance() {
-  if (!trade.value || !store.isAuthenticated) return
-  try {
-    fillBalance.value = await store.getUserBalance(trade.value.token_sell_identifier)
-  } catch { fillBalance.value = 0n }
-}
 
 function bigIntToDecimal(amount: bigint, decimals: number, maxFrac: number): string {
   const divisor = 10n ** BigInt(decimals)
@@ -519,6 +518,9 @@ async function fillOrder() {
 
     if ('Ok' in result) {
       fillPhase.value = 'success'
+      // Filling moves both the sell and received token balances — refresh the
+      // single source so the OTC balance line and the Assets panel update.
+      void store.refreshAfterMutation('swap')
       toast.success('Order Filled')
     } else {
       const { classifyExchangeError } = await import('../utils/errors')
@@ -725,6 +727,8 @@ async function createOrder() {
     if ('Ok' in result) {
       createdCode.value = result.Ok.accessCode
       createPhase.value = 'done'
+      // Creating an order deposits the offer token — refresh the single source.
+      void store.refreshAfterMutation('order')
       toast.success('Order Created')
     } else {
       const { classifyExchangeError } = await import('../utils/errors')
@@ -776,7 +780,7 @@ async function loadTrade(code: string) {
     trade.value = found
     if (found && Number(found.trade_done) === 0) {
       addToCache(code, found)
-      loadFillBalance()
+      // fillBalance is reactive to trade.value via useTokenBalance — no manual fetch.
       // Auto-fill amount for all-or-nothing trades
       if (found.allOrNothing) {
         fillAmount.value = (Number(found.amount_sell) / 10 ** sellDecimals.value).toFixed(Math.min(sellDecimals.value, 6))

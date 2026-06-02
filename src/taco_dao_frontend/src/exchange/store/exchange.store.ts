@@ -287,25 +287,24 @@ export const useExchangeStore = defineStore('exchange', () => {
       // are correct fast without depending on the slow external price chain.
       const daoPricesPromise = fetchDaoPrices().catch(() => { /* best-effort */ })
 
-      // Fetch each independently so one failure doesn't kill everything. The
-      // frozen check (slot 8) is folded into this parallel batch rather than
-      // awaited serially before it — saves one canister round-trip on every
-      // cold load.
-      const results = await Promise.allSettled([
-        callExchangeQuery('getAcceptedTokensInfo'), // 0 — heavy token list, decode off-thread
-        actor.getPausedTokens(),          // 1
-        actor.p2acannister(),             // 2
-        actor.returncontractprincipal(),  // 3
-        actor.hmFee(),                    // 4
-        actor.hmRevokeFee(),              // 5
-        actor.hmRefFee(),                 // 6
-        callExchangeQuery('exchangeInfo'), // 7 — heavy pool struct, decode off-thread
-        actor.isExchangeFrozen(),         // 8
+      // CRITICAL batch: gate-opening pair + frozen check. The Pro view gate
+      // `v-if="selectedToken0 && selectedToken1"` only needs tokens +
+      // exchangeInfo to populate; everything else (fees / treasury /
+      // paused-tokens) was previously bundled here but isn't required to
+      // flip the gate. Splitting cuts time-to-gate-open from "slowest of 9"
+      // to "slowest of 3" on cold load. Frozen stays critical: a frozen
+      // exchange short-circuits the rest of init.
+      // All three are wrapped in cachedQuery (persist:true), so on warm
+      // boot tokens/info resolve from localStorage on the first microtask.
+      const criticalResults = await Promise.allSettled([
+        acceptedTokensQuery.ensure(CACHE_TTL.tokens),   // 0 — gate (24h persist)
+        exchangeInfoQuery.ensure(CACHE_TTL.info),        // 1 — gate (5m persist)
+        actor.isExchangeFrozen(),                        // 2 — admin state (uncached)
       ])
 
       // Frozen short-circuit — mirrors checkFrozenStatus() error semantics:
       // missing method ⇒ not frozen; any other failure ⇒ treat as frozen.
-      const frozenSettled = results[8]
+      const frozenSettled = criticalResults[2]
       let frozen: boolean
       if (frozenSettled.status === 'fulfilled') {
         frozen = Boolean(frozenSettled.value)
@@ -321,30 +320,71 @@ export const useExchangeStore = defineStore('exchange', () => {
         return
       }
 
-      const get = <T>(i: number): T | null => {
-        const r = results[i]
+      const getCritical = <T>(i: number): T | null => {
+        const r = criticalResults[i]
         if (r.status === 'fulfilled') return r.value as T
-        console.error(`[Exchange] Init call ${i} failed:`, r.reason)
+        console.error(`[Exchange] Init critical call ${i} failed:`, r.reason)
         return null
       }
 
-      const tokensResult = get<[] | [TokenInfo[]]>(0)
-      const pausedResult = get<[] | [string[]]>(1)
-      const treasuryAcct = get<string>(2)
-      const treasuryPrinc = get<string>(3)
-      const fee = get<bigint>(4)
-      const revFee = get<bigint>(5)
-      const refFee = get<bigint>(6)
-      const infoResult = get<[] | [pool]>(7)
+      const tokensResult = getCritical<[] | [TokenInfo[]]>(0)
+      const infoResult   = getCritical<[] | [pool]>(1)
 
       if (tokensResult && tokensResult.length > 0) tokens.value = tokensResult[0] ?? []
-      if (pausedResult && pausedResult.length > 0) pausedTokens.value = pausedResult[0] ?? []
-      if (treasuryAcct) treasuryAccountId.value = treasuryAcct
-      if (treasuryPrinc) treasuryPrincipal.value = treasuryPrinc
-      if (fee !== null) tradingFeeBps.value = fee
-      if (revFee !== null) revokeFeeDivisor.value = revFee
-      if (refFee !== null) referralFeePct.value = refFee
-      if (infoResult && infoResult.length > 0) exchangeInfoData.value = infoResult[0] ?? null
+      if (infoResult   && infoResult.length > 0)   exchangeInfoData.value = infoResult[0] ?? null
+
+      // DEFERRED batch: config / fees / paused-tokens. NOT required to flip the
+      // Pro view gate. Fired on the next microtask so the gate watcher
+      // (ProTradeView) runs first; these refs populate reactively when the calls
+      // land. writeCache for the legacy 'treasury'/'fees' sync-hydration keys
+      // also moves here so it sees real values (was racing the original
+      // synchronous write against the still-pending deferred batch).
+      queueMicrotask(() => {
+        void Promise.allSettled([
+          pausedTokensQuery.ensure(5 * 60_000),
+          treasuryAcctQuery.ensure(24 * 60 * 60_000),
+          treasuryPrincQuery.ensure(24 * 60 * 60_000),
+          tradingFeeQuery.ensure(60 * 60_000),
+          revokeFeeQuery.ensure(60 * 60_000),
+          refFeeQuery.ensure(60 * 60_000),
+        ]).then((deferredResults) => {
+          const getD = <T>(i: number): T | null => {
+            const r = deferredResults[i]
+            if (r.status === 'fulfilled') return r.value as T
+            console.error(`[Exchange] Init deferred call ${i} failed:`, r.reason)
+            return null
+          }
+
+          const pausedResult  = getD<[] | [string[]]>(0)
+          const treasuryAcct  = getD<string>(1)
+          const treasuryPrinc = getD<string>(2)
+          const fee           = getD<bigint>(3)
+          const revFee        = getD<bigint>(4)
+          const refFee        = getD<bigint>(5)
+
+          if (pausedResult && pausedResult.length > 0) pausedTokens.value = pausedResult[0] ?? []
+          if (treasuryAcct)  treasuryAccountId.value  = treasuryAcct
+          if (treasuryPrinc) treasuryPrincipal.value  = treasuryPrinc
+          if (fee    !== null) tradingFeeBps.value    = fee
+          if (revFee !== null) revokeFeeDivisor.value = revFee
+          if (refFee !== null) referralFeePct.value   = refFee
+
+          // Persist for sync-hydration on next F5 (legacy 'treasury'/'fees'
+          // keys read at lines 250-271). cachedQuery's persist layer caches
+          // each under boot.* keys too, but the manual readCache there paints
+          // a tick earlier on F5 because it runs synchronously.
+          if (treasuryAccountId.value && treasuryPrincipal.value) {
+            writeCache('treasury', { acct: treasuryAccountId.value, princ: treasuryPrincipal.value })
+          }
+          if (tradingFeeBps.value > 0n) {
+            writeCache('fees', {
+              trading: tradingFeeBps.value,
+              revoke:  revokeFeeDivisor.value,
+              ref:     referralFeePct.value,
+            })
+          }
+        })
+      })
 
       // Fallback: if getAcceptedTokensInfo returned empty but getAcceptedTokens has IDs,
       // build minimal TokenInfo from on-chain ICRC-1 metadata
@@ -383,19 +423,11 @@ export const useExchangeStore = defineStore('exchange', () => {
 
       console.log(`[Exchange] Init complete: ${tokens.value.length} tokens, info=${!!exchangeInfoData.value}`)
 
-      // Persist fresh state to localStorage so the next F5 hydrates instantly.
+      // Persist tokens + info for sync-hydration on next F5 (lines 250-271).
+      // treasury + fees are persisted inside the deferred microtask above, since
+      // their values aren't populated yet at this point in the critical path.
       if (tokens.value.length > 0) writeCache('tokens', tokens.value)
       if (exchangeInfoData.value) writeCache('info', exchangeInfoData.value)
-      if (treasuryAccountId.value && treasuryPrincipal.value) {
-        writeCache('treasury', { acct: treasuryAccountId.value, princ: treasuryPrincipal.value })
-      }
-      if (tradingFeeBps.value > 0n) {
-        writeCache('fees', {
-          trading: tradingFeeBps.value,
-          revoke:  revokeFeeDivisor.value,
-          ref:     referralFeePct.value,
-        })
-      }
 
       // Prices are already racing in parallel — kicked off above before
       // Promise.allSettled. Just keep the in-flight handle around so any
@@ -407,7 +439,9 @@ export const useExchangeStore = defineStore('exchange', () => {
       startExchangeInfoPolling()
 
       if (tokens.value.length === 0) {
-        const allFailed = results.every(r => r.status === 'rejected')
+        // "Can't reach canister" needs only the critical batch — deferred can
+        // fail independently without indicating a connectivity problem.
+        const allFailed = criticalResults.every(r => r.status === 'rejected')
         if (allFailed) {
           initError.value = `Cannot reach exchange canister (${getExchangeCanisterId()}). Check canister ID and deployment.`
         } else {
@@ -886,7 +920,11 @@ export const useExchangeStore = defineStore('exchange', () => {
   onMutation((kind) => {
     if (kind === 'lp' || kind === 'claim') void userLpQuery.refresh()
     if (kind === 'order' || kind === 'revoke' || kind === 'swap') void userTradesQuery.refresh()
-    if (kind === 'swap' || kind === 'lp' || kind === 'claim') refreshAllBalances()
+    // Every mutation can move wallet balances: swap/lp/claim obviously, but also
+    // order (deposits tokens), revoke (returns them) and referral (pays out fees).
+    // refreshAllBalances() only refreshes already-opened, deduped token queries,
+    // so firing it unconditionally is cheap and keeps the single source correct.
+    refreshAllBalances()
     if (kind === 'claim' || kind === 'referral') {
       void userFeesReferrerQuery.refresh()
       void userReferralQuery.refresh()
@@ -1060,6 +1098,11 @@ export const useExchangeStore = defineStore('exchange', () => {
     void getKlineDataRange(t0, t1, timeframe, [], 2500n)
     void getKlineData(t0, t1, { day: null }, true)
     void getKlineData(t0, t1, timeframe, true)
+    // Also pre-warm the orderbook for the same pair so OrderbookPanel's first
+    // poll hits an in-flight (or persisted) response instead of the skeleton.
+    // 50|10 is the most-common useOrderbook bucket (see getStepAndLevels);
+    // a non-default precision is a harmless cache miss.
+    orderbookQuery(`${t0}|${t1}|50|10`).prefetch()
   }
 
   async function getAllAMMPools() {
@@ -1073,12 +1116,15 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
 
   async function getAllPoolStats() {
-    // Heavy decode (all pools' stats) — run it off the main thread.
-    return callExchangeQuery<Awaited<ReturnType<_SERVICE['getAllPoolStats']>>>('getAllPoolStats')
+    // Routes through poolStatsQuery so repeated callers dedup + share the 30s cache.
+    return (await poolStatsQuery.ensure()) ?? ([] as any)
   }
 
   async function getOrderbookCombined(token0: string, token1: string, numLevels: bigint, stepPercent: bigint) {
-    return callExchangeQuery<Awaited<ReturnType<_SERVICE['getOrderbookCombined']>>>('getOrderbookCombined', [token0, token1, numLevels, stepPercent])
+    // Routes through orderbookQuery so the syncProPair prefetch + the 3s poller
+    // share one in-flight request, and a warm pair revisit hits localStorage.
+    const key = `${token0}|${token1}|${numLevels.toString()}|${stepPercent.toString()}`
+    return (await orderbookQuery(key).ensure()) ?? ({} as any)
   }
 
   // Kline factory: each unique (pair, timeframe, initialGet) tuple gets its
@@ -1134,7 +1180,10 @@ export const useExchangeStore = defineStore('exchange', () => {
       key: `klineRange:${compositeKey}`,
       // Heavy decode (up to 2500 candles) — off the main thread.
       fetcher: () => callExchangeQuery<KlineData[]>('getKlineDataRange', [token1, token2, tfMap[tfKey] ?? { day: null }, [], BigInt(limitStr)]),
-      persist: false,
+      // Persist so a same-pair revisit within the TTL repaints candles from
+      // localStorage on the same frame as the chart shell, instead of waiting
+      // on the canister. Stale-while-revalidate via ensure() still refreshes.
+      persist: true,
       maxAgeMs: 30_000,
       shallow: true,
       timeoutMs: 15_000,
@@ -1195,6 +1244,115 @@ export const useExchangeStore = defineStore('exchange', () => {
     const key = [...tokenAddresses].sort().join('|')
     return (await trendsQuery(key).ensure()) ?? []
   }
+
+  // ─── Boot-batch cached queries (persist:true) ────────────────────────────
+  // initExchange used to fire 9 raw canister calls in a single Promise.allSettled;
+  // 7 are now wrapped here so a warm boot resolves them from localStorage on the
+  // first microtask instead of blocking the Pro view gate on a network round-trip.
+  // Only `isExchangeFrozen` stays raw (admin state — correctness > perf).
+
+  const acceptedTokensQuery: CachedQuery<[] | [TokenInfo[]]> = createCachedQuery({
+    key: 'boot.acceptedTokens',
+    fetcher: () => callExchangeQuery<[] | [TokenInfo[]]>('getAcceptedTokensInfo'),
+    persist: true,
+    maxAgeMs: CACHE_TTL.tokens,    // 24h — matches existing manual hydration TTL
+    shallow: true,
+    timeoutMs: 20_000,
+  })
+
+  const exchangeInfoQuery: CachedQuery<[] | [pool]> = createCachedQuery({
+    key: 'boot.exchangeInfo',
+    fetcher: () => callExchangeQuery<[] | [pool]>('exchangeInfo'),
+    persist: true,
+    maxAgeMs: CACHE_TTL.info,      // 5 min
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  const pausedTokensQuery: CachedQuery<[] | [string[]]> = createCachedQuery({
+    key: 'boot.pausedTokens',
+    fetcher: async () => (await getQueryActor()).getPausedTokens(),
+    persist: true,
+    maxAgeMs: 5 * 60_000,          // 5 min — admin can pause/unpause; want fresh-ish
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  const treasuryAcctQuery: CachedQuery<string> = createCachedQuery({
+    key: 'boot.treasuryAcct',
+    fetcher: async () => (await getQueryActor()).p2acannister(),
+    persist: true,
+    maxAgeMs: 24 * 60 * 60_000,    // 24h — practically static
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  const treasuryPrincQuery: CachedQuery<string> = createCachedQuery({
+    key: 'boot.treasuryPrinc',
+    fetcher: async () => (await getQueryActor()).returncontractprincipal(),
+    persist: true,
+    maxAgeMs: 24 * 60 * 60_000,    // 24h — practically static
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  const tradingFeeQuery: CachedQuery<bigint> = createCachedQuery({
+    key: 'boot.tradingFee',
+    fetcher: async () => (await getQueryActor()).hmFee(),
+    persist: true,
+    maxAgeMs: 60 * 60_000,         // 1h — fee changes are rare
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  const revokeFeeQuery: CachedQuery<bigint> = createCachedQuery({
+    key: 'boot.revokeFee',
+    fetcher: async () => (await getQueryActor()).hmRevokeFee(),
+    persist: true,
+    maxAgeMs: 60 * 60_000,         // 1h
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  const refFeeQuery: CachedQuery<bigint> = createCachedQuery({
+    key: 'boot.refFee',
+    fetcher: async () => (await getQueryActor()).hmRefFee(),
+    persist: true,
+    maxAgeMs: 60 * 60_000,         // 1h
+    shallow: true,
+    timeoutMs: 15_000,
+  })
+
+  // ─── Off-boot heavy queries ──────────────────────────────────────────────
+
+  // All-pools stats — heavy decode. Cached so repeated callers (PoolList,
+  // dashboards) dedup; 30s TTL keeps freshness. Not persisted (bulky + churns).
+  const poolStatsQuery: CachedQuery<Awaited<ReturnType<_SERVICE['getAllPoolStats']>>> = createCachedQuery({
+    key: 'pool.allStats',
+    fetcher: () => callExchangeQuery<Awaited<ReturnType<_SERVICE['getAllPoolStats']>>>('getAllPoolStats'),
+    persist: false,
+    maxAgeMs: 30_000,
+    shallow: true,
+    timeoutMs: 20_000,
+  })
+
+  // Orderbook per (pair, depth, stepBps) — wrap so prefetch (from syncProPair)
+  // and concurrent subscribers dedup. 5s TTL stays under the 3s poll, persisted
+  // so a same-pair revisit shows real rows instantly instead of the skeleton.
+  const orderbookQuery = createKeyedQueryFactory<string, Awaited<ReturnType<_SERVICE['getOrderbookCombined']>>>((compositeKey) => {
+    const [token0, token1, numLevelsStr, stepPctStr] = compositeKey.split('|')
+    return createCachedQuery({
+      key: `orderbook:${compositeKey}`,
+      fetcher: () => callExchangeQuery<Awaited<ReturnType<_SERVICE['getOrderbookCombined']>>>(
+        'getOrderbookCombined',
+        [token0, token1, BigInt(numLevelsStr), BigInt(stepPctStr)],
+      ),
+      persist: true,
+      maxAgeMs: 5_000,
+      shallow: true,
+      timeoutMs: 15_000,
+    })
+  })
 
   async function getPoolHistory(token1: string, token2: string, limit: bigint) {
     return callExchangeQuery<Awaited<ReturnType<_SERVICE['getPoolHistory']>>>('getPoolHistory', [token1, token2, limit])

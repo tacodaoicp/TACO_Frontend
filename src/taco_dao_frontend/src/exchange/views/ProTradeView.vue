@@ -182,6 +182,11 @@ function syncProPair() {
   if (!pair) return
   if (store.selectedToken0 !== pair[0]) store.selectedToken0 = pair[0]
   if (store.selectedToken1 !== pair[1]) store.selectedToken1 = pair[1]
+  // Pre-warm the kline + orderbook caches so the chart shell and orderbook
+  // panel find data already in-flight (or hot in localStorage) by the time
+  // their onMounted hooks reach datafeed.getRange / startPolling. Default
+  // timeframe matches TradingChart's `default-timeframe="hour"` prop above.
+  store.prefetchProPair({ hour: null })
 }
 
 // Re-resolve once tokens/pool data finish loading after entry (async init may
