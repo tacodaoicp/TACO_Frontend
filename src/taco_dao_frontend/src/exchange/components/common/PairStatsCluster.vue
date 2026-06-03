@@ -34,8 +34,8 @@ import { isVisible as isDocumentVisible, onVisible } from '../../composables/use
 const store = useExchangeStore()
 const { activePair } = useExchangePairs()
 
-const stats24h = ref<{ high: string | null; low: string | null; volume: string | null }>({
-  high: null, low: null, volume: null,
+const stats24h = ref<{ high: string | null; low: string | null; change: number | null; volume: string | null }>({
+  high: null, low: null, change: null, volume: null,
 })
 
 const currentPrice = computed(() => {
@@ -46,7 +46,9 @@ const currentPrice = computed(() => {
   }
   return activePair.value?.lastPrice ?? null
 })
-const priceChange = computed<number | null>(() => activePair.value?.change24h ?? null)
+// Prefer the kline-derived 24H change (same candle as high/low — consistent with
+// the chart). Fall back to the pool-stats change24h only if kline isn't available.
+const priceChange = computed<number | null>(() => stats24h.value.change ?? activePair.value?.change24h ?? null)
 
 const visible = computed(() =>
   !!(currentPrice.value || stats24h.value.high || stats24h.value.low),
@@ -65,7 +67,7 @@ async function loadStats24h() {
   const t0 = store.selectedToken0
   const t1 = store.selectedToken1
   if (!t0 || !t1) {
-    stats24h.value = { high: null, low: null, volume: null }
+    stats24h.value = { high: null, low: null, change: null, volume: null }
     return
   }
   try {
@@ -76,9 +78,17 @@ async function loadStats24h() {
     const swapped = pair ? (pair.base !== t0) : false
     const high = swapped && latest.high > 0 ? 1 / latest.low  : latest.high
     const low  = swapped && latest.low  > 0 ? 1 / latest.high : latest.low
+    // 24H change from the SAME candle as high/low so they stay consistent with the
+    // chart. (The pool-stats `price_day_before` used by useExchangePairs is sparse/
+    // stale for illiquid pairs, which made this disagree with the high/low.)
+    // Swapped display price = 1/raw, so the inverted % change is (open - close)/close.
+    let change: number | null = null
+    if (!swapped && latest.open > 0) change = (latest.close - latest.open) / latest.open * 100
+    else if (swapped && latest.close > 0) change = (latest.open - latest.close) / latest.close * 100
     stats24h.value = {
       high: fmtPrice(high),
       low:  fmtPrice(low),
+      change: (change !== null && isFinite(change)) ? change : null,
       volume: null,
     }
   } catch { /* soft-fail */ }

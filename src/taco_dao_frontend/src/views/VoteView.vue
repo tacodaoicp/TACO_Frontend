@@ -127,7 +127,9 @@
 
                         <!-- chart -->
                         <apexchart type="pie" :options="chartOptions" :series="series"
-                          class="vote-allocations__taco-chart" @dataPointSelection="handleChartSegmentClick">
+                          class="vote-allocations__taco-chart"
+                          @mounted="refitVoteChart"
+                          @dataPointSelection="handleChartSegmentClick">
                         </apexchart>
 
                       </div>
@@ -1469,7 +1471,8 @@
 
       // 
       &__taco-chart-container {
-          max-height: 257px;
+          // No max-height cap: the apexchart (pie + labels) fills its full svg, so
+          // capping the box made the chart overflow onto the text below it.
           position: relative;
           background-color: rgba(255, 255, 255, 0.03);
       }
@@ -2743,22 +2746,46 @@
   } 
   
   // set taco chart max height
+  // The apexchart is a TOP semicircle (startAngle -90 → endAngle 90), but apexcharts
+  // still reserves a FULL-circle-tall svg — so ~half the container is empty space below
+  // the visible pie, which pushed the token-info card off-screen. Crop the container to
+  // the pie's REAL rendered bottom (measured live, since the pie scales with width) + a
+  // small margin, with overflow:hidden — so the chart shows in full AND the info card
+  // sits right beneath it. Guard against cropping to nothing before the lazy chart has
+  // rendered (no `.apexcharts-pie` yet → clear any crop).
   const setTacoChartMaxHeight = async () => {
       const element = tacoChartContainer.value;
-      if (element) {
-          element.style.maxHeight = ''; // Temporarily remove max-width to allow natural height
-
-          await nextTick(); // Wait for the DOM to update
-
-          if (window.innerWidth < maxWidthThreshold) {
-              const height = element.clientHeight;
-              const maxHeight = height / 2 + 12;
-              element.style.maxHeight = `${maxHeight}px`;
-          } else {
-              element.style.maxHeight = ''; // Ensure max-width is removed if above the threshold
-          }
+      if (!element) return;
+      const pie = element.querySelector('.apexcharts-pie') as SVGGraphicsElement | null;
+      if (!pie) { element.style.maxHeight = ''; return; }
+      const top = element.getBoundingClientRect().top;
+      const pieBottom = pie.getBoundingClientRect().bottom;
+      const cropH = Math.round(pieBottom - top + 12); // 12px breathing room below the pie/labels
+      if (cropH > 60) {
+          element.style.maxHeight = cropH + 'px';
+          element.style.overflow = 'hidden';
+      } else {
+          element.style.maxHeight = '';
       }
-  }    
+  }
+
+  // The lazy apexchart often mounts before the (mobile) container width has settled, so
+  // it renders oversized. Force a resize on the next frame so apexcharts re-measures the
+  // container, then crop. Re-measure after the ~300ms entry animation so we crop to the
+  // final geometry.
+  const refitVoteChart = () => {
+      requestAnimationFrame(() => {
+          window.dispatchEvent(new Event('resize'))
+          setTacoChartMaxHeight()
+      })
+      setTimeout(setTacoChartMaxHeight, 350)
+  }
+
+  // Same, but only when returning to a backgrounded browser tab.
+  const handleChartVisibilityRefit = () => {
+      if (document.visibilityState !== 'visible') return
+      refitVoteChart()
+  }
 
   // cast vote
   const castVote = async () => {
@@ -3239,6 +3266,7 @@
     // chart stuff
     setTacoChartMaxHeight()
     window.addEventListener('resize', setTacoChartMaxHeight)
+    document.addEventListener('visibilitychange', handleChartVisibilityRefit)
 
     // Check for existing cached data FIRST before any await calls or loading flags
     const hasCachedTokenDetails = fetchedTokenDetails.value && fetchedTokenDetails.value.length > 0
@@ -3456,6 +3484,7 @@
 
       //
       window.removeEventListener('resize', setTacoChartMaxHeight)
+      document.removeEventListener('visibilitychange', handleChartVisibilityRefit)
 
 
   })

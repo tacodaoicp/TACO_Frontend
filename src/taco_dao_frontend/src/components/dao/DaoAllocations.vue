@@ -90,6 +90,7 @@
                 :options="chartOptions"
                 :series="series"
                 class="dao-allocations__taco-chart"
+                @mounted="refitChart"
                 @dataPointSelection="handleChartSegmentClick"></apexchart>
 
             <!-- no data message -->
@@ -811,16 +812,45 @@ LOCAL METHODS
     //////////////
     // HANDLERS //
 
-    // set taco chart max height
+    // The apexchart is a TOP semicircle (startAngle -90 → endAngle 90), but apexcharts
+    // still reserves a FULL-circle-tall svg — so ~half the container is empty space
+    // below the visible pie, which pushed the token-info card off-screen. Crop the
+    // container to the pie's REAL rendered bottom (measured live, since the pie scales
+    // with width) + a small margin, with overflow:hidden — so the chart shows in full
+    // AND the info card sits right beneath it. Guard against cropping to nothing before
+    // the lazy chart has rendered (no `.apexcharts-pie` yet → clear any crop).
     const handleSetTacoChartMaxHeight = async () => {
         const element = tacoChartContainer.value
-        if (element) {
-            element.style.maxHeight = ''; // Temporarily remove max-width to allow natural height
-            await nextTick() // Wait for the DOM to update
-            const height = element.clientHeight
-            const maxHeight = height / 2
-            element.style.maxHeight = `${maxHeight}px`
+        if (!element) return
+        const pie = element.querySelector('.apexcharts-pie') as SVGGraphicsElement | null
+        if (!pie) { element.style.maxHeight = ''; return }
+        const top = element.getBoundingClientRect().top
+        const pieBottom = pie.getBoundingClientRect().bottom
+        const cropH = Math.round(pieBottom - top + 12) // 12px breathing room below the pie/labels
+        if (cropH > 60) {
+            element.style.maxHeight = cropH + 'px'
+            element.style.overflow = 'hidden'
+        } else {
+            element.style.maxHeight = ''
         }
+    }
+
+    // Re-fit the chart to its container. The lazy apexchart often mounts before the
+    // (mobile) container width has settled, so it renders OVERSIZED. Force a resize on
+    // the next frame so apexcharts re-measures the container, then crop. Re-measure once
+    // more after the ~300ms entry animation so the final geometry is what we crop to.
+    const refitChart = () => {
+        requestAnimationFrame(() => {
+            window.dispatchEvent(new Event('resize')) // apexcharts re-measures its container
+            handleSetTacoChartMaxHeight()
+        })
+        setTimeout(handleSetTacoChartMaxHeight, 350)
+    }
+
+    // Same, but only when returning to a backgrounded browser tab.
+    const handleVisibilityRefit = () => {
+        if (document.visibilityState !== 'visible') return
+        refitChart()
     }
 
     // handle apply allocation data to chart
@@ -1313,6 +1343,8 @@ LOCAL METHODS
 
         // add event listener for resize
         window.addEventListener('resize', handleSetTacoChartMaxHeight)
+        // re-fit the chart when returning to a backgrounded tab (fixes oversize/overlap)
+        document.addEventListener('visibilitychange', handleVisibilityRefit)
 
         // init bootstrap tooltips
         new Tooltip(document.body, {
@@ -1348,6 +1380,7 @@ LOCAL METHODS
 
         // remove event listener for resize
         window.removeEventListener('resize', handleSetTacoChartMaxHeight)
+        document.removeEventListener('visibilitychange', handleVisibilityRefit)
 
         // clear refresh timer
         if (refreshTimer.value) {
