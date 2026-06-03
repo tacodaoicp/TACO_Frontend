@@ -753,7 +753,7 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
 // Queue Processing
 // ============================================================================
 
-const MAX_CONCURRENT_FETCHES = 5
+const MAX_CONCURRENT_FETCHES = 8
 let activeFetchCount = 0
 
 async function processQueue(): Promise<void> {
@@ -761,6 +761,11 @@ async function processQueue(): Promise<void> {
   isProcessing = true
 
   while (true) {
+    // A backoff-blocked key must not stall the rest of the queue. Skip it by
+    // leaving it marked processing (so dequeue() returns a different item) and
+    // release it after the pass — NOT queue.retry()+continue, which would clear
+    // the processing flag and busy-spin on the same item. See the unified worker.
+    const blockedThisPass: DataKey[] = []
     while (activeFetchCount < MAX_CONCURRENT_FETCHES) {
       const item = queue.dequeue()
 
@@ -778,8 +783,9 @@ async function processQueue(): Promise<void> {
       }
 
       if (!backoff.canRetry(item.dataKey)) {
-        queue.retry(item.dataKey)
-        break // Exit inner loop to sleep — 'continue' would infinite-loop (dequeue returns same item)
+        // Backoff not elapsed — skip (left processing) and keep servicing others.
+        blockedThisPass.push(item.dataKey)
+        continue
       }
 
       activeFetchCount++
@@ -788,7 +794,11 @@ async function processQueue(): Promise<void> {
       })
     }
 
-    await sleep(50)
+    // Release backoff-blocked items so the next pass re-checks them.
+    for (const key of blockedThisPass) queue.retry(key)
+
+    const onlyBlocked = activeFetchCount === 0 && blockedThisPass.length > 0
+    await sleep(onlyBlocked ? 250 : 50)
   }
 }
 

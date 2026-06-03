@@ -718,7 +718,7 @@ import TacoTitle from '../components/misc/TacoTitle.vue'
 import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
 import type { Rewards } from '../../../declarations/rewards/rewards.did'
 import { workerBridge } from '../stores/worker-bridge'
-import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
+import { deserializeFromTransfer } from '../workers/shared/transfer'
 
 const router = useRouter()
 const tacoStore = useTacoStore()

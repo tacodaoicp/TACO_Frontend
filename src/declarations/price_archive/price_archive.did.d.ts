@@ -48,7 +48,9 @@ export interface DataCertificate {
   'certificate' : Uint8Array | number[],
   'hash_tree' : Uint8Array | number[],
 }
-export type ExchangeType = { 'KongSwap' : null } |
+export type ExchangeType = { 'Neutrinite' : null } |
+  { 'TACO' : null } |
+  { 'KongSwap' : null } |
   { 'ICPSwap' : null };
 export interface GetArchivesArgs { 'from' : [] | [Principal] }
 export type GetArchivesResult = Array<
@@ -71,11 +73,12 @@ export type LogLevel = { 'INFO' : null } |
   { 'WARN' : null } |
   { 'ERROR' : null };
 export interface PriceArchiveV2 {
-  'archivePriceBlock' : ActorMethod<[PriceBlockData], Result_9>,
+  'archivePriceBlock' : ActorMethod<[PriceBlockData], Result_17>,
+  'archivePriceBlockBatch' : ActorMethod<[Array<PriceBlockData>], Result_16>,
   'catchUpImport' : ActorMethod<[], Result_1>,
   'forceResetMiddleLoop' : ActorMethod<[], Result_1>,
   'getArchiveStats' : ActorMethod<[], ArchiveStatus>,
-  'getArchiveStatus' : ActorMethod<[], Result_8>,
+  'getArchiveStatus' : ActorMethod<[], Result_15>,
   'getBatchImportStatus' : ActorMethod<
     [],
     {
@@ -84,12 +87,31 @@ export interface PriceArchiveV2 {
       'isRunning' : boolean,
     }
   >,
-  'getLatestPrice' : ActorMethod<[Principal], Result_5>,
+  'getLatestPrice' : ActorMethod<[Principal], Result_9>,
+  'getLatestPrices' : ActorMethod<[Array<Principal>], Result_5>,
   'getLogs' : ActorMethod<[bigint], Array<LogEntry>>,
-  'getPriceAtOrAfterTime' : ActorMethod<[Principal, bigint], Result_5>,
-  'getPriceAtTime' : ActorMethod<[Principal, bigint], Result_5>,
-  'getPriceHistory' : ActorMethod<[Principal, bigint, bigint], Result_4>,
-  'getPricesAtTime' : ActorMethod<[Array<Principal>, bigint], Result_3>,
+  'getPriceAtOrAfterTime' : ActorMethod<[Principal, bigint], Result_9>,
+  'getPriceAtOrAfterTimeComposite' : ActorMethod<[Principal, bigint], Result_9>,
+  'getPriceAtTime' : ActorMethod<[Principal, bigint], Result_9>,
+  'getPriceAtTimeComposite' : ActorMethod<[Principal, bigint], Result_9>,
+  'getPriceHistory' : ActorMethod<[Principal, bigint, bigint], Result_8>,
+  'getPricesAtOrAfterTimes' : ActorMethod<
+    [Array<{ 'token' : Principal, 'timestamp' : bigint }>],
+    Result_3
+  >,
+  'getPricesAtOrAfterTimesComposite' : ActorMethod<
+    [Array<{ 'token' : Principal, 'timestamp' : bigint }>],
+    Result_3
+  >,
+  'getPricesAtTime' : ActorMethod<[Array<Principal>, bigint], Result_5>,
+  'getPricesAtTimes' : ActorMethod<
+    [Array<{ 'token' : Principal, 'timestamp' : bigint }>],
+    Result_3
+  >,
+  'getPricesAtTimesComposite' : ActorMethod<
+    [Array<{ 'token' : Principal, 'timestamp' : bigint }>],
+    Result_3
+  >,
   'getTimerStatus' : ActorMethod<[], TimerStatus>,
   'get_canister_cycles' : ActorMethod<[], { 'cycles' : bigint }>,
   'icrc3_get_archives' : ActorMethod<[GetArchivesArgs], GetArchivesResult>,
@@ -124,9 +146,21 @@ export type Result = { 'ok' : string } |
   { 'err' : ArchiveError };
 export type Result_1 = { 'ok' : string } |
   { 'err' : string };
+export type Result_15 = { 'ok' : ArchiveStatus } |
+  { 'err' : ArchiveError };
+export type Result_16 = { 'ok' : { 'failed' : bigint, 'archived' : bigint } } |
+  { 'err' : ArchiveError };
+export type Result_17 = { 'ok' : bigint } |
+  { 'err' : ArchiveError };
 export type Result_2 = { 'ok' : ArchiveQueryResult } |
   { 'err' : ArchiveError };
 export type Result_3 = {
+    'ok' : Array<
+      [] | [{ 'usdPrice' : number, 'timestamp' : bigint, 'icpPrice' : bigint }]
+    >
+  } |
+  { 'err' : ArchiveError };
+export type Result_5 = {
     'ok' : Array<
       [
         Principal,
@@ -137,17 +171,13 @@ export type Result_3 = {
     >
   } |
   { 'err' : ArchiveError };
-export type Result_4 = { 'ok' : Array<PriceBlockData> } |
+export type Result_8 = { 'ok' : Array<PriceBlockData> } |
   { 'err' : ArchiveError };
-export type Result_5 = {
+export type Result_9 = {
     'ok' : [] | [
       { 'usdPrice' : number, 'timestamp' : bigint, 'icpPrice' : bigint }
     ]
   } |
-  { 'err' : ArchiveError };
-export type Result_8 = { 'ok' : ArchiveStatus } |
-  { 'err' : ArchiveError };
-export type Result_9 = { 'ok' : bigint } |
   { 'err' : ArchiveError };
 export type TacoBlockType = { 'NeuronUpdate' : null } |
   { 'VotingPower' : null } |

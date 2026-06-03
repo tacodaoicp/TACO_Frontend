@@ -4,6 +4,12 @@
  * Spins up a DedicatedWorker, asks it to fetch + decode + serialize a user's
  * performance graph off the main thread, resolves with chart-ready serialized
  * checkpoints (or an error), then terminates the worker.
+ *
+ * NB: kept deliberately simple (one worker per call, response read directly from
+ * e.data). A pooled/reqId-correlated variant was tried but is fragile across an
+ * asset-canister deploy — if a stale worker chunk is served against a newer
+ * client the correlation never matches and the chart spins forever. This version
+ * has no such coupling.
  */
 import PerfGraphWorkerUrl from './performance-graph.worker.ts?worker&url'
 import type { SerializedCheckpoint } from './shared/chart-compute'
@@ -19,6 +25,9 @@ export interface FetchGraphResult {
   checkpoints?: SerializedCheckpoint[]
   error?: string
 }
+
+/** No-op kept for callers that warm at idle; one-shot workers need no warming. */
+export function warmPerformanceGraphWorker(): void { /* intentionally empty */ }
 
 export function fetchPerformanceGraph(params: FetchGraphParams, timeoutMs = 120_000): Promise<FetchGraphResult> {
   return new Promise((resolve) => {

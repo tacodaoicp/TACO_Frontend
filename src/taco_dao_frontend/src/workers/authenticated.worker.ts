@@ -1018,9 +1018,10 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
 // Queue Processing (Parallel)
 // ============================================================================
 
-// Maximum concurrent fetches - higher priority items are dequeued first
-// Bumped to 10 to handle 41 admin data keys more efficiently
-const MAX_CONCURRENT_FETCHES = 5
+// Maximum concurrent fetches - higher priority items are dequeued first.
+// 8 keeps route-critical keys from queuing behind the boot preload barrage / 41
+// admin keys; the IC boundary nodes multiplex over HTTP/2 so this is safe.
+const MAX_CONCURRENT_FETCHES = 8
 let activeFetchCount = 0
 
 async function processQueue(): Promise<void> {
@@ -1036,7 +1037,15 @@ async function processQueue(): Promise<void> {
       continue
     }
 
-    // Start new fetches up to the limit (priority queue returns highest priority first)
+    // Start new fetches up to the limit (priority queue returns highest priority first).
+    // A backoff-blocked key must NOT stall the rest of the queue: we skip it and
+    // move on to other fetchable keys. The skip works by leaving the item marked
+    // as processing (dequeue() returns the first item NOT processing), so the next
+    // dequeue() returns a DIFFERENT item instead of the same blocked one — that's
+    // why we can't just call queue.retry()+continue here (retry() clears the
+    // processing flag, so dequeue() would return it again and busy-spin). Blocked
+    // keys are released after the pass so the next pass re-evaluates them.
+    const blockedThisPass: DataKey[] = []
     while (activeFetchCount < MAX_CONCURRENT_FETCHES) {
       // Get next highest-priority item (queue.dequeue handles deduplication internally)
       const item = queue.dequeue()
@@ -1063,8 +1072,11 @@ async function processQueue(): Promise<void> {
       }
 
       if (!backoff.canRetry(item.dataKey)) {
-        queue.retry(item.dataKey)
-        break // Exit inner loop to sleep — 'continue' would infinite-loop (dequeue returns same item)
+        // Backoff window not yet elapsed. Leave it marked processing (so the next
+        // dequeue() skips it) and keep servicing other keys — one slow/failing key
+        // no longer blocks the whole queue. Released after the pass below.
+        blockedThisPass.push(item.dataKey)
+        continue
       }
 
       // Start fetch in parallel (don't await) - critical/high priority items start first
@@ -1074,10 +1086,16 @@ async function processQueue(): Promise<void> {
       })
     }
 
-    // Adaptive sleep: longer when idle (no active fetches and empty queue), shorter when processing
-    // This dramatically reduces CPU overhead when the worker is waiting
+    // Release backoff-blocked items so the next pass re-checks them once their
+    // delay elapses (retry() clears the processing flag + re-sorts the queue).
+    for (const key of blockedThisPass) queue.retry(key)
+
+    // Adaptive sleep: longer when idle (no active fetches and empty queue), shorter
+    // when processing. When the only thing left is backoff-blocked keys (nothing in
+    // flight), poll a little slower than the active 50ms — we're just waiting on timers.
     const isIdle = activeFetchCount === 0 && queue.isEmpty()
-    await sleep(isIdle ? 500 : 50)
+    const onlyBlocked = activeFetchCount === 0 && blockedThisPass.length > 0
+    await sleep(isIdle ? 500 : onlyBlocked ? 250 : 50)
   }
 }
 

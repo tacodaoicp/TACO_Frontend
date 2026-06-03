@@ -49,28 +49,18 @@ type TacoBlockType =
 type Result_9 = 
  variant {
    err: ArchiveError;
-   ok: nat;
- };
-type Result_8 = 
- variant {
-   err: ArchiveError;
-   ok: ArchiveStatus;
- };
-type Result_5 = 
- variant {
-   err: ArchiveError;
    ok: opt record {
              icpPrice: nat;
              timestamp: int;
              usdPrice: float64;
            };
  };
-type Result_4 = 
+type Result_8 = 
  variant {
    err: ArchiveError;
    ok: vec PriceBlockData;
  };
-type Result_3 = 
+type Result_5 = 
  variant {
    err: ArchiveError;
    ok:
@@ -84,10 +74,37 @@ type Result_3 =
            };
      };
  };
+type Result_3 = 
+ variant {
+   err: ArchiveError;
+   ok: vec opt record {
+                 icpPrice: nat;
+                 timestamp: int;
+                 usdPrice: float64;
+               };
+ };
 type Result_2 = 
  variant {
    err: ArchiveError;
    ok: ArchiveQueryResult;
+ };
+type Result_17 = 
+ variant {
+   err: ArchiveError;
+   ok: nat;
+ };
+type Result_16 = 
+ variant {
+   err: ArchiveError;
+   ok: record {
+         archived: nat;
+         failed: nat;
+       };
+ };
+type Result_15 = 
+ variant {
+   err: ArchiveError;
+   ok: ArchiveStatus;
  };
 type Result_1 = 
  variant {
@@ -118,26 +135,52 @@ type PriceBlockData =
  };
 type PriceArchiveV2 = 
  service {
-   archivePriceBlock: (price: PriceBlockData) -> (Result_9);
+   archivePriceBlock: (price: PriceBlockData) -> (Result_17);
+   archivePriceBlockBatch: (prices: vec PriceBlockData) -> (Result_16);
    catchUpImport: () -> (Result_1);
    forceResetMiddleLoop: () -> (Result_1);
    getArchiveStats: () -> (ArchiveStatus) query;
-   getArchiveStatus: () -> (Result_8) query;
+   getArchiveStatus: () -> (Result_15) query;
    getBatchImportStatus: () ->
     (record {
        intervalSeconds: nat;
        isRunning: bool;
        lastImportedPriceTime: int;
      }) query;
-   getLatestPrice: (token: principal) -> (Result_5) query;
+   getLatestPrice: (token: principal) -> (Result_9) query;
+   getLatestPrices: (tokens: vec principal) -> (Result_5) query;
    getLogs: (count: nat) -> (vec LogEntry) query;
    getPriceAtOrAfterTime: (token: principal, timestamp: int) ->
-    (Result_5) query;
-   getPriceAtTime: (token: principal, timestamp: int) -> (Result_5) query;
+    (Result_9) query;
+   getPriceAtOrAfterTimeComposite: (token: principal, timestamp: int) ->
+    (Result_9) composite_query;
+   getPriceAtTime: (token: principal, timestamp: int) -> (Result_9) query;
+   getPriceAtTimeComposite: (token: principal, timestamp: int) ->
+    (Result_9) composite_query;
    getPriceHistory: (token: principal, startTime: int, endTime: int) ->
-    (Result_4) query;
+    (Result_8) query;
+   getPricesAtOrAfterTimes: (queries:
+    vec record {
+          timestamp: int;
+          token: principal;
+        }) -> (Result_3) query;
+   getPricesAtOrAfterTimesComposite: (queries:
+    vec record {
+          timestamp: int;
+          token: principal;
+        }) -> (Result_3) composite_query;
    getPricesAtTime: (tokens: vec principal, timestamp: int) ->
-    (Result_3) query;
+    (Result_5) query;
+   getPricesAtTimes: (queries:
+    vec record {
+          timestamp: int;
+          token: principal;
+        }) -> (Result_3) query;
+   getPricesAtTimesComposite: (queries:
+    vec record {
+          timestamp: int;
+          token: principal;
+        }) -> (Result_3) composite_query;
    getTimerStatus: () -> (TimerStatus) query;
    get_canister_cycles: () -> (record {cycles: nat;}) query;
    icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
@@ -191,6 +234,8 @@ type ExchangeType =
  variant {
    ICPSwap;
    KongSwap;
+   Neutrinite;
+   TACO;
  };
 type DataCertificate = 
  record {

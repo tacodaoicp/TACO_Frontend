@@ -1,5 +1,32 @@
 import { createPinia } from 'pinia'
-import { createApp } from 'vue'
+import { createApp, defineAsyncComponent } from 'vue'
+
+// ─── Chunk-load recovery ─────────────────────────────────────────────
+// Lazy route/app chunks are hashed; after a deploy a client holding an old
+// index.html requests a hash that no longer exists → the dynamic import rejects
+// ("Failed to fetch dynamically imported module" / ChunkLoadError) and the app
+// would hang at a blank screen. Recover with a ONE-TIME reload to pick up the
+// fresh manifest, guarded against reload loops (a genuine outage shouldn't loop).
+function isChunkLoadError(err) {
+  const m = (err && (err.message || err.toString && err.toString())) || ''
+  return /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk [\w-]+ failed/i.test(String(m))
+}
+function recoverFromChunkError(err) {
+  if (!isChunkLoadError(err)) return false
+  try {
+    if (sessionStorage.getItem('taco_chunk_reloaded') === '1') return false
+    sessionStorage.setItem('taco_chunk_reloaded', '1')
+  } catch { /* private mode — best effort, skip the loop guard */ }
+  location.reload()
+  return true
+}
+function clearChunkReloadGuard() {
+  try { sessionStorage.removeItem('taco_chunk_reloaded') } catch { /* ignore */ }
+}
+// Vite emits this on the window when a dynamically-imported chunk fails to load.
+window.addEventListener('vite:preloadError', (e) => {
+  if (recoverFromChunkError(e && e.payload)) e.preventDefault()
+})
 
 // ─── App routing ─────────────────────────────────────────────────────
 // exchange.tacodao.com → Exchange app (production)
@@ -19,22 +46,40 @@ if (isExchange) {
 
 // ─── Exchange App (lazy-loaded, zero impact on DAO bundle) ────────────
 async function bootExchange() {
-  const [{ default: ExchangeApp }, { default: exchangeRouter }] = await Promise.all([
-    import('./ExchangeApp.vue'),
-    import('./exchange/router'),
-  ])
+  let ExchangeApp, exchangeRouter
+  try {
+    const mods = await Promise.all([
+      import('./ExchangeApp.vue'),
+      import('./exchange/router'),
+    ])
+    ExchangeApp = mods[0].default
+    exchangeRouter = mods[1].default
+  } catch (err) {
+    // Stale/failed app chunk (e.g. post-deploy hash) — recover via one-time reload.
+    console.error('[Exchange] failed to load app bundle:', err)
+    recoverFromChunkError(err)
+    return
+  }
   const app = createApp(ExchangeApp)
   app.use(exchangeRouter).use(createPinia())
-  // Resolve the initial route (the / → /easy redirect and its lazy chunk)
-  // before mounting, so the first paint is real content rather than an empty
-  // router-view. The #ex-boot spinner (index.html) covers this whole window.
+  // Recover from lazy route-chunk load failures (stale hashes post-deploy).
+  exchangeRouter.onError((err) => { recoverFromChunkError(err) })
+  // Resolve the initial route (the / → /easy redirect and its lazy chunk) before
+  // mounting, so the first paint is real content rather than an empty router-view.
+  // BUT race it against a timeout — a stalled initial-chunk fetch must never trap
+  // the user on the "Loading exchange…" spinner. On timeout we mount anyway; the
+  // router resolves the route after mount. The #ex-boot spinner covers this window.
   try {
-    await exchangeRouter.isReady()
+    await Promise.race([
+      exchangeRouter.isReady(),
+      new Promise((resolve) => setTimeout(resolve, 7000)),
+    ])
   } catch (err) {
     console.error('[Exchange] initial route failed to resolve:', err)
   }
   app.mount('#app')
   hideBootSpinner()
+  clearChunkReloadGuard() // mounted OK — re-arm chunk recovery for future deploys
 }
 
 // Tear down the static boot spinner from index.html once the exchange has
@@ -51,13 +96,14 @@ async function bootDAO() {
   const [
     { createRouter, createWebHistory },
     { default: App },
-    { default: VueApexCharts },
     { default: VueClickAway },
   ] = await Promise.all([
     import('vue-router'),
     import('./App.vue'),
-    import('vue3-apexcharts'),
     import('vue3-click-away'),
+    // NB: vue3-apexcharts is intentionally NOT awaited here — it (and the heavy
+    // `apexcharts` lib it pulls) is registered as a lazy global component below,
+    // so it loads with the first chart route instead of blocking every cold boot.
   ])
 
   // Pre-mount stylesheets. ORDER MATTERS — at equal specificity, the LAST
@@ -184,6 +230,9 @@ async function bootDAO() {
       routes,
   })
 
+  // Recover from lazy route-chunk load failures (stale hashes post-deploy).
+  router.onError((err) => { recoverFromChunkError(err) })
+
   // Scroll to top on every route change (or to hash target if present)
   // (Vue Router's scrollBehavior doesn't work because .app__content is the scroll container, not window)
   router.afterEach((to) => {
@@ -209,7 +258,16 @@ async function bootDAO() {
 
   const app = createApp(App)
 
-  app.use(router).use(createPinia()).use(VueApexCharts).use(VueClickAway).mount('#app')
+  // Register <apexchart> as a lazy global component so the heavy apexcharts lib
+  // loads with the first chart route (vault/dao/vote/admin) instead of on the
+  // boot critical path. Charts pop in a beat after their page; nothing else waits.
+  app.component('apexchart', defineAsyncComponent(() =>
+    import('vue3-apexcharts').then((m) => m.default || m)
+  ))
+
+  app.use(router).use(createPinia()).use(VueClickAway).mount('#app')
+
+  clearChunkReloadGuard() // mounted OK — re-arm chunk recovery for future deploys
 
   // Fire-and-forget the genuinely non-critical CSS post-mount: legacy FA4
   // (incomplete migration), FA duotone (not used above the fold), and

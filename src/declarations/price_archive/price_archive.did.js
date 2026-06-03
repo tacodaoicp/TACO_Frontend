@@ -2,6 +2,8 @@ export const idlFactory = ({ IDL }) => {
   const GetBlocksResult = IDL.Rec();
   const Value = IDL.Rec();
   const ExchangeType = IDL.Variant({
+    'Neutrinite' : IDL.Null,
+    'TACO' : IDL.Null,
     'KongSwap' : IDL.Null,
     'ICPSwap' : IDL.Null,
   });
@@ -29,7 +31,11 @@ export const idlFactory = ({ IDL }) => {
     'InvalidBlockType' : IDL.Null,
     'InvalidTimeRange' : IDL.Null,
   });
-  const Result_9 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
+  const Result_17 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : ArchiveError });
+  const Result_16 = IDL.Variant({
+    'ok' : IDL.Record({ 'failed' : IDL.Nat, 'archived' : IDL.Nat }),
+    'err' : ArchiveError,
+  });
   const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
   const ArchiveStatus = IDL.Record({
     'supportedBlockTypes' : IDL.Vec(IDL.Text),
@@ -39,14 +45,29 @@ export const idlFactory = ({ IDL }) => {
     'totalBlocks' : IDL.Nat,
     'lastArchiveTime' : IDL.Int,
   });
-  const Result_8 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
-  const Result_5 = IDL.Variant({
+  const Result_15 = IDL.Variant({ 'ok' : ArchiveStatus, 'err' : ArchiveError });
+  const Result_9 = IDL.Variant({
     'ok' : IDL.Opt(
       IDL.Record({
         'usdPrice' : IDL.Float64,
         'timestamp' : IDL.Int,
         'icpPrice' : IDL.Nat,
       })
+    ),
+    'err' : ArchiveError,
+  });
+  const Result_5 = IDL.Variant({
+    'ok' : IDL.Vec(
+      IDL.Tuple(
+        IDL.Principal,
+        IDL.Opt(
+          IDL.Record({
+            'usdPrice' : IDL.Float64,
+            'timestamp' : IDL.Int,
+            'icpPrice' : IDL.Nat,
+          })
+        ),
+      )
     ),
     'err' : ArchiveError,
   });
@@ -62,21 +83,18 @@ export const idlFactory = ({ IDL }) => {
     'message' : IDL.Text,
     'timestamp' : IDL.Int,
   });
-  const Result_4 = IDL.Variant({
+  const Result_8 = IDL.Variant({
     'ok' : IDL.Vec(PriceBlockData),
     'err' : ArchiveError,
   });
   const Result_3 = IDL.Variant({
     'ok' : IDL.Vec(
-      IDL.Tuple(
-        IDL.Principal,
-        IDL.Opt(
-          IDL.Record({
-            'usdPrice' : IDL.Float64,
-            'timestamp' : IDL.Int,
-            'icpPrice' : IDL.Nat,
-          })
-        ),
+      IDL.Opt(
+        IDL.Record({
+          'usdPrice' : IDL.Float64,
+          'timestamp' : IDL.Int,
+          'icpPrice' : IDL.Nat,
+        })
       )
     ),
     'err' : ArchiveError,
@@ -180,11 +198,16 @@ export const idlFactory = ({ IDL }) => {
   });
   const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : ArchiveError });
   const PriceArchiveV2 = IDL.Service({
-    'archivePriceBlock' : IDL.Func([PriceBlockData], [Result_9], []),
+    'archivePriceBlock' : IDL.Func([PriceBlockData], [Result_17], []),
+    'archivePriceBlockBatch' : IDL.Func(
+        [IDL.Vec(PriceBlockData)],
+        [Result_16],
+        [],
+      ),
     'catchUpImport' : IDL.Func([], [Result_1], []),
     'forceResetMiddleLoop' : IDL.Func([], [Result_1], []),
     'getArchiveStats' : IDL.Func([], [ArchiveStatus], ['query']),
-    'getArchiveStatus' : IDL.Func([], [Result_8], ['query']),
+    'getArchiveStatus' : IDL.Func([], [Result_15], ['query']),
     'getBatchImportStatus' : IDL.Func(
         [],
         [
@@ -196,27 +219,78 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'getLatestPrice' : IDL.Func([IDL.Principal], [Result_5], ['query']),
+    'getLatestPrice' : IDL.Func([IDL.Principal], [Result_9], ['query']),
+    'getLatestPrices' : IDL.Func(
+        [IDL.Vec(IDL.Principal)],
+        [Result_5],
+        ['query'],
+      ),
     'getLogs' : IDL.Func([IDL.Nat], [IDL.Vec(LogEntry)], ['query']),
     'getPriceAtOrAfterTime' : IDL.Func(
         [IDL.Principal, IDL.Int],
-        [Result_5],
+        [Result_9],
         ['query'],
+      ),
+    'getPriceAtOrAfterTimeComposite' : IDL.Func(
+        [IDL.Principal, IDL.Int],
+        [Result_9],
+        ['composite_query'],
       ),
     'getPriceAtTime' : IDL.Func(
         [IDL.Principal, IDL.Int],
-        [Result_5],
+        [Result_9],
         ['query'],
+      ),
+    'getPriceAtTimeComposite' : IDL.Func(
+        [IDL.Principal, IDL.Int],
+        [Result_9],
+        ['composite_query'],
       ),
     'getPriceHistory' : IDL.Func(
         [IDL.Principal, IDL.Int, IDL.Int],
-        [Result_4],
+        [Result_8],
         ['query'],
+      ),
+    'getPricesAtOrAfterTimes' : IDL.Func(
+        [
+          IDL.Vec(
+            IDL.Record({ 'token' : IDL.Principal, 'timestamp' : IDL.Int })
+          ),
+        ],
+        [Result_3],
+        ['query'],
+      ),
+    'getPricesAtOrAfterTimesComposite' : IDL.Func(
+        [
+          IDL.Vec(
+            IDL.Record({ 'token' : IDL.Principal, 'timestamp' : IDL.Int })
+          ),
+        ],
+        [Result_3],
+        ['composite_query'],
       ),
     'getPricesAtTime' : IDL.Func(
         [IDL.Vec(IDL.Principal), IDL.Int],
+        [Result_5],
+        ['query'],
+      ),
+    'getPricesAtTimes' : IDL.Func(
+        [
+          IDL.Vec(
+            IDL.Record({ 'token' : IDL.Principal, 'timestamp' : IDL.Int })
+          ),
+        ],
         [Result_3],
         ['query'],
+      ),
+    'getPricesAtTimesComposite' : IDL.Func(
+        [
+          IDL.Vec(
+            IDL.Record({ 'token' : IDL.Principal, 'timestamp' : IDL.Int })
+          ),
+        ],
+        [Result_3],
+        ['composite_query'],
       ),
     'getTimerStatus' : IDL.Func([], [TimerStatus], ['query']),
     'get_canister_cycles' : IDL.Func(

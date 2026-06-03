@@ -16,7 +16,7 @@ export const idlFactory = ({ IDL }) => {
     'NotAuthorized' : IDL.Null,
     'InvalidPercentage' : IDL.Null,
   });
-  const Result_19 = IDL.Variant({
+  const Result_21 = IDL.Variant({
     'ok' : IDL.Nat,
     'err' : PortfolioCircuitBreakerError,
   });
@@ -30,7 +30,16 @@ export const idlFactory = ({ IDL }) => {
     'InvalidPercentage' : IDL.Null,
     'InvalidTokenList' : IDL.Null,
   });
-  const Result_18 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : PriceFailsafeError });
+  const Result_20 = IDL.Variant({ 'ok' : IDL.Nat, 'err' : PriceFailsafeError });
+  const Result_19 = IDL.Variant({
+    'ok' : IDL.Record({
+      'totalsTransferredByToken' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)),
+      'positionsClaimed' : IDL.Nat,
+      'positionsScanned' : IDL.Nat,
+      'consolidationSavings' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)),
+    }),
+    'err' : IDL.Text,
+  });
   const Result = IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text });
   const RebalanceError = IDL.Variant({
     'LiquidityError' : IDL.Text,
@@ -52,11 +61,11 @@ export const idlFactory = ({ IDL }) => {
     'amount' : IDL.Nat,
     'symbol' : IDL.Text,
   });
-  const Result_17 = IDL.Variant({
+  const Result_18 = IDL.Variant({
     'ok' : IDL.Vec(ClaimsReply),
     'err' : IDL.Text,
   });
-  const Result_16 = IDL.Variant({
+  const Result_17 = IDL.Variant({
     'ok' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat, IDL.Text, IDL.Int)),
     'err' : IDL.Text,
   });
@@ -73,7 +82,7 @@ export const idlFactory = ({ IDL }) => {
     'err' : PortfolioCircuitBreakerError,
   });
   const Result_1 = IDL.Variant({ 'ok' : IDL.Text, 'err' : PriceFailsafeError });
-  const Result_15 = IDL.Variant({
+  const Result_16 = IDL.Variant({
     'ok' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat)),
     'err' : IDL.Text,
   });
@@ -138,6 +147,7 @@ export const idlFactory = ({ IDL }) => {
     'pausedTokens' : IDL.Vec(TradingPauseRecord),
   });
   const ExchangeType = IDL.Variant({
+    'Neutrinite' : IDL.Null,
     'TACO' : IDL.Null,
     'KongSwap' : IDL.Null,
     'ICPSwap' : IDL.Null,
@@ -206,7 +216,7 @@ export const idlFactory = ({ IDL }) => {
       }),
     }),
   });
-  const Result_14 = IDL.Variant({
+  const Result_15 = IDL.Variant({
     'ok' : EnhancedTreasuryDashboard,
     'err' : IDL.Text,
   });
@@ -257,7 +267,7 @@ export const idlFactory = ({ IDL }) => {
     'NotAuthorized' : IDL.Null,
     'InvalidLimit' : IDL.Null,
   });
-  const Result_13 = IDL.Variant({
+  const Result_14 = IDL.Variant({
     'ok' : PortfolioHistoryResponse,
     'err' : PortfolioSnapshotError,
   });
@@ -319,11 +329,11 @@ export const idlFactory = ({ IDL }) => {
     'pausedDueToSyncFailure' : IDL.Bool,
     'tokenType' : TokenType,
   });
-  const Result_12 = IDL.Variant({
+  const Result_13 = IDL.Variant({
     'ok' : IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Vec(PricePoint))),
     'err' : IDL.Text,
   });
-  const Result_11 = IDL.Variant({
+  const Result_12 = IDL.Variant({
     'ok' : IDL.Record({
       'executedTrades' : IDL.Vec(TradeRecord),
       'metrics' : IDL.Record({
@@ -353,7 +363,7 @@ export const idlFactory = ({ IDL }) => {
     }),
     'err' : IDL.Text,
   });
-  const Result_10 = IDL.Variant({
+  const Result_11 = IDL.Variant({
     'ok' : IDL.Record({
       'executedTrades' : IDL.Vec(TradeRecord),
       'metrics' : IDL.Record({
@@ -474,7 +484,7 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'actions' : IDL.Vec(TreasuryAdminActionRecord),
   });
-  const Result_9 = IDL.Variant({
+  const Result_10 = IDL.Variant({
     'ok' : TreasuryAdminActionsSinceResponse,
     'err' : TradingPauseError,
   });
@@ -486,7 +496,7 @@ export const idlFactory = ({ IDL }) => {
       'subaccount' : IDL.Opt(Subaccount),
     }),
   });
-  const Result_8 = IDL.Variant({
+  const Result_9 = IDL.Variant({
     'ok' : IDL.Record({
       'icpPriceUSD' : IDL.Float64,
       'tokensRefreshed' : IDL.Nat,
@@ -494,12 +504,21 @@ export const idlFactory = ({ IDL }) => {
     }),
     'err' : IDL.Text,
   });
-  const Result_7 = IDL.Variant({
+  const Result_8 = IDL.Variant({
     'ok' : IDL.Record({
       'icpPriceUSD' : IDL.Float64,
       'tokenDetails' : IDL.Vec(IDL.Tuple(IDL.Principal, TokenDetails)),
       'tokensRefreshed' : IDL.Nat,
       'timestamp' : IDL.Int,
+    }),
+    'err' : IDL.Text,
+  });
+  const Result_7 = IDL.Variant({
+    'ok' : IDL.Record({
+      'requestId' : IDL.Nat,
+      'liquidityRemoved' : IDL.Nat,
+      'poolsUsed' : IDL.Vec(IDL.Text),
+      'expectedAmount' : IDL.Nat,
     }),
     'err' : IDL.Text,
   });
@@ -523,6 +542,7 @@ export const idlFactory = ({ IDL }) => {
   const UpdateConfig = IDL.Record({
     'maxPriceHistoryEntries' : IDL.Opt(IDL.Nat),
     'priceUpdateIntervalNS' : IDL.Opt(IDL.Nat),
+    'kongEnabled' : IDL.Opt(IDL.Bool),
     'tokenSyncTimeoutNS' : IDL.Opt(IDL.Nat),
     'maxSlippageBasisPoints' : IDL.Opt(IDL.Nat),
     'shortSyncIntervalNS' : IDL.Opt(IDL.Nat),
@@ -534,6 +554,7 @@ export const idlFactory = ({ IDL }) => {
     'portfolioRebalancePeriodNS' : IDL.Opt(IDL.Nat),
     'longSyncIntervalNS' : IDL.Opt(IDL.Nat),
     'maxTradeAttemptsPerInterval' : IDL.Opt(IDL.Nat),
+    'neutriniteEnabled' : IDL.Opt(IDL.Bool),
     'maxKongswapAttempts' : IDL.Opt(IDL.Nat),
   });
   const TriggerConditionUpdate = IDL.Record({
@@ -553,7 +574,7 @@ export const idlFactory = ({ IDL }) => {
           IDL.Nat,
           PortfolioValueType,
         ],
-        [Result_19],
+        [Result_21],
         [],
       ),
     'addTriggerCondition' : IDL.Func(
@@ -564,13 +585,15 @@ export const idlFactory = ({ IDL }) => {
           IDL.Nat,
           IDL.Vec(IDL.Principal),
         ],
-        [Result_18],
+        [Result_20],
         [],
       ),
+    'admin_claimExchangeLPFees' : IDL.Func([], [Result_19], []),
+    'admin_clearAllTacoExchangePairSkips' : IDL.Func([], [IDL.Nat], []),
     'admin_executeKongClaims' : IDL.Func([], [Result], []),
     'admin_executeTradingCycle' : IDL.Func([IDL.Opt(IDL.Text)], [Result_2], []),
     'admin_exitAllLP' : IDL.Func([], [Result], []),
-    'admin_getKongClaims' : IDL.Func([], [Result_17], []),
+    'admin_getKongClaims' : IDL.Func([], [Result_18], []),
     'admin_getLPStatus' : IDL.Func(
         [],
         [
@@ -632,7 +655,8 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'admin_getTacoFailedSwaps' : IDL.Func([], [Result_16], []),
+    'admin_getTacoFailedSwaps' : IDL.Func([], [Result_17], []),
+    'admin_recoverNeutriniteBalances' : IDL.Func([], [Result], []),
     'admin_recoverPoolBalances' : IDL.Func([], [Result], []),
     'admin_recoverTacoSwaps' : IDL.Func([], [Result], []),
     'admin_refreshICPSwapPools' : IDL.Func([], [Result], []),
@@ -658,6 +682,7 @@ export const idlFactory = ({ IDL }) => {
         [Result],
         [],
       ),
+    'admin_setNudgeBoostFactor' : IDL.Func([IDL.Nat], [Result], []),
     'admin_setPoolLPConfig' : IDL.Func(
         [
           IDL.Text,
@@ -685,7 +710,27 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getAvailableBalancesForBurn' : IDL.Func(
         [IDL.Vec(IDL.Principal)],
-        [Result_15],
+        [Result_16],
+        ['query'],
+      ),
+    'getBurnUnwindRequests' : IDL.Func(
+        [],
+        [
+          IDL.Vec(
+            IDL.Tuple(
+              IDL.Principal,
+              IDL.Vec(
+                IDL.Record({
+                  'requestId' : IDL.Nat,
+                  'liquidityRemoved' : IDL.Nat,
+                  'poolKey' : IDL.Text,
+                  'amount' : IDL.Nat,
+                  'requestedAt' : IDL.Int,
+                })
+              ),
+            )
+          ),
+        ],
         ['query'],
       ),
     'getCurrentAllocations' : IDL.Func(
@@ -693,7 +738,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat))],
         ['query'],
       ),
-    'getEnhancedTreasuryDashboard' : IDL.Func([], [Result_14], ['query']),
+    'getEnhancedTreasuryDashboard' : IDL.Func([], [Result_15], ['query']),
     'getICPSwapPoolInfo' : IDL.Func(
         [IDL.Principal, IDL.Principal],
         [
@@ -739,6 +784,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getMaxPortfolioSnapshots' : IDL.Func([], [IDL.Nat], ['query']),
     'getMaxPriceHistoryEntries' : IDL.Func([], [IDL.Nat], ['query']),
+    'getNudgeStatus' : IDL.Func(
+        [],
+        [IDL.Record({ 'multiplier' : IDL.Nat, 'boostFactor' : IDL.Nat })],
+        ['query'],
+      ),
     'getPausedTokenThresholdForCircuitBreaker' : IDL.Func(
         [],
         [IDL.Nat],
@@ -759,10 +809,10 @@ export const idlFactory = ({ IDL }) => {
         ],
         ['query'],
       ),
-    'getPortfolioHistory' : IDL.Func([IDL.Nat], [Result_13], ['query']),
+    'getPortfolioHistory' : IDL.Func([IDL.Nat], [Result_14], ['query']),
     'getPortfolioHistorySince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_13],
+        [Result_14],
         ['query'],
       ),
     'getPortfolioSnapshotStatus' : IDL.Func(
@@ -792,6 +842,19 @@ export const idlFactory = ({ IDL }) => {
     'getPriceAlertsForToken' : IDL.Func(
         [IDL.Principal, IDL.Nat],
         [IDL.Vec(PriceAlertLog)],
+        ['query'],
+      ),
+    'getShortSyncTimerStatus' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'nextScheduledTime' : IDL.Int,
+            'lastRunTime' : IDL.Int,
+            'intervalNS' : IDL.Nat,
+            'timerId' : IDL.Nat,
+            'isRunning' : IDL.Bool,
+          }),
+        ],
         ['query'],
       ),
     'getSkipMetrics' : IDL.Func(
@@ -837,7 +900,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getTokenPriceHistory' : IDL.Func(
         [IDL.Vec(IDL.Principal)],
-        [Result_12],
+        [Result_13],
         ['query'],
       ),
     'getTradingPauseInfo' : IDL.Func(
@@ -845,11 +908,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(TradingPauseRecord)],
         ['query'],
       ),
-    'getTradingStatus' : IDL.Func([], [Result_11], ['query']),
-    'getTradingStatusSince' : IDL.Func([IDL.Int], [Result_10], ['query']),
+    'getTradingStatus' : IDL.Func([], [Result_12], ['query']),
+    'getTradingStatusSince' : IDL.Func([IDL.Int], [Result_11], ['query']),
     'getTreasuryAdminActionsSince' : IDL.Func(
         [IDL.Int, IDL.Nat],
-        [Result_9],
+        [Result_10],
         ['query'],
       ),
     'getTriggerCondition' : IDL.Func(
@@ -888,6 +951,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(TriggerCondition)],
         ['query'],
       ),
+    'nudgeTradingCycle' : IDL.Func(
+        [IDL.Opt(IDL.Principal), IDL.Opt(IDL.Text)],
+        [Result],
+        [],
+      ),
     'pauseTokenFromTradingManual' : IDL.Func(
         [IDL.Principal, IDL.Text],
         [Result_5],
@@ -903,14 +971,15 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Bool, IDL.Opt(IDL.Vec(IDL.Tuple(IDL.Principal, IDL.Nat64)))],
         [],
       ),
-    'refreshAllPrices' : IDL.Func([], [Result_8], []),
-    'refreshPricesAndGetDetails' : IDL.Func([], [Result_7], []),
+    'refreshAllPrices' : IDL.Func([], [Result_9], []),
+    'refreshPricesAndGetDetails' : IDL.Func([], [Result_8], []),
     'removePortfolioCircuitBreakerCondition' : IDL.Func(
         [IDL.Nat],
         [Result_3],
         [],
       ),
     'removeTriggerCondition' : IDL.Func([IDL.Nat], [Result_1], []),
+    'requestLPUnwind' : IDL.Func([IDL.Principal, IDL.Nat], [Result_7], []),
     'resetRebalanceState' : IDL.Func([IDL.Opt(IDL.Text)], [Result_2], []),
     'sendToken' : IDL.Func(
         [IDL.Principal, IDL.Nat, IDL.Principal, IDL.Opt(Subaccount)],

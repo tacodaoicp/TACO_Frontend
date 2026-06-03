@@ -235,6 +235,9 @@ const chartOptions = computed(() => ({
     border: 1px solid var(--table-row-border);
     border-radius: 0.5rem;
     padding: 1rem;
+    // Reserve the donut's footprint (260px chart + 1rem padding) so the box
+    // doesn't collapse→reflow while the (lazy) apexcharts lib loads.
+    min-height: 292px;
   }
 }
 

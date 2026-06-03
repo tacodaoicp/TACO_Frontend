@@ -12,7 +12,7 @@ import { useTacoStore } from './taco.store'
 import { getEffectiveNetwork, isDevEnvironment } from '../config/network-config'
 import { getCanisterId } from '../constants/canisterIds'
 import { workerBridge } from './worker-bridge'
-import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
+import { deserializeFromTransfer } from '../workers/shared/transfer'
 // Vault IDL factory now managed by taco.store's lazy loader + actor cache
 import type {
   MintResult, BurnResult, NachosError, CachedNAV, ActiveDeposit,

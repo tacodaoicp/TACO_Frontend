@@ -17,6 +17,7 @@ import { Principal } from '@dfinity/principal'
 import { idlFactory } from 'declarations/OTC_backend/OTC_backend.did.js'
 import { idlFactory as daoBackendIDL } from 'declarations/dao_backend/DAO_backend.did.js'
 import { callExchangeQuery, warmExchangeWorker, setExchangeWorkerIdentity, clearExchangeWorkerIdentity } from '../../workers/exchange-worker-client'
+import { withTimeout } from '../utils/withTimeout'
 import type {
   _SERVICE,
   TokenInfo,
@@ -296,10 +297,13 @@ export const useExchangeStore = defineStore('exchange', () => {
       // exchange short-circuits the rest of init.
       // All three are wrapped in cachedQuery (persist:true), so on warm
       // boot tokens/info resolve from localStorage on the first microtask.
+      // withTimeout so a stuck IC response can't leave the exchange hanging on a
+      // loading state — on timeout the call rejects, allSettled settles, and we
+      // fall back to cached/stale data (or the initError banner below).
       const criticalResults = await Promise.allSettled([
-        acceptedTokensQuery.ensure(CACHE_TTL.tokens),   // 0 — gate (24h persist)
-        exchangeInfoQuery.ensure(CACHE_TTL.info),        // 1 — gate (5m persist)
-        actor.isExchangeFrozen(),                        // 2 — admin state (uncached)
+        withTimeout(acceptedTokensQuery.ensure(CACHE_TTL.tokens), 15_000, 'getAcceptedTokensInfo'), // 0 — gate
+        withTimeout(exchangeInfoQuery.ensure(CACHE_TTL.info), 15_000, 'exchangeInfo'),               // 1 — gate
+        withTimeout(actor.isExchangeFrozen(), 8_000, 'isExchangeFrozen'),                            // 2 — admin
       ])
 
       // Frozen short-circuit — mirrors checkFrozenStatus() error semantics:
@@ -391,7 +395,7 @@ export const useExchangeStore = defineStore('exchange', () => {
       if (tokens.value.length === 0) {
         console.log('[Exchange] getAcceptedTokensInfo empty, trying getAcceptedTokens fallback...')
         try {
-          const idsResult = await actor.getAcceptedTokens()
+          const idsResult = await withTimeout(actor.getAcceptedTokens(), 15_000, 'getAcceptedTokens')
           const ids = (idsResult.length > 0 ? idsResult[0] ?? [] : []).map((id: string) => id.trim())
           if (ids.length > 0) {
             console.log(`[Exchange] Found ${ids.length} accepted token IDs, fetching on-chain metadata...`)

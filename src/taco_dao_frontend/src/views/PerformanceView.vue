@@ -242,7 +242,7 @@ import { ref, onMounted, computed, watch, nextTick, onUnmounted } from "vue"
 import { useTacoStore } from "../stores/taco.store"
 import { storeToRefs } from "pinia"
 import workerBridge from '../stores/worker-bridge'
-import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
+import { deserializeFromTransfer } from '../workers/shared/transfer'
 import { yieldToMain } from '../utils/yieldToMain'
 import DfinityLogo from "../assets/images/dfinityLogo.vue"
 import MyPerformance from "../components/performance/MyPerformance.vue"
@@ -456,7 +456,14 @@ export default {
       if (newEntries && newEntries.length > 0) {
         loadFollowerInfo()
       }
-    }, { immediate: true })
+    })
+    // Initial load: if the leaderboard is already populated (warm cache) when this
+    // component mounts, kick off follower-info AFTER paint rather than synchronously
+    // during setup — `{ immediate: true }` fired an actor-create + network call
+    // before first paint, delaying the route transition.
+    if (leaderboardEntries.value && leaderboardEntries.value.length > 0) {
+      Promise.resolve().then(() => loadFollowerInfo())
+    }
 
     // Worker subscription for user performance data
     // Worker handles all the data fetching, weighted averaging, and caching

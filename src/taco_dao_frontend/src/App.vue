@@ -12,6 +12,9 @@
 
     </div>
 
+    <!-- Route-transition progress bar (shows while a lazy route chunk resolves) -->
+    <div v-if="routePending" class="app__route-progress" role="progressbar" aria-label="Loading page"></div>
+
     <!-- Persistent HeaderBar - renders once and stays across all routes -->
     <HeaderBar />
 
@@ -151,6 +154,26 @@
     routerReady.value = true
   })
 
+  // Route-transition progress. Lazy route chunks fetch+parse on first visit with
+  // no built-in feedback, so a click to e.g. /performance can feel dead until the
+  // chunk mounts. Show a thin top bar while a navigation is resolving — debounced
+  // ~120ms so instant/cached navigations don't flicker.
+  const routePending = ref(false)
+  let routePendingTimer = null
+  const clearRoutePending = () => {
+    if (routePendingTimer) { clearTimeout(routePendingTimer); routePendingTimer = null }
+    routePending.value = false
+  }
+  router.beforeEach((to, from) => {
+    if (to.path !== from.path) {
+      if (routePendingTimer) clearTimeout(routePendingTimer)
+      routePendingTimer = setTimeout(() => { routePending.value = true }, 120)
+    }
+    return true
+  })
+  router.afterEach(clearRoutePending)
+  router.onError(clearRoutePending)
+
   // images
   const astronautLoaderUrl = astronautLoader
 
@@ -263,6 +286,12 @@
       import('./views/WalletView.vue')
       import('./views/NachosVaultView.vue')
       import('./views/BuyTacoView.vue')
+      import('./views/PerformanceView.vue')
+      // Preload apexcharts during idle so the first chart route (vault/dao/vote)
+      // renders its chart immediately instead of collapsing→reflowing while the
+      // 574 KB lib loads. Kept OUT of the boot path (it's idle, post-mount), so
+      // first paint stays fast — this just hides the lazy-load gap.
+      import('vue3-apexcharts')
     })
 
   }
@@ -327,3 +356,28 @@
   })
 
 </script>
+
+<style scoped>
+/* Thin top route-transition progress bar — indeterminate sweep while a lazy
+   route chunk resolves, so clicking to a new page never feels dead. */
+.app__route-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 2000;
+  background: linear-gradient(90deg, transparent, var(--taco-accent, #ffb347), transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: app-route-progress 1s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes app-route-progress {
+  0%   { background-position: -40% 0; }
+  100% { background-position: 140% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app__route-progress { animation-duration: 2.4s; }
+}
+</style>

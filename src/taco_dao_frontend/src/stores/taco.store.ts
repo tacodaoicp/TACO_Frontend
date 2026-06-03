@@ -8,7 +8,9 @@ import { defineStore } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
 import { workerBridge, fetchAndWait } from './worker-bridge'
-import { deserializeFromTransfer } from '../workers/shared/fetch-functions'
+// Dependency-free transfer helper — NOT from fetch-functions, which would drag
+// @dfinity/agent + every canister IDL factory into the eager core bundle.
+import { deserializeFromTransfer } from '../workers/shared/transfer'
 import { getEffectiveNetwork, getICHost } from '../config/network-config'
 import { getCanisterId } from '../constants/canisterIds'
 import { getFrontendIdentity } from '../utils/frontend-identity'
