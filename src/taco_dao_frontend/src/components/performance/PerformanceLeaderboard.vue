@@ -498,6 +498,12 @@ export default {
 .clickable-row {
   cursor: pointer;
   transition: background-color 0.15s ease;
+  /* Skip layout/paint for off-screen leaderboard rows (native virtualization-lite).
+     The `auto` size estimate is replaced by the real height once a row renders,
+     so scroll height stays accurate. No behavior/markup change; ignored by
+     browsers that don't support it. Big render win when the list is long. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 44px;
 }
 
 .clickable-row:hover {

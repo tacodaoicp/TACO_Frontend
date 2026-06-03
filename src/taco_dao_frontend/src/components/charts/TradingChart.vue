@@ -101,6 +101,7 @@ const noData = ref(false)
 const isStale = ref(false)
 
 let chart: IChartApi | null = null
+let resizeObserver: ResizeObserver | null = null
 let candleSeries: ISeriesApi<'Candlestick'> | null = null
 let lineSeries: ISeriesApi<'Line'> | null = null
 let volumeSeries: ISeriesApi<'Histogram'> | null = null
@@ -329,8 +330,9 @@ function initChart() {
     scaleMargins: { top: 0.8, bottom: 0 },
   })
 
-  // Resize observer
-  const ro = new ResizeObserver(() => {
+  // Resize observer (disconnected on unmount — see onUnmounted)
+  resizeObserver?.disconnect()
+  resizeObserver = new ResizeObserver(() => {
     if (chart && chartContainer.value) {
       chart.applyOptions({
         width: chartContainer.value.clientWidth,
@@ -338,7 +340,7 @@ function initChart() {
       })
     }
   })
-  ro.observe(chartContainer.value)
+  resizeObserver.observe(chartContainer.value)
 
   // Scroll-left lazy pagination — when user scrolls near leftmost loaded candle, fetch older
   chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
@@ -756,6 +758,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
   chart?.remove()
   chart = null
   candleSeries = null

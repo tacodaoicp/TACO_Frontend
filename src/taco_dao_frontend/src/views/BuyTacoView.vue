@@ -977,6 +977,7 @@ const detectedIcpAmount = ref(0n)
 
 // Deposit polling
 let depositPollInterval: ReturnType<typeof setInterval> | null = null
+let popupPollInterval: ReturnType<typeof setInterval> | null = null
 
 // Auto-swap toggle (visible only in production)
 const autoSwapEnabled = ref(false)
@@ -1191,9 +1192,10 @@ const prepareForDeposit = async () => {
 
 /** After provider tab opens, poll until it closes, then give a 5-min grace period */
 const watchPopupForGrace = (popup: Window | null) => {
-  const popupPoll = setInterval(() => {
+  if (popupPollInterval) clearInterval(popupPollInterval)
+  popupPollInterval = setInterval(() => {
     if (!popup || popup.closed) {
-      clearInterval(popupPoll)
+      if (popupPollInterval) { clearInterval(popupPollInterval); popupPollInterval = null }
       setTimeout(() => {
         if (buyPhase.value === 'detecting') {
           buyPhase.value = 'idle'
@@ -1274,6 +1276,10 @@ const stopDepositPolling = () => {
   if (depositPollInterval) {
     clearInterval(depositPollInterval)
     depositPollInterval = null
+  }
+  if (popupPollInterval) {
+    clearInterval(popupPollInterval)
+    popupPollInterval = null
   }
 }
 

@@ -49,21 +49,32 @@ export function serializeForTransfer(obj: unknown): unknown {
 }
 
 export function deserializeFromTransfer(obj: unknown): unknown {
-  if (obj === null || obj === undefined) return obj
-  if (typeof obj === 'string') {
-    if (obj.startsWith('__bigint__')) return BigInt(obj.slice(10))
-    if (obj.startsWith('__uint8array__')) {
-      const s = obj.slice(14)
-      return new Uint8Array(s ? s.split(',').map(Number) : [])
+  // Hot path: this runs on the MAIN THREAD for every worker payload, so it's
+  // optimized for the common shapes. (1) Non-objects: only `__`-prefixed strings
+  // are specially encoded — gate the three startsWith on a single char-code check
+  // so ordinary strings (the vast majority — symbols, names, ids) skip them.
+  // (2) Arrays: preallocated index loop instead of .map. (3) Objects: a plain
+  // for-in instead of Object.entries (no [k,v] pair allocation per field).
+  if (obj === null || typeof obj !== 'object') {
+    if (typeof obj === 'string' && obj.charCodeAt(0) === 95 /* '_' */) {
+      if (obj.startsWith('__bigint__')) return BigInt(obj.slice(10))
+      if (obj.startsWith('__uint8array__')) {
+        const s = obj.slice(14)
+        return new Uint8Array(s ? s.split(',').map(Number) : [])
+      }
+      if (obj.startsWith('__principal__')) return getCachedPrincipal(obj.slice(13))
     }
-    if (obj.startsWith('__principal__')) return getCachedPrincipal(obj.slice(13))
     return obj
   }
-  if (Array.isArray(obj)) return obj.map(deserializeFromTransfer)
-  if (typeof obj === 'object') {
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(obj)) out[k] = deserializeFromTransfer(v)
+  if (Array.isArray(obj)) {
+    const n = obj.length
+    const out = new Array(n)
+    for (let i = 0; i < n; i++) out[i] = deserializeFromTransfer(obj[i])
     return out
   }
-  return obj
+  const out: Record<string, unknown> = {}
+  for (const k in obj as Record<string, unknown>) {
+    out[k] = deserializeFromTransfer((obj as Record<string, unknown>)[k])
+  }
+  return out
 }

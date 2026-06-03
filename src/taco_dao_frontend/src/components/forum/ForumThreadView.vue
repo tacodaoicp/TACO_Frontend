@@ -1140,7 +1140,7 @@
                 <span style="color: var(--black-to-white);">or</span>
                 
                 <!-- retry button -->
-                <button @click="error = null; componentLoading = true; loadThreadData().then(() => componentLoading = false)" class="btn taco-nav-btn taco-nav-btn--active mt-3">
+                <button @click="error = null; componentLoading = true; loadThreadData().then(() => componentLoading = false).catch((e) => { error = e?.message || 'Failed to load thread'; componentLoading = false })" class="btn taco-nav-btn taco-nav-btn--active mt-3">
 
                     <!-- reload icon -->
                     <i class="fa-solid fa-refresh"></i>

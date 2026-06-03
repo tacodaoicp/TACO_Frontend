@@ -110,14 +110,20 @@ async function bootDAO() {
   // <link> wins. taco.scss (loaded via index.scss) overrides bootstrap on
   // shared selectors like .btn / .taco-nav-btn, so index.scss MUST come last.
   // (See the matching comment in App.vue: "loads before taco.scss for correct
-  // cascade".) Truly non-critical sheets (FA4 legacy, FA Pro duotone,
-  // animate.css) are deferred post-mount below.
+  // cascade".) Truly non-critical sheets (FA Pro brands, duotone, animate.css)
+  // are deferred post-mount below.
   await Promise.all([
     import('bootstrap/dist/css/bootstrap.css'),
     import('@fortawesome/fontawesome-pro/css/fontawesome.css'),
     import('@fortawesome/fontawesome-pro/css/light.css'),
     import('@fortawesome/fontawesome-pro/css/regular.css'),
     import('@fortawesome/fontawesome-pro/css/solid.css'),
+    // v4-shims maps the ~300 legacy `fa fa-X` (v4-syntax) icons used across the
+    // app to FA6 glyphs. Eager because they're above the fold (nav/wallet). NB:
+    // we intentionally do NOT load the real `font-awesome@4.7` package — its
+    // `.fa { font-family:'FontAwesome' }` would override FA6's `.fa` and break
+    // every FA5/6 icon used with the `fa` prefix (taco/coins/exchange-alt → tofu).
+    import('@fortawesome/fontawesome-pro/css/v4-shims.css'),
     import('./index.scss'),
   ])
 
@@ -269,16 +275,16 @@ async function bootDAO() {
 
   clearChunkReloadGuard() // mounted OK — re-arm chunk recovery for future deploys
 
-  // Fire-and-forget the genuinely non-critical CSS post-mount: legacy FA4
-  // (incomplete migration), FA duotone (not used above the fold), and
-  // animate.css. Saves ~120 KB off the critical path without FOUC risk.
+  // Fire-and-forget the genuinely non-critical CSS post-mount: FA brands (one
+  // github icon, not above the fold), FA duotone, and animate.css. Saves weight
+  // off the critical path without FOUC risk.
   const idle = (cb) =>
     typeof requestIdleCallback === 'function'
       ? requestIdleCallback(cb, { timeout: 1500 })
       : setTimeout(cb, 200)
   idle(() => {
     void Promise.all([
-      import('font-awesome/css/font-awesome.min.css'),
+      import('@fortawesome/fontawesome-pro/css/brands.css'), // fa-brands (e.g. fa-github), not above the fold
       import('@fortawesome/fontawesome-pro/css/duotone.css'),
       import('animate.css'),
     ]).catch(() => {})

@@ -400,15 +400,11 @@ async function init(): Promise<void> {
     console.error('[AuthWorker-Dedicated] Error loading cache:', error)
   }
 
-  // Create anonymous agent for public reads
-  anonymousAgent = await createAgent({
-    identity: getFrontendIdentity(),
-    host: getHost(),
-    fetchRootKey: shouldFetchRootKey(),
-    // Public read-only data — skip per-query signature verification (saves a
-    // read_state + BLS verify on first query). Authenticated agent stays verified.
-    verifyQuerySignatures: false,
-  })
+  // DON'T create the agent here — wait for SET_NETWORK. The main thread owns the
+  // network override (localStorage isn't reliably readable in a worker), so
+  // creating an agent now risks binding to the wrong host before SET_NETWORK
+  // arrives. handleSetNetwork() creates it; processQueue() below waits for it.
+  // (Mirrors authenticated.worker.ts — keeps the two workers at parity.)
 
   isInitialized = true
   processQueue()
@@ -761,6 +757,13 @@ async function processQueue(): Promise<void> {
   isProcessing = true
 
   while (true) {
+    // If no agent yet (agents are created on SET_NETWORK), wait rather than spin
+    // the inner loop. Prevents CPU busy-wait before the network is configured.
+    if (!anonymousAgent && !authenticatedAgent) {
+      await sleep(100)
+      continue
+    }
+
     // A backoff-blocked key must not stall the rest of the queue. Skip it by
     // leaving it marked processing (so dequeue() returns a different item) and
     // release it after the pass — NOT queue.retry()+continue, which would clear
@@ -797,8 +800,12 @@ async function processQueue(): Promise<void> {
     // Release backoff-blocked items so the next pass re-checks them.
     for (const key of blockedThisPass) queue.retry(key)
 
+    // Adaptive sleep: 500ms when fully idle (nothing queued, nothing in flight)
+    // so the worker isn't waking every 50ms draining mobile battery; 250ms when
+    // only backoff-blocked keys remain; 50ms when actively processing.
+    const isIdle = activeFetchCount === 0 && queue.isEmpty()
     const onlyBlocked = activeFetchCount === 0 && blockedThisPass.length > 0
-    await sleep(onlyBlocked ? 250 : 50)
+    await sleep(isIdle ? 500 : onlyBlocked ? 250 : 50)
   }
 }
 

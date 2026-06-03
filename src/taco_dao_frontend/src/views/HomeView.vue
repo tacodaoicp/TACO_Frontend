@@ -2553,7 +2553,7 @@
     if (userLoggedIn.value) {
       tacoStore.getTacoNeurons().then(rawNeurons => {
         localNeuronsCount.value = rawNeurons.length
-      })
+      }).catch(err => { console.error('Failed to load neurons count:', err) })
     }
 
     // get the below the fold element
@@ -2607,7 +2607,7 @@
     if (loggedIn) {
       tacoStore.getTacoNeurons().then(rawNeurons => {
         localNeuronsCount.value = rawNeurons.length
-      })
+      }).catch(err => { console.error('Failed to load neurons count:', err) })
     } else {
       localNeuronsCount.value = 0
     }

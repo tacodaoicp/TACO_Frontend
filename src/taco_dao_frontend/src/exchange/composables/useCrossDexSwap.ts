@@ -18,6 +18,7 @@ import { useTokenBalance } from './useTokenBalance'
 import { probeSwapLanded } from './useSwapFlow'
 import { buildTacoSplitPlan } from '../utils/tacoSplitOptimizer'
 import { buildCrossDexPlan, interpolatePairSplit, type CrossDexSwapPlan, type CrossDexLeg, type CrossDexVenue, type TacoGridEntry } from '../utils/crossDexOptimizer'
+import { withTimeout } from '../utils/withTimeout'
 import { depositToken, removeDepositFromCache } from '../utils/deposit'
 import { classifyExchangeError, isTransportError, verifyAfterTransportError } from '../utils/errors'
 import { formatTokenAmount } from '../utils/format'
@@ -278,9 +279,22 @@ export function useCrossDexSwap() {
     legSteps.value = { icpswap: '', taco: '', neutrinite: '' }
 
     // Fire ALL legs concurrently. Promise.allSettled guarantees one leg's
-    // failure never aborts another leg or its recovery.
+    // failure never aborts another leg or its recovery. Each leg also gets a
+    // generous backstop timeout so a hung inner call (dropped connection, stuck
+    // poll) can NEVER leave the execution modal spinning forever — on timeout the
+    // leg resolves to a failed outcome (its own recovery keeps running in the
+    // background; refreshAfterMutation reconciles real balances afterwards).
     const settled = await Promise.allSettled(
-      plan.value.legs.map(leg => executeLeg(leg, fromAddr, toAddr, sellToken, slip)),
+      plan.value.legs.map(leg =>
+        withTimeout(
+          executeLeg(leg, fromAddr, toAddr, sellToken, slip),
+          180_000,
+          `crossdex-leg-${leg.dex}`,
+        ).catch((err: any): LegOutcome => ({
+          dex: leg.dex, success: false, amountOut: 0n,
+          error: err?.message || 'Leg timed out',
+        })),
+      ),
     )
 
     const results: LegOutcome[] = settled.map((s, i) =>

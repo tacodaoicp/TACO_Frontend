@@ -989,6 +989,10 @@ watch(hasActiveInput, (active) => {
 
 onBeforeUnmount(() => {
   if (refreshInterval) clearInterval(refreshInterval)
+  // Clear pending input debounces so their callbacks don't fire after unmount.
+  if (icpDebounce) clearTimeout(icpDebounce)
+  if (tokenDebounce) clearTimeout(tokenDebounce)
+  if (portfolioDebounce) clearTimeout(portfolioDebounce)
 })
 </script>
 

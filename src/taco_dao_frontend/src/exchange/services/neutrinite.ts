@@ -18,6 +18,7 @@ import { Principal } from '@dfinity/principal'
 import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../shared/auth-cache'
 import { getEffectiveNetwork } from '../../config/network-config'
 import { icrcIDL } from '../../shared/icrc-idl'
+import { withTimeout } from '../utils/withTimeout'
 
 const safeStringify = (obj: unknown) =>
   JSON.stringify(obj, (_, v) => (typeof v === 'bigint' ? v.toString() : v))
@@ -26,8 +27,9 @@ export const NEUTRINITE_PYLON = 'togwv-zqaaa-aaaal-qr7aa-cai'
 
 // Credit polling: the pylon indexes incoming icrc1 transfers on a ~2s timer, so
 // a deposit is not usable by dex_swap until credited. Poll the virtual balance.
-const CREDIT_POLL_TRIES = 40
+const CREDIT_POLL_TRIES = 24
 const CREDIT_POLL_INTERVAL_MS = 1500
+const CREDIT_POLL_DEADLINE_MS = 40_000 // hard wall-clock cap so the swap modal can't hang here
 
 // ── Pylon IDL (only the methods we use) ──
 const pylonIDL = ({ IDL }: any) => {
@@ -241,10 +243,12 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   params.onStep?.('Confirming deposit…')
   let creditedDelta = 0n
   const started = Date.now()
-  for (let i = 0; i < CREDIT_POLL_TRIES; i++) {
+  for (let i = 0; i < CREDIT_POLL_TRIES && (Date.now() - started) < CREDIT_POLL_DEADLINE_MS; i++) {
     await new Promise(r => setTimeout(r, CREDIT_POLL_INTERVAL_MS))
     try {
-      const accts = (await pylon.icrc55_accounts({ owner, subaccount: [] })) as any[]
+      // Bound the (idempotent) poll query so one hung connection can't stall the
+      // whole loop indefinitely — on timeout we simply poll again next tick.
+      const accts = (await withTimeout(pylon.icrc55_accounts({ owner, subaccount: [] }), 5000, 'pylon-accounts')) as any[]
       const ep = findEndpoint(accts, params.sell)
       if (ep && ep.balance > balanceBefore) { creditedDelta = ep.balance - balanceBefore; break }
     } catch { /* keep polling */ }

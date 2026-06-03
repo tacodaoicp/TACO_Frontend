@@ -605,7 +605,11 @@ function addToCache(code: string, trade: TradePosition) {
     tokenReceive: trade.token_init_identifier,
     amountSend: trade.amount_sell.toString(),
     amountReceive: trade.amount_init.toString(),
-    fillPct: Number(trade.filledInit * 100n / (trade.filledInit + trade.amount_init)),
+    // Guard the BigInt divisor: filledInit + amount_init can both be 0n, and
+    // BigInt division by 0n THROWS (RangeError) — which would break the render.
+    fillPct: (trade.filledInit + trade.amount_init) > 0n
+      ? Number(trade.filledInit * 100n / (trade.filledInit + trade.amount_init))
+      : 0,
     status: 'active',
   })
   saveCache(cached)
@@ -674,7 +678,10 @@ async function verifyCachedCodes() {
       tokenReceive: t.token_init_identifier,
       amountSend: t.amount_sell.toString(),
       amountReceive: t.amount_init.toString(),
-      fillPct: Number(t.filledInit * 100n / (t.filledInit + t.amount_init)),
+      // Guard the BigInt divisor (0n/0n would throw RangeError, breaking the list).
+      fillPct: (t.filledInit + t.amount_init) > 0n
+        ? Number(t.filledInit * 100n / (t.filledInit + t.amount_init))
+        : 0,
       status: 'active',
     })
   }

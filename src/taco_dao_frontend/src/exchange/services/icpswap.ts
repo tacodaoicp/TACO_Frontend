@@ -303,7 +303,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     zeroForOne,
   })) as any
   if ('err' in swapResult) {
-    await sweep({ token0Principal: params.sellTokenPrincipal, token1Principal: params.buyTokenPrincipal, poolId }).catch(() => {})
+    await sweep({ token0Principal: params.sellTokenPrincipal, token1Principal: params.buyTokenPrincipal, poolId }).catch((err) => { console.error('[icpswap] sweep cleanup failed (funds may be recoverable via Recover):', err) })
     throw new Error(`Swap failed: ${safeStringify(swapResult.err)}`)
   }
   const amountOut = swapResult.ok as bigint
@@ -319,7 +319,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     token: params.buyTokenPrincipal,
   })) as any
   if ('err' in withdrawResult) {
-    await sweep({ token0Principal: params.sellTokenPrincipal, token1Principal: params.buyTokenPrincipal, poolId }).catch(() => {})
+    await sweep({ token0Principal: params.sellTokenPrincipal, token1Principal: params.buyTokenPrincipal, poolId }).catch((err) => { console.error('[icpswap] sweep cleanup failed (funds may be recoverable via Recover):', err) })
     throw new Error(`Withdraw failed: ${safeStringify(withdrawResult.err)}`)
   }
 

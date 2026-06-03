@@ -320,7 +320,7 @@ async function init(): Promise<void> {
       }
       // Queue fetch if data is missing or stale
       const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
-      const canFetch = !requiresAuth || PUBLIC_ADMIN_KEYS.includes(key)
+      const canFetch = !requiresAuth || (PUBLIC_ADMIN_KEYS.includes(key) && currentRoute.startsWith('/admin'))
       if (canFetch && (!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
         queue.enqueue(key, 'high')
       }
@@ -545,7 +545,10 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
           }
           // Enqueue stale/missing data as critical priority
           const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
-          const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
+          // PUBLIC_ADMIN keys (e.g. voterDetails = admin_getUserAllocations) are only
+      // consumed on /admin pages; don't fetch them on other routes (they'd 8s-time-out
+      // for anon users on every route via the all-keys subscription barrage).
+      const canFetch = !requiresAuth || isAuthenticated || (PUBLIC_ADMIN_KEYS.includes(key) && currentRoute.startsWith('/admin'))
           if (canFetch && (!state?.data || isStale(key, state.lastUpdated))) {
             // User explicitly navigated here — clear any leftover backoff so the
             // fetch fires immediately instead of honoring a stale (≤8s) window.
@@ -709,7 +712,10 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
     }
     // Queue fetch for stale priority data and track it
     if (!state?.data || isStale(key, state.lastUpdated)) {
-      const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
+      // PUBLIC_ADMIN keys (e.g. voterDetails = admin_getUserAllocations) are only
+      // consumed on /admin pages; don't fetch them on other routes (they'd 8s-time-out
+      // for anon users on every route via the all-keys subscription barrage).
+      const canFetch = !requiresAuth || isAuthenticated || (PUBLIC_ADMIN_KEYS.includes(key) && currentRoute.startsWith('/admin'))
       if (canFetch) {
         if (debugEnabled) console.log(`[AuthWorker] Queuing fetch for ${key} (stale/missing, canFetch=true)`)
         pendingPriorityKeys.add(key)
@@ -776,7 +782,10 @@ function triggerDeferredLoad(): void {
     }
     // Queue fetch if stale
     if (!state?.data || isStale(key, state.lastUpdated)) {
-      const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
+      // PUBLIC_ADMIN keys (e.g. voterDetails = admin_getUserAllocations) are only
+      // consumed on /admin pages; don't fetch them on other routes (they'd 8s-time-out
+      // for anon users on every route via the all-keys subscription barrage).
+      const canFetch = !requiresAuth || isAuthenticated || (PUBLIC_ADMIN_KEYS.includes(key) && currentRoute.startsWith('/admin'))
       if (canFetch) {
         queue.enqueue(key, 'low')
       }

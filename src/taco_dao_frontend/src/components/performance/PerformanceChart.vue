@@ -100,15 +100,10 @@ import {
 } from 'lightweight-charts'
 import { useTacoStore } from '../../stores/taco.store'
 import { storeToRefs } from 'pinia'
-import { createChartPort } from '../../workers/chart-worker-port'
-import { fetchPerformanceGraph } from '../../workers/performance-graph-client'
+import { createPerfGraphSession } from '../../workers/performance-graph-client'
 import { getNetworkHost } from '../../shared/auth-cache'
 import { getEffectiveNetwork } from '../../config/network-config'
 import { getCanisterId } from '../../constants/canisterIds'
-
-// Module-level cache for getUserPerformanceGraphData results by principal (TTL'd).
-const performanceDataCache = new Map()
-const CACHE_TTL_MS = 60_000 // 60 seconds
 
 const COLORS = {
   usd: '#FEC800',
@@ -145,7 +140,6 @@ export default {
     const usdCheckpoints = shallowRef([])
     const icpCheckpoints = shallowRef([])
     const baselineIndex = ref(0)
-    const serializedCheckpoints = shallowRef([])
     const tooltipDataMap = shallowRef({})
 
     // Monotonic load id — lets an in-flight chunked transform detect that a
@@ -185,14 +179,17 @@ export default {
       }
     })
 
-    // Chart compute worker — singleton, preloaded at app startup
-    const { port: chartPort, dispose: disposeChartPort } = createChartPort()
-    chartPort.onmessage = (e) => {
+    // Per-chart worker session. It fetches + decodes once, HOLDS the checkpoints,
+    // and answers cheap recompute messages — so the big checkpoints array never
+    // crosses to the main thread (the /performance freeze fix).
+    const session = createPerfGraphSession()
+
+    // Apply a chart-compute result (from load or recompute) to the chart.
+    const applyChartData = (cd) => {
       computing.value = false
-      const { usdSeries: usd, icpSeries: icp, tooltipData } = e.data
-      usdSeriesData.value = usd
-      icpSeriesData.value = icp
-      tooltipDataMap.value = tooltipData
+      usdSeriesData.value = cd.usdSeries
+      icpSeriesData.value = cd.icpSeries
+      tooltipDataMap.value = cd.tooltipData
       applyData()
     }
 
@@ -234,22 +231,24 @@ export default {
 
     const heightCss = computed(() => typeof props.height === 'number' ? `${props.height}px` : props.height)
 
-    // ----- Worker dispatch -----
+    // ----- Worker recompute (baseline / token-symbol changes) -----
 
-    const dispatchToWorker = () => {
-      if (!serializedCheckpoints.value.length) return
+    // Ask the worker (which still holds the checkpoints) to recompute the chart
+    // for the current baseline + token symbols. No big array crosses the main
+    // thread. Guarded by loadSeq so a stale recompute can't clobber a newer load.
+    const recompute = async () => {
+      if (!usdCheckpoints.value.length) return
+      const seq = loadSeq
       computing.value = true
-      chartPort.postMessage({
-        checkpoints: serializedCheckpoints.value,
-        baselineIndex: baselineIndex.value,
-        tokenSymbolMap: Object.fromEntries(tokenSymbolMap.value),
-        isLocal
-      })
+      const r = await session.recompute(baselineIndex.value, Object.fromEntries(tokenSymbolMap.value), isLocal)
+      if (seq !== loadSeq) return // superseded by a newer load
+      computing.value = false
+      if (r.data) applyChartData(r.data)
     }
 
-    watch([serializedCheckpoints, baselineIndex], dispatchToWorker)
+    watch(baselineIndex, recompute)
     watch(tokenSymbolMap, () => {
-      if (serializedCheckpoints.value.length) dispatchToWorker()
+      if (usdCheckpoints.value.length) recompute()
     })
 
     // ----- Chart lifecycle -----
@@ -547,30 +546,27 @@ export default {
 
       try {
         // The graph can approach the 2 MiB query-reply limit, and decoding ~2 MiB
-        // of Candid on the main thread froze the page for tens of seconds. Do the
-        // fetch + DECODE + serialize entirely inside a DedicatedWorker; we receive
-        // only chart-ready serialized checkpoints, so the page stays responsive.
-        let serialized
-        const cached = performanceDataCache.get(props.principal)
-        if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
-          serialized = cached.data
-        } else {
-          const res = await fetchPerformanceGraph({
-            principal: props.principal,
-            host: getNetworkHost(),
-            canisterId: getCanisterId('rewards'),
-            fetchRootKey: getEffectiveNetwork() === 'local',
-          })
-          if (seq !== loadSeq) return // superseded
-          if (res.error) { error.value = res.error; return }
-          serialized = res.checkpoints || []
-          performanceDataCache.set(props.principal, { data: serialized, timestamp: Date.now() })
-        }
-        if (!serialized.length) { error.value = 'No checkpoint data available'; return }
-        usdCheckpoints.value = serialized
-        icpCheckpoints.value = serialized
-        serializedCheckpoints.value = serialized
+        // of Candid on the main thread froze the page for tens of seconds. The
+        // worker fetches + DECODES + computes the chart and HOLDS the checkpoints;
+        // we receive only chart-ready series + a compact {timestamp, reason} meta,
+        // so the big array never crosses the main thread (no freeze).
+        const r = await session.load({
+          principal: props.principal,
+          host: getNetworkHost(),
+          canisterId: getCanisterId('rewards'),
+          fetchRootKey: getEffectiveNetwork() === 'local',
+          baselineIndex: 0,
+          tokenSymbolMap: Object.fromEntries(tokenSymbolMap.value),
+          isLocal,
+        })
+        if (seq !== loadSeq) return // superseded
+        if (r.error) { error.value = r.error; return }
+        const data = r.data
+        if (!data.meta.length) { error.value = 'No checkpoint data available'; return }
+        usdCheckpoints.value = data.meta
+        icpCheckpoints.value = data.meta
         baselineIndex.value = 0
+        applyChartData(data)
       } catch (err) {
         console.error('Error loading performance chart data:', err)
         const msg = err?.message || String(err)
@@ -616,7 +612,7 @@ export default {
       chart = null
       usdSeries = null
       icpSeries = null
-      disposeChartPort()
+      session.dispose()
     })
 
     return {

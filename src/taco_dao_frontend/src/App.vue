@@ -280,8 +280,6 @@
     // Deeper idle: warm the chart compute worker + commonly-navigated views.
     const idleDeep = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000))
     idleDeep(() => {
-      import('./workers/chart-worker-port').then(m => m.getChartPort())
-
       // Preload commonly-used route components (in navigation, frequently accessed)
       import('./views/WalletView.vue')
       import('./views/NachosVaultView.vue')
