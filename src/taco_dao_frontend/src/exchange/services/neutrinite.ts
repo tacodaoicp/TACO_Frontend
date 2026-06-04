@@ -76,12 +76,20 @@ const pylonIDL = ({ IDL }: any) => {
     ok: IDL.Record({}),
   })
 
+  // Per-ledger indexer scan cadence. Declared minimal — Candid record subtyping
+  // silently drops the pylon's other fields (pending, follow_priority, timers, …).
+  const LedgerFollowSettingStatus = IDL.Record({
+    ledger: IDL.Principal,
+    follow_interval_sec: IDL.Nat,
+  })
+
   return IDL.Service({
     dex_quote: IDL.Func([QuoteRequest], [QuoteResponse], ['query']),
     dex_swap: IDL.Func([SwapRequest], [SwapReportResponse], []),
     icrc55_accounts: IDL.Func([AccountsRequest], [AccountsResponse], ['query']),
     icrc55_account_register: IDL.Func([Account], [], []),
     icrc55_command: IDL.Func([BatchCommandRequest], [BatchCommandResponse], []),
+    ledger_follow_settings: IDL.Func([], [IDL.Vec(LedgerFollowSettingStatus)], ['query']),
   })
 }
 
@@ -162,6 +170,57 @@ export async function getQuoteAmount(sell: string, buy: string, amountIn: bigint
 export async function quoteGrid(sell: string, buy: string, amounts: bigint[]): Promise<bigint[]> {
   const settled = await Promise.allSettled(amounts.map(a => getQuoteAmount(sell, buy, a)))
   return settled.map(s => (s.status === 'fulfilled' ? s.value : 0n))
+}
+
+// ── Ledger follow-settings (per-ledger indexer scan cadence) ──
+// The pylon credits a deposit only on the next indexer tick for that ledger, so
+// the deposit-credit latency ≈ follow_interval_sec. We refuse to use Neutrinite
+// for a SELL token whose cadence exceeds our credit-poll budget — the deposit
+// could never credit in time (CREDIT_POLL_DEADLINE_MS) and the leg would just
+// fail + sweep, costing the user a wasted transfer fee. Only the Neutrinite DAO
+// can change these (admin_set_ledger_follow_settings), so they're ~static; cache
+// for hours. The BUY/withdraw side never blocks, so we gate the sell token only.
+export const NEUTRINITE_MAX_SELL_FOLLOW_SEC = 40
+const FOLLOW_TTL_MS = 6 * 60 * 60_000
+let _followMap: Map<string, number> | null = null
+let _followAt = 0
+let _followInflight: Promise<Map<string, number>> | null = null
+
+async function getFollowSettings(): Promise<Map<string, number>> {
+  if (_followMap && Date.now() - _followAt < FOLLOW_TTL_MS) return _followMap
+  if (_followInflight) return _followInflight
+  _followInflight = (async () => {
+    try {
+      const rows = (await (await anonActor()).ledger_follow_settings()) as any[]
+      const m = new Map<string, number>()
+      for (const r of rows) { try { m.set(r.ledger.toText(), Number(r.follow_interval_sec)) } catch { /* skip row */ } }
+      _followMap = m; _followAt = Date.now()
+      return m
+    } catch (e) {
+      console.warn('[neutrinite] ledger_follow_settings failed; using prior cache:', e)
+      return _followMap ?? new Map()
+    } finally { _followInflight = null }
+  })()
+  return _followInflight
+}
+
+/** Best-effort cache warm-up (call on app open). Anonymous; safe before login. */
+export async function prefetchFollowSettings(): Promise<void> {
+  try { await getFollowSettings() } catch { /* warm-up only */ }
+}
+
+/**
+ * True if Neutrinite should be SKIPPED as a venue for SELLING `sell`, because the
+ * pylon indexes that ledger slower than our deposit-credit poll budget
+ * (NEUTRINITE_MAX_SELL_FOLLOW_SEC). Unknown/absent cadence → false (keep trying;
+ * fall back to the reactive credit-poll + sweep). Gates the deposit (sell) side
+ * only — the buy/withdraw side never blocks.
+ */
+export async function isSellDepositTooSlow(sell: string): Promise<boolean> {
+  try {
+    const sec = (await getFollowSettings()).get(sell)
+    return sec != null && sec > NEUTRINITE_MAX_SELL_FOLLOW_SEC
+  } catch { return false }
 }
 
 // ── Pending-swap cache (localStorage) — survives a tab-close so the Recover page can sweep ──

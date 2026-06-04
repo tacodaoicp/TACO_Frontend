@@ -69,6 +69,11 @@ onMounted(() => {
     console.error('Failed to initialize exchange:', err)
   })
 
+  // Warm the Neutrinite per-ledger indexer-cadence cache (anonymous query) so the
+  // first CrossDEX quote can decide whether to skip a slow-to-credit sell token
+  // without paying a round-trip. Best-effort; CrossDEX falls back gracefully.
+  void neutrinite.prefetchFollowSettings()
+
   window.addEventListener('keydown', handleKeydown)
   mobileMql.addEventListener('change', syncTradeRouteToViewport)
 })

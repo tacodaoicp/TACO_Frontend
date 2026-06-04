@@ -122,13 +122,21 @@ export function useCrossDexSwap() {
       // Neutrinite grid amounts: raw (the pylon credits the full deposited amount).
       const neuAmounts = GRID_BPS.map(bp => total * bp / 10000n)
 
+      // Neutrinite credits a deposit only on its per-ledger indexer tick; if the
+      // SELL token's cadence exceeds our credit-poll budget the deposit can't
+      // credit in time, so exclude Neutrinite for this pair (feed it a zero grid
+      // → the optimizer never allocates it). The buy/withdraw side never blocks.
+      const skipNeu = await neutrinite.isSellDepositTooSlow(fromAddr)
+      if (skipNeu) console.info('[CrossDEX] Neutrinite skipped — sell token indexer cadence >',
+        neutrinite.NEUTRINITE_MAX_SELL_FOLLOW_SEC + 's')
+
       const [batchResults, icpGrid, neuGrid] = await Promise.all([
         store.getExpectedReceiveAmountBatchMulti(
           requests.map(r => ({ tokenSell: fromAddr, tokenBuy: toAddr, amountSell: r.amt })),
           MAX_ROUTES_PER_FRACTION,
         ) as Promise<any[]>,
         icpswap.quoteGrid(fromAddr, toAddr, icpAmounts),
-        neutrinite.quoteGrid(fromAddr, toAddr, neuAmounts),
+        skipNeu ? Promise.resolve(neuAmounts.map(() => 0n)) : neutrinite.quoteGrid(fromAddr, toAddr, neuAmounts),
       ])
       if (mySeq !== seq) return // superseded by a newer quote
 
