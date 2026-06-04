@@ -260,13 +260,30 @@
                         <span class="home-view__taco-assets__kvp__key"
                             style="padding-left: 0.5rem">
                             <span class="home-view__taco-assets__svg-circle">
-                                <img :src="solumLogo" class="home-view__taco-assets__svg home-view__taco-assets__svg--solum"/>
+                                <img :src="solumLogo" class="home-view__taco-assets__svg home-view__taco-assets__svg--round"/>
                             </span>
                             Solum
                         </span>
 
                         <!-- value -->
                         <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasurySolumValueInUsd)}}</span>
+
+                    </div>
+
+                    <!-- kvp (simwin) -->
+                    <div class="home-view__taco-assets__kvp">
+
+                        <!-- key -->
+                        <span class="home-view__taco-assets__kvp__key"
+                            style="padding-left: 0.5rem">
+                            <span class="home-view__taco-assets__svg-circle">
+                                <img :src="simwinLogo" class="home-view__taco-assets__svg home-view__taco-assets__svg--round"/>
+                            </span>
+                            Simwin
+                        </span>
+
+                        <!-- value -->
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasurySimwinValueInUsd)}}</span>
 
                     </div>
 
@@ -1463,7 +1480,7 @@
       width: 1.25rem;
     }
 
-    // solum icon sits inside a white circle for contrast
+    // logo sits inside a white circle for contrast / round shape (solum, simwin)
     &__svg-circle {
       width: 1.25rem;
       height: 1.25rem;
@@ -1475,7 +1492,7 @@
       flex-shrink: 0;
     }
 
-    &__svg--solum {
+    &__svg--round {
       width: 1rem;
       height: 1rem;
       border-radius: 50%;
@@ -2192,6 +2209,7 @@
   import icpLogo from "../assets/tokens/snspng/icp.png"
   import dkpLogo from "../assets/tokens/snspng/dragginz.png"
   import solumLogo from "../assets/tokens/solum.png"
+  import simwinLogo from "../assets/tokens/simwin.webp"
   import neutriniteLogo from "../assets/tokens/snspng/neutrinite.png"
   import TaggrSocialImg from '../assets/images/social/taggr.vue'
   import CatalyzeSocialImg from '../assets/images/social/catalyze.vue'
@@ -2233,7 +2251,7 @@
   const { userLoggedIn } = storeToRefs(tacoStore)
 
   // dao
-  const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+  const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
   /////////////////////
   // Local Variables //

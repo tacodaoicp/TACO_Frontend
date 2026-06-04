@@ -1484,10 +1484,12 @@ export const useTacoStore = defineStore('taco', () => {
     const cachedTacoNeurons = ref<any[]>([])
     const cachedNeuronRewardBalances = ref<Map<string, number>>(new Map())
 
-    // solum: off-chain reserve, 10k ICP from 2026-04-01, 10% APR simple linear accrual
-    const SOLUM_INITIAL_ICP = 10_000
-    const SOLUM_START_DATE_MS = Date.UTC(2026, 3, 1)
-    const SOLUM_APR = 0.10
+    // solum: fixed off-chain reserve, 420,069 tokens @ $0.25
+    const SOLUM_PRICE_USD = 0.25
+    const SOLUM_QUANTITY = 420_069
+
+    // simwin: fixed off-chain reserve valued at $30,000
+    const SIMWIN_VALUE_USD = 30_000
 
     // off-chain ICP held outside the SNS treasury (locked-neuron + reserve)
     const EXTRA_ICP_HOLDINGS = 7832
@@ -1521,14 +1523,8 @@ export const useTacoStore = defineStore('taco', () => {
     const snsTreasuryDkpValueInUsd = computed<number>(
         () => snsTreasuryDkpAmount.value * dkpPriceUsd.value
     )
-    const snsTreasurySolumValueInUsd = computed<number>(() => {
-        const yearsSinceSolumStart = Math.max(
-            0,
-            (Date.now() - SOLUM_START_DATE_MS) / (1000 * 60 * 60 * 24 * 365.25)
-        )
-        const solumIcpAmount = SOLUM_INITIAL_ICP * (1 + SOLUM_APR * yearsSinceSolumStart)
-        return solumIcpAmount * icpPriceUsd.value
-    })
+    const snsTreasurySolumValueInUsd = computed<number>(() => SOLUM_PRICE_USD * SOLUM_QUANTITY)
+    const snsTreasurySimwinValueInUsd = computed<number>(() => SIMWIN_VALUE_USD)
     const snsTreasuryNtnValueInUsd = computed<number>(
         () => snsTreasuryNtnHoldings.value * ntnPriceUsd.value
     )
@@ -1537,6 +1533,7 @@ export const useTacoStore = defineStore('taco', () => {
             + snsTreasuryIcpValueInUsd.value
             + snsTreasuryDkpValueInUsd.value
             + snsTreasurySolumValueInUsd.value
+            + snsTreasurySimwinValueInUsd.value
             + snsTreasuryNtnValueInUsd.value
     )
 
@@ -9026,6 +9023,7 @@ export const useTacoStore = defineStore('taco', () => {
         snsTreasuryIcpValueInUsd,
         snsTreasuryDkpValueInUsd,
         snsTreasurySolumValueInUsd,
+        snsTreasurySimwinValueInUsd,
         snsTreasuryNtnValueInUsd,
         tacoForumId,
         proposalsTopicId,

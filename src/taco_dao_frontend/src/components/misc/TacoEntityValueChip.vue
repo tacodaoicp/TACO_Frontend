@@ -116,6 +116,25 @@
 
             </div>
 
+            <!-- kvp (simwin) -->
+            <div class="taco-entity-value-chip__tooltip__kvp pt-2"
+                style="padding-top: 0.75rem !important; padding-left: 1.25rem !important;">
+
+                <!-- key -->
+                <span class="taco-entity-value-chip__tooltip__kvp__key
+                    taco-text-black-to-white">
+                    <span style="width: 1rem; height: 1rem; border-radius: 50%; background: #ffffff; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <img :src="simwinLogo" style="width: 0.8rem; height: 0.8rem; border-radius: 50%;"/>
+                    </span>
+                    Simwin
+                </span>
+
+                <!-- value -->
+                <span class="taco-entity-value-chip__tooltip__kvp__value
+                    taco-text-black-to-white">${{formatNumber(snsTreasurySimwinValueInUsd)}}</span>
+
+            </div>
+
             <!-- kvp (ntn) -->
             <div class="taco-entity-value-chip__tooltip__kvp pt-2"
                 style="padding: 0.75rem 1rem 1rem 1.25rem !important; border-bottom: 1px solid var(--table-row-border);">
@@ -305,6 +324,7 @@
     import icpLogo from "../../assets/tokens/snspng/icp.png"
     import dkpLogo from "../../assets/tokens/snspng/dragginz.png"
     import solumLogo from "../../assets/tokens/solum.png"
+    import simwinLogo from "../../assets/tokens/simwin.webp"
     import neutriniteLogo from "../../assets/tokens/snspng/neutrinite.png"
     import TacoCoinIcon from "../../assets/tokens/tacoCoinIcon.vue"
 
@@ -322,7 +342,7 @@
     // # STATE #
 
     // dao
-    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
     // prices (for watching)
     const { icpPriceUsd, tacoPriceUsd, dkpPriceUsd } = storeToRefs(tacoStore)
