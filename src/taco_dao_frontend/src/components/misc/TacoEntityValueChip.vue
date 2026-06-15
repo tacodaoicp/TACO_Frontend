@@ -13,7 +13,7 @@
             <TacoDaoTacoT />
 
             <!-- price in usd -->
-            <span class="taco-text-black-to-white">${{ formatNumber(portfolioValueExTacoInUsd + totalTreasuryValueInUsd) }}</span>
+            <span class="taco-text-black-to-white">${{ formatNumber(totalPortfolioValueInUsd + treasuryValueExTacoInUsd) }}</span>
 
         </span>
 
@@ -42,7 +42,7 @@
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd)}}</span>
+                    taco-text-black-to-white">${{formatNumber(treasuryValueExTacoInUsd)}}</span>
 
             </div>   
             
@@ -63,22 +63,7 @@
 
             </div>              
 
-            <!-- kvp (taco) -->
-            <div class="taco-entity-value-chip__tooltip__kvp pt-2"
-                style="padding-top: 0.75rem !important; padding-left: 1.25rem !important;">
-
-                <!-- key -->
-                <span class="taco-entity-value-chip__tooltip__kvp__key 
-                    taco-text-black-to-white">
-                    <TacoCoinIcon style="width: 1rem; height: 1rem;"/>
-                    Taco
-                </span>
-
-                <!-- value -->
-                <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(snsTreasuryTacoValueInUsd)}}</span>
-
-            </div> 
+            <!-- taco intentionally excluded from this breakdown -->
             
             <!-- kvp (dkp) -->
             <div class="taco-entity-value-chip__tooltip__kvp pt-2"
@@ -165,7 +150,7 @@
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(portfolioValueExTacoInUsd)}}</span>
+                    taco-text-black-to-white">${{formatNumber(totalPortfolioValueInUsd)}}</span>
 
             </div>
 
@@ -178,7 +163,7 @@
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd + portfolioValueExTacoInUsd)}}</span>
+                    taco-text-black-to-white">${{formatNumber(treasuryValueExTacoInUsd + totalPortfolioValueInUsd)}}</span>
 
             </div>
 
@@ -326,7 +311,6 @@
     import solumLogo from "../../assets/tokens/solum.png"
     import simwinLogo from "../../assets/tokens/simwin.webp"
     import neutriniteLogo from "../../assets/tokens/snspng/neutrinite.png"
-    import TacoCoinIcon from "../../assets/tokens/tacoCoinIcon.vue"
 
     ///////////
     // Store //
@@ -342,7 +326,7 @@
     // # STATE #
 
     // dao
-    const { totalPortfolioValueInUsd, portfolioValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+    const { totalPortfolioValueInUsd, treasuryValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
     // prices (for watching)
     const { icpPriceUsd, tacoPriceUsd, dkpPriceUsd } = storeToRefs(tacoStore)

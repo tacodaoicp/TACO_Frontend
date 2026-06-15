@@ -204,7 +204,7 @@
                         </span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalTreasuryValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(treasuryValueExTacoInUsd)}}</span>
 
                     </div>   
                     
@@ -223,21 +223,8 @@
 
                     </div>                     
 
-                    <!-- kvp (taco) -->
-                    <div class="home-view__taco-assets__kvp">
+                    <!-- taco intentionally excluded from this breakdown -->
 
-                        <!-- key -->
-                        <span class="home-view__taco-assets__kvp__key"
-                            style="padding-left: 0.5rem">
-                            <TacoCoinIcon class="home-view__taco-assets__svg"/>
-                            Taco
-                        </span>
-
-                        <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(snsTreasuryTacoValueInUsd)}}</span>
-
-                    </div> 
-                    
                     <!-- kvp (dkp) -->
                     <div class="home-view__taco-assets__kvp">
 
@@ -314,7 +301,7 @@
                         </span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(portfolioValueExTacoInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalPortfolioValueInUsd)}}</span>
 
                     </div>
 
@@ -327,7 +314,7 @@
                         <span class="home-view__taco-assets__kvp__key">Total</span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalTreasuryValueInUsd + portfolioValueExTacoInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(treasuryValueExTacoInUsd + totalPortfolioValueInUsd)}}</span>
 
                     </div>
 
@@ -2251,7 +2238,7 @@
   const { userLoggedIn } = storeToRefs(tacoStore)
 
   // dao
-  const { totalPortfolioValueInUsd, portfolioValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+  const { totalPortfolioValueInUsd, treasuryValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
   /////////////////////
   // Local Variables //

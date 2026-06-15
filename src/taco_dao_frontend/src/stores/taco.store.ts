@@ -1564,6 +1564,10 @@ export const useTacoStore = defineStore('taco', () => {
     const portfolioValueExTacoInUsd = computed<number>(
         () => Math.max(0, totalPortfolioValueInUsd.value - portfolioTacoValueInUsd.value)
     )
+    // treasury value with its TACO holding removed (used for the asset breakdown displays)
+    const treasuryValueExTacoInUsd = computed<number>(
+        () => Math.max(0, totalTreasuryValueInUsd.value - snsTreasuryTacoValueInUsd.value)
+    )
     // circulating = total supply minus every TACO the DAO holds (treasury + portfolio)
     const tacoCirculatingSupply = computed<number>(
         () => Math.max(0, tacoTotalSupply.value - snsTreasuryTacoAmount.value - portfolioTacoAmount.value)
@@ -9116,6 +9120,7 @@ export const useTacoStore = defineStore('taco', () => {
         snsTreasurySimwinValueInUsd,
         snsTreasuryNtnValueInUsd,
         portfolioValueExTacoInUsd,
+        treasuryValueExTacoInUsd,
         tacoTotalSupply,
         tacoCirculatingSupply,
         tacoBackingValueUsd,
