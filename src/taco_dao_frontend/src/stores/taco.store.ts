@@ -1551,9 +1551,15 @@ export const useTacoStore = defineStore('taco', () => {
         const d = entry[1]
         return Number(d.balance) / Math.pow(10, Number(d.tokenDecimals))
     })
-    const portfolioTacoValueInUsd = computed<number>(
-        () => portfolioTacoAmount.value * tacoPriceUsd.value
-    )
+    // value TACO at the portfolio's own per-token price so it cancels exactly out of the portfolio total
+    const portfolioTacoValueInUsd = computed<number>(() => {
+        const entry = fetchedTokenDetails.value.find(
+            (e) => e[0].toText() === TACO_LEDGER_CANISTER_ID
+        )
+        if (!entry) return 0
+        const d = entry[1]
+        return Number(d.priceInUSD) * (Number(d.balance) / Math.pow(10, Number(d.tokenDecimals)))
+    })
     // portfolio value with its TACO holding removed (used for display and for the fair value backing)
     const portfolioValueExTacoInUsd = computed<number>(
         () => Math.max(0, totalPortfolioValueInUsd.value - portfolioTacoValueInUsd.value)
