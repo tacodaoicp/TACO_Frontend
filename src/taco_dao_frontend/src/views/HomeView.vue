@@ -314,7 +314,7 @@
                         </span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalPortfolioValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(portfolioValueExTacoInUsd)}}</span>
 
                     </div>
 
@@ -327,7 +327,7 @@
                         <span class="home-view__taco-assets__kvp__key">Total</span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalTreasuryValueInUsd + totalPortfolioValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalTreasuryValueInUsd + portfolioValueExTacoInUsd)}}</span>
 
                     </div>
 
@@ -2251,7 +2251,7 @@
   const { userLoggedIn } = storeToRefs(tacoStore)
 
   // dao
-  const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+  const { totalPortfolioValueInUsd, portfolioValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
   /////////////////////
   // Local Variables //

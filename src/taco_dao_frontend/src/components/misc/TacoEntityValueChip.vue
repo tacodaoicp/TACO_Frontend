@@ -13,7 +13,7 @@
             <TacoDaoTacoT />
 
             <!-- price in usd -->
-            <span class="taco-text-black-to-white">${{ formatNumber(totalPortfolioValueInUsd + totalTreasuryValueInUsd) }}</span>
+            <span class="taco-text-black-to-white">${{ formatNumber(portfolioValueExTacoInUsd + totalTreasuryValueInUsd) }}</span>
 
         </span>
 
@@ -165,7 +165,7 @@
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(totalPortfolioValueInUsd)}}</span>
+                    taco-text-black-to-white">${{formatNumber(portfolioValueExTacoInUsd)}}</span>
 
             </div>
 
@@ -178,7 +178,7 @@
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd + totalPortfolioValueInUsd)}}</span>
+                    taco-text-black-to-white">${{formatNumber(totalTreasuryValueInUsd + portfolioValueExTacoInUsd)}}</span>
 
             </div>
 
@@ -342,7 +342,7 @@
     // # STATE #
 
     // dao
-    const { totalPortfolioValueInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+    const { totalPortfolioValueInUsd, portfolioValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryTacoValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
     // prices (for watching)
     const { icpPriceUsd, tacoPriceUsd, dkpPriceUsd } = storeToRefs(tacoStore)

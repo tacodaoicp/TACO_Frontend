@@ -1499,6 +1499,7 @@ export const useTacoStore = defineStore('taco', () => {
     const NTN_HOLDER_PRINCIPAL = '6jvpj-sqaaa-aaaaj-azwnq-cai'
     const NTN_LEDGER_CANISTER_ID = 'f54if-eqaaa-aaaaq-aacea-cai'
     const ICP_LEDGER_CANISTER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
+    const TACO_LEDGER_CANISTER_ID = 'kknbx-zyaaa-aaaaq-aae4a-cai'
 
     // Raw token amounts in the SNS treasury (written by fetchTotalTreasuryValueInUsd).
     // USD values below are computeds so price/balance updates flow into the total automatically.
@@ -1506,6 +1507,9 @@ export const useTacoStore = defineStore('taco', () => {
     const snsTreasuryIcpAmount = ref<number>(0)  // queried treasury ICP only — EXTRA_ICP_HOLDINGS is added in the computed
     const snsTreasuryDkpAmount = ref<number>(0)
     const snsTreasuryNtnHoldings = ref<number>(NTN_DEFAULT_HOLDINGS)
+
+    // total TACO supply (whole tokens), written by fetchTacoTotalSupply via the ledger icrc1_total_supply query
+    const tacoTotalSupply = ref<number>(0)
 
     const ntnPriceUsd = computed<number>(() => {
         const entry = fetchedTokenDetails.value.find(
@@ -1535,6 +1539,46 @@ export const useTacoStore = defineStore('taco', () => {
             + snsTreasurySolumValueInUsd.value
             + snsTreasurySimwinValueInUsd.value
             + snsTreasuryNtnValueInUsd.value
+    )
+
+    // TACO fair value: hard-asset backing per circulating TACO, leaving out all TACO holdings.
+    // TACO the DAO holds inside its portfolio (amount in whole tokens + its USD value)
+    const portfolioTacoAmount = computed<number>(() => {
+        const entry = fetchedTokenDetails.value.find(
+            (e) => e[0].toText() === TACO_LEDGER_CANISTER_ID
+        )
+        if (!entry) return 0
+        const d = entry[1]
+        return Number(d.balance) / Math.pow(10, Number(d.tokenDecimals))
+    })
+    const portfolioTacoValueInUsd = computed<number>(
+        () => portfolioTacoAmount.value * tacoPriceUsd.value
+    )
+    // portfolio value with its TACO holding removed (used for display and for the fair value backing)
+    const portfolioValueExTacoInUsd = computed<number>(
+        () => Math.max(0, totalPortfolioValueInUsd.value - portfolioTacoValueInUsd.value)
+    )
+    // circulating = total supply minus every TACO the DAO holds (treasury + portfolio)
+    const tacoCirculatingSupply = computed<number>(
+        () => Math.max(0, tacoTotalSupply.value - snsTreasuryTacoAmount.value - portfolioTacoAmount.value)
+    )
+    // backing = (treasury minus its TACO) + (portfolio minus its TACO)
+    const tacoBackingValueUsd = computed<number>(
+        () => (totalTreasuryValueInUsd.value - snsTreasuryTacoValueInUsd.value)
+            + portfolioValueExTacoInUsd.value
+    )
+    const tacoFairValueUsd = computed<number>(
+        () => tacoCirculatingSupply.value > 0
+            ? tacoBackingValueUsd.value / tacoCirculatingSupply.value
+            : 0
+    )
+    const tacoFairValueIcp = computed<number>(
+        () => icpPriceUsd.value > 0 ? tacoFairValueUsd.value / icpPriceUsd.value : 0
+    )
+    const tacoBelowFairPct = computed<number>(
+        () => tacoFairValueUsd.value > 0
+            ? (tacoFairValueUsd.value - tacoPriceUsd.value) / tacoFairValueUsd.value * 100
+            : 0
     )
 
     // also source ICP price from fetchedTokenDetails (reuses existing fetch; other providers stay as fallbacks)
@@ -3106,7 +3150,7 @@ export const useTacoStore = defineStore('taco', () => {
                 // log
                 // console.log('taco.store: fetchCryptoPrices() - gecko terminal pool endpoint - body:', body)
 
-                const baseTokenPriceQuoteToken = body.data.attributes.base_token_price_quote_token
+                const baseTokenPriceQuoteToken = Number(body.data.attributes.base_token_price_quote_token)
                 const basePrice  = Number(body.data.attributes.base_token_price_usd)
                 
                 // set the base price
@@ -3200,6 +3244,29 @@ export const useTacoStore = defineStore('taco', () => {
 
             // log error
             console.error('error fetching balance from icrc1 canister:', error)
+
+            // return false
+            return false
+
+        }
+
+    }
+    const icrc1TotalSupply = async (canisterId: string) => {
+
+        try {
+            // create actor using cached anonymous agent
+            const actor = await getAnonymousActor(canisterId, () => idlFactory)
+
+            // get total supply
+            const supply = await actor.icrc1_total_supply()
+
+            // return total supply
+            return supply
+
+        } catch (error) {
+
+            // log error
+            console.error('error fetching total supply from icrc1 canister:', error)
 
             // return false
             return false
@@ -3314,6 +3381,23 @@ export const useTacoStore = defineStore('taco', () => {
         snsTreasuryIcpAmount.value = icpBalance / Math.pow(10, 8)
         snsTreasuryDkpAmount.value = dkpBalance / Math.pow(10, 8)
         snsTreasuryNtnHoldings.value = ntnBalance / Math.pow(10, 8)
+
+        return
+
+    }
+
+    // total TACO supply from the ledger (used for the fair value circulating supply)
+    const fetchTacoTotalSupply = async (forceRefetch = false) => {
+
+        // already have it, skip unless forced
+        if (tacoTotalSupply.value > 0 && !forceRefetch) {
+            return true
+        }
+
+        const supply = await icrc1TotalSupply(TACO_LEDGER_CANISTER_ID)
+        if (supply !== false) {
+            tacoTotalSupply.value = Number(supply) / Math.pow(10, 8)
+        }
 
         return
 
@@ -9025,6 +9109,13 @@ export const useTacoStore = defineStore('taco', () => {
         snsTreasurySolumValueInUsd,
         snsTreasurySimwinValueInUsd,
         snsTreasuryNtnValueInUsd,
+        portfolioValueExTacoInUsd,
+        tacoTotalSupply,
+        tacoCirculatingSupply,
+        tacoBackingValueUsd,
+        tacoFairValueUsd,
+        tacoFairValueIcp,
+        tacoBelowFairPct,
         tacoForumId,
         proposalsTopicId,
         fetchedForums,
@@ -9099,6 +9190,7 @@ export const useTacoStore = defineStore('taco', () => {
         clearTreasuryLogs,
         icrc1BalanceOf,
         fetchTotalTreasuryValueInUsd,
+        fetchTacoTotalSupply,
         acceptReportsDisclaimer,
         listTriggerConditions,
         addTriggerCondition,

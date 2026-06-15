@@ -138,7 +138,7 @@
         <!-- icp value -->
         <IcpValueChip />
 
-        <!-- taco value -->
+        <!-- taco value (with fair value badge + hover modal) -->
         <TacoTokenPriceChip />
 
         <!-- entity value -->
