@@ -15,10 +15,10 @@
             <span class="taco-token-price-chip__price-wrap">
 
                 <!-- price in usd -->
-                <span class="taco-text-black-to-white">${{ tacoPriceUsd.toFixed(2) }}</span>
+                <span class="taco-token-price-chip__price taco-text-black-to-white">${{ tacoPriceUsd.toFixed(2) }}</span>
 
-                <!-- tiny fair value badge (reuses the beta tag look) -->
-                <span v-if="tacoFairValueUsd > 0" class="taco-token-price-chip__fair">
+                <!-- tiny fair value badge (only when TACO trades below fair value) -->
+                <span v-if="showFairValue" class="taco-token-price-chip__fair">
                     <span class="taco-token-price-chip__fair-tag">Fair</span>
                     <span class="taco-token-price-chip__fair-value taco-text-black-to-white">${{ tacoFairValueUsd.toFixed(2) }}</span>
                 </span>
@@ -27,8 +27,8 @@
 
         </span>
 
-        <!-- hover modal -->
-        <div v-if="showingFairModal"
+        <!-- hover modal (only when TACO trades below fair value) -->
+        <div v-if="showingFairModal && showFairValue"
              class="taco-token-price-chip__modal taco-container--l1 shadow">
 
             <!-- title -->
@@ -83,8 +83,10 @@
             align-items: center;
             gap: 0.25rem;
 
-            // token icon
+            // token icon (stays in front of the fair badge, like the price)
             img, svg {
+                position: relative;
+                z-index: 2;
                 width: 1.125rem;
                 height: 1.125rem;
                 border: 1px solid var(--dark-orange-to-transparent);
@@ -107,11 +109,18 @@
             display: inline-flex;
         }
 
+        // price text stays in front so the badge can never cover it
+        &__price {
+            position: relative;
+            z-index: 2;
+        }
+
         // fair value badge, sits on the top right of the price (reuses the beta tag look)
         &__fair {
             position: absolute;
-            top: -0.62rem;
+            top: -0.8rem;
             right: -0.4rem;
+            z-index: 1;
             display: inline-flex;
             align-items: center;
             gap: 0.2rem;
@@ -122,7 +131,7 @@
         // "Fair" tag, styled like the nav beta badge
         &__fair-tag {
             font-family: 'rubik' !important;
-            font-size: 0.5rem !important;
+            font-size: 0.4rem !important;
             font-weight: 700 !important;
             line-height: 1 !important;
             padding: 0.1rem 0.3rem;
@@ -135,7 +144,7 @@
         // fair value amount next to the tag
         &__fair-value {
             font-family: 'rubik' !important;
-            font-size: 0.6rem !important;
+            font-size: 0.45rem !important;
             font-weight: 700 !important;
             line-height: 1 !important;
         }
@@ -243,6 +252,23 @@
 
     }
 
+    // phone portrait: center the fair value modal on screen so it never clips off the side
+    @media (max-width: 575.98px) {
+
+        .taco-token-price-chip__modal {
+            position: fixed;
+            top: 3.5rem;
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%);
+            width: calc(100vw - 1.5rem);
+            max-width: 21rem;
+            max-height: calc(100vh - 4.5rem);
+            overflow-y: auto;
+        }
+
+    }
+
 </style>
 
 <script setup lang="ts">
@@ -252,7 +278,7 @@
     /////////////
 
     import TacoCoinIcon from "../../assets/tokens/tacoCoinIcon.vue"
-    import { ref, onMounted, watch } from 'vue'
+    import { ref, computed, onMounted, watch } from 'vue'
     import { useTacoStore } from "../../stores/taco.store"
     import { storeToRefs } from "pinia"
 
@@ -271,6 +297,11 @@
 
     // showing fair value modal
     const showingFairModal = ref(false)
+
+    // only surface the fair value (badge + modal) when TACO trades below it
+    const showFairValue = computed(
+        () => tacoPriceUsd.value > 0 && tacoFairValueUsd.value > tacoPriceUsd.value
+    )
 
     /////////////////////
     // lifecycle hooks //
