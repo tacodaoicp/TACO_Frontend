@@ -3378,6 +3378,19 @@ export const useTacoStore = defineStore('taco', () => {
             Principal.fromText(NTN_HOLDER_PRINCIPAL),
         )
 
+        // ponytail: DAO's ICPSwap TACO/ICP LP (SNS-treasury positions in pool vhoia). Count the ICP side; skip TACO.
+        let lpIcp = 0
+        try {
+            const poolMod = await import("../../../declarations/icp_swap/icp_swap.did.js")
+            const pool = await getAnonymousActor('vhoia-myaaa-aaaar-qbmja-cai', () => poolMod.idlFactory)
+            const idsRes: any = await pool.getUserPositionIdsByPrincipal(Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'))
+            const ids = new Set<string>((idsRes.ok ?? []).map((n: bigint) => n.toString()))
+            if (ids.size) {
+                const page: any = await pool.getUserPositionWithTokenAmount(0n, 5000n) // ponytail: 5000 cap; paginate if pool grows
+                for (const p of (page.ok?.content ?? [])) if (ids.has(p.id.toString())) lpIcp += (Number(p.token1Amount) + Number(p.tokensOwed1)) / 1e8 // token1 = ICP, + uncollected ICP fees
+            }
+        } catch (e) { console.error('ICPSwap LP fetch failed', e) }
+
         /////////////////
         // store balances; USD rows + total are reactive computeds that follow price refs //
         /////////////////
@@ -3388,7 +3401,7 @@ export const useTacoStore = defineStore('taco', () => {
         const ntnBalance = snsTreasuryNtnBalance ? Number(snsTreasuryNtnBalance) : 0
 
         snsTreasuryTacoAmount.value = tacoBalance / Math.pow(10, 8)
-        snsTreasuryIcpAmount.value = icpBalance / Math.pow(10, 8)
+        snsTreasuryIcpAmount.value = icpBalance / Math.pow(10, 8) + lpIcp
         snsTreasuryDkpAmount.value = dkpBalance / Math.pow(10, 8)
         snsTreasuryNtnHoldings.value = ntnBalance / Math.pow(10, 8)
 
