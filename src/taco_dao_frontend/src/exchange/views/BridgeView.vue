@@ -173,18 +173,16 @@
               <span class="bridge-view__tx-state" :class="`bridge-view__tx-state--${e.state}`">{{ stateLabel(e.state) }}</span>
             </div>
             <div v-if="e.note" class="bridge-view__tx-note tx-ink-3">{{ e.note }}</div>
-            <div v-if="e.txid" class="bridge-view__tx-note tx-ink-3">
-              BTC tx:
-              <a :href="`https://mempool.space/tx/${e.txid}`" :title="e.txid" target="_blank" rel="noopener" class="bridge-view__tx-link tx-mono">
-                {{ e.txid.slice(0, 20) }}... ↗
-              </a>
+            <div v-if="e.txid" class="bridge-view__tx-note bridge-view__tx-row tx-ink-3">
+              <span class="bridge-view__tx-label">BTC tx:</span>
+              <a :href="`https://mempool.space/tx/${e.txid}`" :title="e.txid" target="_blank" rel="noopener" class="bridge-view__tx-link tx-mono">{{ e.txid }}</a>
+              <span class="bridge-view__tx-ext">↗</span>
               <button class="bridge-view__tx-copy" :title="'Copy full tx id'" @click="copy(e.txid!)">Copy</button>
             </div>
-            <div v-if="e.txHash" class="bridge-view__tx-note tx-ink-3">
-              ETH tx:
-              <a :href="`https://etherscan.io/tx/${e.txHash}`" :title="e.txHash" target="_blank" rel="noopener" class="bridge-view__tx-link tx-mono">
-                {{ e.txHash.slice(0, 20) }}... ↗
-              </a>
+            <div v-if="e.txHash" class="bridge-view__tx-note bridge-view__tx-row tx-ink-3">
+              <span class="bridge-view__tx-label">ETH tx:</span>
+              <a :href="`https://etherscan.io/tx/${e.txHash}`" :title="e.txHash" target="_blank" rel="noopener" class="bridge-view__tx-link tx-mono">{{ e.txHash }}</a>
+              <span class="bridge-view__tx-ext">↗</span>
               <button class="bridge-view__tx-copy" :title="'Copy full tx hash'" @click="copy(e.txHash!)">Copy</button>
             </div>
           </div>
@@ -534,7 +532,15 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   &__tx-main { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
   &__tx-kind { font-weight: 600; }
   &__tx-note { font-size: 12px; margin-top: 2px; }
-  &__tx-link { color: var(--tx-orange, #f7931a); text-decoration: none; &:hover { text-decoration: underline; } }
+  /* Full hash on one line; ellipsis only when it genuinely doesn't fit. */
+  &__tx-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  &__tx-label { flex: 0 0 auto; }
+  &__tx-ext { flex: 0 0 auto; color: var(--tx-orange, #f7931a); }
+  &__tx-link {
+    color: var(--tx-orange, #f7931a); text-decoration: none;
+    flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    &:hover { text-decoration: underline; }
+  }
   &__tx-copy {
     margin-left: 6px; padding: 0 6px; font-size: 11px; cursor: pointer;
     background: transparent; color: inherit; font-family: inherit;
