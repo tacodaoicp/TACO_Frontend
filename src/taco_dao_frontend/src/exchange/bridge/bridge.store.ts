@@ -619,7 +619,7 @@ export const useBridgeStore = defineStore('bridge', () => {
           else entry.state = 'reimbursed'
         } else if ('TxSent' in st) {
           entry.txHash = st.TxSent.transaction_hash
-          entry.note = 'Ethereum transaction sent, waiting for finalization.'
+          entry.note = 'Ethereum transaction sent. It may already show success on Etherscan; the minter marks it complete after Ethereum finality, about 15 minutes.'
         }
         upsertEntry(entry)
       } else if ((entry.kind === 'eth-mint' || entry.kind === 'erc20-mint')
