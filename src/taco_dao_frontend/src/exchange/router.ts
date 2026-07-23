@@ -10,6 +10,7 @@ const ExchangeAdminView = () => import('./views/ExchangeAdminView.vue')
 const RecoverView = () => import('./views/RecoverView.vue')
 const MobileTradeView = () => import('./views/MobileTradeView.vue')
 const StyleGuideView = () => import('./views/StyleGuideView.vue')
+const BridgeView = () => import('./views/BridgeView.vue')
 
 // Route-chunk loader registry — `preloadRoute('Portfolio')` from a nav link's
 // hover handler resolves the dynamic import for that route. Empty strings or
@@ -25,6 +26,7 @@ const routeChunkLoaders: Record<string, () => Promise<unknown>> = {
   ExchangeAdmin: ExchangeAdminView,
   Recover:       RecoverView,
   StyleGuide:    StyleGuideView,
+  Bridge:        BridgeView,
 }
 const preloadedChunks = new Set<string>()
 export function preloadRoute(name: string): void {
@@ -53,6 +55,7 @@ function initialRouteName(): string {
   if (path.startsWith('/recover')) return 'Recover'
   if (path.startsWith('/admin')) return 'ExchangeAdmin'
   if (path.startsWith('/styleguide')) return 'StyleGuide'
+  if (path.startsWith('/bridge')) return 'Bridge'
   // Root: pro users land on the Pro terminal, everyone else on Easy Swap.
   let isPro = false
   try { isPro = localStorage.getItem('taco_exchange_mode') === 'pro' } catch { /* private mode */ }
@@ -96,6 +99,7 @@ const routes = [
   { path: '/admin', name: 'ExchangeAdmin', component: ExchangeAdminView },
   { path: '/recover', name: 'Recover', component: RecoverView },
   { path: '/styleguide', name: 'StyleGuide', component: StyleGuideView },
+  { path: '/bridge', name: 'Bridge', component: BridgeView },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 

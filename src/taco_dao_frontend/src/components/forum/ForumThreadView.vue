@@ -892,7 +892,7 @@
                                     </div>
 
                                     <!-- cannot vote -->
-                                    <div v-else class="text-muted small">
+                                    <div v-else class="small" style="color: #fff;">
                                         Cannot vote (no voting power)
                                     </div>
 
@@ -2324,6 +2324,18 @@
   &--info {
     border-color: rgba(139, 90, 43, 0.6);
     color: var(--gold);
+  }
+}
+
+// bulk vote buttons + VP readout (Bootstrap btn/text-muted have no app font/contrast on the brown card)
+.forum-thread-view__details__bulk-vote {
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-weight: bold;
+  }
+  &__info .text-muted {
+    color: var(--black-to-white) !important;
+    opacity: 0.7;
   }
 }
 

@@ -145,7 +145,7 @@
             @click="handleStake"
             :disabled="!canStake || isStaking">
 
-            <span style="color: var(--black) !important;">Add to Stake</span>
+            <span>Add to Stake</span>
 
           </button>
 

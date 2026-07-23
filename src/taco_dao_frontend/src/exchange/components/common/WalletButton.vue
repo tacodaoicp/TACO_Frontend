@@ -47,9 +47,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangeToast } from '../../composables/useExchangeToast'
+import { useExchangeAuth } from '../../composables/useExchangeAuth'
 
 const exchangeStore = useExchangeStore()
 const toast = useExchangeToast()
+const auth = useExchangeAuth()
 
 const isConnected = ref(false)
 const principalText = ref('')
@@ -90,55 +92,21 @@ async function copyText(text: string, message: string) {
 }
 
 async function connectWallet() {
-  try {
-    const { getCachedAuthClient } = await import('../../../shared/auth-cache')
-    const authClient = await getCachedAuthClient()
-
-    // Anchor to tacodao.com on the custom subdomain so the principal matches the DAO app.
-    // Only exchange.tacodao.com (DNS + content fully ours) — never third-party-DNS domains.
-    const derivationOrigin =
-      window.location.hostname === 'exchange.tacodao.com'
-        ? 'https://tacodao.com'
-        : undefined
-
-    await new Promise<void>((resolve, reject) => {
-      authClient.login({
-        identityProvider: 'https://id.ai',
-        derivationOrigin,
-        onSuccess: () => resolve(),
-        onError: (err) => reject(err),
-      })
-    })
-
-    const identity = authClient.getIdentity()
-    principalText.value = identity.getPrincipal().toText()
+  // Single shared login path: 30-day TTL, localStorage cache, cross-tab notify.
+  await auth.connect()
+  if (exchangeStore.isAuthenticated) {
+    principalText.value = exchangeStore.principalText
     isConnected.value = true
-    exchangeStore.isAuthenticated = true
-    exchangeStore.principalText = principalText.value
     deriveAccountId()
-
-    // Reinitialize the store with authenticated actor
-    exchangeStore.clearActorCache()
-  } catch (err) {
-    console.error('Wallet connect failed:', err)
   }
 }
 
 async function disconnectWallet() {
-  try {
-    const { getCachedAuthClient } = await import('../../../shared/auth-cache')
-    const authClient = await getCachedAuthClient()
-    await authClient.logout()
-  } catch {
-    // ignore
-  }
+  showMenu.value = false
+  await auth.disconnect()
   isConnected.value = false
   principalText.value = ''
   accountIdHex.value = ''
-  showMenu.value = false
-  exchangeStore.isAuthenticated = false
-  exchangeStore.principalText = ''
-  exchangeStore.clearActorCache()
 }
 
 // Hydrate from cached identity on mount

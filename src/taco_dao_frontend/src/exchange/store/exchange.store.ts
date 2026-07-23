@@ -34,7 +34,7 @@ import type {
   pool,
 } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 import { getCanisterId } from '../../constants/canisterIds'
-import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../shared/auth-cache'
+import { getCachedAgent, getCachedIdentity, getNetworkHost, isSessionAuthError, clearAuthCache, EXCHANGE_AUTH_DB_NAME } from '../../shared/auth-cache'
 import { getEffectiveNetwork } from '../../config/network-config'
 import { readCache, writeCache } from '../utils/persistCache'
 import { createCachedQuery, createKeyedQueryFactory, type CachedQuery } from '../utils/cachedQuery'
@@ -162,13 +162,39 @@ export const useExchangeStore = defineStore('exchange', () => {
     const agent = await getCachedAgent()
     if (!agent) throw new Error('Not authenticated')
 
-    _updateActor = Actor.createActor<_SERVICE>(idlFactory, {
+    _updateActor = wrapWithSessionGuard(Actor.createActor<_SERVICE>(idlFactory, {
       agent,
       canisterId: getExchangeCanisterId(),
-    })
+    }))
     _identityHash = currentHash
 
     return _updateActor
+  }
+
+  /** Funnel every update call through one choke point: a dead session (expired
+   *  delegation / key mismatch) resets auth state instead of leaking raw 400s. */
+  function wrapWithSessionGuard<T extends object>(actor: T): T {
+    return new Proxy(actor, {
+      get(target, prop, receiver) {
+        const v = Reflect.get(target, prop, receiver)
+        if (typeof v !== 'function') return v
+        return async (...args: unknown[]) => {
+          try { return await (v as (...a: unknown[]) => Promise<unknown>).apply(target, args) }
+          catch (err) {
+            if (isSessionAuthError(err)) {
+              clearAuthCache()
+              clearActorCache()
+              isAuthenticated.value = false
+              principalText.value = ''
+              try { localStorage.removeItem('taco_exchange_auth') } catch { /* ignore */ }
+              try { new BroadcastChannel('taco-exchange-auth').postMessage({ type: 'logout' }) } catch { /* ignore */ }
+              throw new Error('Session expired. Please reconnect your wallet.')
+            }
+            throw err
+          }
+        }
+      },
+    })
   }
 
   // ═══════════════════════════════════════════
@@ -819,8 +845,17 @@ export const useExchangeStore = defineStore('exchange', () => {
       const chainJson = JSON.stringify(id.getDelegation().toJSON())
       if (chainJson === _lastSentChainJson) return
       const authMod: any = await import('@dfinity/auth-client')
-      const storedKey = await new authMod.IdbStorage().get(authMod.KEY_STORAGE_KEY)
+      const storedKey = await new authMod.IdbStorage({ dbName: EXCHANGE_AUTH_DB_NAME }).get(authMod.KEY_STORAGE_KEY)
       if (storedKey && typeof storedKey === 'string') {
+        // Never hand the worker a mismatched pair: the delegation's bound pubkey
+        // must equal the stored session key's pubkey.
+        const { Ed25519KeyIdentity } = await import('@dfinity/identity')
+        const sessionKey = Ed25519KeyIdentity.fromJSON(storedKey)
+        const chain = id.getDelegation()
+        const boundPub = new Uint8Array(chain.delegations[chain.delegations.length - 1].delegation.pubkey)
+        const sessionPub = new Uint8Array(sessionKey.getPublicKey().toDer())
+        const same = boundPub.length === sessionPub.length && boundPub.every((b, i) => b === sessionPub[i])
+        if (!same) { console.warn('[Exchange] worker identity skipped: key/delegation mismatch'); return }
         setExchangeWorkerIdentity({ delegationChainJson: chainJson, sessionKeyJson: storedKey })
         _lastSentChainJson = chainJson
       }
@@ -934,6 +969,22 @@ export const useExchangeStore = defineStore('exchange', () => {
       void userReferralQuery.refresh()
     }
   })
+
+  // Live balances: keep every opened balance query fresh while connected and
+  // visible, so "max" amounts track incoming transfers without a reload.
+  // refresh() dedups in-flight fetches, and only already-opened queries refetch.
+  let balancePollTimer: ReturnType<typeof setInterval> | null = null
+  function startBalancePolling() {
+    if (balancePollTimer) return
+    balancePollTimer = setInterval(() => {
+      if (document.hidden || !isAuthenticated.value) return
+      refreshAllBalances()
+    }, 7_000)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && isAuthenticated.value) refreshAllBalances()
+    })
+  }
+  startBalancePolling()
 
   // Auth-flip handling:
   //   true→false: drop personal data from memory + localStorage so it can't

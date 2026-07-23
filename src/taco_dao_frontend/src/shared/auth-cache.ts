@@ -87,10 +87,16 @@ function getIdentityHash(identity: Identity): string {
  * Get cached AuthClient instance.
  * Creates one if it doesn't exist.
  */
+// Exchange-private IDB database. The DAO app's AuthClient uses the default
+// 'auth-client' DB; sharing it lets either app clobber the other's session key,
+// which produced "Invalid basic signature" 400s on ledger calls.
+export const EXCHANGE_AUTH_DB_NAME = 'taco-exchange-auth'
+
 export async function getCachedAuthClient(): Promise<AuthClient> {
   if (!cachedAuthClient) {
-    const { AuthClient } = await getAuthClientModule()
+    const { AuthClient, IdbStorage } = await getAuthClientModule()
     cachedAuthClient = await AuthClient.create({
+      storage: new IdbStorage({ dbName: EXCHANGE_AUTH_DB_NAME }),
       keyType: 'Ed25519',
       idleOptions: { disableIdle: true },
     })
@@ -104,7 +110,20 @@ export async function getCachedAuthClient(): Promise<AuthClient> {
  */
 export async function getCachedIdentity(): Promise<Identity> {
   const authClient = await getCachedAuthClient()
-  const currentIdentity = authClient.getIdentity()
+  let currentIdentity = authClient.getIdentity()
+
+  // An expired/invalid delegation must read as logged out, not surface raw 400s.
+  if (!currentIdentity.getPrincipal().isAnonymous()) {
+    try {
+      const { DelegationIdentity, isDelegationValid } = await import('@dfinity/identity')
+      if (currentIdentity instanceof DelegationIdentity
+          && !isDelegationValid(currentIdentity.getDelegation())) {
+        await authClient.logout()
+        clearAuthCache()
+        currentIdentity = (await getCachedAuthClient()).getIdentity() // anonymous now
+      }
+    } catch { /* best-effort; never block reads on validation */ }
+  }
 
   // Check if identity changed (e.g., user logged in/out)
   const currentHash = getIdentityHash(currentIdentity)
@@ -189,6 +208,15 @@ export function clearAuthCache(): void {
 export function invalidateAgentCache(): void {
   cachedAgent = null
   cachedAgentIdentityHash = null
+}
+
+/** True for IC 400s caused by a dead/corrupt session (expired delegation or key mismatch). */
+export function isSessionAuthError(err: unknown): boolean {
+  const m = String((err as any)?.message ?? err ?? '')
+  return m.includes('Invalid delegation expiry')
+    || m.includes('delegation has expired')
+    || m.includes('Invalid basic signature')
+    || m.includes('Invalid signature')
 }
 
 // ============================================================================

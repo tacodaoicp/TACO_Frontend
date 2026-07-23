@@ -78,7 +78,10 @@ export function useExchangeAuth() {
     error.value = null
 
     try {
-      const { getCachedAuthClient } = await import('../../shared/auth-cache')
+      const { getCachedAuthClient, clearAuthCache } = await import('../../shared/auth-cache')
+      // Always start login from a fresh client so a stale in-memory identity
+      // (or a half-dead delegation) can't survive into the new session.
+      clearAuthCache()
       const authClient = await getCachedAuthClient()
 
       // Anchor to tacodao.com on the custom subdomain so the principal matches the DAO app.
@@ -133,9 +136,10 @@ export function useExchangeAuth() {
   /** Disconnect and clear auth state */
   async function disconnect() {
     try {
-      const { getCachedAuthClient } = await import('../../shared/auth-cache')
+      const { getCachedAuthClient, clearAuthCache } = await import('../../shared/auth-cache')
       const authClient = await getCachedAuthClient()
       await authClient.logout()
+      clearAuthCache()
     } catch {
       // Ignore logout errors
     }
@@ -146,6 +150,22 @@ export function useExchangeAuth() {
     try { localStorage.removeItem('taco_exchange_auth') } catch { /* ignore */ }
     try { new BroadcastChannel('taco-exchange-auth').postMessage({ type: 'logout' }) } catch { /* ignore */ }
     toast.info('Wallet Disconnected')
+  }
+
+  /** Central handler for dead-session errors (expired delegation / key mismatch).
+   *  Returns true when the error was a session failure and the UI was reset —
+   *  callers should then stop retrying and let the user reconnect. */
+  async function handleSessionError(err: unknown): Promise<boolean> {
+    const { isSessionAuthError, clearAuthCache } = await import('../../shared/auth-cache')
+    if (!isSessionAuthError(err)) return false
+    clearAuthCache()
+    exchangeStore.isAuthenticated = false
+    exchangeStore.principalText = ''
+    exchangeStore.clearActorCache()
+    try { localStorage.removeItem('taco_exchange_auth') } catch { /* ignore */ }
+    try { new BroadcastChannel('taco-exchange-auth').postMessage({ type: 'logout' }) } catch { /* ignore */ }
+    toast.error('Session expired', 'Please reconnect your wallet')
+    return true
   }
 
   /** Copy the principal to clipboard */
@@ -179,11 +199,15 @@ export function useExchangeAuth() {
             exchangeStore.isAuthenticated = false
             exchangeStore.principalText = ''
             exchangeStore.clearActorCache()
+            void import('../../shared/auth-cache').then(m => m.clearAuthCache())
             try { localStorage.removeItem('taco_exchange_auth') } catch { /* ignore */ }
           } else if (data?.type === 'login' && data.principal) {
             exchangeStore.isAuthenticated = true
             exchangeStore.principalText = data.principal
             exchangeStore.clearActorCache()
+            // Drop this tab's in-memory identity so the next call re-reads the
+            // fresh delegation the other tab just wrote to IDB.
+            void import('../../shared/auth-cache').then(m => m.clearAuthCache())
           }
         }
       } catch { /* BroadcastChannel unavailable — fall back to localStorage events */ }
@@ -195,6 +219,7 @@ export function useExchangeAuth() {
           exchangeStore.isAuthenticated = false
           exchangeStore.principalText = ''
           exchangeStore.clearActorCache()
+          void import('../../shared/auth-cache').then(m => m.clearAuthCache())
         } else {
           try {
             const v = JSON.parse(e.newValue) as { principal?: string }
@@ -202,6 +227,7 @@ export function useExchangeAuth() {
               exchangeStore.isAuthenticated = true
               exchangeStore.principalText = v.principal
               exchangeStore.clearActorCache()
+              void import('../../shared/auth-cache').then(m => m.clearAuthCache())
             }
           } catch { /* ignore */ }
         }
@@ -224,5 +250,6 @@ export function useExchangeAuth() {
     disconnect,
     copyPrincipal,
     checkExistingAuth,
+    handleSessionError,
   }
 }

@@ -1032,6 +1032,7 @@ async function submitFullRange() {
       }
     }
   } catch (err: any) {
+    if (await auth.handleSessionError(err)) { phase.value = 'idle'; return }
     if (isTransportError(err) && block0 != null && block1 != null) {
       const probe = async (): Promise<VerifyStatus> => {
         try {
@@ -1155,6 +1156,7 @@ async function submitConcentrated() {
       }
     }
   } catch (err: any) {
+    if (await auth.handleSessionError(err)) { phase.value = 'idle'; return }
     if (isTransportError(err)) {
       const probe = async (): Promise<VerifyStatus> => {
         try {

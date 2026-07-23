@@ -25,7 +25,7 @@
         v-for="item in items"
         :key="item.route"
         class="tx-tab"
-        :class="{ 'tx-tab--mobile-hide': item.key === 'crossdex' }"
+        :class="{ 'tx-tab--mobile-hide': item.key === 'crossdex' || item.key === 'bridge' }"
         :aria-selected="active === item.key || route.path === item.route"
         @pointerenter="warmDestination(item.route)"
         @focus="warmDestination(item.route)"
@@ -60,6 +60,7 @@ const routeMeta: Record<string, { name: string; warm?: () => void }> = {
   '/pool':      { name: 'Pool' },
   '/otc':       { name: 'OTC' },
   '/recover':   { name: 'Recover' },
+  '/bridge':    { name: 'Bridge' },
   '/portfolio': { name: 'Portfolio', warm: () => {
     const s = useExchangeStore()
     if (!s.isAuthenticated) return
@@ -114,6 +115,7 @@ withDefaults(defineProps<{
     { key: 'crossdex',  label: 'CrossDEX',  route: '/crossdex' },
     { key: 'otc',       label: 'OTC',       route: '/otc' },
     { key: 'pool',      label: 'Pool',      route: '/pool' },
+    { key: 'bridge',    label: 'Bridge',    route: '/bridge' },
     { key: 'portfolio', label: 'Portfolio', route: '/portfolio' },
   ],
 })

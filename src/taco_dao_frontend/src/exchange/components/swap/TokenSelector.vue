@@ -31,7 +31,7 @@
               :disabled="isDisabled(token)"
               @click="selectToken(token)"
             >
-              <img v-if="getTokenIcon(token.symbol, token.name)" :src="getTokenIcon(token.symbol, token.name)!" class="token-selector__chip-img" width="18" height="18" />
+              <img v-if="getTokenIcon(token.symbol, token.name, token.address)" :src="getTokenIcon(token.symbol, token.name, token.address)!" class="token-selector__chip-img" width="18" height="18" />
               <span v-else class="token-selector__chip-icon">{{ token.symbol.charAt(0) }}</span>
               {{ token.symbol }}
             </button>
@@ -56,7 +56,7 @@
             @click="selectToken(token)"
           >
             <div class="token-selector__item-icon">
-              <img v-if="getTokenIcon(token.symbol, token.name)" :src="getTokenIcon(token.symbol, token.name)!" width="28" height="28" style="border-radius:50%;object-fit:cover" />
+              <img v-if="getTokenIcon(token.symbol, token.name, token.address)" :src="getTokenIcon(token.symbol, token.name, token.address)!" width="28" height="28" style="border-radius:50%;object-fit:cover" />
               <span v-else>{{ token.symbol.charAt(0) }}</span>
             </div>
             <div class="token-selector__item-info">
@@ -79,7 +79,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
-import { getTokenIcon } from '../../utils/token-icons'
+import { getTokenIcon, prefetchLedgerLogos, iconCacheVersion } from '../../utils/token-icons'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
 type TokenInfoWithPaused = TokenInfo & { _paused?: boolean }
@@ -109,11 +109,13 @@ watch(() => props.visible, async (val) => {
 })
 
 const allTokens = computed((): TokenInfoWithPaused[] => {
+  void iconCacheVersion.value // re-render once lazily fetched ledger logos land
   return store.tokens.map(t => ({
     ...t,
     _paused: store.isTokenPaused(t.address),
   }))
 })
+watch(() => store.tokens, (tokens) => { prefetchLedgerLogos(tokens) }, { immediate: true, deep: false })
 
 const popularTokens = computed(() => {
   // Show first 5 tokens as "popular" (ideally sorted by volume)

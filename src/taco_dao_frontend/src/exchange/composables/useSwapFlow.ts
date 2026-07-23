@@ -13,6 +13,7 @@ import { depositToken, removeDepositFromCache } from '../utils/deposit'
 import { classifyExchangeError, classifyTransportReject, isTransportError, verifyAfterTransportError, type ClassifyContext, type VerifyStatus } from '../utils/errors'
 import { formatTokenAmount } from '../utils/format'
 import { useExchangeToast } from './useExchangeToast'
+import { useExchangeAuth } from './useExchangeAuth'
 import { buildTacoSplitPlan } from '../utils/tacoSplitOptimizer'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
@@ -152,6 +153,7 @@ export interface SplitPlan {
 export function useSwapFlow() {
   const store = useExchangeStore()
   const toast = useExchangeToast()
+  const auth = useExchangeAuth()
 
   // ── State ──
   const phase = ref<SwapPhase>('idle')
@@ -724,6 +726,12 @@ export function useSwapFlow() {
       }
     } catch (err: any) {
       console.error('[Swap] Error:', err)
+      if (await auth.handleSessionError(err)) {
+        errorMsg.value = 'Session expired. Please reconnect your wallet.'
+        errorCanRetry.value = false
+        phase.value = 'error'
+        return
+      }
       if (isTransportError(err) && blockNumber != null) {
         const submittedAt = Date.now()
         const status = await verifyAfterTransportError(() =>

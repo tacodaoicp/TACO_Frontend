@@ -15,6 +15,7 @@
             </div>
           </div>
           <div class="tx-row portfolio-view__tools">
+            <router-link to="/bridge" class="tx-btn tx-btn--ghost tx-btn--sm">Bridge</router-link>
             <router-link to="/recover" class="tx-btn tx-btn--ghost tx-btn--sm">Recover</router-link>
             <router-link v-if="isAdmin" to="/admin" class="tx-btn tx-btn--ghost tx-btn--sm">Admin</router-link>
           </div>

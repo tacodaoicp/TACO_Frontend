@@ -14,6 +14,7 @@
 import { ref, computed } from 'vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { useExchangeToast } from './useExchangeToast'
+import { useExchangeAuth } from './useExchangeAuth'
 import { useTokenBalance } from './useTokenBalance'
 import { probeSwapLanded } from './useSwapFlow'
 import { buildTacoSplitPlan } from '../utils/tacoSplitOptimizer'
@@ -44,6 +45,7 @@ const MAX_ROUTES_PER_FRACTION = 5n
 export function useCrossDexSwap() {
   const store = useExchangeStore()
   const toast = useExchangeToast()
+  const auth = useExchangeAuth()
 
   // ── State ──
   const phase = ref<CrossDexPhase>('idle')
@@ -325,6 +327,14 @@ export function useCrossDexSwap() {
       phase.value = 'partial'
       toast.warning('Partial Fill', `${successes.length}/${results.length} legs filled. Failed legs were refunded.`)
     } else {
+      // A dead session fails every leg the same way; reset auth once instead of
+      // showing raw signature/expiry text.
+      const firstErr = results.map(r => r.error).find(Boolean)
+      if (firstErr && await auth.handleSessionError(new Error(firstErr))) {
+        phase.value = 'error'
+        errorMsg.value = 'Session expired. Please reconnect your wallet.'
+        return
+      }
       phase.value = 'error'
       errorMsg.value = results.map(r => r.error).filter(Boolean).join('; ') || 'All legs failed'
       toast.error('CrossDEX Swap Failed', errorMsg.value)

@@ -76,10 +76,30 @@ export const icrcIDL = ({ IDL }: any) => {
     Err: ApproveError,
   })
 
+  const AllowanceArgs = IDL.Record({
+    account: Account,
+    spender: Account,
+  })
+
+  const MetadataValue = IDL.Variant({
+    Nat: IDL.Nat,
+    Int: IDL.Int,
+    Text: IDL.Text,
+    Blob: IDL.Vec(IDL.Nat8),
+  })
+
   return IDL.Service({
     icrc1_transfer: IDL.Func([TransferArg], [TransferResult], []),
     icrc2_approve: IDL.Func([ApproveArgs], [ApproveResult], []),
     icrc1_fee: IDL.Func([], [IDL.Nat], ['query']),
     icrc1_balance_of: IDL.Func([Account], [IDL.Nat], ['query']),
+    icrc1_decimals: IDL.Func([], [IDL.Nat8], ['query']),
+    icrc1_symbol: IDL.Func([], [IDL.Text], ['query']),
+    icrc1_metadata: IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Text, MetadataValue))], ['query']),
+    icrc2_allowance: IDL.Func(
+      [AllowanceArgs],
+      [IDL.Record({ allowance: IDL.Nat, expires_at: IDL.Opt(IDL.Nat64) })],
+      ['query'],
+    ),
   })
 }

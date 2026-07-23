@@ -123,6 +123,7 @@ import { ref, computed, watch } from 'vue'
 import { Principal } from '@dfinity/principal'
 import { Actor } from '@dfinity/agent'
 import { getCachedAgent, getCachedIdentity } from '../../../shared/auth-cache'
+import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { getTokenIcon } from '../../utils/token-icons'
 
 interface TransferToken {
@@ -138,6 +139,8 @@ const props = defineProps<{
   visible: boolean
   token: TransferToken | null
 }>()
+
+const auth = useExchangeAuth()
 
 const emit = defineEmits<{
   close: []
@@ -434,6 +437,7 @@ async function handleSend() {
     emit('sent', { address: token.address, amount })
     close()
   } catch (err: any) {
+    if (await auth.handleSessionError(err)) { amountError.value = 'Session expired. Please reconnect your wallet.'; return }
     amountError.value = err.message || 'Transfer failed'
   } finally {
     sending.value = false
