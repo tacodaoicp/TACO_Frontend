@@ -250,11 +250,11 @@ const isProcessing = computed(() => cx.phase.value === 'executing')
 
 const fromIcon = computed(() => {
   const t = cx.tokenFrom.value
-  return t ? getTokenIcon(t.symbol, t.name) : null
+  return t ? getTokenIcon(t.symbol, t.name, t.address) : null
 })
 const toIcon = computed(() => {
   const t = cx.tokenTo.value
-  return t ? getTokenIcon(t.symbol, t.name) : null
+  return t ? getTokenIcon(t.symbol, t.name, t.address) : null
 })
 
 const fromBalanceDisplay = computed(() => {

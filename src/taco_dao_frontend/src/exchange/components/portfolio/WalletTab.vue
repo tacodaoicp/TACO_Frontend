@@ -277,7 +277,7 @@ const allRows = computed((): WalletRow[] => {
       usdValue,
       usdFormatted: usdValue > 0.01 ? `$${usdValue.toFixed(2)}` : usdValue > 0 ? `$${usdValue.toFixed(6)}` : '—',
       onExchange: true,
-      icon: getTokenIcon(token.symbol, token.name),
+      icon: getTokenIcon(token.symbol, token.name, token.address),
       tokenType: token.asset_type,
     }
   })
@@ -303,7 +303,7 @@ const allRows = computed((): WalletRow[] => {
       usdValue,
       usdFormatted: usdValue > 0.01 ? `$${usdValue.toFixed(2)}` : usdValue > 0 ? `$${usdValue.toFixed(6)}` : '—',
       onExchange: false,
-      icon: getTokenIcon(dt.symbol, dt.name),
+      icon: getTokenIcon(dt.symbol, dt.name, dt.address),
       tokenType: dt.tokenType,
     })
   }

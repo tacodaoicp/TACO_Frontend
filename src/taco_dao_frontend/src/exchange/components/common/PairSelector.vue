@@ -130,11 +130,11 @@ const currentPairLabel = computed(() => {
 
 const baseIcon = computed(() => {
   const t = store.getTokenByAddress(store.selectedToken0)
-  return t ? getTokenIcon(t.symbol, t.name) : null
+  return t ? getTokenIcon(t.symbol, t.name, t.address) : null
 })
 const quoteIcon = computed(() => {
   const t = store.getTokenByAddress(store.selectedToken1)
-  return t ? getTokenIcon(t.symbol, t.name) : null
+  return t ? getTokenIcon(t.symbol, t.name, t.address) : null
 })
 
 function select(pair: PairOption) {

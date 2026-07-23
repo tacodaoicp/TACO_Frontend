@@ -23,6 +23,8 @@ const props = withDefaults(defineProps<{
   symbol: string
   /** Optional token name — improves icon lookup hit-rate. */
   name?: string
+  /** Optional ledger address — enables the icrc1_metadata logo fallback. */
+  address?: string
   /** Background color used for the letter-fallback circle. */
   color?: string
   size?: number
@@ -34,7 +36,7 @@ const props = withDefaults(defineProps<{
 const imgFailed = ref(false)
 const iconUrl = computed<string | null>(() => {
   if (imgFailed.value) return null
-  return getTokenIcon(props.symbol, props.name)
+  return getTokenIcon(props.symbol, props.name, props.address)
 })
 function onImgError() {
   imgFailed.value = true

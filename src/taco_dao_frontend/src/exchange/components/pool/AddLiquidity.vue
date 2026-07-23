@@ -100,7 +100,7 @@
             >
               <div class="tx-row tx-row--between">
                 <div class="tx-row add-liquidity__amount-ident">
-                  <CoinIcon :symbol="symbol0" :name="info0?.name" :color="colorForSymbol(symbol0)" :size="22" />
+                  <CoinIcon :symbol="symbol0" :name="info0?.name" :address="info0?.address" :color="colorForSymbol(symbol0)" :size="22" />
                   <span class="add-liquidity__amount-sym">{{ symbol0 }}</span>
                 </div>
                 <span v-if="balance0 > 0n" class="tx-ink-3 add-liquidity__amount-bal">
@@ -136,7 +136,7 @@
             >
               <div class="tx-row tx-row--between">
                 <div class="tx-row add-liquidity__amount-ident">
-                  <CoinIcon :symbol="symbol1" :name="info1?.name" :color="colorForSymbol(symbol1)" :size="22" />
+                  <CoinIcon :symbol="symbol1" :name="info1?.name" :address="info1?.address" :color="colorForSymbol(symbol1)" :size="22" />
                   <span class="add-liquidity__amount-sym">{{ symbol1 }}</span>
                 </div>
                 <span v-if="balance1 > 0n" class="tx-ink-3 add-liquidity__amount-bal">

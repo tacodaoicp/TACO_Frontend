@@ -163,7 +163,7 @@ const isICP = computed(() => props.token?.address === ICP_CANISTER)
 
 const tokenIcon = computed(() => {
   if (!props.token) return null
-  return getTokenIcon(props.token.symbol, props.token.name)
+  return getTokenIcon(props.token.symbol, props.token.name, props.token.address)
 })
 
 // Address type detection

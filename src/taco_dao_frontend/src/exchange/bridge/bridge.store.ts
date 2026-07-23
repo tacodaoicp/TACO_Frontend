@@ -27,6 +27,7 @@ import {
   CKBTC_MINTER_ID, CKBTC_LEDGER_ID, CKETH_MINTER_ID, CKETH_LEDGER_ID,
 } from './minter-idl'
 import { useExchangeStore } from '../store/exchange.store'
+import { useExchangeToast } from '../composables/useExchangeToast'
 
 // ── Types ──
 
@@ -583,7 +584,19 @@ export const useBridgeStore = defineStore('bridge', () => {
 
   // ── Status polling (resumes pending entries; a failed poll NEVER fails an entry) ──
 
+  const toast = useExchangeToast()
+
+  /** Toast once when an entry reaches a terminal state via polling. */
+  function notifyStateChange(entry: JournalEntry, before: JournalState): void {
+    if (entry.state === before) return
+    const label = `${entry.token} ${entry.kind.includes('mint') ? 'deposit' : 'withdrawal'}`
+    if (entry.state === 'confirmed') toast.success('Bridge complete', `${label} finished.`)
+    else if (entry.state === 'reimbursed') toast.warning('Bridge reimbursed', `${label} was refunded by the minter.`)
+    else if (entry.state === 'failed') toast.error('Bridge failed', entry.note || `${label} failed.`)
+  }
+
   async function pollEntry(entry: JournalEntry): Promise<void> {
+    const stateBefore = entry.state
     try {
       if (entry.kind === 'btc-dissolve' && entry.blockIndex) {
         const minter = await queryActor(CKBTC_MINTER_ID, ckbtcMinterIDL)
@@ -622,6 +635,8 @@ export const useBridgeStore = defineStore('bridge', () => {
       // network/poll failure: keep waiting, never mark failed
       console.warn('[Bridge] status poll failed (will retry):', err)
     }
+    notifyStateChange(entry, stateBefore)
+    if (entry.state === 'confirmed' && stateBefore !== 'confirmed') void exchangeStore.refreshAllBalances()
   }
 
   let pollTimer: ReturnType<typeof setInterval> | null = null

@@ -173,8 +173,18 @@
               <span class="bridge-view__tx-state" :class="`bridge-view__tx-state--${e.state}`">{{ stateLabel(e.state) }}</span>
             </div>
             <div v-if="e.note" class="bridge-view__tx-note tx-ink-3">{{ e.note }}</div>
-            <div v-if="e.txid" class="bridge-view__tx-note tx-ink-3">BTC tx: <span class="tx-mono">{{ e.txid.slice(0, 20) }}...</span></div>
-            <div v-if="e.txHash" class="bridge-view__tx-note tx-ink-3">ETH tx: <span class="tx-mono">{{ e.txHash.slice(0, 20) }}...</span></div>
+            <div v-if="e.txid" class="bridge-view__tx-note tx-ink-3">
+              BTC tx:
+              <a :href="`https://mempool.space/tx/${e.txid}`" target="_blank" rel="noopener" class="bridge-view__tx-link tx-mono">
+                {{ e.txid.slice(0, 20) }}... ↗
+              </a>
+            </div>
+            <div v-if="e.txHash" class="bridge-view__tx-note tx-ink-3">
+              ETH tx:
+              <a :href="`https://etherscan.io/tx/${e.txHash}`" target="_blank" rel="noopener" class="bridge-view__tx-link tx-mono">
+                {{ e.txHash.slice(0, 20) }}... ↗
+              </a>
+            </div>
           </div>
         </section>
     </div>
@@ -452,8 +462,21 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
     flex-direction: column;
     gap: 20px;
   }
-  /* Keep the form card readable; the nav and title span the full shell. */
-  &__card { max-width: 720px; width: 100%; }
+  /* Keep the form card readable and centered; the nav and title span the full shell. */
+  &__card { max-width: 720px; width: 100%; margin: 0 auto; }
+  &__error-card { max-width: 720px; width: 100%; margin: 0 auto; }
+
+  @media (max-width: 767px) {
+    padding: 12px 10px 80px;
+
+    .bridge-view__direction { flex-wrap: wrap; }
+    .bridge-view__direction .ex-btn { flex: 1 1 auto; }
+    .bridge-view__token--trigger { width: 100%; }
+    .bridge-view__token-menu { width: 100%; min-width: 0; }
+    .bridge-view__btc-deposit { flex-direction: column; align-items: center; }
+    .bridge-view__panel .ex-btn--primary { width: 100%; }
+    .bridge-view__amount-row .ex-input { min-width: 0; flex: 1; }
+  }
   &__card { padding: var(--space-4, 16px); display: flex; flex-direction: column; gap: var(--space-3, 12px); }
   &__connect { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   &__error-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: var(--space-3, 12px); }
@@ -509,6 +532,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   &__tx-main { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
   &__tx-kind { font-weight: 600; }
   &__tx-note { font-size: 12px; margin-top: 2px; }
+  &__tx-link { color: var(--tx-orange, #f7931a); text-decoration: none; &:hover { text-decoration: underline; } }
   &__tx-state {
     font-size: 12px; padding: 1px 8px; border-radius: 999px;
     border: 1px solid var(--tx-border, rgba(128,128,128,0.35));

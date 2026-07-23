@@ -59,7 +59,7 @@ function getDecimals(addr: string) {
 
 function getIcon(addr: string) {
   const t = store.getTokenByAddress(addr)
-  return t ? getTokenIcon(t.symbol, t.name) : null
+  return t ? getTokenIcon(t.symbol, t.name, t.address) : null
 }
 
 function formatAmt(amount: bigint, addr: string) {

@@ -278,11 +278,11 @@ const tokenSelectorSelected = computed(() =>
 // Token icons
 const fromIcon = computed(() => {
   const t = swap.tokenFrom.value
-  return t ? getTokenIcon(t.symbol, t.name) : null
+  return t ? getTokenIcon(t.symbol, t.name, t.address) : null
 })
 const toIcon = computed(() => {
   const t = swap.tokenTo.value
-  return t ? getTokenIcon(t.symbol, t.name) : null
+  return t ? getTokenIcon(t.symbol, t.name, t.address) : null
 })
 
 // Balance — bound reactively to the store's single userBalanceQuery cache, so it

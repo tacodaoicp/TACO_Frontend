@@ -1,8 +1,8 @@
 <template>
   <div class="tx-pair" :style="wrapStyle">
-    <CoinIcon :symbol="symbolA" :name="nameA" :color="colorA" :size="size" />
+    <CoinIcon :symbol="symbolA" :name="nameA" :address="addressA" :color="colorA" :size="size" />
     <div class="tx-pair__b">
-      <CoinIcon :symbol="symbolB" :name="nameB" :color="colorB" :size="size" />
+      <CoinIcon :symbol="symbolB" :name="nameB" :address="addressB" :color="colorB" :size="size" />
     </div>
   </div>
 </template>
@@ -17,6 +17,8 @@ const props = withDefaults(defineProps<{
   /** Optional names — improve icon lookup hit-rate. */
   nameA?: string
   nameB?: string
+  addressA?: string
+  addressB?: string
   colorA?: string
   colorB?: string
   size?: number

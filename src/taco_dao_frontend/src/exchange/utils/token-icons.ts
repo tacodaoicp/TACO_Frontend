@@ -44,6 +44,9 @@ export function prefetchLedgerLogos(tokens: Array<{ symbol: string; name?: strin
  * Falls back through: exact name → symbol → uppercase symbol → null
  */
 export function getTokenIcon(symbol: string, name?: string, address?: string): string | null {
+  // Register a dependency so any computed/template calling this re-renders
+  // when a lazily fetched ledger logo lands in the cache.
+  void iconCacheVersion.value
   if (name && tokenImages[name]) return tokenImages[name]
   if (tokenImages[symbol]) return tokenImages[symbol]
   if (tokenImages[symbol.toUpperCase()]) return tokenImages[symbol.toUpperCase()]

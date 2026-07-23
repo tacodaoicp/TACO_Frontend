@@ -970,6 +970,13 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
   })
 
+  // Fetch missing token logos (ledger icrc1_metadata) once the token list is
+  // known, so wallet/selectors/pair pickers all get icons for new ck tokens.
+  watch(tokens, (t) => {
+    if (!t.length) return
+    void import('../utils/token-icons').then(m => m.prefetchLedgerLogos(t))
+  }, { immediate: true })
+
   // Live balances: keep every opened balance query fresh while connected and
   // visible, so "max" amounts track incoming transfers without a reload.
   // refresh() dedups in-flight fetches, and only already-opened queries refetch.
