@@ -325,11 +325,14 @@ export function useLimitOrder(
     // For sell: deposit token is token0 (base), amount is quantity of token0 (base)
     if (side.value === 'sell') {
       const tokenInfo = getTokenInfo(token0.value)
-      const balance = await store.getUserBalance(token0.value)
+      // Force a fresh ledger read so Max never computes from a stale cached balance.
+      const balance = (await store.userBalanceQuery(token0.value).refresh()) ?? 0n
       if (balance > 0n && tokenInfo) {
         const transferFee = BigInt(tokenInfo.transfer_fee)
         const tradingFee = (balance * (store.tradingFeeBps as bigint)) / 10000n
-        const maxAmount = balance - transferFee - tradingFee
+        // Reserve 2× transfer fee: one is baked into calculateRequiredDeposit,
+        // the second is charged by the ledger on top (same as SwapCard.setPercentage).
+        const maxAmount = balance - transferFee * 2n - tradingFee
         if (maxAmount <= 0n) return
         const useAmount = pct === 100 ? maxAmount : (maxAmount * BigInt(pct)) / 100n
         amount.value = bigIntToDecimal(useAmount, decimals0.value, Math.min(decimals0.value, 6))
@@ -338,11 +341,12 @@ export function useLimitOrder(
       const p = parseFloat(price.value) || 0
       if (p <= 0) return
       const tokenInfo = getTokenInfo(token1.value)
-      const balance = await store.getUserBalance(token1.value)
+      const balance = (await store.userBalanceQuery(token1.value).refresh()) ?? 0n
       if (balance > 0n && tokenInfo) {
         const transferFee = BigInt(tokenInfo.transfer_fee)
         const tradingFee = (balance * (store.tradingFeeBps as bigint)) / 10000n
-        const maxQuote = balance - transferFee - tradingFee
+        // 2× transfer fee, same reasoning as the sell branch.
+        const maxQuote = balance - transferFee * 2n - tradingFee
         if (maxQuote <= 0n) return
         const useQuote = pct === 100 ? maxQuote : (maxQuote * BigInt(pct)) / 100n
         const availableQuote = Number(useQuote) / 10 ** decimals1.value

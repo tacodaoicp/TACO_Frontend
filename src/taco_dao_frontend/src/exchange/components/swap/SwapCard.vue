@@ -325,8 +325,11 @@ function bigIntToDecimal(amount: bigint, decimals: number, maxFrac: number): str
   return `${whole}.${fracStr}`
 }
 
-function setPercentage(pct: number) {
+async function setPercentage(pct: number) {
   pctSlider.value = pct
+  if (!swap.tokenFrom.value || fromBalance.value <= 0n) return
+  // Fresh ledger read so Max never computes from a stale cached balance.
+  try { await store.userBalanceQuery(swap.tokenFrom.value.address).refresh() } catch { /* cached value stands */ }
   if (!swap.tokenFrom.value || fromBalance.value <= 0n) return
   const fee = swap.tokenFrom.value.transfer_fee
   const tradingFee = (fromBalance.value * store.tradingFeeBps) / 10000n

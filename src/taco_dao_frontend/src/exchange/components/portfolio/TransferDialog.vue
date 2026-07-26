@@ -182,11 +182,15 @@ const maxSendable = computed(() => {
 })
 
 const amountBigInt = computed(() => {
+  // Exact decimal-string parse: parseFloat loses precision on high-decimal
+  // tokens and could push MAX above the true sendable balance.
   if (!props.token || !amountStr.value) return 0n
+  const t = amountStr.value.trim()
+  if (!/^\d*(\.\d*)?$/.test(t) || t === '' || t === '.') return 0n
+  const d = props.token.decimals
+  const [int, frac = ''] = t.split('.')
   try {
-    const n = parseFloat(amountStr.value)
-    if (isNaN(n) || n <= 0) return 0n
-    return BigInt(Math.floor(n * 10 ** props.token.decimals))
+    return BigInt(int || '0') * 10n ** BigInt(d) + BigInt(frac.slice(0, d).padEnd(d, '0') || '0')
   } catch { return 0n }
 })
 

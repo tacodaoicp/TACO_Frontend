@@ -478,9 +478,11 @@ function bigIntToDecimal(amount: bigint, decimals: number, maxFrac: number): str
   return `${whole}.${fracStr}`
 }
 
-function setPercentage(pct: number) {
+async function setPercentage(pct: number) {
   pctSlider.value = pct
-  const balance = fromBalance.value
+  // Fresh ledger read so Max never computes from a stale cached balance.
+  let balance = fromBalance.value
+  try { balance = (await store.userBalanceQuery(fromToken.value).refresh()) ?? balance } catch { /* cached value stands */ }
   if (balance > 0n) {
     const fromInfo = store.getTokenByAddress(fromToken.value)
     const fee = fromInfo ? BigInt(fromInfo.transfer_fee) : 0n

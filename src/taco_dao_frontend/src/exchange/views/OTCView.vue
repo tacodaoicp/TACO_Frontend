@@ -412,7 +412,10 @@ const maxFillByBalance = computed(() => {
   if (fillBalance.value <= 0n || !sellTokenInfo.value) return 0n
   const fee = sellTokenInfo.value.transfer_fee ?? 0n
   const tradingFee = (fillBalance.value * store.tradingFeeBps) / 10000n
-  const available = fillBalance.value > (fee + tradingFee) ? fillBalance.value - fee - tradingFee : 0n
+  // Reserve 2× transfer fee: one baked into calculateRequiredDeposit, one
+  // charged by the ledger on top (same model as SwapCard.setPercentage).
+  const reserve = fee * 2n + tradingFee
+  const available = fillBalance.value > reserve ? fillBalance.value - reserve : 0n
   return available
 })
 
@@ -426,9 +429,11 @@ function bigIntToDecimal(amount: bigint, decimals: number, maxFrac: number): str
   return `${whole}.${fracStr}`
 }
 
-function setFillPercentage(pct: number) {
+async function setFillPercentage(pct: number) {
   fillPctSlider.value = pct
   if (!trade.value) return
+  // Fresh ledger read so a Max right after another trade can't overdraw.
+  try { await store.userBalanceQuery(trade.value.token_sell_identifier).refresh() } catch { /* cached value stands */ }
   // Use the smaller of: what the order still wants, what the user can afford
   const maxOrder = maxFillByOrder.value
   const maxBal = maxFillByBalance.value
@@ -476,7 +481,8 @@ const insufficientBalance = computed(() => {
   const rawAmount = BigInt(Math.round(fa * 10 ** sellDecimals.value))
   const fee = sellTokenInfo.value?.transfer_fee ?? 0n
   const tradingFee = (rawAmount * store.tradingFeeBps) / 10000n
-  return fillBalance.value < rawAmount + fee + tradingFee
+  // 2× transfer fee: matches what depositToken actually debits.
+  return fillBalance.value < rawAmount + fee * 2n + tradingFee
 })
 
 const canFill = computed(() => {

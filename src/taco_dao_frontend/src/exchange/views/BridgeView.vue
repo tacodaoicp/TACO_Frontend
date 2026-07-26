@@ -298,7 +298,11 @@ function selectToken(t: BridgeToken) {
 
 function setMax() {
   if (!selected.value) return
-  amount.value = formatUnits(ckBalance.value, selected.value.decimals)
+  // Leave 2× ledger fee headroom: the approve call costs one fee, and the
+  // approved amount itself includes another (minter pulls amount + fee).
+  const fee = selected.value.fee ?? 0n
+  const max = ckBalance.value > fee * 2n ? ckBalance.value - fee * 2n : 0n
+  amount.value = formatUnits(max, selected.value.decimals)
 }
 
 async function copy(text: string) {

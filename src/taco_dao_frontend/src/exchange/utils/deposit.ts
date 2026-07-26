@@ -268,7 +268,11 @@ export async function depositTokenForLiquidity(
       from_subaccount: [],
       created_at_time: [],
     })
-    if ('Err' in (result as any)) throw new Error(`ICP transfer failed: ${JSON.stringify((result as any).Err, jsonSafe)}`)
+    if ('Err' in (result as any)) {
+      const err = (result as any).Err
+      if ('InsufficientFunds' in err) throw new Error('Insufficient balance for this deposit plus the ledger fee.')
+      throw new Error(`ICP transfer failed: ${JSON.stringify(err, jsonSafe)}`)
+    }
     block = (result as any).Ok
   } else {
     const tokenActor = Actor.createActor(icrc1TransferIdl, { agent, canisterId: tokenCanisterId })
@@ -280,7 +284,11 @@ export async function depositTokenForLiquidity(
       memo: [],
       created_at_time: [],
     })
-    if ('Err' in (result as any)) throw new Error(`Token transfer failed: ${JSON.stringify((result as any).Err, jsonSafe)}`)
+    if ('Err' in (result as any)) {
+      const err = (result as any).Err
+      if ('InsufficientFunds' in err) throw new Error('Insufficient balance for this deposit plus the ledger fee.')
+      throw new Error(`Token transfer failed: ${JSON.stringify(err, jsonSafe)}`)
+    }
     block = (result as any).Ok
   }
 

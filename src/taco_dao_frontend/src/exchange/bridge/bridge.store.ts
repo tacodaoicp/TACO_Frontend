@@ -39,6 +39,7 @@ export interface BridgeToken {
   ledgerId: string
   erc20Address?: string
   decimals: number
+  fee: bigint               // ledger icrc1_fee, used for Max headroom
 }
 
 export type JournalKind = 'btc-mint' | 'btc-dissolve' | 'eth-mint' | 'erc20-mint' | 'eth-dissolve' | 'erc20-dissolve'
@@ -109,9 +110,13 @@ export const useBridgeStore = defineStore('bridge', () => {
   const loadingInfo = ref(false)
   const infoError = ref('')
 
+  // ledger fees for the two constant tokens (known mainnet values, re-read on init)
+  const btcLedgerFee = ref(10n)
+  const ethLedgerFee = ref(2_000_000_000_000n)
+
   const bridgeTokens = computed<BridgeToken[]>(() => [
-    { key: 'BTC', symbol: 'ckBTC', nativeSymbol: 'BTC', chain: 'btc', ledgerId: CKBTC_LEDGER_ID, decimals: 8 },
-    { key: 'ETH', symbol: 'ckETH', nativeSymbol: 'ETH', chain: 'eth', ledgerId: CKETH_LEDGER_ID, decimals: 18 },
+    { key: 'BTC', symbol: 'ckBTC', nativeSymbol: 'BTC', chain: 'btc', ledgerId: CKBTC_LEDGER_ID, decimals: 8, fee: btcLedgerFee.value },
+    { key: 'ETH', symbol: 'ckETH', nativeSymbol: 'ETH', chain: 'eth', ledgerId: CKETH_LEDGER_ID, decimals: 18, fee: ethLedgerFee.value },
     ...erc20Tokens.value,
   ])
 
@@ -171,14 +176,20 @@ export const useBridgeStore = defineStore('bridge', () => {
         ledgerId: t.ledger_canister_id.toText(),
         erc20Address: t.erc20_contract_address,
         decimals: 0, // filled lazily from the ledger below
+        fee: 0n,     // filled lazily from the ledger below
       }))
-      // decimals from each ledger (parallel, best-effort — selector needs them)
+      // decimals + fee from each ledger (parallel, best-effort — selector and Max need them)
       await Promise.all(erc20Tokens.value.map(async (t) => {
         try {
           const ledger = await queryActor(t.ledgerId, icrcIDL)
-          t.decimals = Number(await ledger.icrc1_decimals())
-        } catch { t.decimals = 6 } // ponytail: USDC-style default if a ledger read hiccups
+          const [dec, fee] = await Promise.all([ledger.icrc1_decimals(), ledger.icrc1_fee()])
+          t.decimals = Number(dec)
+          t.fee = BigInt(fee)
+        } catch { t.decimals = t.decimals || 6 } // ponytail: USDC-style default if a ledger read hiccups
       }))
+      // refresh the constant tokens' fees too (best-effort; known defaults stand)
+      void queryActor(CKBTC_LEDGER_ID, icrcIDL).then(l => l.icrc1_fee()).then((f: bigint) => { btcLedgerFee.value = BigInt(f) }).catch(() => {})
+      void queryActor(CKETH_LEDGER_ID, icrcIDL).then(l => l.icrc1_fee()).then((f: bigint) => { ethLedgerFee.value = BigInt(f) }).catch(() => {})
     } catch (err: any) {
       infoError.value = 'Could not load bridge configuration. Check your connection and try again.'
       console.error('[Bridge] loadMinterInfo failed:', err)

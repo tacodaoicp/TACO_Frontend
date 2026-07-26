@@ -353,12 +353,15 @@ function flip() {
   cx.tokenTo.value = t
 }
 
-function setPercentage(pct: number) {
+async function setPercentage(pct: number) {
   if (!cx.tokenFrom.value || cx.fromBalance.value <= 0n) return
+  // Fresh ledger read so Max never computes from a stale cached balance.
+  try { await store.userBalanceQuery(cx.tokenFrom.value.address).refresh() } catch { /* cached value stands */ }
+  if (cx.fromBalance.value <= 0n) return
   const fee = cx.tokenFrom.value.transfer_fee
   const tradingFee = (cx.fromBalance.value * store.tradingFeeBps) / 10000n
-  // Reserve fees for both potential legs (extra transfer fee on a split).
-  const reserve = fee * 3n + tradingFee
+  // Worst case 3-venue split: TACO leg needs 2 fees (deposit model), ICPSwap 1, Neutrinite 1.
+  const reserve = fee * 4n + tradingFee
   const max = cx.fromBalance.value > reserve ? cx.fromBalance.value - reserve : 0n
   const useAmount = pct === 100 ? max : (max * BigInt(pct)) / 100n
   if (useAmount <= 0n) { cx.amountIn.value = ''; return }
