@@ -44,6 +44,87 @@
             <div v-if="result" class="admin-view__result">{{ result }}</div>
           </div>
 
+          <!-- V2 Rollout -->
+          <div v-if="activeTab === 'v2'" class="admin-view__section">
+            <h3>V2 Rollout (approve and pull deposits)</h3>
+            <p>
+              V2 routes only when the global switch is on AND the token is allowlisted.
+              The frontend re-checks both within about 5 minutes, no redeploy needed.
+            </p>
+
+            <div class="admin-view__subsection">
+              <h4>Global switch</h4>
+              <p>Currently: <strong>{{ v2StatusText }}</strong></p>
+              <div style="display:flex;gap:8px">
+                <button class="ex-btn ex-btn--primary" @click="setV2Enabled(true)" :disabled="busy">Enable V2</button>
+                <button class="ex-btn ex-btn--sell" @click="setV2Enabled(false)" :disabled="busy">Disable V2</button>
+                <button class="ex-btn ex-btn--outline" @click="loadV2Status" :disabled="busy">Refresh</button>
+              </div>
+            </div>
+
+            <div class="admin-view__subsection">
+              <h4>Token allowlist ({{ v2Allowed.length }} allowed)</h4>
+              <p v-if="v2Allowed.length > 0">{{ v2Allowed.map(a => getAdminTokenSymbol(a)).join(', ') }}</p>
+              <select v-model="v2TokenId" class="ex-input">
+                <option value="">Select token</option>
+                <option v-for="t in store.tokens" :key="t.address" :value="t.address">
+                  {{ t.symbol }} ({{ t.address.slice(0, 10) }}...)
+                </option>
+              </select>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="ex-btn ex-btn--primary" @click="setV2Token(true)" :disabled="busy || !v2TokenId">Allow</button>
+                <button class="ex-btn ex-btn--outline" @click="setV2Token(false)" :disabled="busy || !v2TokenId">Disallow</button>
+              </div>
+            </div>
+
+            <div class="admin-view__subsection">
+              <h4>Per-leg minimum enforcement</h4>
+              <p>enforceMinLegOut is currently: <strong>{{ enforceMinLegOutState === null ? 'unknown' : enforceMinLegOutState ? 'ON' : 'OFF' }}</strong></p>
+              <div style="display:flex;gap:8px">
+                <button class="ex-btn ex-btn--outline" @click="setEnforce(true)" :disabled="busy">Turn on</button>
+                <button class="ex-btn ex-btn--outline" @click="setEnforce(false)" :disabled="busy">Turn off</button>
+              </div>
+            </div>
+
+            <div class="admin-view__subsection">
+              <h4>Pending pulls ({{ adminPulls.length }})</h4>
+              <p>Deposits with an unknown outcome. Resolve pays out against the confirmed ledger block, exactly once. Drop discards the record without paying.</p>
+              <button class="ex-btn ex-btn--outline" @click="loadAdminPulls" :disabled="busy" style="margin-bottom:8px">Load pending pulls</button>
+              <table v-if="adminPulls.length > 0" class="ex-table">
+                <thead>
+                  <tr><th>Id</th><th>Caller</th><th>Token</th><th>Gross</th><th>Context</th><th>Note</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  <tr v-for="p in adminPulls" :key="p.id.toString()">
+                    <td class="num">{{ p.id.toString() }}</td>
+                    <td>{{ p.caller.toText().slice(0, 12) }}...</td>
+                    <td>{{ getAdminTokenSymbol(p.token) }}</td>
+                    <td class="num">{{ p.gross.toString() }}</td>
+                    <td>{{ p.context }}</td>
+                    <td>{{ p.note }}</td>
+                    <td>
+                      <button class="ex-btn ex-btn--sm ex-btn--outline" @click="dropPull(p.id)" :disabled="busy">Drop</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="admin-view__field" style="margin-top:8px">
+                <label>Resolve: pull id / confirmed ledger block / standard</label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <input v-model="resolvePullId" class="ex-input num" placeholder="pull id" style="max-width:110px" />
+                  <input v-model="resolveBlock" class="ex-input num" placeholder="ledger block" style="max-width:150px" />
+                  <select v-model="resolveStandard" class="ex-input" style="max-width:120px">
+                    <option value="ICRC12">ICRC-1/2</option>
+                    <option value="ICRC3">ICRC-3</option>
+                    <option value="ICP">ICP</option>
+                  </select>
+                  <button class="ex-btn ex-btn--primary" @click="resolvePull" :disabled="busy || !resolvePullId || !resolveBlock">Resolve</button>
+                </div>
+              </div>
+            </div>
+            <div v-if="result" class="admin-view__result">{{ result }}</div>
+          </div>
+
           <!-- Token Management -->
           <div v-if="activeTab === 'tokens'" class="admin-view__section">
             <h3>Token Management</h3>
@@ -304,6 +385,7 @@ const result = ref('')
 
 const tabs = [
   { key: 'freeze', label: 'Freeze' },
+  { key: 'v2', label: 'V2' },
   { key: 'tokens', label: 'Tokens' },
   { key: 'fees', label: 'Fees' },
   { key: 'bans', label: 'Bans' },
@@ -320,6 +402,22 @@ const tokenCanisterId = ref('')
 const tokenMinAmount = ref('10000')
 const tokenStandard = ref('ICRC12')
 const pauseTokenId = ref('')
+
+// V2 rollout
+const v2GlobalOn = ref<boolean | null>(null)
+const v2Allowed = ref<string[]>([])
+const v2TokenId = ref('')
+const enforceMinLegOutState = ref<boolean | null>(null)
+const adminPulls = ref<any[]>([])
+const resolvePullId = ref('')
+const resolveBlock = ref('')
+const resolveStandard = ref('ICRC12')
+const v2StatusText = computed(() =>
+  v2GlobalOn.value === null ? 'unknown (press Refresh)' : v2GlobalOn.value ? 'ENABLED' : 'DISABLED')
+
+function getAdminTokenSymbol(address: string): string {
+  return store.getTokenByAddress(address)?.symbol ?? address.slice(0, 10) + '...'
+}
 
 // Fee management
 const newTradingFee = ref('')
@@ -382,6 +480,61 @@ async function withBusy(fn: () => Promise<any>) {
 
 async function toggleFreeze() {
   await withBusy(() => store.freeze())
+}
+
+// ── V2 rollout ──
+
+async function loadV2Status() {
+  busy.value = true
+  try {
+    await store.refreshV2Gates()
+    v2GlobalOn.value = store.v2Enabled
+    v2Allowed.value = Array.from(store.v2AllowedTokens)
+    enforceMinLegOutState.value = await store.getEnforceMinLegOut()
+  } catch (err: any) {
+    result.value = `Error: ${err.message || err}`
+  } finally {
+    busy.value = false
+  }
+}
+
+async function setV2Enabled(enabled: boolean) {
+  await withBusy(() => store.adminSetV2Enabled(enabled))
+  await loadV2Status()
+}
+
+async function setV2Token(allowed: boolean) {
+  await withBusy(() => store.adminSetV2TokenAllowed(v2TokenId.value, allowed))
+  await loadV2Status()
+}
+
+async function setEnforce(enabled: boolean) {
+  await withBusy(() => store.adminSetEnforceMinLegOut(enabled))
+  await loadV2Status()
+}
+
+async function loadAdminPulls() {
+  busy.value = true
+  try {
+    adminPulls.value = await store.adminListPendingPulls() as any[]
+  } catch (err: any) {
+    result.value = `Error: ${err.message || err}`
+  } finally { busy.value = false }
+}
+
+async function resolvePull() {
+  const standards: Record<string, any> = { ICP: { ICP: null }, ICRC12: { ICRC12: null }, ICRC3: { ICRC3: null } }
+  await withBusy(() => store.adminResolvePendingPull(
+    BigInt(resolvePullId.value),
+    BigInt(resolveBlock.value),
+    standards[resolveStandard.value],
+  ))
+  await loadAdminPulls()
+}
+
+async function dropPull(id: bigint) {
+  await withBusy(() => store.adminDropPendingPull(id))
+  await loadAdminPulls()
 }
 
 async function addToken() {

@@ -131,6 +131,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
+import { isApprovalDeclined } from '../../utils/approvalPrompt'
 import { formatUSD } from '../../utils/format'
 import { useExchangeToast } from '../../composables/useExchangeToast'
 import { useTokenBalance } from '../../composables/useTokenBalance'
@@ -157,6 +158,8 @@ const pctSlider = ref(0)
 // Buy: user pays token1 (quote) to get token0 (base)
 // Sell: user pays token0 (base) to get token1 (quote)
 const fromToken = computed(() => side.value === 'buy' ? props.token1 : props.token0)
+// Warm the V2 allowance cache for whichever token would be deposited.
+watch(fromToken, (t) => { if (t) store.prefetchExchangeAllowance(t) }, { immediate: true })
 const toToken = computed(() => side.value === 'buy' ? props.token0 : props.token1)
 
 // Pay-token balance — bound to the store's single userBalanceQuery cache so the
@@ -405,18 +408,51 @@ async function executeSwap() {
     const fromInfo = store.getTokenByAddress(fromToken.value)
     if (!fromInfo) throw new Error('Token not found')
 
-    const { depositToken } = await import('../../utils/deposit')
+    const { depositToken, approveExchangeDeposit, calculateRequiredDeposit } = await import('../../utils/deposit')
     const rawAmount = BigInt(Math.round(a * 10 ** fromDecimals.value))
 
-    const blockNumber = await depositToken(
-      fromToken.value,
-      fromInfo.asset_type as any,
-      rawAmount,
-      store.tradingFeeBps,
-      BigInt(fromInfo.transfer_fee),
-      store.treasuryAccountId,
-      store.treasuryPrincipal,
-    )
+    // Path decided ONCE per action.
+    const v2 = store.useV2Deposit(fromToken.value)
+    const transferFee = BigInt(fromInfo.transfer_fee)
+    const gross = calculateRequiredDeposit(rawAmount, store.tradingFeeBps, transferFee)
+
+    if (v2) {
+      // Fees spent since the amount was set (an approval, an earlier attempt)
+      // can make a Max amount exceed the live balance. Refresh the amount
+      // instead of letting the ledger decline the pull.
+      let bal: bigint | null = null
+      try { bal = await store.userBalanceQuery(fromToken.value).refresh() } catch { /* unknown; let the ledger decide */ }
+      if (bal != null && bal < gross + 2n * transferFee) {
+        const tradingFeeB = (bal * store.tradingFeeBps) / 10000n
+        const freshMax = bal - 3n * transferFee - tradingFeeB
+        if (freshMax <= 0n) {
+          error.value = 'Your balance is too low for this swap.'
+          phase.value = 'error'
+          toast.error('Swap Failed', error.value)
+          return
+        }
+        fromAmount.value = bigIntToDecimal(freshMax, fromDecimals.value, Math.min(fromDecimals.value, 6))
+        phase.value = 'idle'
+        toast.info('Amount updated', 'Fees were paid since you set this amount, so it no longer fit your balance. It was refreshed. Please confirm again.')
+        onAmountChange()
+        return
+      }
+    }
+
+    let blockNumber: bigint | null = null
+    if (v2) {
+      await approveExchangeDeposit(fromToken.value, gross, transferFee)
+    } else {
+      blockNumber = await depositToken(
+        fromToken.value,
+        fromInfo.asset_type as any,
+        rawAmount,
+        store.tradingFeeBps,
+        transferFee,
+        store.treasuryAccountId,
+        store.treasuryPrincipal,
+      )
+    }
 
     phase.value = 'submitting'
 
@@ -429,14 +465,22 @@ async function executeSwap() {
     const minOut = quoteData.value.expectedBuyAmount *
       BigInt(Math.floor((100 - slippage.value) * 100)) / 10000n
 
-    const result = await store.swapMultiHop(
-      fromToken.value,
-      toToken.value,
-      rawAmount,
-      quoteData.value.route,
-      minOut,
-      blockNumber,
-    )
+    const result = v2
+      ? await store.swapMultiHopV2(
+          fromToken.value,
+          toToken.value,
+          gross,
+          quoteData.value.route,
+          minOut,
+        )
+      : await store.swapMultiHop(
+          fromToken.value,
+          toToken.value,
+          rawAmount,
+          quoteData.value.route,
+          minOut,
+          blockNumber!,
+        )
 
     if ('Ok' in result) {
       phase.value = 'success'
@@ -453,6 +497,7 @@ async function executeSwap() {
       const classified = classifyExchangeError(result.Err, {
         outDecimals: toDecimals.value,
         outSymbol: toSymbol.value,
+        v2Settled: v2,
         hopTokens: hops.map(h => {
           const tok = store.getTokenByAddress(h.tokenOut)
           return { symbol: tok?.symbol ?? h.tokenOut.slice(0, 8) }
@@ -461,8 +506,19 @@ async function executeSwap() {
       error.value = classified.message
       phase.value = 'error'
       toast.error(classified.title, classified.message)
+      // V2 slippage settles on chain and system errors track a pull —
+      // either way balances may have changed.
+      if (v2 && ('SlippageExceeded' in result.Err || 'SystemError' in result.Err)) {
+        void store.refreshAfterMutation('swap')
+      }
     }
   } catch (err: any) {
+    if (isApprovalDeclined(err)) {
+      error.value = ''
+      phase.value = 'idle'
+      toast.info('Approval cancelled', 'Nothing left your wallet.')
+      return
+    }
     error.value = err.message || 'Swap failed'
     phase.value = 'error'
     toast.error('Swap Failed', error.value)
@@ -489,7 +545,9 @@ async function setPercentage(pct: number) {
     const tradingFee = (balance * store.tradingFeeBps) / 10000n
     // Reserve 2× transfer fee: one is baked into `required` inside calculateRequiredDeposit,
     // the second is charged by the ledger as the transfer fee on top of `amount`.
-    const maxAmount = balance - fee - fee - tradingFee
+    // The V2 approve+pull path costs one more (the approval is its own ledger tx).
+    const feeReserve = store.useV2Deposit(fromToken.value) ? 3n : 2n
+    const maxAmount = balance - fee * feeReserve - tradingFee
     if (maxAmount <= 0n) return
     const useAmount = pct === 100 ? maxAmount : (maxAmount * BigInt(pct)) / 100n
     const dec = Math.min(fromDecimals.value, 6)

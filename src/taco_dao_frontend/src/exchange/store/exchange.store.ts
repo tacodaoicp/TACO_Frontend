@@ -15,6 +15,7 @@ import { Actor } from '@dfinity/agent'
 import { ICP_LEDGER_ID, isBaseToken } from '../constants/tokens'
 import { Principal } from '@dfinity/principal'
 import { idlFactory } from 'declarations/OTC_backend/OTC_backend.did.js'
+import { icrcIDL } from '../../shared/icrc-idl'
 import { idlFactory as daoBackendIDL } from 'declarations/dao_backend/DAO_backend.did.js'
 import { callExchangeQuery, warmExchangeWorker, setExchangeWorkerIdentity, clearExchangeWorkerIdentity } from '../../workers/exchange-worker-client'
 import { withTimeout } from '../utils/withTimeout'
@@ -92,6 +93,10 @@ export const useExchangeStore = defineStore('exchange', () => {
   const revokeFeeDivisor = ref(5n)
   const referralFeePct = ref(20n)
   const isFrozen = ref(false)
+  // Exchange V2 (approve+pull) gate state — dark by default. Populated by the
+  // gate queries below via onSuccess; read through useV2Deposit().
+  const v2Enabled = ref(false)
+  const v2AllowedTokens = ref<Set<string>>(new Set())
   const icpPriceUSD = ref(0) // from external APIs (CoinGecko/CoinCap/Binance)
   const externalPricesUSD = ref<Map<string, number>>(new Map()) // known external token prices
   const tokenPricesUSD = ref<Map<string, number>>(new Map())
@@ -377,6 +382,10 @@ export const useExchangeStore = defineStore('exchange', () => {
           tradingFeeQuery.ensure(60 * 60_000),
           revokeFeeQuery.ensure(60 * 60_000),
           refFeeQuery.ensure(60 * 60_000),
+          // V2 gates — APPENDED (getD below unpacks by index). Refs populate
+          // via each query's onSuccess, so no unpacking here.
+          v2EnabledQuery.ensure(5 * 60_000),
+          v2AllowedTokensQuery.ensure(5 * 60_000),
         ]).then((deferredResults) => {
           const getD = <T>(i: number): T | null => {
             const r = deferredResults[i]
@@ -779,6 +788,11 @@ export const useExchangeStore = defineStore('exchange', () => {
     return `${p.pool_canister?.length ?? 0}|${(p.last_traded_price ?? []).join(',')}|${(p.amm_reserve0 ?? []).join(',')}|${(p.amm_reserve1 ?? []).join(',')}`
   }
   async function refreshExchangeInfo() {
+    // Piggyback V2 gate freshness on this poll (runs every 15s and on every
+    // mutation; the 5-min TTL caps it at one fetch per window) so an admin
+    // flipping the gates reaches open tabs without a reload.
+    void v2EnabledQuery.ensure(5 * 60_000)
+    void v2AllowedTokensQuery.ensure(5 * 60_000)
     // exchangeInfo is a large struct decoded every 15s — off the main thread.
     const result = await callExchangeQuery<[] | [pool]>('exchangeInfo')
     if (result.length > 0) {
@@ -952,6 +966,51 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
   }
 
+  // ── V2 allowance cache (user → exchange, per token) ──
+  // icrc2_allowance is a public query (account and spender are arguments), so
+  // an anonymous read is fine — same policy as balances. Advisory value: the
+  // worst a stale read causes is one skipped-then-declined pull (clean retry)
+  // or one unneeded approval prompt.
+  async function fetchExchangeAllowance(address: string): Promise<{ allowance: bigint; expiresAt: bigint | null } | null> {
+    const identity = await getCachedIdentity()
+    if (!identity || identity.getPrincipal().isAnonymous()) return null
+    const { HttpAgent } = await import('@dfinity/agent')
+    const agent = new HttpAgent({ host: getNetworkHost(), verifyQuerySignatures: false })
+    if (getEffectiveNetwork() === 'local') await agent.fetchRootKey()
+    const ledger = Actor.createActor(icrcIDL, { agent, canisterId: address })
+    const res: any = await (ledger as any).icrc2_allowance({
+      account: { owner: identity.getPrincipal(), subaccount: [] },
+      spender: { owner: Principal.fromText(getExchangeCanisterId()), subaccount: [] },
+    })
+    return {
+      allowance: BigInt(res.allowance),
+      expiresAt: Array.isArray(res.expires_at) && res.expires_at.length > 0 ? BigInt(res.expires_at[0]) : null,
+    }
+  }
+
+  const userAllowanceQuery = createKeyedQueryFactory<string, { allowance: bigint; expiresAt: bigint | null } | null>((address) => createCachedQuery({
+    key: `user.allowance:${address}`,
+    fetcher: () => fetchExchangeAllowance(address),
+    maxAgeMs: 30_000,
+    principalRef: principalText,
+    timeoutMs: 10_000,
+  }))
+
+  /** Warm the allowance cache ahead of a possible V2 deposit (token switch,
+   *  page mount). No-op for anonymous users and non-V2 tokens. */
+  function prefetchExchangeAllowance(token: string) {
+    if (!isAuthenticated.value || !useV2Deposit(token)) return
+    userAllowanceQuery(token).prefetch()
+  }
+
+  function refreshAllAllowances() {
+    // Pulls consume allowance; keep every opened allowance query in sync.
+    for (const t of tokens.value) {
+      const q = userAllowanceQuery(t.address)
+      if (q.data !== null) void q.refresh()
+    }
+  }
+
   // Centralised mutation propagation. Each kind only refreshes what it can
   // possibly affect. Balances refresh for every token the user has *already*
   // queried (so freshly-loaded views see fresh numbers immediately) — we
@@ -964,6 +1023,8 @@ export const useExchangeStore = defineStore('exchange', () => {
     // refreshAllBalances() only refreshes already-opened, deduped token queries,
     // so firing it unconditionally is cheap and keeps the single source correct.
     refreshAllBalances()
+    // V2 pulls consume allowance the same way.
+    refreshAllAllowances()
     if (kind === 'claim' || kind === 'referral') {
       void userFeesReferrerQuery.refresh()
       void userReferralQuery.refresh()
@@ -1182,6 +1243,11 @@ export const useExchangeStore = defineStore('exchange', () => {
     return (await poolStatsQuery.ensure()) ?? ([] as any)
   }
 
+  async function refreshPoolStats() {
+    // Forced fetch (bypasses the 30s TTL) — for pollers like PoolList's interval.
+    return (await poolStatsQuery.refresh()) ?? ([] as any)
+  }
+
   async function getOrderbookCombined(token0: string, token1: string, numLevels: bigint, stepPercent: bigint) {
     // Routes through orderbookQuery so the syncProPair prefetch + the 3s poller
     // share one in-flight request, and a warm pair revisit hits localStorage.
@@ -1384,6 +1450,69 @@ export const useExchangeStore = defineStore('exchange', () => {
     shallow: true,
     timeoutMs: 15_000,
   })
+
+  // ── Exchange V2 (approve+pull) gates ──
+  // V2 routes only when BOTH are open: the global switch and the per-token
+  // allowlist. Refs are wired via onSuccess so init AND every later refresh
+  // reach useV2Deposit (a bare .refresh() only updates query.data). NOT
+  // persisted: onSuccess must fire once per session so the refs populate —
+  // until then the safe default is the V1 path.
+  const v2EnabledQuery: CachedQuery<boolean> = createCachedQuery({
+    key: 'boot.v2Enabled',
+    fetcher: async () => (await getQueryActor()).getV2Enabled(),
+    maxAgeMs: 5 * 60_000,
+    timeoutMs: 15_000,
+    onSuccess: (v) => { v2Enabled.value = v },
+  })
+
+  const v2AllowedTokensQuery: CachedQuery<string[]> = createCachedQuery({
+    key: 'boot.v2AllowedTokens',
+    fetcher: async () => (await getQueryActor()).getV2AllowedTokens(),
+    maxAgeMs: 5 * 60_000,
+    shallow: true,
+    timeoutMs: 15_000,
+    onSuccess: (v) => { v2AllowedTokens.value = new Set(v) },
+  })
+
+  /**
+   * True when the V2 approve+pull deposit path should be used for this token.
+   * localStorage 'taco_force_v1' = '1' forces the V1 path (debug lever).
+   * Decide ONCE per user action (const at the top of the submit function) —
+   * never re-read mid-flow, so a background gate refresh cannot desync the
+   * approval from the exchange call.
+   */
+  function useV2Deposit(token: string): boolean {
+    try { if (localStorage.getItem('taco_force_v1') === '1') return false } catch { /* ignore */ }
+    return v2Enabled.value && v2AllowedTokens.value.has(token)
+  }
+
+  async function refreshV2Gates(): Promise<void> {
+    await Promise.all([v2EnabledQuery.refresh(), v2AllowedTokensQuery.refresh()])
+  }
+
+  /**
+   * V2 wrappers call this with their Err result. When the backend says a V2
+   * gate is closed, believe it immediately (so the user's retry routes V1 on
+   * the first try, even if the re-fetch below is slow or fails), then
+   * re-fetch for eventual consistency. The allowlist message ends with the
+   * token id, so it can be cleared without threading the token through.
+   */
+  function noteV2GateError(res: unknown) {
+    const msg = (res as any)?.Err?.InvalidInput
+    if (typeof msg !== 'string') return
+    if (msg === 'V2 disabled') {
+      v2Enabled.value = false
+    } else if (msg.includes('not enabled for V2')) {
+      const token = msg.slice(msg.lastIndexOf(': ') + 2).trim()
+      if (!token) return
+      const next = new Set(v2AllowedTokens.value)
+      next.delete(token)
+      v2AllowedTokens.value = next
+    } else {
+      return
+    }
+    void refreshV2Gates()
+  }
 
   // ─── Off-boot heavy queries ──────────────────────────────────────────────
 
@@ -1666,6 +1795,110 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
 
   // ═══════════════════════════════════════════
+  // V2 twins (approve+pull deposit model)
+  // ═══════════════════════════════════════════
+  // Same shapes as their V1 twins minus the block args; amounts are GROSS
+  // ("what you hand over" — exactly what the V1 path transfers). Callers
+  // approve via approveExchangeDeposit() first and gate on useV2Deposit().
+
+  async function addPositionV2(
+    amountSell: bigint,
+    amountInitGross: bigint,
+    tokenSell: string,
+    tokenInit: string,
+    pub: boolean,
+    excludeDAO: boolean,
+    oc: [] | [string],
+    referrer: string,
+    allOrNothing: boolean,
+    strictlyOTC: boolean,
+  ) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached. Wait before making more trades.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    const res = await actor.addPositionV2(amountSell, amountInitGross, tokenSell, tokenInit, pub, excludeDAO, oc, referrer, allOrNothing, strictlyOTC)
+    noteV2GateError(res)
+    return res
+  }
+
+  async function swapMultiHopV2(
+    tokenIn: string,
+    tokenOut: string,
+    amountInGross: bigint,
+    route: SwapHop[],
+    minAmountOut: bigint,
+  ) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached. Wait before making more trades.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    const res = await actor.swapMultiHopV2(tokenIn, tokenOut, amountInGross, route, minAmountOut)
+    noteV2GateError(res)
+    return res
+  }
+
+  async function swapSplitRoutesV2(
+    tokenIn: string,
+    tokenOut: string,
+    splits: SplitLeg[],
+    minAmountOut: bigint,
+  ) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached. Wait before making more trades.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    const res = await actor.swapSplitRoutesV2(tokenIn, tokenOut, splits, minAmountOut)
+    noteV2GateError(res)
+    return res
+  }
+
+  async function finishSellV2(accesscode: string, amountSellingGross: bigint) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    const res = await actor.FinishSellV2(accesscode, amountSellingGross)
+    noteV2GateError(res)
+    return res
+  }
+
+  async function addLiquidityV2(
+    token0: string, token1: string,
+    amount0: bigint, amount1: bigint,
+    isInitial?: boolean,
+  ) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    const res = await actor.addLiquidityV2(token0, token1, amount0, amount1,
+      isInitial != null ? [isInitial] : [])
+    noteV2GateError(res)
+    return res
+  }
+
+  async function addConcentratedLiquidityV2(
+    token0: string, token1: string,
+    amount0: bigint, amount1: bigint,
+    priceLower: bigint, priceUpper: bigint,
+  ) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    const res = await actor.addConcentratedLiquidityV2(token0, token1, amount0, amount1, priceLower, priceUpper)
+    noteV2GateError(res)
+    return res
+  }
+
+  /**
+   * Caller-scoped V2 pending pulls (deposits with an unknown outcome, tracked
+   * on-chain). A plain signed query: free, NOT rate limited, and deliberately
+   * without canMakeUpdateCall — it must keep working while the exchange is
+   * frozen, which is exactly when users need to see it. Requires auth
+   * (anonymous callers get an empty list from the backend anyway).
+   */
+  async function getMyPendingPulls() {
+    const actor = await getUpdateActor()
+    return actor.getMyPendingPulls()
+  }
+
+  // ═══════════════════════════════════════════
   // Admin Methods (update, rate-limited, owner-only)
   // ═══════════════════════════════════════════
 
@@ -1674,6 +1907,63 @@ export const useExchangeStore = defineStore('exchange', () => {
     trackUpdateCall()
     const actor = await getUpdateActor()
     return actor.Freeze()
+  }
+
+  // ── V2 rollout admin controls ──
+
+  async function adminSetV2Enabled(enabled: boolean) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    const res = await actor.admin_setV2Enabled(enabled)
+    void refreshV2Gates()
+    return res
+  }
+
+  async function adminSetV2TokenAllowed(token: string, allowed: boolean) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    const res = await actor.adminSetV2TokenAllowed(token, allowed)
+    void refreshV2Gates()
+    return res
+  }
+
+  async function adminSetEnforceMinLegOut(enabled: boolean) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    return actor.setEnforceMinLegOut(enabled)
+  }
+
+  /** Admin-gated signed query — free, not rate limited. */
+  async function getEnforceMinLegOut() {
+    const actor = await getQueryActor()
+    return actor.getEnforceMinLegOut()
+  }
+
+  /** Admin-gated signed query — free, not rate limited. */
+  async function adminListPendingPulls() {
+    const actor = await getUpdateActor()
+    return actor.adminListPendingPulls()
+  }
+
+  async function adminResolvePendingPull(
+    pullId: bigint,
+    confirmedLedgerBlock: bigint,
+    tType: { ICP: null } | { ICRC3: null } | { ICRC12: null },
+  ) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    return actor.adminResolvePendingPull(pullId, confirmedLedgerBlock, tType)
+  }
+
+  async function adminDropPendingPull(pullId: bigint) {
+    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
+    trackUpdateCall()
+    const actor = await getUpdateActor()
+    return actor.adminDropPendingPull(pullId)
   }
 
   async function addAcceptedToken(
@@ -1995,6 +2285,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     getAllAMMPools,
     getPoolStats,
     getAllPoolStats,
+    refreshPoolStats,
     getOrderbookCombined,
     getKlineData,
     getKlineDataRange,
@@ -2034,8 +2325,30 @@ export const useExchangeStore = defineStore('exchange', () => {
     recoverBatch,
     fixStuckTX,
 
+    // Exchange V2 (approve+pull)
+    v2Enabled,
+    v2AllowedTokens,
+    useV2Deposit,
+    userAllowanceQuery,
+    prefetchExchangeAllowance,
+    refreshV2Gates,
+    addPositionV2,
+    swapMultiHopV2,
+    swapSplitRoutesV2,
+    finishSellV2,
+    addLiquidityV2,
+    addConcentratedLiquidityV2,
+    getMyPendingPulls,
+
     // Admin methods
     freeze,
+    adminSetV2Enabled,
+    adminSetV2TokenAllowed,
+    adminSetEnforceMinLegOut,
+    getEnforceMinLegOut,
+    adminListPendingPulls,
+    adminResolvePendingPull,
+    adminDropPendingPull,
     addAcceptedToken,
     pauseToken,
     changeTradingFees,

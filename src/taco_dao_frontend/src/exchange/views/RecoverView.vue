@@ -95,6 +95,39 @@
         </table>
       </section>
 
+      <!-- Exchange V2 pending pulls (unknown-outcome deposits, tracked on chain) -->
+      <section v-if="pendingPulls.length > 0" class="recover-view__section">
+        <h2 class="recover-view__subtitle">Pending Exchange Deposits</h2>
+        <p class="recover-view__desc">
+          These deposits were pulled by the exchange but the ledger did not confirm the outcome.
+          They are tracked on chain and an admin will resolve them. Do not repeat the trade that
+          created them.
+        </p>
+        <button class="ex-btn ex-btn--outline" @click="loadPendingPulls" :disabled="pullsLoading" style="margin-bottom:var(--space-3)">
+          {{ pullsLoading ? 'Checking...' : 'Refresh' }}
+        </button>
+        <table class="ex-table recover-view__deposits-table">
+          <thead>
+            <tr>
+              <th>Pull</th>
+              <th>Amount</th>
+              <th>Context</th>
+              <th>When</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in pendingPulls" :key="p.id.toString()">
+              <td class="num">#{{ p.id.toString() }}</td>
+              <td>{{ formatPullAmount(p) }}</td>
+              <td>{{ p.context }}</td>
+              <td>{{ formatPullTime(p.time) }}</td>
+              <td>{{ p.note }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
       <!-- ICPSwap Recovery (sweep stranded pool funds) -->
       <section class="recover-view__section">
         <h2 class="recover-view__subtitle">ICPSwap Recovery</h2>
@@ -251,7 +284,9 @@ async function recoverCachedDeposit(dep: CachedDeposit) {
       recoverError.value = 'Connect your wallet first'
       return
     }
-    const standard = tokenType[dep.type] ?? { ICRC12: null }
+    // Prefer the LIVE backend asset_type (authoritative ICRC3/ICRC12/ICP) over the cached
+    // dep.type, which may have been tagged ICRC12 by a stale/fallback token load.
+    const standard = store.getTokenByAddress(dep.token)?.asset_type ?? tokenType[dep.type] ?? { ICRC12: null }
     console.log(`[Recover] Calling recoverWronglysent(${dep.token}, ${dep.block}, ${JSON.stringify(standard)})`)
     const result = await store.recoverWronglysent(
       dep.token,
@@ -306,7 +341,7 @@ async function recoverAllCached() {
     const batch = cachedDeposits.value.slice(0, 20).map(dep => ({
       identifier: dep.token,
       block: BigInt(dep.block),
-      tType: tokenType[dep.type] ?? { ICRC12: null },
+      tType: store.getTokenByAddress(dep.token)?.asset_type ?? tokenType[dep.type] ?? { ICRC12: null },
     }))
 
     console.log(`[Recover] Batch recovering ${batch.length} deposits`)
@@ -417,7 +452,9 @@ async function recoverTokens() {
     try { blockNum = BigInt(recoverBlock.value.trim()) }
     catch { recoverError.value = 'Invalid block number'; recovering.value = false; return }
 
-    const standard = tokenType[recoverStandard.value]
+    // Prefer the token's real backend asset_type; the manual dropdown is only a fallback
+    // for a token that isn't in the accepted-token list.
+    const standard = store.getTokenByAddress(recoverTokenId.value.trim())?.asset_type ?? tokenType[recoverStandard.value]
     if (!standard) { recoverError.value = 'Invalid token standard'; recovering.value = false; return }
 
     const result = await store.recoverWronglysent(
@@ -545,10 +582,34 @@ async function sweepNeuManual() {
   }
 }
 
+// ── Exchange V2 pending pulls ──
+// Deposits the exchange pulled whose outcome the ledger never confirmed.
+// Tracked on chain; an admin resolves them. Display-only here.
+const pendingPulls = ref<any[]>([])
+const pullsLoading = ref(false)
+async function loadPendingPulls() {
+  if (!store.isAuthenticated) { pendingPulls.value = []; return }
+  pullsLoading.value = true
+  try {
+    pendingPulls.value = await store.getMyPendingPulls() as any[]
+  } catch { /* best-effort; section stays as-is */ }
+  finally { pullsLoading.value = false }
+}
+function formatPullAmount(p: any): string {
+  const t = store.getTokenByAddress(p.token)
+  const dec = t ? Number(t.decimals) : 8
+  const amount = Number(p.gross) / 10 ** dec
+  return `${amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${t?.symbol ?? String(p.token).slice(0, 8)}`
+}
+function formatPullTime(timeNs: bigint): string {
+  return formatDepositAge(Number(BigInt(timeNs) / 1_000_000n))
+}
+
 onMounted(() => {
   loadCachedDeposits()
   loadPendingNeu()
   loadPendingSwaps()
+  void loadPendingPulls()
 })
 </script>
 

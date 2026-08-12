@@ -9,8 +9,9 @@ import { ref, computed, watch, onBeforeUnmount, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useExchangeStore } from '../store/exchange.store'
 import { isVisible as isDocumentVisible, onVisible } from './useVisibilityAware'
-import { depositToken, removeDepositFromCache } from '../utils/deposit'
+import { depositToken, removeDepositFromCache, approveExchangeDeposit, calculateRequiredDeposit } from '../utils/deposit'
 import { classifyExchangeError, classifyTransportReject, isTransportError, verifyAfterTransportError, type ClassifyContext, type VerifyStatus } from '../utils/errors'
+import { isApprovalDeclined } from '../utils/approvalPrompt'
 import { formatTokenAmount } from '../utils/format'
 import { useExchangeToast } from './useExchangeToast'
 import { useExchangeAuth } from './useExchangeAuth'
@@ -198,6 +199,11 @@ export function useSwapFlow() {
     }
   })
 
+  // Warm the V2 allowance cache the moment the input token is known, so the
+  // approval check at confirm time reads a hot cache (and only prompts when
+  // a new approval is really needed).
+  watch(tokenFrom, (t) => { if (t) store.prefetchExchangeAllowance(t.address) }, { immediate: true })
+
   // Internal
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   let preventNavigation = false
@@ -276,6 +282,43 @@ export function useSwapFlow() {
 
   // Drift banner shown when the last-mile re-quote detects significant movement.
   const needsReconfirm = ref(false)
+
+  /**
+   * V2 pre-flight: fees spent since the amount was set (an approval fee, an
+   * earlier attempt) can make a Max-fill amount exceed the live balance. The
+   * ledger would decline the pull, and a retry with the same stale amount
+   * declines again. Re-check against a fresh balance; when the amount no
+   * longer fits, refresh it to the current max and hand control back for an
+   * explicit re-confirm. Returns true when the swap may proceed as is.
+   */
+  async function v2AmountStillFits(gross: bigint, transferFee: bigint): Promise<boolean> {
+    if (!tokenFrom.value) return false
+    let bal: bigint | null = null
+    try { bal = await store.userBalanceQuery(tokenFrom.value.address).refresh() }
+    catch { return true } // balance unknown right now; let the ledger decide
+    if (bal == null) return true
+    // Worst case wallet need: gross (one fee embedded) + approve fee + pull fee.
+    if (bal >= gross + 2n * transferFee) return true
+    const tradingFeeB = (bal * store.tradingFeeBps) / 10000n
+    const freshMax = bal - 3n * transferFee - tradingFeeB
+    if (freshMax <= 0n) {
+      errorMsg.value = 'Your balance is too low for this swap.'
+      errorCanRetry.value = false
+      phase.value = 'error'
+      toast.error('Swap Failed', errorMsg.value)
+      return false
+    }
+    const dec = Number(tokenFrom.value.decimals)
+    const divisor = 10n ** BigInt(dec)
+    const whole = freshMax / divisor
+    const frac = (freshMax % divisor).toString().padStart(dec, '0').replace(/0+$/, '')
+    amountIn.value = frac ? `${whole}.${frac}` : `${whole}`
+    needsReconfirm.value = true
+    phase.value = 'quoteReady'
+    toast.info('Amount updated', 'Fees were paid since you set this amount, so it no longer fit your balance. It was refreshed. Please confirm again.')
+    fetchQuote(true).catch(() => { /* best-effort re-quote */ })
+    return false
+  }
 
   /**
    * Pure fetch — no UI state mutation. Returns the freshest SwapQuoteResult
@@ -504,21 +547,43 @@ export function useSwapFlow() {
     const ok = await requoteAndCheckDrift()
     if (!ok) return
 
-    // 1. Single deposit for the FULL amount (same as regular swap)
+    // Path decided ONCE per action — a background gate refresh must not
+    // desync the deposit from the exchange call below.
+    const v2 = store.useV2Deposit(tokenFrom.value.address)
+    const transferFee = tokenFrom.value.transfer_fee
+    const netTotal = amountInBigInt.value
+    // Gross = exactly what the V1 path transfers (identical arithmetic backend-side).
+    const grossTotal = calculateRequiredDeposit(netTotal, store.tradingFeeBps, transferFee)
+
+    if (v2 && !(await v2AmountStillFits(grossTotal, transferFee))) return
+
+    // 1. Move funds: V2 approves the exchange to pull the full amount once;
+    //    V1 transfers to the treasury and passes the block index.
     phase.value = 'depositing'
-    let blockNumber: bigint
+    let blockNumber: bigint | null = null
+    let submitted = false
     try {
-      blockNumber = await depositToken(
-        tokenFrom.value.address,
-        tokenFrom.value.asset_type,
-        amountInBigInt.value,
-        store.tradingFeeBps,
-        tokenFrom.value.transfer_fee,
-        store.treasuryAccountId,
-        store.treasuryPrincipal,
-      )
-      console.log('[Swap] Split deposit OK, blockNumber:', blockNumber.toString())
+      if (v2) {
+        await approveExchangeDeposit(tokenFrom.value.address, grossTotal, transferFee)
+        console.log('[Swap] Split V2 approve OK, gross:', grossTotal.toString())
+      } else {
+        blockNumber = await depositToken(
+          tokenFrom.value.address,
+          tokenFrom.value.asset_type,
+          netTotal,
+          store.tradingFeeBps,
+          transferFee,
+          store.treasuryAccountId,
+          store.treasuryPrincipal,
+        )
+        console.log('[Swap] Split deposit OK, blockNumber:', blockNumber.toString())
+      }
     } catch (err: any) {
+      if (isApprovalDeclined(err)) {
+        phase.value = 'quoteReady'
+        toast.info('Approval cancelled', 'Nothing left your wallet.')
+        return
+      }
       errorMsg.value = `Deposit failed: ${err.message || err}`
       errorCanRetry.value = true
       phase.value = 'error'
@@ -526,20 +591,35 @@ export function useSwapFlow() {
       return
     }
 
-    // 2. Build split legs for backend
+    // 2. Build split legs for backend. V1 legs are the optimizer's net shares.
+    //    V2 legs are GROSS shares summing to grossTotal, proportional to the
+    //    net legs (floor, remainder to leg 0) — the backend nets the sum once
+    //    and re-apportions with the exact same rule, so dust stays sub-unit.
     phase.value = 'submitting'
-    const splits = plan.legs.map(leg => ({
-      amountIn: leg.amountIn,
-      route: leg.route,
-      minLegOut: 0n, // rely on global minAmountOut
-    }))
+    let splits: Array<{ amountIn: bigint; route: SwapHop[]; minLegOut: bigint }>
+    if (v2) {
+      const grossLegs = plan.legs.map(leg => (leg.amountIn * grossTotal) / netTotal)
+      const assigned = grossLegs.reduce((a, b) => a + b, 0n)
+      if (grossTotal > assigned) grossLegs[0] += grossTotal - assigned
+      splits = plan.legs.map((leg, i) => ({
+        amountIn: grossLegs[i],
+        route: leg.route,
+        minLegOut: 0n, // rely on global minAmountOut
+      }))
+    } else {
+      splits = plan.legs.map(leg => ({
+        amountIn: leg.amountIn,
+        route: leg.route,
+        minLegOut: 0n, // rely on global minAmountOut
+      }))
+    }
 
     const minOut = quote.value.expectedBuyAmount *
       BigInt(Math.floor((100 - slippage.value) * 100)) / 10000n
 
     console.log('[Swap] swapSplitRoutes call:', {
-      tokenIn: tokenFrom.value.address, tokenOut: tokenTo.value.address,
-      legs: splits.length, minOut: minOut.toString(), block: blockNumber.toString(),
+      tokenIn: tokenFrom.value.address, tokenOut: tokenTo.value.address, v2,
+      legs: splits.length, minOut: minOut.toString(), block: blockNumber?.toString() ?? 'v2-pull',
     })
 
     // Debug handoff (item 7): paste this block to backend when a swap misbehaves.
@@ -549,6 +629,7 @@ export function useSwapFlow() {
       tokenIn: tokenFrom.value.address,
       tokenOut: tokenTo.value.address,
       amountIn: amountInBigInt.value.toString(),
+      v2,
       slippagePct: slippage.value,
       quoteResponse: {
         expectedBuyAmount: quote.value.expectedBuyAmount.toString(),
@@ -560,49 +641,66 @@ export function useSwapFlow() {
     })
 
     try {
-      const rawResult = await store.swapSplitRoutes(
-        tokenFrom.value.address,
-        tokenTo.value.address,
-        splits,
-        minOut,
-        blockNumber,
-      )
+      submitted = true
+      const rawResult = v2
+        ? await store.swapSplitRoutesV2(
+            tokenFrom.value.address,
+            tokenTo.value.address,
+            splits,
+            minOut,
+          )
+        : await store.swapSplitRoutes(
+            tokenFrom.value.address,
+            tokenTo.value.address,
+            splits,
+            minOut,
+            blockNumber!,
+          )
 
       console.log('[Swap] swapSplitRoutes result:', rawResult)
 
       if ('Ok' in rawResult) {
         const swap = rawResult.Ok
         result.value = {
-          amountSent: swap.amountIn,
+          // V2 echoes the gross (fees included); show the user's net so the
+          // result screen matches V1 and the typed amount.
+          amountSent: v2 ? netTotal : swap.amountIn,
           amountReceived: swap.amountOut,
           fee: swap.fee,
         }
         phase.value = 'success'
-        removeDepositFromCache(blockNumber.toString())
+        if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
         void store.refreshAfterMutation('swap')
         toast.success('Split Swap Complete', formatTokenAmount(swap.amountOut, Number(tokenTo.value.decimals), tokenTo.value.symbol) + ' received via ' + plan.legs.length + ' routes')
       } else {
-        const classified = classifyExchangeError(rawResult.Err, buildSwapCtx())
+        const classified = classifyExchangeError(rawResult.Err, { ...buildSwapCtx(), v2Settled: v2 })
         errorMsg.value = classified.message
         errorCanRetry.value = classified.recoverable
         phase.value = 'error'
         toast.error(classified.title, classified.message)
+        // V2 slippage settles on chain and system errors track a pull —
+        // either way balances may have changed.
+        if (v2 && ('SlippageExceeded' in rawResult.Err || 'SystemError' in rawResult.Err)) {
+          void store.refreshAfterMutation('swap')
+        }
       }
     } catch (err: any) {
       console.error('[Swap] Split swap error:', err)
-      if (isTransportError(err)) {
+      if (isTransportError(err) && submitted) {
         const submittedAt = Date.now()
         const status = await verifyAfterTransportError(() =>
           probeSwapLanded(store, tokenFrom.value!.address, tokenTo.value!.address, amountInBigInt.value, submittedAt)
         )
         if (status === 'succeeded') {
-          removeDepositFromCache(blockNumber.toString())
+          if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
           void store.refreshAfterMutation('swap')
           phase.value = 'success'
           toast.success('Split Swap Complete', 'Network hiccup during submit — confirmed via query.')
           return
         }
-        errorMsg.value = 'Network issue during submit. Refresh to verify before retrying — your tokens are safe.'
+        errorMsg.value = v2
+          ? 'Network issue during submit. Check your trade history and the Recover page before retrying.'
+          : 'Network issue during submit. Refresh to verify before retrying — your tokens are safe.'
         errorCanRetry.value = true
         phase.value = 'error'
         toast.warning('Network issue', errorMsg.value)
@@ -627,8 +725,12 @@ export function useSwapFlow() {
     window.addEventListener('beforeunload', beforeUnloadHandler)
 
     // Lifted out of the try so the catch below (transport-error probe) can
-    // reference it when deciding whether to clear the pending-deposit cache.
+    // reference them. `submitted` (not block presence) gates the probe: the
+    // V2 path never has a block, but an ambiguous submit must still be
+    // verified before inviting a retry.
     let blockNumber: bigint | null = null
+    let submitted = false
+    let v2 = false
 
     try {
       // ── Split execution path ──
@@ -644,22 +746,34 @@ export function useSwapFlow() {
       const driftOk = await requoteAndCheckDrift()
       if (!driftOk) return
 
-      // 1. Deposit
+      // Path decided ONCE per action.
+      v2 = store.useV2Deposit(tokenFrom.value.address)
+      const transferFee = tokenFrom.value.transfer_fee
+      const gross = calculateRequiredDeposit(amountInBigInt.value, store.tradingFeeBps, transferFee)
+
+      if (v2 && !(await v2AmountStillFits(gross, transferFee))) return
+
+      // 1. Deposit (V1: transfer + block) or approval (V2: exchange pulls)
       phase.value = 'depositing'
       console.log('[Swap] Depositing:', {
-        token: tokenFrom.value.address, amount: amountInBigInt.value.toString(),
-        feeBps: store.tradingFeeBps.toString(), transferFee: tokenFrom.value.transfer_fee.toString(),
+        token: tokenFrom.value.address, amount: amountInBigInt.value.toString(), v2,
+        feeBps: store.tradingFeeBps.toString(), transferFee: transferFee.toString(),
       })
-      blockNumber = await depositToken(
-        tokenFrom.value.address,
-        tokenFrom.value.asset_type,
-        amountInBigInt.value,
-        store.tradingFeeBps,
-        tokenFrom.value.transfer_fee,
-        store.treasuryAccountId,
-        store.treasuryPrincipal,
-      )
-      console.log('[Swap] Deposit OK, blockNumber:', blockNumber.toString())
+      if (v2) {
+        await approveExchangeDeposit(tokenFrom.value.address, gross, transferFee)
+        console.log('[Swap] V2 approve OK, gross:', gross.toString())
+      } else {
+        blockNumber = await depositToken(
+          tokenFrom.value.address,
+          tokenFrom.value.asset_type,
+          amountInBigInt.value,
+          store.tradingFeeBps,
+          transferFee,
+          store.treasuryAccountId,
+          store.treasuryPrincipal,
+        )
+        console.log('[Swap] Deposit OK, blockNumber:', blockNumber.toString())
+      }
 
       // 2. Submit via swapMultiHop (works for both direct 1-hop and multi-hop routes)
       phase.value = 'submitting'
@@ -673,8 +787,8 @@ export function useSwapFlow() {
 
       console.log('[Swap] swapMultiHop call:', {
         tokenIn: tokenFrom.value.address, tokenOut: tokenTo.value.address,
-        amountIn: amountInBigInt.value.toString(), route: quote.value.route,
-        minOut: minOut.toString(), blockNumber: blockNumber.toString(),
+        amountIn: amountInBigInt.value.toString(), route: quote.value.route, v2,
+        minOut: minOut.toString(), blockNumber: blockNumber?.toString() ?? 'v2-pull',
       })
 
       // Debug handoff (item 7): paste this block to backend when a swap misbehaves.
@@ -684,6 +798,7 @@ export function useSwapFlow() {
         tokenIn: tokenFrom.value.address,
         tokenOut: tokenTo.value.address,
         amountIn: amountInBigInt.value.toString(),
+        v2,
         slippagePct: slippage.value,
         quoteResponse: {
           expectedBuyAmount: quote.value.expectedBuyAmount.toString(),
@@ -694,14 +809,23 @@ export function useSwapFlow() {
         minAmountOut: minOut.toString(),
       })
 
-      const rawResult = await store.swapMultiHop(
-        tokenFrom.value.address,
-        tokenTo.value.address,
-        amountInBigInt.value,
-        quote.value.route,
-        minOut,
-        blockNumber,
-      )
+      submitted = true
+      const rawResult = v2
+        ? await store.swapMultiHopV2(
+            tokenFrom.value.address,
+            tokenTo.value.address,
+            gross,
+            quote.value.route,
+            minOut,
+          )
+        : await store.swapMultiHop(
+            tokenFrom.value.address,
+            tokenTo.value.address,
+            amountInBigInt.value,
+            quote.value.route,
+            minOut,
+            blockNumber!,
+          )
 
       console.log('[Swap] swapMultiHop result:', rawResult)
 
@@ -709,7 +833,9 @@ export function useSwapFlow() {
       if ('Ok' in rawResult) {
         const swap = rawResult.Ok
         result.value = {
-          amountSent: swap.amountIn,
+          // V2 echoes the gross (fees included); show the user's net so the
+          // result screen matches V1 and the typed amount.
+          amountSent: v2 ? amountInBigInt.value : swap.amountIn,
           amountReceived: swap.amountOut,
           fee: swap.fee,
         }
@@ -718,11 +844,16 @@ export function useSwapFlow() {
         void store.refreshAfterMutation('swap')
         toast.success('Swap Complete', formatTokenAmount(swap.amountOut, Number(tokenTo.value!.decimals), tokenTo.value!.symbol) + ' received')
       } else {
-        const classified = classifyExchangeError(rawResult.Err, buildSwapCtx())
+        const classified = classifyExchangeError(rawResult.Err, { ...buildSwapCtx(), v2Settled: v2 })
         errorMsg.value = classified.message
         errorCanRetry.value = classified.recoverable
         phase.value = 'error'
         toast.error(classified.title, classified.message)
+        // V2 slippage settles on chain and system errors track a pull —
+        // either way balances may have changed.
+        if (v2 && ('SlippageExceeded' in rawResult.Err || 'SystemError' in rawResult.Err)) {
+          void store.refreshAfterMutation('swap')
+        }
       }
     } catch (err: any) {
       console.error('[Swap] Error:', err)
@@ -732,22 +863,29 @@ export function useSwapFlow() {
         phase.value = 'error'
         return
       }
-      if (isTransportError(err) && blockNumber != null) {
+      if (isTransportError(err) && submitted) {
         const submittedAt = Date.now()
         const status = await verifyAfterTransportError(() =>
           probeSwapLanded(store, tokenFrom.value!.address, tokenTo.value!.address, amountInBigInt.value, submittedAt)
         )
         if (status === 'succeeded') {
-          removeDepositFromCache(blockNumber.toString())
+          if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
           void store.refreshAfterMutation('swap')
           phase.value = 'success'
           toast.success('Swap Complete', 'Network hiccup during submit — confirmed via query.')
           return
         }
-        errorMsg.value = 'Network issue during submit. Refresh to verify before retrying — your tokens are safe.'
+        errorMsg.value = v2
+          ? 'Network issue during submit. Check your trade history and the Recover page before retrying.'
+          : 'Network issue during submit. Refresh to verify before retrying — your tokens are safe.'
         errorCanRetry.value = true
         phase.value = 'error'
         toast.warning('Network issue', errorMsg.value)
+        return
+      }
+      if (isApprovalDeclined(err)) {
+        phase.value = 'quoteReady'
+        toast.info('Approval cancelled', 'Nothing left your wallet.')
         return
       }
       errorMsg.value = err.message || 'An unexpected error occurred'
@@ -786,17 +924,6 @@ export function useSwapFlow() {
     errorMsg.value = ''
     // Keep tokens and amount so user can retry
     if (amountIn.value) debouncedFetchQuote()
-  }
-
-  // Set MAX amount
-  function setMaxAmount() {
-    if (!tokenFrom.value) return
-    // Leave room for transfer fee
-    const fee = tokenFrom.value.transfer_fee
-    // We also need room for trading fee
-    const tradingFee = (amountInBigInt.value * store.tradingFeeBps) / 10000n
-    // Get wallet balance — for now this is a placeholder
-    // In the real implementation, the swap card component passes the balance
   }
 
   // Stop quote polling the moment the user leaves the swap surface (we may

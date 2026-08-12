@@ -16,6 +16,7 @@
     <MobileNav v-if="!isProRoute" />
     <ExchangeToastContainer />
     <HelpModal v-model:open="helpOpen" />
+    <ApprovalDialog />
     <div class="ex-sr-announce" aria-live="polite" aria-atomic="true" id="ex-announce"></div>
   </div>
 </template>
@@ -29,6 +30,7 @@ import { ADMIN_PRINCIPALS } from './composables/useAdminCheck'
 import MobileNav from './exchange/components/layout/MobileNav.vue'
 import ExchangeToastContainer from './exchange/components/shared/ExchangeToastContainer.vue'
 import HelpModal from './exchange/components/common/HelpModal.vue'
+import ApprovalDialog from './exchange/components/common/ApprovalDialog.vue'
 import * as neutrinite from './exchange/services/neutrinite'
 
 const exchangeStore = useExchangeStore()

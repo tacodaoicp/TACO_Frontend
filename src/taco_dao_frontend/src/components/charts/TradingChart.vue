@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, type IChartApi, type ISeriesApi, ColorType, type CandlestickData, type HistogramData, type LineData, type Time } from 'lightweight-charts'
 import { usePolling } from '../../composables/usePolling'
 import type { KlineDatafeed, TimeFrame } from './types'
@@ -156,6 +156,17 @@ function getTimeframeVariant(): TimeFrame {
     week: { week: null },
   }
   return map[activeTimeframe.value] ?? { hour: null }
+}
+
+function bucketSeconds(): number {
+  const map: Record<string, number> = {
+    fivemin: 300,
+    hour: 3600,
+    fourHours: 14400,
+    day: 86400,
+    week: 604800,
+  }
+  return map[activeTimeframe.value] ?? 3600
 }
 
 function setTimeframe(key: string) {
@@ -564,6 +575,13 @@ async function loadInitialData() {
 
     // Initial paint is done — quietly page more history in the background.
     scheduleBackgroundPrefetch()
+
+    // The paint above may have come from a stale persisted cache (the range
+    // query returns cached data immediately and revalidates in the background,
+    // which this one-shot await never sees). Backfill any missing tail now so
+    // the stale paint heals by appending instead of waiting; when the data was
+    // fresh the gap is under two buckets and this returns without a fetch.
+    void catchUp()
   } catch (err) {
     if (mySwitchId !== switchId) return
     console.error('[TradingChart] Load error:', err)
@@ -624,6 +642,18 @@ async function pollUpdate() {
       d.timestamp && d.open != null && d.close != null &&
       (d.open !== 0 || d.high !== 0 || d.low !== 0 || d.close !== 0)
     )
+
+    // Gap detector: if the newest buckets sit well past our painted tail, the
+    // bars in between were never fetched (hidden tab, long absence). Backfill
+    // through catchUp() instead of blindly appending across the hole.
+    if (validData.length > 0 && cachedCandles.length > 0) {
+      const oldestFetchedSec = Math.floor(Number(validData[0].timestamp) / 1_000_000_000)
+      const lastCachedSec = Number(cachedCandles[cachedCandles.length - 1].time)
+      if (oldestFetchedSec > lastCachedSec + bucketSeconds() * 1.5) {
+        void catchUp()
+        return
+      }
+    }
 
     for (const d of validData) {
       const adj = adjustCandle(d)
@@ -688,6 +718,114 @@ function reconcileLastCandleWithEffectivePrice() {
     lineSeries?.update({ time: last.time, value: ep })
   }
 }
+
+// ── Gap catch-up ────────────────────────────────────────────────
+// The 5s poll only ever fetches the newest two buckets, so any absence longer
+// than that (hidden tab, keep-alive navigation away, a stale persisted first
+// paint) leaves a hole between the painted tail and the live bar. catchUp()
+// fetches exactly the missing stretch through the uncached before-cursor
+// range path and MERGES it into the existing series, so the chart heals in
+// place instead of showing a gap or waiting for a full repaint.
+let catchUpRunning = false
+
+function mergeBars(candles: CandlestickData[], volumes: HistogramData[]) {
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i]
+    const v = volumes[i]
+    const idx = cachedCandles.findIndex(x => x.time === c.time)
+    if (idx >= 0) { cachedCandles[idx] = c; cachedVolumes[idx] = v }
+    else { cachedCandles.push(c); cachedVolumes.push(v) }
+  }
+  cachedCandles.sort((a, b) => Number(a.time) - Number(b.time))
+  cachedVolumes.sort((a, b) => Number(a.time) - Number(b.time))
+  // series.update() cannot insert older bars — repaint from the merged cache.
+  if (activeChartType.value === 'candles') {
+    candleSeries?.setData(cachedCandles)
+  } else {
+    lineSeries?.setData(cachedCandles.map(c => ({ time: c.time, value: c.close })))
+  }
+  volumeSeries?.setData(cachedVolumes)
+}
+
+async function catchUp() {
+  if (catchUpRunning) return
+  if (!props.token0 || !props.token1) return
+  if (cachedCandles.length === 0) { void loadInitialData(); return }
+
+  const bucket = bucketSeconds()
+  const lastCachedSec = Number(cachedCandles[cachedCandles.length - 1].time)
+  const nowSec = Math.floor(Date.now() / 1000)
+  const gapBuckets = (nowSec - lastCachedSec) / bucket
+  if (gapBuckets <= 1.5) return // the poll already covers this
+
+  catchUpRunning = true
+  const mySwitchId = switchId
+  try {
+    const limit = BigInt(Math.min(Math.ceil(gapBuckets) + 3, 2000))
+    // before just past now → the newest `limit` bars, ascending, uncached.
+    const beforeNs = BigInt(nowSec + bucket) * 1_000_000_000n
+    const data = await props.datafeed.getRange(
+      props.token0,
+      props.token1,
+      getTimeframeVariant(),
+      [beforeNs],
+      limit,
+    )
+    if (mySwitchId !== switchId) return
+    if (!data || data.length === 0) return
+
+    const validData = data.filter(d =>
+      d.timestamp && d.open != null && d.close != null &&
+      (d.open !== 0 || d.high !== 0 || d.low !== 0 || d.close !== 0)
+    )
+    if (validData.length === 0) return
+
+    const candles: CandlestickData[] = validData.map(d => {
+      const adj = adjustCandle(d)
+      return {
+        time: Math.floor(Number(d.timestamp) / 1_000_000_000) as Time,
+        open: adj.open, high: adj.high, low: adj.low, close: adj.close,
+      }
+    })
+    const volumes: HistogramData[] = validData.map(d => {
+      const adj = adjustCandle(d)
+      return {
+        time: Math.floor(Number(d.timestamp) / 1_000_000_000) as Time,
+        value: Number(d.volume),
+        color: adj.close >= adj.open ? colorBuy + '40' : colorSell + '40',
+      }
+    })
+
+    const oldestFetchedSec = Number(candles[0].time)
+    const cameBackFull = validData.length >= Number(limit)
+    if (cameBackFull && oldestFetchedSec > lastCachedSec + bucket * 1.5) {
+      // The absence outran the fetch window; the old tail cannot be bridged.
+      // Replace with the fresh window and reset the viewport like a fresh load.
+      cachedCandles = candles
+      cachedVolumes = volumes
+      if (activeChartType.value === 'candles') {
+        candleSeries?.setData(candles)
+      } else {
+        lineSeries?.setData(candles.map(c => ({ time: c.time, value: c.close })))
+      }
+      volumeSeries?.setData(volumes)
+      const from = candles.length > 100 ? candles[candles.length - 100].time : candles[0].time
+      chart?.timeScale().setVisibleRange({ from, to: candles[candles.length - 1].time })
+    } else {
+      mergeBars(candles, volumes)
+      chart?.timeScale().scrollToRealTime()
+    }
+    reconcileLastCandleWithEffectivePrice()
+  } catch (err) {
+    console.error('[TradingChart] Catch-up error:', err)
+  } finally {
+    catchUpRunning = false
+  }
+}
+
+// Keep-alive re-entry: the poll resumes on its own, but only ever carries the
+// two newest buckets — backfill whatever formed while this view was away.
+onActivated(() => { void catchUp() })
 
 // Poll every 5 seconds for faster chart updates after trades
 const enabledRef = computed(() => props.enabled !== false)

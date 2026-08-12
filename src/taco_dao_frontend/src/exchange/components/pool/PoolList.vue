@@ -127,7 +127,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { isVisible } from '../../composables/useVisibilityAware'
 import { useExchangeStore } from '../../store/exchange.store'
 import { ratioToHumanPrice, formatRangePrice, isEffectivelyFullRange } from '../../utils/concentrated'
 import { formatUSD } from '../../utils/format'
@@ -369,9 +370,13 @@ async function toggleExpand(pool: PoolRow) {
   }
 }
 
-onMounted(async () => {
+async function loadPools(force = false) {
   try {
-    const allStats = await store.getAllPoolStats().catch(() => []) as any[]
+    // force bypasses the 30s query cache — used by the poll and mutation
+    // reloads so /pool volume never sits stale until an F5.
+    const allStats = force
+      ? await store.refreshPoolStats().catch(() => []) as any[]
+      : await store.getAllPoolStats().catch(() => []) as any[]
 
     if (allStats.length > 0) {
       const seen = new Set<string>()
@@ -500,6 +505,20 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => { void loadPools() })
+
+// Keep the table live: a 30s visibility-gated poll plus an immediate reload
+// when the user's own swap or LP action lands. Previously this component
+// loaded once on mount and volume sat stale until a full page refresh.
+const poolTimer = setInterval(() => { if (isVisible.value) void loadPools(true) }, 30_000)
+const offPoolMutation = store.onMutation((kind) => {
+  if (kind === 'swap' || kind === 'lp') void loadPools(true)
+})
+onUnmounted(() => {
+  clearInterval(poolTimer)
+  offPoolMutation()
 })
 </script>
 

@@ -35,13 +35,17 @@ type create_trading_canister =
    ChangeReferralFees: (newFeePercentage: nat) -> ();
    ChangeRevokefees: (ok: nat) -> () oneway;
    ChangeTradingfees: (ok: nat) -> () oneway;
-   FinishSell: (Block: nat64, accesscode: text, amountSelling: nat) ->
+   FinishSell: (Block: nat64, accesscode: text, amountSellingRaw: nat) ->
     (ActionResult);
    FinishSellBatch: (Block: nat64, accesscode: vec text,
     amount_Sell_by_Reactor: vec nat, token_sell_identifier: text,
     token_init_identifier: text) -> (ActionResult);
    FinishSellBatchDAO: (trades: vec TradeData, createOrdersIfNotDone: 
     bool, special: vec nat) -> (opt BatchProcessResult);
+   FinishSellBatchV2: (accesscode: vec text, amount_Sell_by_Reactor: 
+    vec nat, token_sell_identifier: text, token_init_identifier: text) ->
+    (ActionResult);
+   FinishSellV2: (accesscode: text, amountSelling: nat) -> (ActionResult);
    FixStuckTX: (accesscode: text) -> (ActionResult);
    Freeze: () -> ();
    addAcceptedToken: (action: variant {
@@ -57,6 +61,9 @@ type create_trading_canister =
    addConcentratedLiquidity: (token0i: text, token1i: text, amount0i: 
     nat, amount1i: nat, priceLower: nat, priceUpper: nat, block0i: nat,
     block1i: nat) -> (AddConcentratedResult);
+   addConcentratedLiquidityV2: (token0i: text, token1i: text, amount0i: 
+    nat, amount1i: nat, priceLower: nat, priceUpper: nat) ->
+    (AddConcentratedResult);
    addFeeCollector: (p: principal) -> (ActionResult);
    addLiquidity: (token0i: text, token1i: text, amount0i: nat, amount1i: 
     nat, block0i: nat, block1i: nat, isInitial: opt bool) ->
@@ -64,10 +71,16 @@ type create_trading_canister =
    addLiquidityDAO: (token0i: text, token1i: text, amount0i: nat, amount1i:
     nat, block0i: nat, block1i: nat, isInitial: opt bool) ->
     (AddLiquidityResult);
+   addLiquidityV2: (token0i: text, token1i: text, amount0i: nat, amount1i:
+    nat, isInitial: opt bool) -> (AddLiquidityResult);
    addPosition: (Block: nat, amount_sell: nat, amount_init: nat,
     token_sell_identifier: text, token_init_identifier: text, pub: bool,
     excludeDAO: bool, OC: opt text, referrer: text, allOrNothing: bool,
     strictlyOTC: bool) -> (OrderResult);
+   addPositionV2: (amount_sell: nat, amount_init: nat, token_sell_identifier:
+    text, token_init_identifier: text, pub: bool, excludeDAO: bool, OC:
+    opt text, referrer: text, allOrNothing: bool, strictlyOTC: bool) ->
+    (OrderResult);
    addTimer: () -> ();
    adminAnalyzeRouteEfficiency: (token: text, sampleSize: nat, depth: 
     nat) ->
@@ -79,10 +92,12 @@ type create_trading_canister =
         outputAmount: nat;
         route: vec SwapHop;
       }) query;
+   adminCheckBan: (p: principal) -> (nat) query;
    adminDeleteKlinesBefore: (cutoffNs: int, maxDeletesPerBucket: nat) ->
     (text);
    adminDrainTestModeExchange: (target: principal) -> (text);
    adminDrainTestModeStatus: () -> (text) query;
+   adminDropPendingPull: (pullId: nat) -> (ActionResult);
    adminExecuteRouteStrategy: (amount: nat, route: vec SwapHop, minOutput:
     nat, Block: nat) -> (SwapResult);
    adminFindOptimalArb: (token: text, minSample: nat, maxSample: nat, depth:
@@ -117,8 +132,32 @@ type create_trading_canister =
           transferFee: nat;
         };
      });
+   adminForceUnlockRecovery: () -> (bool);
+   adminListPendingPulls: () -> (vec PullRecordV2) query;
+   adminPruneBlocksDone: (batchSize: nat) ->
+    (record {
+       deleted: nat;
+       remaining: nat;
+       skippedICRC3: nat;
+     });
+   adminRecoverWronglysent: (recipient: principal, identifier: text, Block:
+    nat, tType: variant {
+                  ICP;
+                  ICRC12;
+                  ICRC3;
+                }) -> (bool);
    adminRepairLastTradedPriceAndKlines: (affectedPoolIndexes: vec nat,
     alsoRepairVolume24h: bool) -> (text);
+   adminResolvePendingPull: (pullId: nat, confirmedLedgerBlock: nat, tType:
+    variant {
+      ICP;
+      ICRC12;
+      ICRC3;
+    }) -> (ActionResult);
+   adminSetV2TokenAllowed: (token: text, allowed: bool) -> (ActionResult);
+   adminSweepPendingPulls: (olderThanSeconds: nat) -> (ActionResult);
+   admin_setV2Enabled: (enabled: bool) -> (ActionResult);
+   admin_setVerboseLogging: (on: bool) -> (bool);
    batchAdjustLiquidity: (adjustments:
     vec
      record {
@@ -170,6 +209,14 @@ type create_trading_canister =
                                  }) query;
    claimAllLPFees: () -> (ClaimAllLPFeesResult);
    claimConcentratedFees: (positionId: nat) -> (ClaimFeesResult);
+   claimDAOFeesToCaller: () ->
+    (variant {
+       Err: ExchangeError;
+       Ok: vec record {
+                 text;
+                 nat;
+               };
+     });
    claimFeesReferrer: () -> (vec record {
                                    text;
                                    nat;
@@ -245,6 +292,8 @@ type create_trading_canister =
                                     vec TradePrivate;
                                   }) query;
    getAllowedCanisters: () -> (vec text) query;
+   getBlockDoneStatus: (token: text, block: nat) -> (bool) query;
+   getBlocksDoneSize: () -> (nat) query;
    getCurrentLiquidity: (token1: text, token2: text, direction:
     variant {
       backward;
@@ -318,7 +367,19 @@ type create_trading_canister =
                                    text;
                                    int;
                                  }) query;
+   getEnforceMinLegOut: () -> (bool) query;
    getExpectedMultiHopAmount: (tokenIn: text, tokenOut: text, amountIn:
+    nat) ->
+    (record {
+       bestRoute: vec SwapHop;
+       expectedAmountOut: nat;
+       hopDetails: vec HopDetail;
+       hops: nat;
+       priceImpact: float64;
+       routeTokens: vec text;
+       totalFee: nat;
+     }) query;
+   getExpectedMultiHopAmountV2: (tokenIn: text, tokenOut: text, amountIn:
     nat) ->
     (record {
        bestRoute: vec SwapHop;
@@ -386,23 +447,103 @@ type create_trading_canister =
             priceImpact: float64;
             routeDescription: text;
             routeTokens: vec text;
-          };
-        splitSim:
-         opt
+            tradingFeeBps: nat;
+          };}) query;
+   getExpectedReceiveAmountBatchMultiOptimal: (tokenSell: text, tokenBuy:
+    text, amountIn: nat) ->
+    (record {
+       canFulfillFully: bool;
+       expectedBuyAmount: nat;
+       fee: nat;
+       legs:
+        vec
+         record {
+           bp: nat;
+           expectedBuyAmount: nat;
+           route: vec SwapHop;
+           routeDescription: text;
+         };
+       priceImpact: float64;
+       routeDescription: text;
+       tradingFeeBps: nat;
+     }) query;
+   getExpectedReceiveAmountBatchMultiOptimalV2: (tokenSell: text, tokenBuy:
+    text, amountIn: nat) ->
+    (record {
+       canFulfillFully: bool;
+       expectedBuyAmount: nat;
+       fee: nat;
+       legs:
+        vec
+         record {
+           bp: nat;
+           expectedBuyAmount: nat;
+           route: vec SwapHop;
+           routeDescription: text;
+         };
+       priceImpact: float64;
+       routeDescription: text;
+       tradingFeeBps: nat;
+     }) query;
+   getExpectedReceiveAmountBatchMultiV2: (requests:
+    vec record {
+          amountSell: nat;
+          tokenBuy: text;
+          tokenSell: text;
+        }, maxRoutesPerRequest: nat) ->
+    (vec
+      record {
+        routes:
+         vec
           record {
-            legs:
-             vec
-              record {
-                amountIn: nat;
-                expectedOut: nat;
-                route: vec record {
-                             tokenIn: text;
-                             tokenOut: text;
-                           };
-              };
-            totalOut: nat;
-          };
+            canFulfillFully: bool;
+            expectedBuyAmount: nat;
+            fee: nat;
+            hopDetails: vec HopDetail;
+            potentialOrderDetails:
+             opt record {
+                   amount_init: nat;
+                   amount_sell: nat;
+                 };
+            priceImpact: float64;
+            routeDescription: text;
+            routeTokens: vec text;
+            tradingFeeBps: nat;
+          };}) query;
+   getExpectedReceiveAmountBatchV2: (requests:
+    vec record {
+          amountSell: nat;
+          tokenBuy: text;
+          tokenSell: text;
+        }) ->
+    (vec
+      record {
+        canFulfillFully: bool;
+        expectedBuyAmount: nat;
+        fee: nat;
+        hopDetails: vec HopDetail;
+        potentialOrderDetails:
+         opt record {
+               amount_init: nat;
+               amount_sell: nat;
+             };
+        priceImpact: float64;
+        routeDescription: text;
       }) query;
+   getExpectedReceiveAmountV2: (tokenSell: text, tokenBuy: text, amountSell:
+    nat) ->
+    (record {
+       canFulfillFully: bool;
+       expectedBuyAmount: nat;
+       fee: nat;
+       hopDetails: vec HopDetail;
+       potentialOrderDetails: opt record {
+                                    amount_init: nat;
+                                    amount_sell: nat;
+                                  };
+       priceImpact: float64;
+       routeDescription: text;
+     }) query;
    getFeeCollectors: () -> (vec principal) query;
    getKlineData: (token1: text, token2: text, timeFrame: TimeFrame,
     initialGet: bool) -> (vec KlineData) query;
@@ -417,6 +558,19 @@ type create_trading_canister =
            text;
          }) query;
    getLogs: (count: nat) -> (vec LogEntry) query;
+   getMemoryStats: () ->
+    (record {
+       heap_size: nat;
+       max_live_size: nat;
+       memory_size: nat;
+       reclaimed: nat;
+       sizes: vec record {
+                    text;
+                    nat;
+                  };
+       total_allocation: nat;
+     }) query;
+   getMyPendingPulls: () -> (vec PullRecordV2) query;
    getOrderbookCombined: (token0: text, token1: text, numLevels: nat,
     stepBasisPoints: nat) ->
     (record {
@@ -547,6 +701,9 @@ type create_trading_canister =
         token_sell_identifier: text;
       }) query;
    getUserTrades: () -> (vec TradePrivate2) query;
+   getV2AllowedTokens: () -> (vec text) query;
+   getV2Enabled: () -> (bool) query;
+   getVerboseLogging: () -> (bool) query;
    get_cycles: () -> (nat) query;
    get_token_trends_7d: (tokens: vec principal) ->
     (variant {
@@ -561,10 +718,12 @@ type create_trading_canister =
            token: principal;
          };
      }) query;
+   grossToNetV2: (token: text, gross: nat) -> (nat) query;
    hmFee: () -> (nat) query;
    hmRefFee: () -> (nat) query;
    hmRevokeFee: () -> (nat) query;
    isExchangeFrozen: () -> (bool) query;
+   netToGrossV2: (token: text, net: nat) -> (nat) query;
    p2a: () -> (text) query;
    p2acannister: () -> (text) query;
    p2athird: (p: text) -> (text);
@@ -581,6 +740,12 @@ type create_trading_canister =
       treasury_principal: opt text;
     }) -> ();
    pauseToken: (token: text) -> ();
+   quoteDepositV2: (token: text, gross: nat) ->
+    (record {
+       netSwapped: nat;
+       tradingFee: nat;
+       transferFee: nat;
+     }) query;
    recalibrateDAOpositions: (positions: vec PositionData) ->
     (vec RecalibratedPosition);
    recoverBatch: (recoveries: vec RecoveryInput) -> (vec RecoveryResult);
@@ -596,6 +761,7 @@ type create_trading_canister =
    removeFeeCollector: () -> (ActionResult);
    removeLiquidity: (token0i: text, token1i: text, liquidityAmount: nat) ->
     (RemoveLiquidityResult);
+   requiredAllowanceV2: (token: text, gross: nat) -> (nat) query;
    resetAllState: () -> (text);
    resetDriftOpTracker: () -> ();
    retrieveFundsDao: (trades: vec record {
@@ -620,6 +786,7 @@ type create_trading_canister =
           TransferFee: nat;
         };
       }) query;
+   setEnforceMinLegOut: (enabled: bool) -> (ActionResult);
    setMinimumAmount: (token: text, newMinimum: nat) -> (ActionResult);
    setTest: (a: bool) -> ();
    simulateSplitRoutes: (splits:
@@ -631,12 +798,27 @@ type create_trading_canister =
                  perLegOut: vec nat;
                  totalOut: nat;
                }) query;
+   simulateSplitRoutesV2: (splits:
+    vec record {
+          amountIn: nat;
+          route: vec SwapHop;
+        }) -> (record {
+                 error: text;
+                 perLegOut: vec nat;
+                 totalOut: nat;
+               }) query;
    swapMultiHop: (tokenIn: text, tokenOut: text, amountIn: nat, route:
     vec SwapHop, minAmountOut: nat, Block: nat) -> (SwapResult);
+   swapMultiHopV2: (tokenIn: text, tokenOut: text, amountIn: nat, route:
+    vec SwapHop, minAmountOut: nat) -> (SwapResult);
    swapSplitRoutes: (tokenIn: text, tokenOut: text, splits: vec SplitLeg,
     minAmountOut: nat, Block: nat) -> (SwapResult);
+   swapSplitRoutesV2: (tokenIn: text, tokenOut: text, splits: vec SplitLeg,
+    minAmountOut: nat) -> (SwapResult);
    treasurySwap: (tokenIn: text, tokenOut: text, amountIn: nat, minAmountOut:
     nat, block: nat) -> (SwapResult);
+   treasurySwapV2: (tokenIn: text, tokenOut: text, amountIn: nat,
+    minAmountOut: nat) -> (SwapResult);
    updateTokenType: (token: text, newType: variant {
                                              ICP;
                                              ICRC12;
@@ -865,6 +1047,19 @@ type Ratio =
    Max;
    Value: nat;
    Zero;
+ };
+type PullRecordV2 = 
+ record {
+   caller: principal;
+   context: text;
+   feeBp: nat;
+   gross: nat;
+   id: nat;
+   note: text;
+   revokeBp: nat;
+   tf: nat;
+   time: Time;
+   token: text;
  };
 type ProcessedTrade = 
  record {

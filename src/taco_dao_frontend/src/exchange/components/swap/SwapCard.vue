@@ -335,7 +335,9 @@ async function setPercentage(pct: number) {
   const tradingFee = (fromBalance.value * store.tradingFeeBps) / 10000n
   // Reserve 2× transfer fee: one is baked into `required` inside calculateRequiredDeposit,
   // the second is charged by the ledger as the transfer fee on top of `amount`.
-  const maxAmount = fromBalance.value - fee - fee - tradingFee
+  // The V2 approve+pull path costs one more (the approval is its own ledger tx).
+  const feeReserve = store.useV2Deposit(swap.tokenFrom.value.address) ? 3n : 2n
+  const maxAmount = fromBalance.value - fee * feeReserve - tradingFee
   if (maxAmount <= 0n) return
   const useAmount = pct === 100 ? maxAmount : (maxAmount * BigInt(pct)) / 100n
   if (useAmount <= 0n) { swap.amountIn.value = ''; return }

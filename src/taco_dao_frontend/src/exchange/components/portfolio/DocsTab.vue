@@ -38,6 +38,14 @@
         call against the live canister, useful for scripts, audits, or clients in any
         language). Use the toggle above to switch.
       </p>
+      <p class="docs-tab__text">
+        Deposits use ICRC-2 approve and pull, called <strong>V2</strong>: you approve the
+        exchange as spender for the gross amount and call the V2 method. No transfer to
+        the treasury, no ledger block index, and a failed call leaves nothing to recover.
+        The original V1 methods (transfer first, then pass the block index) keep working
+        and are documented in each section under "the old way", for older integrations
+        and for tokens that are not enabled for V2.
+      </p>
       <div class="docs-tab__callout docs-tab__callout--warn">
         <strong>Critical Candid type note.</strong> All token identifiers in this canister
         are <code>text</code> (the principal as a string), <strong>not</strong>
@@ -70,6 +78,130 @@
           (resolves from <code>getCanisterId('exchange', 'ic')</code>).
         </p>
       </div>
+    </div>
+
+    <!-- Deposits: approve and pull (V2) -->
+    <div class="docs-tab__section">
+      <h3 class="docs-tab__title">Deposits: approve and pull (V2)</h3>
+      <p class="docs-tab__text">
+        Every trade needs a deposit. In V2 you do not transfer anything yourself:
+        you approve the exchange as spender on the token's ledger, then call the V2
+        method. The exchange pulls the amount with <code>icrc2_transfer_from</code>
+        as part of the call. If anything is wrong (bad route, paused token, amount
+        too low), the call refuses before pulling and your balance is untouched.
+      </p>
+
+      <h4 class="docs-tab__subtitle">Feature detection: check both gates</h4>
+      <p class="docs-tab__text">
+        V2 is enabled per token behind two switches. Route to V2 only when
+        <code>getV2Enabled()</code> returns true AND the token is in
+        <code>getV2AllowedTokens()</code>. Both are free anonymous queries. Checking
+        only the allowlist is a trap: it is not gated by the global switch, so it can
+        be non-empty while V2 is off. When either gate is closed for your token, use
+        the V1 flow instead. Right now both gates are open for every accepted token.
+      </p>
+
+      <h4 class="docs-tab__subtitle">Amounts are gross</h4>
+      <p class="docs-tab__text">
+        <code>amountIn</code> on every V2 method is what you hand over, fees included:
+        <code>gross = net + net * feeBps / 10000 + transferFee</code>, where
+        <code>net</code> is the amount that actually gets swapped (and the amount you
+        quote with) and <code>feeBps</code> comes from <code>hmFee()</code>. The
+        backend uses the same arithmetic, so a quote for <code>net</code> and an
+        execution with <code>gross</code> always agree. If you prefer not to compute
+        it yourself, <code>netToGrossV2(token, net)</code> returns it on-chain.
+      </p>
+
+      <h4 class="docs-tab__subtitle">The allowance</h4>
+      <p class="docs-tab__text">
+        Approve the <strong>exchange canister</strong>
+        (<code class="num">{{ canisterId }}</code>) as spender. Never the treasury:
+        that is a V1 transfer target, and an allowance for it does nothing. The
+        allowance must be at least <code>gross + transferFee</code> (the pull costs
+        one ledger fee on top, charged to you). <code>requiredAllowanceV2(token, gross)</code>
+        returns that number. The pull draws from your default subaccount only.
+      </p>
+      <p class="docs-tab__text">
+        What this frontend does, and a good default for any client: read
+        <code>icrc2_allowance(you, exchange)</code> first and skip the approval when it
+        already covers the trade. When a new approval is needed, approve a multiple of
+        the trade (this app suggests 10x) so your next trades skip the approval fee.
+        An approval is its own ledger transaction with its own fee.
+      </p>
+
+      <div class="docs-tab__callout docs-tab__callout--info">
+        <strong>Cost per trade.</strong> First trade on a token: net + trading fee +
+        3 transfer fees (the approval, the fee inside gross, and the pull fee). Repeat
+        trades under a standing allowance: net + trading fee + 2 transfer fees, the
+        same as V1. A Max style fill should keep back 3 transfer fees plus the trading
+        fee so the pull can never overdraw.
+      </div>
+
+      <div class="docs-tab__callout docs-tab__callout--warn">
+        <strong>Never mix V1 and V2 in one action.</strong> If you transfer to the
+        treasury AND call a V2 method for the same trade, you pay twice: once with
+        your own transfer and once with the pull. Pick one path per action.
+        Also note: on the token ledger's <code>icrc2_approve</code> the spender IS a
+        <code>principal</code>. The text-not-principal rule above applies to the
+        exchange canister's own arguments, not to ledger calls.
+      </div>
+
+      <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>// The pattern this app ships (see exchange/utils/deposit.ts).
+const v2 = store.useV2Deposit(tokenIn)          // both gates, cached
+const gross = calculateRequiredDeposit(net, store.tradingFeeBps, transferFee)
+
+if (v2) {
+  // Checks the standing allowance first; only approves (and only asks the
+  // user) when the allowance does not cover gross + transferFee.
+  await approveExchangeDeposit(tokenIn, gross, transferFee)
+  // ...then call the V2 method, no block index. See the sections below.
+}</code></pre>
+
+      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># Both gates (anonymous queries, free):
+dfx canister --network ic call {{ canisterId }} getV2Enabled '()'
+dfx canister --network ic call {{ canisterId }} getV2AllowedTokens '()'
+
+# What to approve for a given gross:
+dfx canister --network ic call {{ canisterId }} requiredAllowanceV2 \
+  '("&lt;TOKEN_LEDGER&gt;", 1_000_000_000 : nat)'
+
+# Approve on the TOKEN LEDGER (spender is a principal here):
+dfx canister --network ic --identity my-key call &lt;TOKEN_LEDGER&gt; icrc2_approve \
+  '(record {
+     spender = record { owner = principal "{{ canisterId }}"; subaccount = null };
+     amount = 1_000_010_000 : nat;   // gross + transferFee
+     fee = null; memo = null; from_subaccount = null;
+     created_at_time = null; expected_allowance = null; expires_at = null })'</code></pre>
+
+      <h4 class="docs-tab__subtitle">When a V2 call fails</h4>
+      <ul class="docs-tab__list">
+        <li>
+          <code>InvalidInput "V2 disabled"</code> or
+          <code>"Token not enabled for V2 ..."</code>: the gates are closed for this
+          token. Nothing moved. Use the V1 flow.
+        </li>
+        <li>
+          <code>InvalidInput "V2 temporarily unavailable ..."</code>: capacity limit.
+          Nothing moved. Safe to retry in a few minutes.
+        </li>
+        <li>
+          <code>InsufficientFunds "V2 pull ... declined"</code>: your allowance or
+          balance was too low at pull time. Nothing was kept; on two-token calls a
+          first pull that already landed is refunded automatically.
+        </li>
+        <li>
+          <code>SystemError</code> naming a pull id with "outcome UNKNOWN":
+          <strong>do not retry</strong>. The ledger did not confirm the pull either
+          way. The deposit is tracked on chain, you can see it with
+          <code>getMyPendingPulls()</code> (a signed query), and an admin resolves it
+          exactly once.
+        </li>
+        <li>
+          <code>SlippageExceeded</code> on V2 settles on chain: the below-minimum
+          output was delivered, or only the net was refunded. Check your balance
+          before assuming the funds are waiting for a retry.
+        </li>
+      </ul>
     </div>
 
     <!-- Quoting -->
@@ -174,6 +306,13 @@ dfx canister --network ic call {{ canisterId }} getExpectedReceiveAmountBatch \
         multi-route batch additionally returns alternative routes the single-best variant
         would discard, which is exactly the data a split-route engine needs.
       </p>
+      <div class="docs-tab__callout docs-tab__callout--info">
+        <strong>Quotes take net, V2 execution takes gross.</strong> Keep quoting with
+        the endpoints above using the net amount (what gets swapped), then compute
+        <code>gross</code> for the V2 call as shown in the deposits section. The backend
+        guarantees the two agree: executing <code>gross</code> swaps exactly the
+        <code>net</code> you quoted, or slightly more from rounding in your favor.
+      </div>
     </div>
 
     <!-- Split-route discovery -->
@@ -181,7 +320,8 @@ dfx canister --network ic call {{ canisterId }} getExpectedReceiveAmountBatch \
       <h3 class="docs-tab__title">Split-route discovery (route × fraction grid)</h3>
       <p class="docs-tab__text">
         The canister accepts split orders that route a single deposit through several
-        independent paths via <code>swapSplitRoutes</code>. To find the optimal split,
+        independent paths via <code>swapSplitRoutesV2</code> (or the older
+        <code>swapSplitRoutes</code>). To find the optimal split,
         fetch quotes for every 10% slice using the <strong>multi-route batch
         endpoint</strong>, then enumerate combinations. The endpoint returns top-N routes
         per fraction in one round-trip, so the full <em>route × fraction</em> grid
@@ -271,45 +411,104 @@ dfx canister --network ic call {{ canisterId }} getExpectedReceiveAmountBatchMul
         The frontend's <code>useSwapFlow</code> composable implements exactly this
         algorithm, fetch the multi-route batch, flatten into a route × fraction grid,
         enumerate 2/3/4/5-way combinations, reject duplicate routes, and accept the best
-        one that beats the unsplit baseline by more than 0.1%. The same
-        <code>swapSplitRoutes</code> update call executes the chosen plan atomically.
+        one that beats the unsplit baseline by more than 0.1%.
       </p>
+      <div class="docs-tab__callout docs-tab__callout--info">
+        <strong>Executing a split on V2.</strong>
+        <code>swapSplitRoutesV2(tokenIn, tokenOut, splits, minAmountOut)</code> with
+        <code>splits = vec { record { amountIn; route; minLegOut } }</code>.
+        Each leg's <code>amountIn</code> is a <strong>gross share</strong>: scale your
+        net legs so they sum to the gross total
+        (<code>grossLeg[i] = netLeg[i] * grossTotal / netTotal</code>, floor, add the
+        remainder to leg 0). One approval and one pull cover the whole sum; the backend
+        nets the total once and re-apportions with the same rule, so the dust is
+        sub-unit. <code>minLegOut</code> is accepted but not enforced; rely on the
+        aggregate <code>minAmountOut</code>. On V1 the legs are net shares and the call
+        takes the deposit block index as a fifth argument.
+      </div>
     </div>
 
     <!-- Submitting a swap -->
     <div class="docs-tab__section">
       <h3 class="docs-tab__title">Submitting a swap</h3>
       <p class="docs-tab__text">
-        <code>swapMultiHop</code> executes immediately against AMM/orderbook liquidity.
-        Every field:
+        <code>swapMultiHopV2</code> executes immediately against AMM/orderbook
+        liquidity. Approve first (deposits section above), then call. Every field:
       </p>
       <ul class="docs-tab__list">
-        <li><code>tokenIn: text</code>: canister id of the token you deposit.</li>
+        <li><code>tokenIn: text</code>: canister id of the token you hand over.</li>
         <li><code>tokenOut: text</code>: canister id of the token you receive.</li>
-        <li><code>amountIn: nat</code>: raw amount in <code>tokenIn</code>'s smallest unit. Must already be deposited.</li>
+        <li><code>amountIn: nat</code>: the <strong>gross</strong> amount in <code>tokenIn</code>'s smallest unit. The exchange pulls exactly this.</li>
         <li><code>route: vec SwapHop</code>: ordered hops <code>[{tokenIn, tokenOut}, ...]</code>. Use <code>bestRoute</code> from the quote.</li>
-        <li><code>minAmountOut: nat</code>: slippage floor. Convention: <code>expectedAmountOut * (10000 - slippageBP) / 10000</code>. Tx reverts if delivered amount falls below this.</li>
-        <li><code>blockNumber: nat</code>: ledger block index of your prior deposit transfer; the backend verifies it.</li>
+        <li><code>minAmountOut: nat</code>: slippage floor, derived from the quote for the net. Convention: <code>expectedAmountOut * (10000 - slippageBP) / 10000</code>.</li>
       </ul>
       <p class="docs-tab__text">
         Returns <code>{ Ok: SwapOk } | { Err: ExchangeError }</code> with
         <code>SwapOk = { fee, tokenIn, tokenOut, hops, firstHopOrderbookMatch, amountIn, amountOut, swapId, route, lastHopAMMOnly }</code>.
-        For multi-leg execution use <code>swapSplitRoutes</code> (same first/last args, but
-        <code>splits = vec { record { amountIn; route; minLegOut } }</code>).
+        On V2, <code>SwapOk.amountIn</code> echoes the gross you passed (on V1 it is
+        the net). For multi-leg execution use <code>swapSplitRoutesV2</code>; see the
+        split-route section above for how the legs are built.
       </p>
+
+      <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>// Same flow the easy swap ships.
+const v2 = store.useV2Deposit(tokenIn)
+const gross = calculateRequiredDeposit(net, store.tradingFeeBps, transferFee)
+
+let result
+if (v2) {
+  await approveExchangeDeposit(tokenIn, gross, transferFee)
+  result = await store.swapMultiHopV2(
+    tokenIn,
+    tokenOut,
+    gross,                              // gross, fees included
+    quote.bestRoute,                    // [{ tokenIn, tokenOut }, ...]
+    expectedOut * 9950n / 10000n,       // 0.5% slippage floor
+  )
+} else {
+  const block = await depositToken(/* V1 transfer, see the old way below */)
+  result = await store.swapMultiHop(tokenIn, tokenOut, net, quote.bestRoute,
+    expectedOut * 9950n / 10000n, block)
+}
+if ('Err' in result) handleError(result.Err)
+else console.log('filled', result.Ok.amountOut)</code></pre>
+
+      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># 1. Approve on the token ledger (see the deposits section).
+# 2. UPDATE call, five args, no block index. Sign with --identity.
+dfx canister --network ic --identity my-key call {{ canisterId }} swapMultiHopV2 \
+  '("&lt;TOKEN_IN&gt;",
+    "&lt;TOKEN_OUT&gt;",
+    1_000_510_000 : nat,
+    vec {
+      record { tokenIn = "&lt;TOKEN_IN&gt;"; tokenOut = "&lt;INTERMEDIATE&gt;" };
+      record { tokenIn = "&lt;INTERMEDIATE&gt;"; tokenOut = "&lt;TOKEN_OUT&gt;" };
+    },
+    995_000_000 : nat)'
+# amountIn here is the GROSS: net 1_000_000_000 + 0.05% trading fee + transfer fee.</code></pre>
+
+      <h4 class="docs-tab__subtitle">The old way: transfer plus block index (V1)</h4>
+      <p class="docs-tab__text">
+        V2 is the better way to swap: fewer things to get wrong, one less unit
+        conversion, and a refused call leaves nothing to recover. V1 keeps working and
+        stays documented here for older integrations and for tokens that are not
+        enabled for V2. The differences: you transfer the gross to the treasury
+        yourself, pass the transfer's block index as a sixth argument, and
+        <code>amountIn</code> is the <strong>net</strong>, not the gross.
+      </p>
+      <ul class="docs-tab__list">
+        <li><code>amountIn: nat</code>: the net amount. Must already be deposited (transfer <code>gross</code>, pass <code>net</code>).</li>
+        <li><code>blockNumber: nat</code>: ledger block index of your deposit transfer; the backend verifies it.</li>
+      </ul>
 
       <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>const result = await store.swapMultiHop(
   tokenIn,
   tokenOut,
-  amountIn,
+  amountIn,                           // NET on V1
   quote.bestRoute,                    // [{ tokenIn, tokenOut }, ...]
   expectedOut * 9950n / 10000n,       // 0.5% slippage floor
   depositBlockNumber,
-)
-if ('Err' in result) handleError(result.Err)
-else console.log('filled', result.Ok.amountOut)</code></pre>
+)</code></pre>
 
-      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># UPDATE call. Sign with --identity.
+      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># V1: transfer gross to the TREASURY first, then pass net + block index.
 dfx canister --network ic --identity my-key call {{ canisterId }} swapMultiHop \
   '("&lt;TOKEN_IN&gt;",
     "&lt;TOKEN_OUT&gt;",
@@ -322,17 +521,18 @@ dfx canister --network ic --identity my-key call {{ canisterId }} swapMultiHop \
     42_000_000 : nat)'</code></pre>
 
       <p class="docs-tab__text docs-tab__text--small">
-        Prerequisite: deposit your tokens to the exchange canister via ICRC1/ICRC2
-        transfer. The transfer's block index is the <code>blockNumber</code> argument.
+        V1 prerequisite: deposit your tokens via ICRC1 transfer to the treasury. The
+        transfer's block index is the <code>blockNumber</code> argument.
       </p>
     </div>
 
     <!-- Limit / OTC -->
     <div class="docs-tab__section">
-      <h3 class="docs-tab__title">Limit orders &amp; OTC trades (addPosition)</h3>
+      <h3 class="docs-tab__title">Limit orders &amp; OTC trades (addPositionV2)</h3>
       <p class="docs-tab__text">
-        <code>addPosition</code> is a single entry point for resting orders at a fixed
-        price. The <code>pub</code> flag picks the mode:
+        <code>addPositionV2</code> is a single entry point for resting orders at a fixed
+        price (its V1 twin <code>addPosition</code> is documented further down). The
+        <code>pub</code> flag picks the mode:
       </p>
       <ul class="docs-tab__list">
         <li>
@@ -363,12 +563,16 @@ dfx canister --network ic --identity my-key call {{ canisterId }} swapMultiHop \
       </div>
 
       <h4 class="docs-tab__subtitle">1. Create</h4>
+      <p class="docs-tab__text">
+        <code>addPositionV2</code>: approve <code>tokenInit</code> for the gross of your
+        offer (deposits section above), then call. Same arguments as the old
+        <code>addPosition</code> minus the block index:
+      </p>
       <ul class="docs-tab__list">
-        <li><code>blockNumber: nat</code>: block index of your deposit of <code>tokenInit</code> to the exchange canister.</li>
         <li><code>amountSell: nat</code>: what you <strong>want</strong> in return (in <code>tokenSell</code>'s smallest unit). The counterparty must send this much.</li>
-        <li><code>amountInit: nat</code>: what you're <strong>offering</strong> / depositing (in <code>tokenInit</code>'s smallest unit). This is the amount that funded the order.</li>
+        <li><code>amountInit: nat</code>: the <strong>gross</strong> of what you're offering (in <code>tokenInit</code>'s smallest unit). The exchange pulls exactly this; the order itself is stored net-sized, so <code>filled</code> and <code>remaining</code> are in net units.</li>
         <li><code>tokenSell: text</code>: canister id of the token you want in return.</li>
-        <li><code>tokenInit: text</code>: canister id of the token you're offering (the one you deposited).</li>
+        <li><code>tokenInit: text</code>: canister id of the token you're offering (the one being pulled).</li>
         <li><code>pub: bool</code>: the limit-vs-OTC switch. <code>true</code> = public limit order, <code>false</code> = private OTC.</li>
         <li><code>excludeDAO: bool</code>: <code>true</code> blocks DAO automated matching.</li>
         <li><code>oc: opt text</code>: optional OTC name/label.</li>
@@ -395,15 +599,16 @@ dfx canister --network ic --identity my-key call {{ canisterId }} swapMultiHop \
         instantly against existing liquidity.
       </p>
 
-      <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>// Private OTC. You deposited offerToken first; share the returned accessCode.
-// amountInit / tokenInit = what you OFFERED (deposited).
+      <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>// Private OTC on V2. Approve tokenOffered first; share the returned accessCode.
+// amountInit / tokenInit = what you OFFER (gross, pulled by the exchange).
 // amountSell / tokenSell = what you WANT in return.
-const result = await store.addPosition(
-  depositBlock,
+const grossOffer = calculateRequiredDeposit(amountOffered, store.tradingFeeBps, offerTransferFee)
+await approveExchangeDeposit(tokenOffered, grossOffer, offerTransferFee)
+const result = await store.addPositionV2(
   amountWanted,                // amountSell:  what counterparty must send
-  amountOffered,               // amountInit:  what you deposited
+  grossOffer,                  // amountInit:  gross of what you offer
   tokenWanted,                 // tokenSell:   what you want
-  tokenOffered,                // tokenInit:   what you deposited
+  tokenOffered,                // tokenInit:   what the exchange pulls
   /* pub */          false,    // false = private OTC, true = public limit
   /* excludeDAO */   false,
   /* oc */           [],       // or ['my-otc-label']
@@ -413,11 +618,11 @@ const result = await store.addPosition(
 )
 if ('Ok' in result) shareLink(`${origin}/otc/${result.Ok.accessCode}`)</code></pre>
 
-      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># Example: offer 100 ICP (tokenInit), want 50 ckUSDC (tokenSell).
-dfx canister --network ic --identity my-key call {{ canisterId }} addPosition \
-  '(42_000_000 : nat,         // blockNumber of your tokenInit deposit
-    50_000_000 : nat,         // amountSell:  what you WANT in return
-    100_000_000 : nat,        // amountInit:  what you OFFERED / deposited
+      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># Example: offer ~100 ICP gross (tokenInit), want 50 ckUSDC (tokenSell).
+# Approve the exchange on the ICP ledger first (deposits section), then:
+dfx canister --network ic --identity my-key call {{ canisterId }} addPositionV2 \
+  '(50_000_000 : nat,         // amountSell:  what you WANT in return
+    100_060_000 : nat,        // amountInit:  GROSS of what you offer
     "&lt;TOKEN_WANTED&gt;",        // tokenSell  (text, not principal)
     "&lt;TOKEN_OFFERED&gt;",       // tokenInit  (text, not principal)
     false,                    // pub: false = OTC, true = public limit
@@ -443,26 +648,65 @@ dfx canister --network ic call {{ canisterId }} getPrivateTrade '("&lt;ACCESS_CO
 
       <h4 class="docs-tab__subtitle">3. Counterparty fills</h4>
       <p class="docs-tab__text">
-        <code>finishSell(blockNumber, accessCode, amount)</code>. The filler deposits
-        <code>tokenSell</code> (the token the creator <em>wants</em>) and receives
-        <code>tokenInit</code> (the token the creator <em>offered</em>) in return. Their
-        <code>amount</code> is how much of <code>tokenSell</code> they're sending; they
-        receive <code>amount * amountInit / amountSell</code> of <code>tokenInit</code>.
-        With <code>allOrNothing = false</code> the same order can be partially filled by
+        <code>FinishSellV2(accessCode, amountSelling)</code>. The filler approves and
+        hands over <code>tokenSell</code> (the token the creator <em>wants</em>) and
+        receives <code>tokenInit</code> (the token the creator <em>offered</em>) in
+        return. <code>amountSelling</code> is the <strong>gross</strong> of what they
+        send. Over-fills are clamped to the order's remainder and the excess pull is
+        refunded automatically, so a max style fill cannot overshoot. With
+        <code>allOrNothing = false</code> the same order can be partially filled by
         multiple counterparties until <code>filledSell == amountSell</code>.
       </p>
 
-      <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>// Filler side
-const result = await store.finishSell(depositBlock, accessCode, fillAmount)</code></pre>
+      <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>// Filler side on V2: approve the order's sell token, then fill with the gross.
+const gross = calculateRequiredDeposit(fillAmount, store.tradingFeeBps, sellTransferFee)
+await approveExchangeDeposit(orderSellToken, gross, sellTransferFee)
+const result = await store.finishSellV2(accessCode, gross)</code></pre>
 
-      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># Method name on backend is `FinishSell` (capital F). Block here is NAT64
-# (the only update method on this canister that uses nat64 instead of nat).
+      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># Approve the exchange on the order's sell-token ledger first, then:
+dfx canister --network ic --identity my-key call {{ canisterId }} FinishSellV2 \
+  '("&lt;ACCESS_CODE&gt;", 25_022_500 : nat)'
+# amountSelling is the GROSS (plain nat; the old nat64 block quirk is V1 only).</code></pre>
+
+      <h4 class="docs-tab__subtitle">The old way: create and fill with a block index (V1)</h4>
+      <p class="docs-tab__text">
+        V2 is the better path for both sides: no treasury transfer, no block index, and
+        a refused call costs nothing. V1 keeps working and stays documented here for
+        older integrations and for tokens that are not enabled for V2. On V1 you
+        transfer the gross to the treasury yourself and the amounts are
+        <strong>net</strong>: <code>addPosition</code> takes the deposit's block index
+        as its first argument, and <code>FinishSell(blockNumber, accessCode, amount)</code>
+        takes the filler's deposit block as a <code>nat64</code> (the only update method
+        on this canister that uses nat64 instead of nat).
+      </p>
+
+      <pre v-if="viewMode === 'frontend'" class="docs-tab__code"><code>// V1 create (amountInit is what you deposited, net of nothing; block from your transfer)
+const created = await store.addPosition(
+  depositBlock,
+  amountWanted, amountOffered,
+  tokenWanted, tokenOffered,
+  false, false, [], '', false, true,
+)
+// V1 fill
+const filled = await store.finishSell(depositBlock, accessCode, fillAmount)</code></pre>
+
+      <pre v-if="viewMode === 'dfx'" class="docs-tab__code"><code># V1 create: 11 args, block index first.
+dfx canister --network ic --identity my-key call {{ canisterId }} addPosition \
+  '(42_000_000 : nat,         // blockNumber of your tokenInit deposit
+    50_000_000 : nat,         // amountSell:  what you WANT in return
+    100_000_000 : nat,        // amountInit:  what you OFFERED / deposited
+    "&lt;TOKEN_WANTED&gt;",
+    "&lt;TOKEN_OFFERED&gt;",
+    false, false, null, "", false, true)'
+
+# V1 fill: block is NAT64 here.
 dfx canister --network ic --identity my-key call {{ canisterId }} FinishSell \
   '(42_000_000 : nat64, "&lt;ACCESS_CODE&gt;", 25_000_000 : nat)'</code></pre>
 
       <h4 class="docs-tab__subtitle">4. Cancel</h4>
       <p class="docs-tab__text">
-        <code>revokeTrade(accessCode, { Initiator: null })</code>. A revoke fee is
+        <code>revokeTrade(accessCode, { Initiator: null })</code>, identical on both
+        paths: cancelling moves no deposit, so there is no V2 twin. A revoke fee is
         deducted (calculated as
         <code>(amount * tradingFeeBps / 10000) / revokeFeeDivisor</code>). DAO and Seller
         revoke variants exist for governance/dispute scenarios.

@@ -298,7 +298,8 @@ import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { useTokenBalance } from '../composables/useTokenBalance'
-import { depositToken } from '../utils/deposit'
+import { depositToken, approveExchangeDeposit, calculateRequiredDeposit } from '../utils/deposit'
+import { isApprovalDeclined } from '../utils/approvalPrompt'
 import { fillPercentage, orderPrice } from '../utils/price-math'
 import type { TradePosition, TradePrivate2 } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 import { useExchangeToast } from '../composables/useExchangeToast'
@@ -393,6 +394,8 @@ async function loadMyPrivateOrders() {
 
 // ── Fill Mode ──
 const trade = ref<TradePosition | null>(null)
+// Warm the V2 allowance cache for the token a fill would deposit.
+watch(trade, (t) => { if (t) store.prefetchExchangeAllowance(t.token_sell_identifier) })
 const loadingTrade = ref(false)
 const fillAmount = ref('')
 const fillPhase = ref<'idle' | 'depositing' | 'filling' | 'success'>('idle')
@@ -414,7 +417,9 @@ const maxFillByBalance = computed(() => {
   const tradingFee = (fillBalance.value * store.tradingFeeBps) / 10000n
   // Reserve 2× transfer fee: one baked into calculateRequiredDeposit, one
   // charged by the ledger on top (same model as SwapCard.setPercentage).
-  const reserve = fee * 2n + tradingFee
+  // 3× on the V2 approve+pull path (the approval is its own ledger tx).
+  const feeReserve = trade.value && store.useV2Deposit(trade.value.token_sell_identifier) ? 3n : 2n
+  const reserve = fee * feeReserve + tradingFee
   const available = fillBalance.value > reserve ? fillBalance.value - reserve : 0n
   return available
 })
@@ -482,7 +487,9 @@ const insufficientBalance = computed(() => {
   const fee = sellTokenInfo.value?.transfer_fee ?? 0n
   const tradingFee = (rawAmount * store.tradingFeeBps) / 10000n
   // 2× transfer fee: matches what depositToken actually debits.
-  return fillBalance.value < rawAmount + fee * 2n + tradingFee
+  // The V2 approve+pull path costs one more (the approval is its own ledger tx).
+  const feeReserve = trade.value && store.useV2Deposit(trade.value.token_sell_identifier) ? 3n : 2n
+  return fillBalance.value < rawAmount + fee * feeReserve + tradingFee
 })
 
 const canFill = computed(() => {
@@ -508,19 +515,41 @@ async function fillOrder() {
   if (!sellTokenInfo) { fillError.value = 'Token not found'; return }
 
   try {
-    fillPhase.value = 'depositing'
-    const blockNumber = await depositToken(
-      trade.value.token_sell_identifier,
-      sellTokenInfo.asset_type as any,
-      rawAmount,
-      store.tradingFeeBps,
-      BigInt(sellTokenInfo.transfer_fee),
-      store.treasuryAccountId,
-      store.treasuryPrincipal,
-    )
+    // Path decided ONCE per action. The fill deposits the order's sell token.
+    const v2 = store.useV2Deposit(trade.value.token_sell_identifier)
+    const transferFee = BigInt(sellTokenInfo.transfer_fee)
+    const gross = calculateRequiredDeposit(rawAmount, store.tradingFeeBps, transferFee)
 
-    fillPhase.value = 'filling'
-    const result = await store.finishSell(blockNumber, accessCode.value, rawAmount)
+    fillPhase.value = 'depositing'
+    let result
+    if (v2) {
+      // Stale-amount guard: fees paid since the amount was set can make it
+      // exceed the live balance. Fail here instead of a ledger decline.
+      let bal: bigint | null = null
+      try { bal = await store.userBalanceQuery(trade.value.token_sell_identifier).refresh() } catch { /* unknown; let the ledger decide */ }
+      if (bal != null && bal < gross + 2n * transferFee) {
+        fillError.value = 'Your balance no longer covers this fill and its fees. Press Max to refresh the amount.'
+        fillPhase.value = 'idle'
+        toast.warning('Amount too high', fillError.value)
+        return
+      }
+      await approveExchangeDeposit(trade.value.token_sell_identifier, gross, transferFee)
+      fillPhase.value = 'filling'
+      // Over-fills are clamped by the backend and the excess refunded.
+      result = await store.finishSellV2(accessCode.value, gross)
+    } else {
+      const blockNumber = await depositToken(
+        trade.value.token_sell_identifier,
+        sellTokenInfo.asset_type as any,
+        rawAmount,
+        store.tradingFeeBps,
+        transferFee,
+        store.treasuryAccountId,
+        store.treasuryPrincipal,
+      )
+      fillPhase.value = 'filling'
+      result = await store.finishSell(blockNumber, accessCode.value, rawAmount)
+    }
 
     if ('Ok' in result) {
       fillPhase.value = 'success'
@@ -534,8 +563,16 @@ async function fillOrder() {
       fillError.value = classified.message
       fillPhase.value = 'idle'
       toast.error('Fill Failed', classified.message)
+      // A V2 pull with an unknown outcome may have moved funds — refresh.
+      if ('SystemError' in result.Err) void store.refreshAfterMutation('swap')
     }
   } catch (err: any) {
+    if (isApprovalDeclined(err)) {
+      fillError.value = ''
+      fillPhase.value = 'idle'
+      toast.info('Approval cancelled', 'Nothing left your wallet.')
+      return
+    }
     fillError.value = err.message || 'Fill failed'
     fillPhase.value = 'idle'
     toast.error('Fill Failed', fillError.value)
@@ -545,6 +582,8 @@ async function fillOrder() {
 // ── Create Mode ──
 const visibility = ref<'private' | 'excluded'>('private')
 const offerToken = ref('')
+// Warm the V2 allowance cache for the token a create would deposit.
+watch(offerToken, (t) => { if (t) store.prefetchExchangeAllowance(t) })
 const offerAmount = ref('')
 const wantToken = ref('')
 const wantAmount = ref('')
@@ -711,31 +750,63 @@ async function createOrder() {
   const rawWant = BigInt(Math.round(parseFloat(wantAmount.value) * 10 ** wantDec))
 
   try {
-    createPhase.value = 'depositing'
-    const blockNumber = await depositToken(
-      offerToken.value,
-      offerInfo.asset_type as any,
-      rawOffer,
-      store.tradingFeeBps,
-      BigInt(offerInfo.transfer_fee),
-      store.treasuryAccountId,
-      store.treasuryPrincipal,
-    )
+    // Path decided ONCE per action. Creating deposits the offer token.
+    const v2 = store.useV2Deposit(offerToken.value)
+    const transferFee = BigInt(offerInfo.transfer_fee)
+    const gross = calculateRequiredDeposit(rawOffer, store.tradingFeeBps, transferFee)
 
-    createPhase.value = 'creating'
-    const result = await store.addPosition(
-      blockNumber,
-      rawWant,
-      rawOffer,
-      wantToken.value,
-      offerToken.value,
-      false,
-      visibility.value === 'excluded',
-      [],
-      '',
-      allOrNothing.value,
-      strictlyOTC.value,
-    )
+    createPhase.value = 'depositing'
+    let result
+    if (v2) {
+      // Stale-amount guard: fees paid since the amount was set can make it
+      // exceed the live balance. Fail here instead of a ledger decline.
+      let bal: bigint | null = null
+      try { bal = await store.userBalanceQuery(offerToken.value).refresh() } catch { /* unknown; let the ledger decide */ }
+      if (bal != null && bal < gross + 2n * transferFee) {
+        createError.value = 'Your balance no longer covers this offer and its fees. Lower the amount and try again.'
+        createPhase.value = 'idle'
+        toast.warning('Amount too high', createError.value)
+        return
+      }
+      await approveExchangeDeposit(offerToken.value, gross, transferFee)
+      createPhase.value = 'creating'
+      result = await store.addPositionV2(
+        rawWant,
+        gross,
+        wantToken.value,
+        offerToken.value,
+        false,
+        visibility.value === 'excluded',
+        [],
+        '',
+        allOrNothing.value,
+        strictlyOTC.value,
+      )
+    } else {
+      const blockNumber = await depositToken(
+        offerToken.value,
+        offerInfo.asset_type as any,
+        rawOffer,
+        store.tradingFeeBps,
+        transferFee,
+        store.treasuryAccountId,
+        store.treasuryPrincipal,
+      )
+      createPhase.value = 'creating'
+      result = await store.addPosition(
+        blockNumber,
+        rawWant,
+        rawOffer,
+        wantToken.value,
+        offerToken.value,
+        false,
+        visibility.value === 'excluded',
+        [],
+        '',
+        allOrNothing.value,
+        strictlyOTC.value,
+      )
+    }
 
     if ('Ok' in result) {
       createdCode.value = result.Ok.accessCode
@@ -749,8 +820,16 @@ async function createOrder() {
       createError.value = classified.message
       createPhase.value = 'idle'
       toast.error('Create Failed', classified.message)
+      // A V2 pull with an unknown outcome may have moved funds — refresh.
+      if ('SystemError' in result.Err) void store.refreshAfterMutation('order')
     }
   } catch (err: any) {
+    if (isApprovalDeclined(err)) {
+      createError.value = ''
+      createPhase.value = 'idle'
+      toast.info('Approval cancelled', 'Nothing left your wallet.')
+      return
+    }
     createError.value = err.message || 'Creation failed'
     createPhase.value = 'idle'
     toast.error('Create Failed', createError.value)

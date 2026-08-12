@@ -393,7 +393,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
-import { depositTokenForLiquidity, removeDepositFromCache } from '../../utils/deposit'
+import { depositTokenForLiquidity, removeDepositFromCache, approveExchangeDeposit } from '../../utils/deposit'
+import { isApprovalDeclined } from '../../utils/approvalPrompt'
 import {
   calculateAmounts,
   capitalEfficiency,
@@ -480,6 +481,11 @@ function onPairOutside(e: MouseEvent) {
 // ── Token info ────────────────────────────────────────────────────
 const token0 = computed(() => selectedPair.value.split('|')[0] || '')
 const token1 = computed(() => selectedPair.value.split('|')[1] || '')
+// Warm the V2 allowance cache for both legs of the selected pair.
+watch([token0, token1], ([t0, t1]) => {
+  if (t0) store.prefetchExchangeAllowance(t0)
+  if (t1) store.prefetchExchangeAllowance(t1)
+}, { immediate: true })
 const info0 = computed(() => store.tokens.find(t => t.address === token0.value))
 const info1 = computed(() => store.tokens.find(t => t.address === token1.value))
 const symbol0 = computed(() => info0.value?.symbol ?? 'Token 0')
@@ -577,9 +583,14 @@ function bigIntToDecimal(amount: bigint, decimals: number, maxFrac: number): str
 function onlyNumbers(e: KeyboardEvent) {
   if (e.key !== '.' && (e.key < '0' || e.key > '9')) e.preventDefault()
 }
+// LP legs debit amount + 1x transfer fee (V1 transfer), or + 2x on the V2
+// approve+pull path (the approval is its own ledger tx).
+function lpFeeReserve(): bigint {
+  return store.useV2Deposit(token0.value) && store.useV2Deposit(token1.value) ? 2n : 1n
+}
 function setPercentage0(pct: number) {
   if (balance0.value <= 0n || !info0.value) return
-  const fee = info0.value.transfer_fee ?? 0n
+  const fee = (info0.value.transfer_fee ?? 0n) * lpFeeReserve()
   const max = balance0.value > fee ? balance0.value - fee : 0n
   const use = pct === 100 ? max : (max * BigInt(pct)) / 100n
   amount0.value = bigIntToDecimal(use, decimals0.value, Math.min(decimals0.value, 6))
@@ -587,7 +598,7 @@ function setPercentage0(pct: number) {
 }
 function setPercentage1(pct: number) {
   if (balance1.value <= 0n || !info1.value) return
-  const fee = info1.value.transfer_fee ?? 0n
+  const fee = (info1.value.transfer_fee ?? 0n) * lpFeeReserve()
   const max = balance1.value > fee ? balance1.value - fee : 0n
   const use = pct === 100 ? max : (max * BigInt(pct)) / 100n
   amount1.value = bigIntToDecimal(use, decimals1.value, Math.min(decimals1.value, 6))
@@ -970,8 +981,36 @@ async function submitFullRange() {
     return
   }
 
+  // Path decided ONCE per action. LP V2 needs BOTH tokens allowlisted.
+  const v2 = store.useV2Deposit(token0.value) && store.useV2Deposit(token1.value)
+  const fee0 = info0.value?.transfer_fee ?? 0n
+  const fee1 = info1.value?.transfer_fee ?? 0n
+  if (v2) {
+    // Backend refundability floor: each leg must exceed 3x its transfer fee,
+    // checked before any funds move. Surface it as a minimum, not an error dump.
+    if (a0Raw <= fee0 * 3n) {
+      error.value = `${symbol0.value} amount must be more than ${bigIntToDecimal(fee0 * 3n, decimals0.value, Math.min(decimals0.value, 6))} (3x the transfer fee)`
+      return
+    }
+    if (a1Raw <= fee1 * 3n) {
+      error.value = `${symbol1.value} amount must be more than ${bigIntToDecimal(fee1 * 3n, decimals1.value, Math.min(decimals1.value, 6))} (3x the transfer fee)`
+      return
+    }
+    // Each V2 leg debits amount + 2x fee (approval tx + pull fee). Check both
+    // up front so the second approval can never fail after the first fee is paid.
+    if (balance0.value < a0Raw + fee0 * 2n) {
+      error.value = `Not enough ${symbol0.value} to cover the deposit plus fees`
+      return
+    }
+    if (balance1.value < a1Raw + fee1 * 2n) {
+      error.value = `Not enough ${symbol1.value} to cover the deposit plus fees`
+      return
+    }
+  }
+
   let block0: bigint | null = null
   let block1: bigint | null = null
+  let submitted = false
   let prePositionCount = 0
   let preLiqByPair = new Map<string, bigint>()
 
@@ -982,42 +1021,79 @@ async function submitFullRange() {
       preLiqByPair = new Map(pre.map((p: any) => [`${p.token0}|${p.token1}`, p.liquidity]))
     } catch { /* probe falls back to 'unknown' */ }
 
-    phase.value = 'deposit0'
-    block0 = await depositTokenForLiquidity(
-      token0.value, info0.value!.asset_type as any,
-      a0Raw, store.treasuryAccountId, store.treasuryPrincipal,
-    )
-    savePendingDeposit(token0.value, block0, symbol0.value)
+    if (v2) {
+      phase.value = 'deposit0'
+      try { await approveExchangeDeposit(token0.value, a0Raw, fee0) }
+      catch (e: any) {
+        if (isApprovalDeclined(e)) { error.value = ''; phase.value = 'idle'; toast.info('Approval cancelled', 'Nothing left your wallet.'); return }
+        throw e
+      }
+      phase.value = 'deposit1'
+      try { await approveExchangeDeposit(token1.value, a1Raw, fee1) }
+      catch (e: any) {
+        if (isApprovalDeclined(e)) {
+          error.value = ''
+          phase.value = 'idle'
+          toast.info('Approval cancelled', `${symbol0.value} was already approved and that fee was paid. Nothing else left your wallet. Retrying reuses that approval at no extra fee.`)
+          return
+        }
+        throw e
+      }
+    } else {
+      phase.value = 'deposit0'
+      block0 = await depositTokenForLiquidity(
+        token0.value, info0.value!.asset_type as any,
+        a0Raw, store.treasuryAccountId, store.treasuryPrincipal,
+      )
+      savePendingDeposit(token0.value, block0, symbol0.value)
 
-    phase.value = 'deposit1'
-    block1 = await depositTokenForLiquidity(
-      token1.value, info1.value!.asset_type as any,
-      a1Raw, store.treasuryAccountId, store.treasuryPrincipal,
-    )
-    savePendingDeposit(token1.value, block1, symbol1.value)
+      phase.value = 'deposit1'
+      block1 = await depositTokenForLiquidity(
+        token1.value, info1.value!.asset_type as any,
+        a1Raw, store.treasuryAccountId, store.treasuryPrincipal,
+      )
+      savePendingDeposit(token1.value, block1, symbol1.value)
+    }
 
     phase.value = 'adding'
     const useInitial = shouldUseInitial.value ? true : undefined
-    const result = await store.addLiquidity(
-      token0.value, token1.value,
-      a0Raw, a1Raw, block0, block1, useInitial,
-    )
+    submitted = true
+    const result = v2
+      ? await store.addLiquidityV2(
+          token0.value, token1.value,
+          a0Raw, a1Raw, useInitial,
+        )
+      : await store.addLiquidity(
+          token0.value, token1.value,
+          a0Raw, a1Raw, block0!, block1!, useInitial,
+        )
     if ('Ok' in result) {
       clearPendingDeposit()
-      removeDepositFromCache(block0.toString())
-      removeDepositFromCache(block1.toString())
+      if (block0 != null) removeDepositFromCache(block0.toString())
+      if (block1 != null) removeDepositFromCache(block1.toString())
       lpMinted.value = result.Ok.liquidityMinted.toString()
       phase.value = 'success'
       amount0.value = ''
       amount1.value = ''
       void store.refreshAfterMutation('lp')
       toast.success('Liquidity Added', 'LP tokens minted: ' + lpMinted.value)
+    } else if (v2) {
+      // V2 typed errors leave no treasury deposit to recover: refusals moved
+      // nothing, a declined second pull auto-refunds the first, and a pull
+      // with an unknown outcome is tracked on chain (the classifier points
+      // at the Recover page).
+      const { classifyExchangeError } = await import('../../utils/errors')
+      const classified = classifyExchangeError(result.Err)
+      error.value = classified.message
+      phase.value = 'idle'
+      toast.error('Add Liquidity Failed', classified.message)
+      if ('SystemError' in result.Err) void store.refreshAfterMutation('lp')
     } else {
       const { classifyExchangeError, isAutoRefundError } = await import('../../utils/errors')
       if (isAutoRefundError(result.Err)) {
         clearPendingDeposit()
-        removeDepositFromCache(block0.toString())
-        removeDepositFromCache(block1.toString())
+        if (block0 != null) removeDepositFromCache(block0.toString())
+        if (block1 != null) removeDepositFromCache(block1.toString())
         error.value = 'Transaction rejected — your tokens are being refunded automatically.'
         phase.value = 'idle'
         toast.info('Auto-Refund', 'Transaction rejected — your tokens are being refunded automatically.')
@@ -1025,15 +1101,15 @@ async function submitFullRange() {
         const classified = classifyExchangeError(result.Err)
         error.value = classified.message
         recoveryInfo.value = `Your deposits are safe in the treasury. Recover them at /recover:\n` +
-          `• ${symbol0.value}: block ${block0.toString()}\n` +
-          `• ${symbol1.value}: block ${block1.toString()}`
+          `• ${symbol0.value}: block ${block0!.toString()}\n` +
+          `• ${symbol1.value}: block ${block1!.toString()}`
         phase.value = 'idle'
         toast.error('Add Liquidity Failed', classified.message)
       }
     }
   } catch (err: any) {
     if (await auth.handleSessionError(err)) { phase.value = 'idle'; return }
-    if (isTransportError(err) && block0 != null && block1 != null) {
+    if (isTransportError(err) && submitted) {
       const probe = async (): Promise<VerifyStatus> => {
         try {
           const post: any[] = await store.getUserLiquidityDetailed()
@@ -1049,8 +1125,8 @@ async function submitFullRange() {
       const status = await verifyAfterTransportError(probe)
       if (status === 'succeeded') {
         clearPendingDeposit()
-        removeDepositFromCache(block0.toString())
-        removeDepositFromCache(block1.toString())
+        if (block0 != null) removeDepositFromCache(block0.toString())
+        if (block1 != null) removeDepositFromCache(block1.toString())
         phase.value = 'success'
         amount0.value = ''
         amount1.value = ''
@@ -1058,17 +1134,25 @@ async function submitFullRange() {
         toast.success('Liquidity Added', 'Network hiccup during submit — confirmed via query.')
         return
       }
-      error.value = 'Network issue during submit — refresh to verify before retrying.'
-      recoveryInfo.value = `If the deposits went through, their blocks are:\n` +
-        `• ${symbol0.value}: block ${block0.toString()}\n` +
-        `• ${symbol1.value}: block ${block1.toString()}\n` +
-        `Refresh first; use Recover only if the add truly failed.`
+      if (v2) {
+        error.value = 'Network issue during submit. Check your positions and the Recover page before retrying.'
+      } else {
+        error.value = 'Network issue during submit — refresh to verify before retrying.'
+        recoveryInfo.value = `If the deposits went through, their blocks are:\n` +
+          `• ${symbol0.value}: block ${block0!.toString()}\n` +
+          `• ${symbol1.value}: block ${block1!.toString()}\n` +
+          `Refresh first; use Recover only if the add truly failed.`
+      }
       phase.value = 'idle'
       toast.warning('Network issue', error.value)
       return
     }
     error.value = err.message || 'Failed to add liquidity'
-    recoveryInfo.value = 'If you deposited tokens, go to Recover to retrieve them.'
+    if (v2) {
+      recoveryInfo.value = submitted ? 'Check the Recover page if your balance changed.' : ''
+    } else {
+      recoveryInfo.value = 'If you deposited tokens, go to Recover to retrieve them.'
+    }
     phase.value = 'idle'
     toast.error('Add Liquidity Failed', error.value)
   }
@@ -1100,8 +1184,38 @@ async function submitConcentrated() {
   const ratioLower = priceToRatio(priceLower.value, decimals0.value, decimals1.value)
   const ratioUpper = priceToRatio(priceUpper.value, decimals0.value, decimals1.value)
 
+  // Path decided ONCE per action. LP V2 needs BOTH tokens allowlisted AND
+  // both legs present: the backend's refundability floor (each leg must
+  // exceed 3x its transfer fee) refuses zero legs, so one-sided adds stay
+  // on the V1 path.
+  const v2 = a0Raw > 0n && a1Raw > 0n
+    && store.useV2Deposit(token0.value) && store.useV2Deposit(token1.value)
+  const fee0 = info0.value?.transfer_fee ?? 0n
+  const fee1 = info1.value?.transfer_fee ?? 0n
+  if (v2) {
+    if (a0Raw <= fee0 * 3n) {
+      error.value = `${symbol0.value} amount must be more than ${bigIntToDecimal(fee0 * 3n, decimals0.value, Math.min(decimals0.value, 6))} (3x the transfer fee)`
+      return
+    }
+    if (a1Raw <= fee1 * 3n) {
+      error.value = `${symbol1.value} amount must be more than ${bigIntToDecimal(fee1 * 3n, decimals1.value, Math.min(decimals1.value, 6))} (3x the transfer fee)`
+      return
+    }
+    // Each V2 leg debits amount + 2x fee (approval tx + pull fee). Check both
+    // up front so the second approval can never fail after the first fee is paid.
+    if (balance0.value < a0Raw + fee0 * 2n) {
+      error.value = `Not enough ${symbol0.value} to cover the deposit plus fees`
+      return
+    }
+    if (balance1.value < a1Raw + fee1 * 2n) {
+      error.value = `Not enough ${symbol1.value} to cover the deposit plus fees`
+      return
+    }
+  }
+
   let block0 = 0n
   let block1 = 0n
+  let submitted = false
   let prePositionCount = 0
   try {
     try {
@@ -1109,28 +1223,55 @@ async function submitConcentrated() {
       prePositionCount = pre.length
     } catch { /* fall back to 'unknown' */ }
 
-    if (a0Raw > 0n) {
+    if (v2) {
       phase.value = 'deposit0'
-      block0 = await depositTokenForLiquidity(
-        token0.value, info0.value!.asset_type as any,
-        a0Raw, store.treasuryAccountId, store.treasuryPrincipal,
-      )
-    }
-    if (a1Raw > 0n) {
+      try { await approveExchangeDeposit(token0.value, a0Raw, fee0) }
+      catch (e: any) {
+        if (isApprovalDeclined(e)) { error.value = ''; phase.value = 'idle'; toast.info('Approval cancelled', 'Nothing left your wallet.'); return }
+        throw e
+      }
       phase.value = 'deposit1'
-      block1 = await depositTokenForLiquidity(
-        token1.value, info1.value!.asset_type as any,
-        a1Raw, store.treasuryAccountId, store.treasuryPrincipal,
-      )
+      try { await approveExchangeDeposit(token1.value, a1Raw, fee1) }
+      catch (e: any) {
+        if (isApprovalDeclined(e)) {
+          error.value = ''
+          phase.value = 'idle'
+          toast.info('Approval cancelled', `${symbol0.value} was already approved and that fee was paid. Nothing else left your wallet. Retrying reuses that approval at no extra fee.`)
+          return
+        }
+        throw e
+      }
+    } else {
+      if (a0Raw > 0n) {
+        phase.value = 'deposit0'
+        block0 = await depositTokenForLiquidity(
+          token0.value, info0.value!.asset_type as any,
+          a0Raw, store.treasuryAccountId, store.treasuryPrincipal,
+        )
+      }
+      if (a1Raw > 0n) {
+        phase.value = 'deposit1'
+        block1 = await depositTokenForLiquidity(
+          token1.value, info1.value!.asset_type as any,
+          a1Raw, store.treasuryAccountId, store.treasuryPrincipal,
+        )
+      }
     }
 
     phase.value = 'adding'
-    const result = await store.addConcentratedLiquidity(
-      token0.value, token1.value,
-      a0Raw, a1Raw,
-      ratioLower, ratioUpper,
-      block0, block1,
-    )
+    submitted = true
+    const result = v2
+      ? await store.addConcentratedLiquidityV2(
+          token0.value, token1.value,
+          a0Raw, a1Raw,
+          ratioLower, ratioUpper,
+        )
+      : await store.addConcentratedLiquidity(
+          token0.value, token1.value,
+          a0Raw, a1Raw,
+          ratioLower, ratioUpper,
+          block0, block1,
+        )
     if ('Ok' in result) {
       resultPositionId.value = result.Ok.positionId
       if (block0 > 0n) removeDepositFromCache(block0.toString())
@@ -1140,6 +1281,14 @@ async function submitConcentrated() {
       amount1.value = ''
       void store.refreshAfterMutation('lp')
       toast.success('Position Created', 'Position ID: #' + resultPositionId.value.toString())
+    } else if (v2) {
+      // V2 typed errors leave no treasury deposit to recover (see submitFullRange).
+      const { classifyExchangeError } = await import('../../utils/errors')
+      const classified = classifyExchangeError(result.Err)
+      error.value = classified.message
+      phase.value = 'idle'
+      toast.error('Add Liquidity Failed', classified.message)
+      if ('SystemError' in result.Err) void store.refreshAfterMutation('lp')
     } else {
       const { classifyExchangeError, isAutoRefundError } = await import('../../utils/errors')
       if (isAutoRefundError(result.Err)) {
@@ -1157,7 +1306,7 @@ async function submitConcentrated() {
     }
   } catch (err: any) {
     if (await auth.handleSessionError(err)) { phase.value = 'idle'; return }
-    if (isTransportError(err)) {
+    if (isTransportError(err) && submitted) {
       const probe = async (): Promise<VerifyStatus> => {
         try {
           const post: any[] = await store.getUserLiquidityDetailed()
@@ -1176,7 +1325,9 @@ async function submitConcentrated() {
         toast.success('Position Created', 'Network hiccup during submit — confirmed via query.')
         return
       }
-      error.value = 'Network issue during submit — refresh to verify before retrying.'
+      error.value = v2
+        ? 'Network issue during submit. Check your positions and the Recover page before retrying.'
+        : 'Network issue during submit — refresh to verify before retrying.'
       phase.value = 'idle'
       toast.warning('Network issue', error.value)
       return

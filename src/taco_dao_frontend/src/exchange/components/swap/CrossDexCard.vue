@@ -361,7 +361,8 @@ async function setPercentage(pct: number) {
   const fee = cx.tokenFrom.value.transfer_fee
   const tradingFee = (cx.fromBalance.value * store.tradingFeeBps) / 10000n
   // Worst case 3-venue split: TACO leg needs 2 fees (deposit model), ICPSwap 1, Neutrinite 1.
-  const reserve = fee * 4n + tradingFee
+  // On the V2 approve+pull path the TACO leg needs 3 (the approval is its own ledger tx).
+  const reserve = fee * (store.useV2Deposit(cx.tokenFrom.value.address) ? 5n : 4n) + tradingFee
   const max = cx.fromBalance.value > reserve ? cx.fromBalance.value - reserve : 0n
   const useAmount = pct === 100 ? max : (max * BigInt(pct)) / 100n
   if (useAmount <= 0n) { cx.amountIn.value = ''; return }

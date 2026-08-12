@@ -3,10 +3,11 @@
  * Based on Sections 6.1-6.4 of FRONTEND_DEV_GUIDE.md.
  */
 
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed, watch, type Ref } from 'vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { createBuyOrderParams, createSellOrderParams, calculateRevokeFee } from '../utils/price-math'
-import { depositToken, removeDepositFromCache } from '../utils/deposit'
+import { depositToken, removeDepositFromCache, approveExchangeDeposit, calculateRequiredDeposit } from '../utils/deposit'
+import { isApprovalDeclined } from '../utils/approvalPrompt'
 import { classifyExchangeError, isTransportError, verifyAfterTransportError, type VerifyStatus } from '../utils/errors'
 import { useExchangeToast } from './useExchangeToast'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
@@ -53,6 +54,9 @@ export function useLimitOrder(
   const depositDecimals = computed(() =>
     depositToken0.value ? decimals0.value : decimals1.value
   )
+
+  // Warm the V2 allowance cache for whichever token this order would deposit.
+  watch(depositTokenAddress, (t) => { if (t) store.prefetchExchangeAllowance(t) }, { immediate: true })
 
   // Computed total
   const total = computed(() => {
@@ -120,16 +124,38 @@ export function useLimitOrder(
     phase.value = 'depositing'
 
     try {
-      // Step 1: Deposit tokens to treasury
-      const blockNumber = await depositToken(
-        tokenInit,
-        tokenInfo.asset_type as any,
-        depositAmount,
-        store.tradingFeeBps,
-        BigInt(tokenInfo.transfer_fee),
-        store.treasuryAccountId,
-        store.treasuryPrincipal,
-      )
+      // Path decided ONCE per action. V2 approves the exchange to pull the
+      // gross (what V1 would transfer); V1 transfers to the treasury.
+      const v2 = store.useV2Deposit(tokenInit)
+      const transferFee = BigInt(tokenInfo.transfer_fee)
+      const gross = calculateRequiredDeposit(depositAmount, store.tradingFeeBps, transferFee)
+
+      // Step 1: Deposit tokens to treasury (V1) or approve the pull (V2)
+      let blockNumber: bigint | null = null
+      if (v2) {
+        // Stale-amount guard: fees paid since the amount was set can make it
+        // exceed the live balance. Fail here with a clear message instead of
+        // letting the ledger decline the pull.
+        let bal: bigint | null = null
+        try { bal = await store.userBalanceQuery(tokenInit).refresh() } catch { /* unknown; let the ledger decide */ }
+        if (bal != null && bal < gross + 2n * transferFee) {
+          error.value = 'Your balance no longer covers this order and its fees. Lower the amount and try again.'
+          phase.value = 'idle'
+          toast.warning('Amount too high', error.value)
+          return
+        }
+        await approveExchangeDeposit(tokenInit, gross, transferFee)
+      } else {
+        blockNumber = await depositToken(
+          tokenInit,
+          tokenInfo.asset_type as any,
+          depositAmount,
+          store.tradingFeeBps,
+          transferFee,
+          store.treasuryAccountId,
+          store.treasuryPrincipal,
+        )
+      }
 
       phase.value = 'submitting'
 
@@ -164,23 +190,36 @@ export function useLimitOrder(
       }
 
       try {
-        const result = await store.addPosition(
-          blockNumber,
-          params.amount_sell,
-          params.amount_init,
-          tokenSell,
-          tokenInit,
-          options.value.pub,
-          options.value.excludeDAO,
-          oc,
-          referrer,
-          options.value.allOrNothing,
-          options.value.strictlyOTC,
-        )
+        const result = v2
+          ? await store.addPositionV2(
+              params.amount_sell,
+              gross,
+              tokenSell,
+              tokenInit,
+              options.value.pub,
+              options.value.excludeDAO,
+              oc,
+              referrer,
+              options.value.allOrNothing,
+              options.value.strictlyOTC,
+            )
+          : await store.addPosition(
+              blockNumber!,
+              params.amount_sell,
+              params.amount_init,
+              tokenSell,
+              tokenInit,
+              options.value.pub,
+              options.value.excludeDAO,
+              oc,
+              referrer,
+              options.value.allOrNothing,
+              options.value.strictlyOTC,
+            )
 
         if ('Ok' in result) {
           const order = result.Ok
-          removeDepositFromCache(blockNumber.toString())
+          if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
           void store.refreshAfterMutation('order')
           if (order.remaining === 0n) {
             onFilledImmediately()
@@ -189,12 +228,22 @@ export function useLimitOrder(
           } else {
             onResting(order.accessCode)
           }
+        } else if (v2) {
+          // V2 typed Err: there is no treasury deposit to recover. Refusals
+          // and declined pulls moved nothing; a pull with an unknown outcome
+          // is tracked on chain (the classifier says so and points at the
+          // Recover page).
+          const classified = classifyExchangeError(result.Err)
+          error.value = classified.message
+          phase.value = 'error'
+          toast.error('Order Failed', error.value)
+          if ('SystemError' in result.Err) void store.refreshAfterMutation('order')
         } else {
           // Typed Err — backend responded, recoverWronglysent is safe to try
           const classified = classifyExchangeError(result.Err)
           try {
             const recovered = await store.recoverWronglysent(
-              tokenInit, blockNumber, tokenInfo.asset_type as any,
+              tokenInit, blockNumber!, tokenInfo.asset_type as any,
             )
             if (recovered) {
               error.value = classified.message + ' — tokens recovered automatically'
@@ -235,7 +284,7 @@ export function useLimitOrder(
           }
           const status = await verifyAfterTransportError(probe)
           if (status === 'succeeded' || status === 'partial') {
-            removeDepositFromCache(blockNumber.toString())
+            if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
             void store.refreshAfterMutation('order')
             if (status === 'partial') {
               toast.success('Partially Filled', 'Network hiccup during submit — confirmed via query.')
@@ -247,10 +296,17 @@ export function useLimitOrder(
             return
           }
           if (status === 'failed') {
+            if (v2) {
+              // Nothing left the wallet; the unused approval expires on its own.
+              error.value = 'Network issue during submit. The order did not land and nothing was taken from your wallet. Please try again.'
+              phase.value = 'error'
+              toast.warning('Network issue', error.value)
+              return
+            }
             let recoveryNote = ' — use Recover Funds to retrieve tokens'
             try {
               const recovered = await store.recoverWronglysent(
-                tokenInit, blockNumber, tokenInfo.asset_type as any,
+                tokenInit, blockNumber!, tokenInfo.asset_type as any,
               )
               if (recovered) recoveryNote = ' — tokens recovered automatically'
             } catch { /* best effort */ }
@@ -261,16 +317,24 @@ export function useLimitOrder(
           }
           // unknown — order state is ambiguous. Do NOT attempt recovery; it
           // could burn a live resting order. Tell the user to refresh.
-          error.value = 'Network issue during submit — refresh to check whether your order was placed.'
+          error.value = v2
+            ? 'Network issue during submit. Refresh to check whether your order was placed.'
+            : 'Network issue during submit — refresh to check whether your order was placed.'
           phase.value = 'error'
           toast.warning('Network issue', error.value)
           return
         }
         // Non-transport throw — the old recovery path is still the best bet.
+        if (v2) {
+          error.value = (orderErr.message || 'Order failed.')
+          phase.value = 'error'
+          toast.error('Order Failed', error.value)
+          return
+        }
         let recoveryNote = ' — use Recover Funds to retrieve tokens'
         try {
           const recovered = await store.recoverWronglysent(
-            tokenInit, blockNumber, tokenInfo.asset_type as any,
+            tokenInit, blockNumber!, tokenInfo.asset_type as any,
           )
           if (recovered) recoveryNote = ' — tokens recovered automatically'
         } catch { /* recovery best-effort */ }
@@ -280,6 +344,12 @@ export function useLimitOrder(
         return
       }
     } catch (err: any) {
+      if (isApprovalDeclined(err)) {
+        error.value = ''
+        phase.value = 'idle'
+        toast.info('Approval cancelled', 'Nothing left your wallet.')
+        return
+      }
       error.value = err.message || 'Order failed.'
       phase.value = 'error'
       toast.error('Order Failed', error.value)
@@ -332,7 +402,9 @@ export function useLimitOrder(
         const tradingFee = (balance * (store.tradingFeeBps as bigint)) / 10000n
         // Reserve 2× transfer fee: one is baked into calculateRequiredDeposit,
         // the second is charged by the ledger on top (same as SwapCard.setPercentage).
-        const maxAmount = balance - transferFee * 2n - tradingFee
+        // V2 (approve+pull) costs one more: the approval is its own ledger tx.
+        const feeReserve = store.useV2Deposit(token0.value) ? 3n : 2n
+        const maxAmount = balance - transferFee * feeReserve - tradingFee
         if (maxAmount <= 0n) return
         const useAmount = pct === 100 ? maxAmount : (maxAmount * BigInt(pct)) / 100n
         amount.value = bigIntToDecimal(useAmount, decimals0.value, Math.min(decimals0.value, 6))
@@ -345,8 +417,9 @@ export function useLimitOrder(
       if (balance > 0n && tokenInfo) {
         const transferFee = BigInt(tokenInfo.transfer_fee)
         const tradingFee = (balance * (store.tradingFeeBps as bigint)) / 10000n
-        // 2× transfer fee, same reasoning as the sell branch.
-        const maxQuote = balance - transferFee * 2n - tradingFee
+        // 2× transfer fee (3× on the V2 approve+pull path), same as the sell branch.
+        const feeReserve = store.useV2Deposit(token1.value) ? 3n : 2n
+        const maxQuote = balance - transferFee * feeReserve - tradingFee
         if (maxQuote <= 0n) return
         const useQuote = pct === 100 ? maxQuote : (maxQuote * BigInt(pct)) / 100n
         const availableQuote = Number(useQuote) / 10 ** decimals1.value

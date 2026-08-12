@@ -11,7 +11,7 @@
  * A failure in one leg never blocks the others or their recovery (Promise.allSettled).
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { useExchangeToast } from './useExchangeToast'
 import { useExchangeAuth } from './useExchangeAuth'
@@ -20,7 +20,8 @@ import { probeSwapLanded } from './useSwapFlow'
 import { buildTacoSplitPlan } from '../utils/tacoSplitOptimizer'
 import { buildCrossDexPlan, interpolatePairSplit, type CrossDexSwapPlan, type CrossDexLeg, type CrossDexVenue, type TacoGridEntry } from '../utils/crossDexOptimizer'
 import { withTimeout } from '../utils/withTimeout'
-import { depositToken, removeDepositFromCache } from '../utils/deposit'
+import { depositToken, removeDepositFromCache, approveExchangeDeposit, calculateRequiredDeposit } from '../utils/deposit'
+import { isApprovalDeclined } from '../utils/approvalPrompt'
 import { classifyExchangeError, isTransportError, verifyAfterTransportError } from '../utils/errors'
 import { formatTokenAmount } from '../utils/format'
 import * as icpswap from '../services/icpswap'
@@ -58,6 +59,9 @@ export function useCrossDexSwap() {
   const quoteError = ref('')
   const outcomes = ref<LegOutcome[]>([])
   const legSteps = ref<Record<CrossDexVenue, string>>({ icpswap: '', taco: '', neutrinite: '' })
+
+  // Warm the V2 allowance cache for the sell token (only the TACO leg uses it).
+  watch(tokenFrom, (t) => { if (t) store.prefetchExchangeAllowance(t.address) }, { immediate: true })
 
   // Monotonic id so a slow refine never overwrites a newer quote's result.
   let seq = 0
@@ -288,6 +292,36 @@ export function useCrossDexSwap() {
     outcomes.value = []
     legSteps.value = { icpswap: '', taco: '', neutrinite: '' }
 
+    // V2 approval is hoisted OUT of the concurrent, timed leg section below:
+    // the dialog can block on the user indefinitely, so it must resolve BEFORE
+    // any leg moves funds. Otherwise a slow decision races the per-leg 180s
+    // timeout (the swap could execute after the UI reported failure) and the
+    // other DEX legs would already have debited the wallet while the user is
+    // still deciding. The allowance check inside approveExchangeDeposit means
+    // this only prompts when an approval is actually needed; the TACO leg
+    // below then reuses the standing allowance with no second dialog.
+    const tacoLeg = plan.value.legs.find(l => l.dex === 'taco')
+    if (tacoLeg && store.useV2Deposit(fromAddr)) {
+      try {
+        const grossTotal = calculateRequiredDeposit(tacoLeg.amountIn, store.tradingFeeBps, sellToken.transfer_fee)
+        setLegStep('taco', 'Approving…')
+        await approveExchangeDeposit(fromAddr, grossTotal, sellToken.transfer_fee)
+        setLegStep('taco', '')
+      } catch (err: any) {
+        // Declined or approval failed before anything moved — abort the whole
+        // swap cleanly. No leg has fired yet, so nothing is stranded.
+        phase.value = 'ready'
+        legSteps.value = { icpswap: '', taco: '', neutrinite: '' }
+        if (isApprovalDeclined(err)) {
+          toast.info('Approval cancelled', 'Nothing left your wallet.')
+        } else {
+          errorMsg.value = err?.message || 'Approval failed'
+          toast.error('Swap Failed', errorMsg.value)
+        }
+        return
+      }
+    }
+
     // Fire ALL legs concurrently. Promise.allSettled guarantees one leg's
     // failure never aborts another leg or its recovery. Each leg also gets a
     // generous backstop timeout so a hung inner call (dropped connection, stuck
@@ -404,31 +438,76 @@ export function useCrossDexSwap() {
 
     // ── TACO leg ──
     let block: bigint | undefined
+    let submitted = false
+    // Path decided ONCE per leg.
+    const v2 = store.useV2Deposit(fromAddr)
     try {
-      setLegStep('taco', 'Depositing…')
-      block = await depositToken(
-        fromAddr,
-        sellToken.asset_type,
-        leg.amountIn,
-        store.tradingFeeBps,
-        sellToken.transfer_fee,
-        store.treasuryAccountId,
-        store.treasuryPrincipal,
-      )
+      const transferFee = sellToken.transfer_fee
+      // Gross = exactly what the V1 path transfers.
+      const grossTotal = calculateRequiredDeposit(leg.amountIn, store.tradingFeeBps, transferFee)
+      if (v2) {
+        setLegStep('taco', 'Approving…')
+        await approveExchangeDeposit(fromAddr, grossTotal, transferFee)
+      } else {
+        setLegStep('taco', 'Depositing…')
+        block = await depositToken(
+          fromAddr,
+          sellToken.asset_type,
+          leg.amountIn,
+          store.tradingFeeBps,
+          transferFee,
+          store.treasuryAccountId,
+          store.treasuryPrincipal,
+        )
+      }
       setLegStep('taco', 'Swapping…')
       const tacoLegs = leg.tacoLegs ?? []
       let raw: any
+      submitted = true
       if (tacoLegs.length > 1) {
-        const splits = tacoLegs.map(l => ({ amountIn: l.amountIn, route: l.route, minLegOut: 0n }))
-        raw = await store.swapSplitRoutes(fromAddr, toAddr, splits, minOut, block)
+        if (v2) {
+          // V2 legs are GROSS shares summing to grossTotal, proportional to
+          // the net legs (floor, remainder to leg 0) — the backend nets the
+          // sum once and re-apportions with the same rule.
+          const grossLegs = tacoLegs.map(l => (l.amountIn * grossTotal) / leg.amountIn)
+          const assigned = grossLegs.reduce((a, b) => a + b, 0n)
+          if (grossTotal > assigned) grossLegs[0] += grossTotal - assigned
+          const splits = tacoLegs.map((l, i) => ({ amountIn: grossLegs[i], route: l.route, minLegOut: 0n }))
+          raw = await store.swapSplitRoutesV2(fromAddr, toAddr, splits, minOut)
+        } else {
+          const splits = tacoLegs.map(l => ({ amountIn: l.amountIn, route: l.route, minLegOut: 0n }))
+          raw = await store.swapSplitRoutes(fromAddr, toAddr, splits, minOut, block!)
+        }
       } else {
         const route = tacoLegs[0]?.route ?? [{ tokenIn: fromAddr, tokenOut: toAddr }]
-        raw = await store.swapMultiHop(fromAddr, toAddr, leg.amountIn, route, minOut, block)
+        raw = v2
+          ? await store.swapMultiHopV2(fromAddr, toAddr, grossTotal, route, minOut)
+          : await store.swapMultiHop(fromAddr, toAddr, leg.amountIn, route, minOut, block!)
       }
       if ('Ok' in raw) {
-        removeDepositFromCache(block.toString())
+        if (block != null) removeDepositFromCache(block.toString())
         setLegStep('taco', 'Done')
         return { dex: 'taco', success: true, amountOut: raw.Ok.amountOut }
+      }
+      if (v2) {
+        // V2 typed errors leave nothing stranded in the treasury, so the V1
+        // recover-by-block path below does not apply. Settle by class.
+        const classified = classifyExchangeError(raw.Err, {
+          outDecimals: Number(tokenTo.value!.decimals),
+          outSymbol: tokenTo.value!.symbol,
+          v2Settled: true,
+        })
+        if ('SlippageExceeded' in raw.Err) {
+          // Settled on chain: the below-minimum output was already delivered.
+          void store.refreshAfterMutation('swap')
+          setLegStep('taco', 'Failed, output delivered below minimum')
+        } else if ('SystemError' in raw.Err) {
+          void store.refreshAfterMutation('swap')
+          setLegStep('taco', 'Failed, deposit tracked on the Recover page')
+        } else {
+          setLegStep('taco', 'Failed, no funds moved')
+        }
+        return { dex: 'taco', success: false, amountOut: 0n, error: classified.message, recovered: false }
       }
       throw new Error(classifyExchangeError(raw.Err, {
         outDecimals: Number(tokenTo.value!.decimals),
@@ -437,14 +516,20 @@ export function useCrossDexSwap() {
     } catch (err: any) {
       console.error('[CrossDEX] TACO leg failed:', err?.message || err)
       // Transport hiccup: the swap may actually have landed — verify before refunding.
-      if (isTransportError(err) && block != null) {
+      if (isTransportError(err) && submitted) {
         const status = await verifyAfterTransportError(() =>
           probeSwapLanded(store, fromAddr, toAddr, leg.amountIn, Date.now()))
         if (status === 'succeeded') {
-          removeDepositFromCache(block.toString())
+          if (block != null) removeDepositFromCache(block.toString())
           setLegStep('taco', 'Done')
           return { dex: 'taco', success: true, amountOut: 0n }
         }
+      }
+      if (v2) {
+        // No block to recover. Before submit nothing left the wallet; after an
+        // ambiguous submit the user must check history before retrying.
+        setLegStep('taco', submitted ? 'Failed, check your history and the Recover page' : 'Failed, no funds moved')
+        return { dex: 'taco', success: false, amountOut: 0n, error: err?.message || 'TACO swap failed', recovered: false }
       }
       // Recover the unspent deposit so funds are never stuck in the treasury.
       setLegStep('taco', 'Recovering funds…')

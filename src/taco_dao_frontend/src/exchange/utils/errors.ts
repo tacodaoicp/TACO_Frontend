@@ -300,6 +300,13 @@ export interface ClassifyContext {
   outDecimals?: number
   outSymbol?: string
   hopTokens?: Array<{ symbol: string }>
+  /**
+   * Set by V2 (approve+pull) call sites. V2 slippage failures are settled on
+   * chain: the below-minimum output was delivered, or only the net was
+   * refunded (fees kept). So the message must not invite "retry with the
+   * same funds" the way the V1 slippage message does.
+   */
+  v2Settled?: boolean
 }
 
 /** Render a nat in smallest units as a human-friendly decimal string. */
@@ -323,6 +330,61 @@ export function classifyExchangeError(err: any, ctx: ClassifyContext = {}): Exch
   if ('NotAuthorized' in err) return { severity: 'warning', title: 'Not Authorized', message: 'Not authorized.', recoverable: false, action: 'none' }
   if ('Banned' in err) return { severity: 'error', title: 'Temporarily Banned', message: 'You have been temporarily banned.', recoverable: true, action: 'wait', waitSeconds: 86400 }
   if ('ExchangeFrozen' in err) return { severity: 'error', title: 'Exchange Frozen', message: 'The exchange is currently frozen.', recoverable: true, action: 'wait' }
+
+  // ── V2 (approve+pull) subcases, matched on backend message text. ──
+  // Every matched string is emitted ONLY by V2 methods, so classification of
+  // V1 errors is unchanged while V2 is dark.
+  if ('InvalidInput' in err && typeof err.InvalidInput === 'string') {
+    const m = err.InvalidInput
+    if (m.includes('already claimed by a concurrent')) {
+      return {
+        severity: 'warning',
+        title: 'Deposit already claimed',
+        message: 'Your deposit reached the exchange but another process claimed it first. The funds are not lost. Open the Recover page to reclaim them.',
+        recoverable: true,
+        action: 'recover',
+      }
+    }
+    if (m.includes('V2 temporarily unavailable')) {
+      return {
+        severity: 'warning',
+        title: 'Deposits busy',
+        message: 'The exchange deposit queue is busy right now. Nothing was taken from your wallet. Please try again in a few minutes.',
+        recoverable: true,
+        action: 'retry',
+      }
+    }
+    if (m === 'V2 disabled' || m.includes('not enabled for V2')) {
+      return {
+        severity: 'warning',
+        title: 'Deposit method changed',
+        message: 'The exchange switched this token back to the standard deposit method. Nothing was taken from your wallet. Please try again.',
+        recoverable: true,
+        action: 'retry',
+      }
+    }
+  }
+  if ('InsufficientFunds' in err && typeof err.InsufficientFunds === 'string'
+    && err.InsufficientFunds.includes('V2 pull') && err.InsufficientFunds.includes('declined')) {
+    return {
+      severity: 'error',
+      title: 'Deposit declined',
+      message: 'The exchange could not pull your deposit. Your allowance or balance was too low. Nothing was kept, and any first part already pulled was refunded automatically. Check your balance and try again.',
+      recoverable: true,
+      action: 'retry',
+    }
+  }
+  if ('SystemError' in err && typeof err.SystemError === 'string'
+    && (err.SystemError.includes('outcome UNKNOWN') || /V2 pull #\d+/.test(err.SystemError))) {
+    return {
+      severity: 'error',
+      title: 'Deposit outcome unknown',
+      message: 'The ledger did not confirm whether your deposit went through. It is tracked on the exchange and an admin will resolve it. Do not submit this trade again. You can check its status on the Recover page.',
+      recoverable: false,
+      action: 'none',
+    }
+  }
+
   if ('InvalidInput' in err) return { severity: 'error', title: 'Invalid Input', message: err.InvalidInput, recoverable: false, action: 'none' }
   if ('TokenNotAccepted' in err) return { severity: 'error', title: 'Token Not Supported', message: err.TokenNotAccepted, recoverable: false, action: 'none' }
   if ('TokenPaused' in err) return { severity: 'warning', title: 'Token Paused', message: `Token is currently paused: ${err.TokenPaused}`, recoverable: true, action: 'wait' }
@@ -338,6 +400,17 @@ export function classifyExchangeError(err: any, ctx: ClassifyContext = {}): Exch
     const expectedHuman = fmtAmount(BigInt(err.SlippageExceeded.expected), dec)
     const gotHuman = fmtAmount(BigInt(err.SlippageExceeded.got), dec)
     const symSuffix = sym ? ` ${sym}` : ''
+    if (ctx.v2Settled) {
+      // V2: the swap settled on chain. The short output was delivered, or the
+      // input was refunded minus fees. There is nothing waiting to retry.
+      return {
+        severity: 'warning',
+        title: 'Slippage Exceeded',
+        message: `Market moved and the swap settled below your minimum of ${expectedHuman}${symSuffix}. The amount received or refunded is already reflected in your balance.`,
+        recoverable: false,
+        action: 'none',
+      }
+    }
     return {
       severity: 'warning',
       title: 'Slippage Exceeded',
