@@ -318,13 +318,16 @@
     { immediate: true }
   )
 
-  // watch for route changes to update worker priorities
+  // watch for route changes to update worker priorities. Immediate so the
+  // landing route also produces a SET_ROUTE — the dedicated-worker fallback
+  // relies on it as redundancy for its initial load.
   watch(
     () => route.path,
     (newPath) => {
       setCurrentRoute(newPath)
-    }
-  )  
+    },
+    { immediate: true }
+  )
 
   /////////////////////
   // Lifecycle Hooks //

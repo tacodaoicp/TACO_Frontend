@@ -302,8 +302,10 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     amountOutMinimum: params.minAmountOut.toString(),
     zeroForOne,
   })) as any
+  // No internal sweep here: the CrossDEX leg catch (this function's only
+  // caller) runs the retried sweep for every failure, and sweeping twice made
+  // the second pass find nothing and report the funds as still stranded.
   if ('err' in swapResult) {
-    await sweep({ token0Principal: params.sellTokenPrincipal, token1Principal: params.buyTokenPrincipal, poolId }).catch((err) => { console.error('[icpswap] sweep cleanup failed (funds may be recoverable via Recover):', err) })
     throw new Error(`Swap failed: ${safeStringify(swapResult.err)}`)
   }
   const amountOut = swapResult.ok as bigint
@@ -319,7 +321,6 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     token: params.buyTokenPrincipal,
   })) as any
   if ('err' in withdrawResult) {
-    await sweep({ token0Principal: params.sellTokenPrincipal, token1Principal: params.buyTokenPrincipal, poolId }).catch((err) => { console.error('[icpswap] sweep cleanup failed (funds may be recoverable via Recover):', err) })
     throw new Error(`Withdraw failed: ${safeStringify(withdrawResult.err)}`)
   }
 
@@ -337,10 +338,20 @@ export interface SweepParams {
 }
 
 /**
- * Recover stranded funds: withdraw any unused pool balances, then deposit any
- * tokens sitting in the user's pool subaccount. Best-effort; logs per-token.
+ * Recover stranded funds. Returns true only when something recoverable was
+ * found AND every attempted move succeeded, so callers can safely clear the
+ * pending-swap marker on true and keep it on false.
+ *
+ * Order matters: first deposit anything sitting in the user's pool subaccount
+ * (a successful deposit only moves funds INTO the pool's unused balance), then
+ * withdraw the unused balances to the wallet.
+ *
+ * Two past bugs fixed here: withdraws now use the POOL's canonical token
+ * order (getUserUnusedBalance slots are pool-ordered; the caller's pair can be
+ * reversed, which made withdraws use the wrong token id and always fail), and
+ * they pass the token's real ledger fee (a fee of 0 makes ledgers refuse).
  */
-export async function sweep(params: SweepParams): Promise<void> {
+export async function sweep(params: SweepParams): Promise<boolean> {
   const authedAgent = await getCachedAgent()
   if (!authedAgent) throw new Error('Not authenticated')
   const identity = await getCachedIdentity()
@@ -350,34 +361,93 @@ export async function sweep(params: SweepParams): Promise<void> {
   const poolId = params.poolId ?? (await getPoolCanister(params.token0Principal, params.token1Principal))
   const poolActor = Actor.createActor(poolIDL, { agent: authedAgent, canisterId: poolId })
 
-  // 1. Withdraw any unused pool balances
-  const balanceResult = (await poolActor.getUserUnusedBalance(ownerPrincipal)) as any
-  if ('ok' in balanceResult) {
-    const { balance0, balance1 } = balanceResult.ok
-    if (balance0 > 0n) {
-      try { await poolActor.withdraw({ amount: balance0, fee: 0n, token: params.token0Principal }) }
-      catch (e) { console.error('[icpswap.sweep] withdraw token0 failed:', e) }
-    }
-    if (balance1 > 0n) {
-      try { await poolActor.withdraw({ amount: balance1, fee: 0n, token: params.token1Principal }) }
-      catch (e) { console.error('[icpswap.sweep] withdraw token1 failed:', e) }
-    }
+  // Canonical token order comes from the pool itself, never from the caller.
+  const metaResult = (await poolActor.metadata()) as any
+  if (!('ok' in metaResult)) throw new Error(`Pool metadata failed: ${safeStringify(metaResult.err)}`)
+  const canonical0: string = metaResult.ok.token0.address
+  const canonical1: string = metaResult.ok.token1.address
+
+  const feeCache = new Map<string, bigint>()
+  async function ledgerFee(tokenPrincipal: string): Promise<bigint> {
+    const cached = feeCache.get(tokenPrincipal)
+    if (cached != null) return cached
+    const tokenActor = Actor.createActor(icrcIDL, { agent: authedAgent, canisterId: tokenPrincipal })
+    const f = (await tokenActor.icrc1_fee()) as any
+    const fee = typeof f === 'bigint' ? f : BigInt(f)
+    feeCache.set(tokenPrincipal, fee)
+    return fee
   }
 
-  // 2. Deposit any tokens stuck in the user's pool subaccount
+  let foundAny = false
+  let allAttemptedOk = true
+
+  // 1. Deposit any tokens stuck in the user's pool subaccount FIRST, so the
+  //    withdraw pass below can pay them out in the same sweep.
   const userSubaccount = principalToSubAccount(ownerPrincipal)
-  for (const tokenPrincipal of [params.token0Principal, params.token1Principal]) {
+  for (const tokenPrincipal of [canonical0, canonical1]) {
     try {
       const tokenActor = Actor.createActor(icrcIDL, { agent: authedAgent, canisterId: tokenPrincipal })
       const bal = (await tokenActor.icrc1_balance_of({
         owner: Principal.fromText(poolId),
         subaccount: [Array.from(userSubaccount)],
       })) as bigint
-      if (bal > 0n) {
-        await poolActor.deposit({ amount: bal, fee: 0n, token: tokenPrincipal })
+      const fee = await ledgerFee(tokenPrincipal)
+      if (bal > fee) {
+        foundAny = true
+        const r = (await poolActor.deposit({ amount: bal, fee, token: tokenPrincipal })) as any
+        if (!('ok' in r)) {
+          allAttemptedOk = false
+          console.error('[icpswap.sweep] subaccount deposit refused for', tokenPrincipal, safeStringify(r.err))
+        }
       }
     } catch (e) {
+      allAttemptedOk = false
       console.error('[icpswap.sweep] subaccount deposit failed for', tokenPrincipal, e)
     }
   }
+
+  // 2. Withdraw unused balances, slots mapped to the pool's canonical order.
+  const balanceResult = (await poolActor.getUserUnusedBalance(ownerPrincipal)) as any
+  if (!('ok' in balanceResult)) throw new Error(`getUserUnusedBalance failed: ${safeStringify(balanceResult.err)}`)
+  const slots: Array<{ amount: bigint; token: string }> = [
+    { amount: balanceResult.ok.balance0 as bigint, token: canonical0 },
+    { amount: balanceResult.ok.balance1 as bigint, token: canonical1 },
+  ]
+  for (const slot of slots) {
+    try {
+      if (slot.amount <= 0n) continue
+      const fee = await ledgerFee(slot.token)
+      // Dust at or below the ledger fee cannot be paid out; treat as zero.
+      if (slot.amount <= fee) continue
+      foundAny = true
+      const r = (await poolActor.withdraw({ amount: slot.amount, fee, token: slot.token })) as any
+      if (!('ok' in r)) {
+        allAttemptedOk = false
+        console.error('[icpswap.sweep] withdraw refused for', slot.token, safeStringify(r.err))
+      }
+    } catch (e) {
+      allAttemptedOk = false
+      console.error('[icpswap.sweep] withdraw failed for', slot.token, e)
+    }
+  }
+
+  return foundAny && allAttemptedOk
+}
+
+/**
+ * sweep, retried. The pool credits a lost-response depositFrom asynchronously,
+ * so the first look often races it; a few spaced retries make leg recovery
+ * automatic instead of a manual Recover-page trip. No sleep after the final
+ * attempt.
+ */
+export async function sweepWithRetry(params: SweepParams, attempts = 3, delayMs = 4000): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      if (await sweep(params)) return true
+    } catch (e) {
+      console.error(`[icpswap.sweepWithRetry] attempt ${i + 1} failed:`, e)
+    }
+    if (i < attempts - 1) await new Promise(resolve => setTimeout(resolve, delayMs))
+  }
+  return false
 }

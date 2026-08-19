@@ -99,6 +99,12 @@ export function setDebugMode(enabled: boolean): void {
     localStorage.setItem('taco_debug_mode', enabled ? 'true' : 'false')
     applyDebugMode(enabled)
     originalConsoleLog(`[TACO] Debug mode ${enabled ? 'ON' : 'OFF'}`)
+    // Forward to the data worker so its per-fetch timing telemetry
+    // (`fetch OK <key> in <ms>ms`) follows the same switch. Dynamic import
+    // avoids a circular dependency with the bridge.
+    void import('../stores/worker-bridge')
+      .then(m => m.setWorkerDebug(enabled))
+      .catch(() => { /* bridge not initialized yet; it reads the flag at init */ })
   }
 }
 

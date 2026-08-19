@@ -55,6 +55,8 @@ export interface CachedQuery<T> {
   refresh: () => Promise<T | null>
   prefetch: () => void
   invalidate: () => void
+  /** Write a known-true value; supersedes any in-flight fetch (see impl). */
+  set: (value: T) => void
   clear: () => void
 }
 
@@ -99,14 +101,30 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
     }
   }
 
+  // Generation counter: set()/clear()/principal flips bump it, and any fetch
+  // still in flight from an older generation is forbidden from writing. This
+  // is what makes set() authoritative — without it, a stale read started
+  // before the set could land afterwards and overwrite the known-true value.
+  let generation = 0
+
   // Non-principal-scoped: hydrate synchronously at construct so first paint sees data.
   if (opts.persist && !opts.principalRef) hydrateFromCache()
 
-  // Principal-scoped: hydrate every time the principal changes (covers cold-load auth restore + identity switch).
-  if (opts.persist && opts.principalRef) {
+  // Principal-scoped: react to principal changes for ALL queries, persisted or
+  // not (covers cold-load auth restore, logout, and direct identity switch).
+  // Persisted queries re-hydrate from the new principal's cache; non-persisted
+  // ones reset so one principal's data can never serve another.
+  if (opts.principalRef) {
     watch(opts.principalRef, () => {
-      hydratedFor = undefined
-      hydrateFromCache()
+      generation++
+      inFlight = null
+      if (opts.persist) {
+        hydratedFor = undefined
+        hydrateFromCache()
+      } else {
+        dataRef.value = null
+        lastFetchedAt.value = 0
+      }
     }, { immediate: true })
   }
 
@@ -115,6 +133,7 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
     isFetching.value = true
     errorRef.value = null
     const principalAtStart = opts.principalRef?.value ?? null
+    const genAtStart = generation
     const promise: Promise<T | null> = (async () => {
       try {
         const fetched = opts.timeoutMs
@@ -122,6 +141,8 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
           : await opts.fetcher()
         // Drop late results if principal flipped mid-flight.
         if ((opts.principalRef?.value ?? null) !== principalAtStart) return null
+        // Drop late results if set()/clear() superseded this fetch.
+        if (generation !== genAtStart) return dataRef.value
         // Defensive: nullish results must not blank good cache (or be persisted
         // by writeCache below — turning a transient hiccup into a sticky empty
         // state on reload). Uses `!= null` so legitimately-falsy values like
@@ -168,7 +189,23 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
     lastFetchedAt.value = 0
   }
 
+  /**
+   * Write a known-true value straight into the cache (e.g. the allowance an
+   * approval just set on chain). Bumps the generation so any fetch already in
+   * flight cannot overwrite it with pre-write state, and drops the in-flight
+   * handle so the next refresh() starts a genuinely fresh read.
+   */
+  function set(value: T): void {
+    generation++
+    inFlight = null
+    dataRef.value = value
+    lastFetchedAt.value = Date.now()
+    errorRef.value = null
+    if (opts.persist) writeCache(persistKey(), value)
+  }
+
   function clear(): void {
+    generation++
     dataRef.value = null
     lastFetchedAt.value = 0
     inFlight = null
@@ -185,6 +222,7 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
     refresh,
     prefetch,
     invalidate,
+    set,
     clear,
   }
 }

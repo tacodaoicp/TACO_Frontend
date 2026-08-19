@@ -124,6 +124,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useNachosStore } from '../../stores/nachos.store'
+import { withTimeout } from '../../exchange/utils/withTimeout'
 
 const nachosStore = useNachosStore()
 const analytics = ref<any>(null)
@@ -145,7 +146,8 @@ const hasNonICPTokens = computed(() =>
 const loadAnalytics = async () => {
   try {
     const actor = await createAnalyticsActor()
-    analytics.value = await actor.getVaultAnalytics()
+    // Timeout so a wedged connection can't leave this section pending forever.
+    analytics.value = await withTimeout(actor.getVaultAnalytics(), 10_000, 'getVaultAnalytics')
   } catch (e) {
     console.error('Failed to load vault analytics:', e)
   }

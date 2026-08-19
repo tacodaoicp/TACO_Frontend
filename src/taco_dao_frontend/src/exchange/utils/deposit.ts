@@ -14,6 +14,7 @@ import { icrcIDL } from '../../shared/icrc-idl'
 import { getCanisterId } from '../../constants/canisterIds'
 import { requestApproval, ApprovalDeclined } from './approvalPrompt'
 import { useExchangeStore } from '../store/exchange.store'
+import { withTimeout } from './withTimeout'
 
 /** JSON replacer that converts BigInt to string (prevents "Do not know how to serialize a BigInt") */
 const jsonSafe = (_: string, v: any) => typeof v === 'bigint' ? v.toString() : v
@@ -65,15 +66,40 @@ export async function approveExchangeDeposit(
   // Reuse a standing allowance when it covers this trade. Reads the store's
   // allowance cache (warmed on token switch / page mount, refreshed after
   // every mutation), so this is usually instant. The 60s margin keeps the
-  // pull off a dying approval.
+  // pull off a dying approval. The cache is trusted only in the direction
+  // that SKIPS work; an insufficient answer is re-verified live below.
   const store = useExchangeStore()
+  const sufficient = (v: { allowance: bigint; expiresAt: bigint | null } | null): boolean => {
+    if (!v) return false
+    const marginNs = BigInt(Date.now() + 60_000) * 1_000_000n
+    return v.allowance >= needed && (v.expiresAt == null || v.expiresAt > marginNs)
+  }
   try {
     const cur = await store.userAllowanceQuery(tokenCanisterId).ensure(30_000)
-    if (cur) {
-      const marginNs = BigInt(Date.now() + 60_000) * 1_000_000n
-      if (cur.allowance >= needed && (cur.expiresAt == null || cur.expiresAt > marginNs)) return
+    if (sufficient(cur)) return
+  } catch { /* allowance unknown — verify live below */ }
+
+  // The cache said no or did not know. Take one LIVE look at the ledger via
+  // the authed agent before opening a dialog: a fresh signed query heals every
+  // stale-low cache state (a poisoned post-approve read, a quick retry, a
+  // stale principal). Fail-open: any error or timeout falls through to the
+  // prompt, so this can never block a trade or wrongly skip a needed approval.
+  try {
+    const live: any = await withTimeout(
+      (ledger as any).icrc2_allowance({
+        account: { owner: identity.getPrincipal(), subaccount: [] },
+        spender,
+      }),
+      8_000,
+      'icrc2_allowance live check',
+    )
+    const liveVal = {
+      allowance: BigInt(live.allowance),
+      expiresAt: Array.isArray(live.expires_at) && live.expires_at.length > 0 ? BigInt(live.expires_at[0]) : null,
     }
-  } catch { /* allowance unknown — fall through to prompt and approve */ }
+    store.userAllowanceQuery(tokenCanisterId).set(liveVal)
+    if (sufficient(liveVal)) return
+  } catch { /* live check unavailable — proceed to the prompt */ }
 
   // New approval needed: the user confirms and can edit amount and validity.
   const decision = await requestApproval({
@@ -100,8 +126,13 @@ export async function approveExchangeDeposit(
     if ('InsufficientFunds' in err) throw new Error('Balance too low to cover the approval fee.')
     throw new Error(`Approval failed: ${JSON.stringify(err, jsonSafe)}`)
   }
-  // Keep the cache honest right away instead of waiting for the next poll.
-  void store.userAllowanceQuery(tokenCanisterId).refresh()
+  // Seed the cache with the value the approval just wrote on chain. A refetch
+  // here could capture pre-approve state from a lagging replica and poison the
+  // cache; set() is authoritative and supersedes any in-flight read.
+  store.userAllowanceQuery(tokenCanisterId).set({
+    allowance: decision.amount,
+    expiresAt: decision.expiresAtNs,
+  })
 }
 
 // Minimal IDL for ICP ledger transfer

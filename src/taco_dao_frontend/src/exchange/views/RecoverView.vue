@@ -143,11 +143,17 @@
               <span>{{ getTokenSymbol(p.sell) }} → {{ getTokenSymbol(p.buy) }}</span>
               <span class="recover-view__stuck-reason">Interrupted {{ formatDepositAge(p.timestamp) }}</span>
             </div>
-            <button
-              class="ex-btn ex-btn--sm ex-btn--primary"
-              @click="sweepPending(p)"
-              :disabled="sweeping === p.sell + p.buy"
-            >{{ sweeping === (p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
+            <div style="display:flex;gap:4px">
+              <button
+                class="ex-btn ex-btn--sm ex-btn--primary"
+                @click="sweepPending(p)"
+                :disabled="sweeping === p.sell + p.buy"
+              >{{ sweeping === (p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
+              <button
+                class="ex-btn ex-btn--sm ex-btn--outline"
+                @click="dismissPendingSwap(p)"
+              >Dismiss</button>
+            </div>
           </div>
         </div>
 
@@ -181,11 +187,17 @@
               <span>{{ getTokenSymbol(p.sell) }} → {{ getTokenSymbol(p.buy) }}</span>
               <span class="recover-view__stuck-reason">Interrupted {{ formatDepositAge(p.timestamp) }}</span>
             </div>
-            <button
-              class="ex-btn ex-btn--sm ex-btn--primary"
-              @click="sweepNeuPending(p)"
-              :disabled="sweeping === ('neu:' + p.sell + p.buy)"
-            >{{ sweeping === ('neu:' + p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
+            <div style="display:flex;gap:4px">
+              <button
+                class="ex-btn ex-btn--sm ex-btn--primary"
+                @click="sweepNeuPending(p)"
+                :disabled="sweeping === ('neu:' + p.sell + p.buy)"
+              >{{ sweeping === ('neu:' + p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
+              <button
+                class="ex-btn ex-btn--sm ex-btn--outline"
+                @click="dismissPendingNeu(p)"
+              >Dismiss</button>
+            </div>
           </div>
         </div>
 
@@ -238,6 +250,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { onVisible } from '../composables/useVisibilityAware'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
@@ -294,14 +307,16 @@ async function recoverCachedDeposit(dep: CachedDeposit) {
       standard,
     )
     console.log('[Recover] Result:', result)
-    // Always remove from cache — the deposit was either recovered or already used
-    removeDepositFromCache(dep.block)
-    cachedDeposits.value = cachedDeposits.value.filter(d => d.block !== dep.block)
     if (result) {
+      removeDepositFromCache(dep.block)
+      cachedDeposits.value = cachedDeposits.value.filter(d => d.block !== dep.block)
       recoverSuccess.value = true
       toast.success('Deposit Recovered')
     } else {
-      recoverError.value = `Block ${dep.block} was already used in a successful trade — removed from list.`
+      // A bare false usually means the deposit was already used by its trade or
+      // already refunded. Keep the row so a support-resolved case stays one
+      // click away; the user can dismiss it once confirmed.
+      recoverError.value = `Block ${dep.block} was already used by its trade or already refunded. Check your wallet history for the refund. If you cannot find it, contact support with this block number. The entry stays in the list; dismiss it once settled.`
       toast.warning('Recovery Notice', recoverError.value)
     }
   } catch (err: any) {
@@ -359,11 +374,11 @@ async function recoverAllCached() {
     if (recovered > 0) {
       recoverSuccess.value = true
       recoverError.value = recovered < results.length
-        ? `Recovered ${recovered}/${results.length} deposits. Others were already used or expired.`
+        ? `Recovered ${recovered}/${results.length} deposits. The others were already used by their trades, already refunded, or expired.`
         : ''
       toast.success('Batch Recovery Complete', recovered + ' deposits recovered')
     } else if (results.length > 0) {
-      recoverError.value = 'No deposits needed recovery — they were already used in successful trades.'
+      recoverError.value = 'No deposits needed recovery. They were already used by their trades or already refunded; check your wallet history if in doubt.'
       toast.warning('Recovery Notice', recoverError.value)
     }
   } catch (err: any) {
@@ -467,7 +482,7 @@ async function recoverTokens() {
       recoverSuccess.value = true
       toast.success('Tokens Recovered')
     } else {
-      recoverError.value = 'Recovery failed. Verify the block number and token canister ID.'
+      recoverError.value = 'Recovery failed. If this deposit was already refunded or used by a trade, this is the double refund guard doing its job: check your wallet history for the refund before retrying. Otherwise verify the block number and token canister ID, and contact support with the block number if it keeps failing.'
       toast.error('Recovery Failed', recoverError.value)
     }
   } catch (err: any) {
@@ -500,11 +515,16 @@ async function sweepPending(p: icpswap.PendingIcpSwap) {
   sweepError.value = ''
   sweepSuccess.value = false
   try {
-    await icpswap.sweep({ token0Principal: p.sell, token1Principal: p.buy })
-    icpswap.removePendingSwap(p.sell, p.buy)
-    pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
-    sweepSuccess.value = true
-    toast.success('Sweep Complete')
+    const recovered = await icpswap.sweep({ token0Principal: p.sell, token1Principal: p.buy })
+    if (recovered) {
+      icpswap.removePendingSwap(p.sell, p.buy)
+      pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
+      sweepSuccess.value = true
+      toast.success('Sweep Complete')
+    } else {
+      sweepError.value = 'Nothing to recover yet. If you just swapped, the deposit may still be crediting. Try again in a few seconds, or dismiss this entry if it stays empty.'
+      toast.warning('Nothing to sweep yet', sweepError.value)
+    }
   } catch (err: any) {
     sweepError.value = err.message || 'Sweep failed'
     toast.error('Sweep Failed', sweepError.value)
@@ -513,15 +533,25 @@ async function sweepPending(p: icpswap.PendingIcpSwap) {
   }
 }
 
+function dismissPendingSwap(p: icpswap.PendingIcpSwap) {
+  icpswap.removePendingSwap(p.sell, p.buy)
+  pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
+}
+
 async function sweepManual() {
   if (!canSweepManual.value) return
   sweeping.value = 'manual'
   sweepError.value = ''
   sweepSuccess.value = false
   try {
-    await icpswap.sweep({ token0Principal: sweepTokenA.value.trim(), token1Principal: sweepTokenB.value.trim() })
-    sweepSuccess.value = true
-    toast.success('Sweep Complete')
+    const recovered = await icpswap.sweep({ token0Principal: sweepTokenA.value.trim(), token1Principal: sweepTokenB.value.trim() })
+    if (recovered) {
+      sweepSuccess.value = true
+      toast.success('Sweep Complete')
+    } else {
+      sweepError.value = 'Nothing found to sweep for this pair.'
+      toast.warning('Nothing to sweep', sweepError.value)
+    }
   } catch (err: any) {
     sweepError.value = err.message || 'Sweep failed'
     toast.error('Sweep Failed', sweepError.value)
@@ -534,6 +564,11 @@ async function sweepManual() {
 const pendingNeu = ref<neutrinite.PendingNeutrinite[]>([])
 function loadPendingNeu() {
   pendingNeu.value = neutrinite.getPendingSwaps()
+}
+
+function dismissPendingNeu(p: neutrinite.PendingNeutrinite) {
+  neutrinite.removePendingSwap(p.sell, p.buy)
+  pendingNeu.value = pendingNeu.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
 }
 
 async function sweepNeuPending(p: neutrinite.PendingNeutrinite) {
@@ -606,6 +641,15 @@ function formatPullTime(timeNs: bigint): string {
 }
 
 onMounted(() => {
+  loadCachedDeposits()
+  loadPendingNeu()
+  loadPendingSwaps()
+  void loadPendingPulls()
+})
+
+// Markers can be written while this tab is hidden (a failed leg in another
+// tab, a zombie leg finishing late). Refresh every list on return.
+onVisible(() => {
   loadCachedDeposits()
   loadPendingNeu()
   loadPendingSwaps()

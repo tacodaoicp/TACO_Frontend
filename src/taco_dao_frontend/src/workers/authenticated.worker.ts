@@ -278,9 +278,17 @@ async function init(): Promise<void> {
   // The network override must be set before we know which host to connect to
   // Agent creation will be triggered by handleSetNetwork
 
-  // Load cached data from IndexedDB (runs in parallel with agent creation)
+  // Load cached data from IndexedDB (runs in parallel with agent creation).
+  // Raced against a timer: a hung openDB (multi-tab upgrade, broken private
+  // window IDB) must never stand between the user and live fetches.
   try {
-    const cached = await getAllCached()
+    const cached = await Promise.race([
+      getAllCached(),
+      new Promise<Map<DataKey, DataState>>((resolve) => setTimeout(() => {
+        console.warn('[AuthWorker] IndexedDB restore timed out after 3s, starting with empty cache')
+        resolve(new Map())
+      }, 3_000)),
+    ])
     for (const [key, state] of cached) {
       if (HANDLED_KEYS.includes(key)) {
         dataStates.set(key, {
@@ -320,7 +328,9 @@ async function init(): Promise<void> {
       }
       // Queue fetch if data is missing or stale
       const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
-      const canFetch = !requiresAuth || (PUBLIC_ADMIN_KEYS.includes(key) && currentRoute.startsWith('/admin'))
+      const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
+        ? currentRoute.startsWith('/admin')
+        : !requiresAuth
       if (canFetch && (!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
         queue.enqueue(key, 'high')
       }
@@ -347,21 +357,35 @@ async function init(): Promise<void> {
   debugLog(`Init complete: anonymousAgent=${!!anonymousAgent}, authenticatedAgent=${!!authenticatedAgent}, queueSize=${queue.size}`)
 }
 
+// Per-request hard abort for the anonymous agent's transport (see usage below).
+const abortingFetch: typeof fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 12_000)
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
 async function createAnonymousAgent(): Promise<void> {
   // Capture network settings at creation time to avoid race with SET_NETWORK
   const host = getHost()
   const fetchRootKey = shouldFetchRootKey()
   debugLog(`Creating anonymous agent... host=${host}, fetchRootKey=${fetchRootKey}`)
   try {
-    anonymousAgent = await createAgent({
+    // HttpAgent.create directly (not @dfinity/utils createAgent, which drops
+    // unknown options like `fetch` instead of forwarding them).
+    anonymousAgent = await HttpAgent.create({
       identity: getFrontendIdentity(),
       host,
-      fetchRootKey,
+      shouldFetchRootKey: fetchRootKey,
       // Public read-only data (vault/prices/treasury). Skipping per-query
       // signature verification removes a subnet-key read_state round-trip +
       // BLS verify on the first query (~200ms saved, measured) with no risk for
       // display-only data. Authenticated agent keeps verification on.
       verifyQuerySignatures: false,
+      // Transport-level abort at 12s per HTTP request: the app's 8s key
+      // timeout only rejects the promise, so retries after sleep or a network
+      // switch could queue behind the same wedged HTTP/2 connection for tens
+      // of seconds. Aborting frees the socket so the retry opens a fresh one.
+      fetch: abortingFetch,
     })
     debugLog('Anonymous agent created successfully')
   } catch (error) {
@@ -527,9 +551,12 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
 
     case 'SET_ROUTE': {
       const newRoute = message.payload.route || '/'
-      if (newRoute !== currentRoute) {
-        currentRoute = newRoute
-        // Proactively serve cache + prioritize fetches for new route
+      // Runs for SAME-route sends too: the bridge re-sends SET_ROUTE as a
+      // resume kick when the tab becomes visible again, and this body is
+      // idempotent (cache replay + stale-only enqueue with backoff reset).
+      currentRoute = newRoute
+      {
+        // Proactively serve cache + prioritize fetches for the route
         const routeKeys = getInitialLoadKeys(newRoute)
         for (const key of routeKeys) {
           if (!HANDLED_KEYS.includes(key)) continue
@@ -543,12 +570,14 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
               payload: { dataKey: key, data: state.data, state, fromCache: true },
             })
           }
-          // Enqueue stale/missing data as critical priority
+          // Enqueue stale/missing data as critical priority. PUBLIC_ADMIN keys
+          // are public but only wanted on /admin routes; the old
+          // `!requiresAuth || ...` form short-circuited before the route check
+          // and fetched all 12 of them anywhere.
           const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
-          // PUBLIC_ADMIN keys (e.g. voterDetails = admin_getUserAllocations) are only
-      // consumed on /admin pages; don't fetch them on other routes (they'd 8s-time-out
-      // for anon users on every route via the all-keys subscription barrage).
-      const canFetch = !requiresAuth || isAuthenticated || (PUBLIC_ADMIN_KEYS.includes(key) && currentRoute.startsWith('/admin'))
+          const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
+            ? currentRoute.startsWith('/admin')
+            : (!requiresAuth || isAuthenticated)
           if (canFetch && (!state?.data || isStale(key, state.lastUpdated))) {
             // User explicitly navigated here — clear any leftover backoff so the
             // fetch fires immediately instead of honoring a stale (≤8s) window.
@@ -556,8 +585,6 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
             queue.enqueue(key, 'critical')
           }
         }
-      } else {
-        currentRoute = newRoute
       }
       break
     }
@@ -599,6 +626,11 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
 
     case 'SET_NETWORK':
       handleSetNetwork(message)
+      break
+
+    case 'SET_DEBUG':
+      debugEnabled = !!(message.payload as { enabled?: boolean } | undefined)?.enabled
+      console.log(`[AuthWorker] Debug ${debugEnabled ? 'enabled' : 'disabled'}`)
       break
 
     case 'PING':
@@ -715,7 +747,12 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
       // PUBLIC_ADMIN keys (e.g. voterDetails = admin_getUserAllocations) are only
       // consumed on /admin pages; don't fetch them on other routes (they'd 8s-time-out
       // for anon users on every route via the all-keys subscription barrage).
-      const canFetch = !requiresAuth || isAuthenticated || (PUBLIC_ADMIN_KEYS.includes(key) && currentRoute.startsWith('/admin'))
+      // Admin data is public but only wanted on /admin routes; the old
+      // `!requiresAuth || ...` form short-circuited before the route check
+      // (PUBLIC_ADMIN keys never require auth), fetching all 12 keys anywhere.
+      const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
+        ? currentRoute.startsWith('/admin')
+        : (!requiresAuth || isAuthenticated)
       if (canFetch) {
         if (debugEnabled) console.log(`[AuthWorker] Queuing fetch for ${key} (stale/missing, canFetch=true)`)
         pendingPriorityKeys.add(key)
@@ -785,7 +822,12 @@ function triggerDeferredLoad(): void {
       // PUBLIC_ADMIN keys (e.g. voterDetails = admin_getUserAllocations) are only
       // consumed on /admin pages; don't fetch them on other routes (they'd 8s-time-out
       // for anon users on every route via the all-keys subscription barrage).
-      const canFetch = !requiresAuth || isAuthenticated || (PUBLIC_ADMIN_KEYS.includes(key) && currentRoute.startsWith('/admin'))
+      // Admin data is public but only wanted on /admin routes; the old
+      // `!requiresAuth || ...` form short-circuited before the route check
+      // (PUBLIC_ADMIN keys never require auth), fetching all 12 keys anywhere.
+      const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
+        ? currentRoute.startsWith('/admin')
+        : (!requiresAuth || isAuthenticated)
       if (canFetch) {
         queue.enqueue(key, 'low')
       }
@@ -930,9 +972,13 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
     }
 
     // Queue fetch if data is missing or stale
-    // PUBLIC_ADMIN_KEYS can be fetched anonymously, others need auth
+    // PUBLIC_ADMIN_KEYS are anonymous but only wanted on /admin routes; the
+    // old unconditional form made every cold boot fetch-and-retry all 12 of
+    // them on any route (each 8s-timing-out for anon users).
     const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
-    const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
+    const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
+      ? currentRoute.startsWith('/admin')
+      : (!requiresAuth || isAuthenticated)
 
     if (canFetch && (!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
       queue.enqueue(key, 'high')
@@ -1091,7 +1137,9 @@ async function processQueue(): Promise<void> {
       // Start fetch in parallel (don't await) - critical/high priority items start first
       activeFetchCount++
       processSingleFetch(item).finally(() => {
-        activeFetchCount--
+        // Clamp: a concurrent INITIAL_LOAD (new tab) zeroes the counter while
+        // fetches are in flight; going negative would over-admit fetches.
+        activeFetchCount = Math.max(0, activeFetchCount - 1)
       })
     }
 

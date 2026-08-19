@@ -110,7 +110,20 @@ function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
   if (typeof localStorage !== 'undefined') {
     const override = localStorage.getItem('taco_network_override')
     if (override === 'ic' || override === 'staging' || override === 'local') {
-      return override
+      // Validate the sticky override against where we are actually running. A
+      // leftover 'local' on a production hostname points the worker at a dead
+      // host: agent creation fails silently and the page shows skeletons
+      // forever. Honor 'local' only on local hosts, and 'staging' anywhere
+      // except the production domain; otherwise drop the override.
+      const hostname = typeof location !== 'undefined' ? location.hostname : ''
+      const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')
+      const isProdHost = hostname.endsWith('tacodao.com') || hostname.startsWith('lx7ws-')
+      const invalid =
+        (override === 'local' && !isLocalHost) ||
+        (override === 'staging' && isProdHost)
+      if (!invalid) return override
+      console.warn(`[WorkerBridge] Ignoring stale network override '${override}' on host '${hostname}' and removing it`)
+      try { localStorage.removeItem('taco_network_override') } catch { /* ignore */ }
     }
   }
   // @ts-ignore - Vite/dfx injects this at build time
@@ -118,7 +131,11 @@ function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
   if (envNetwork === 'ic' || envNetwork === 'staging') {
     return envNetwork
   }
-  return 'local'
+  // Last resort: infer from the hostname rather than defaulting to 'local'
+  // (a build shipped without DFX_NETWORK on prod must still reach mainnet).
+  const hostname = typeof location !== 'undefined' ? location.hostname : ''
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) return 'local'
+  return 'ic'
 }
 
 function setupWorkerAdapter(worker: WorkerAdapter, workerName: string): void {
@@ -332,6 +349,40 @@ export function initWorkerBridge(route?: string): void {
   // Set up activity tracking for idle detection
   setupActivityTracking()
 
+  // Forward the persisted debug flag so the workers' per-fetch timing
+  // telemetry is reachable (it was dead code without a SET_DEBUG message).
+  try {
+    if (localStorage.getItem('taco_debug_mode') === 'true') setWorkerDebug(true)
+  } catch { /* ignore */ }
+
+  // Resume kick: when the tab becomes visible again (or is restored from the
+  // back-forward cache), re-send SET_ROUTE. Both workers treat it as cache
+  // replay + backoff reset + critical enqueue for the route's keys, which
+  // heals wedged connections and backoff accumulated while the tab idled.
+  // Debounced so rapid tab-flipping does not spam the workers.
+  let lastResumeKick = 0
+  const resumeKick = () => {
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+    const now = Date.now()
+    if (now - lastResumeKick < 5_000) return
+    lastResumeKick = now
+    try {
+      sendToWorker(getMainWorker(), {
+        id: generateMessageId(),
+        timestamp: Date.now(),
+        type: 'SET_ROUTE',
+        payload: { route: currentRoute.value || '/' },
+      })
+      if (WORKER_DEBUG()) console.log('[WorkerBridge] Resume kick: SET_ROUTE re-sent after tab became visible')
+    } catch { /* worker not up; nothing to kick */ }
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', resumeKick)
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pageshow', resumeKick)
+  }
+
   // Safety fallback timeout in case worker messages are lost
   // Normally resolved earlier by INITIAL_CACHE_READY signals from workers
   setTimeout(() => {
@@ -345,6 +396,22 @@ export function initWorkerBridge(route?: string): void {
   }, 500) // Increased timeout as fallback only
 
   initialized = true
+}
+
+/**
+ * Toggle the data worker's debug logging (per-fetch timing telemetry).
+ * Safe to call before the worker exists; initWorkerBridge also forwards the
+ * persisted flag at startup.
+ */
+export function setWorkerDebug(enabled: boolean): void {
+  try {
+    sendToWorker(getMainWorker(), {
+      id: generateMessageId(),
+      timestamp: Date.now(),
+      type: 'SET_DEBUG',
+      payload: { enabled },
+    })
+  } catch { /* worker not created yet */ }
 }
 
 /**

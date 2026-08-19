@@ -12,6 +12,7 @@ import { useTacoStore } from './taco.store'
 import { getEffectiveNetwork, isDevEnvironment } from '../config/network-config'
 import { getCanisterId } from '../constants/canisterIds'
 import { workerBridge } from './worker-bridge'
+import { withTimeout } from '../exchange/utils/withTimeout'
 import { deserializeFromTransfer } from '../workers/shared/transfer'
 // Vault IDL factory now managed by taco.store's lazy loader + actor cache
 import type {
@@ -483,10 +484,10 @@ export const useNachosStore = defineStore('nachos', () => {
   const loadDashboard = async (mintEstimateE8s?: bigint, burnEstimateE8s?: bigint) => {
     try {
       const actor = await createVaultActor(false)
-      const result = await (actor as any).getVaultDashboard(
+      const result = await withTimeout<any>((actor as any).getVaultDashboard(
         mintEstimateE8s !== undefined ? [mintEstimateE8s] : [],
         burnEstimateE8s !== undefined ? [burnEstimateE8s] : []
-      )
+      ), 10_000, 'getVaultDashboard')
       // Guard against null/undefined wiping a good cache — mirrors the worker
       // subscription guard at line 100.
       if (result) {
@@ -503,10 +504,10 @@ export const useNachosStore = defineStore('nachos', () => {
     if (!userLoggedIn.value) return
     try {
       const actor = await createVaultActor(true)
-      const result = await (actor as any).getUserActivity(
+      const result = await withTimeout<any>((actor as any).getUserActivity(
         Principal.fromText(userPrincipal.value),
         mintLimit, mintOffset, burnLimit, burnOffset
-      )
+      ), 10_000, 'getUserActivity')
       if (isDevEnvironment()) {
         console.log('[NACHOS loadUserActivity]', {
           principal: userPrincipal.value,
@@ -524,7 +525,7 @@ export const useNachosStore = defineStore('nachos', () => {
   const loadNAVHistory = async () => {
     try {
       const actor = await createVaultActor(false)
-      const result = await (actor as any).getNAVHistoryAdaptive()
+      const result = await withTimeout<any>((actor as any).getNAVHistoryAdaptive(), 10_000, 'getNAVHistoryAdaptive')
       if (result) navHistory.value = result
     } catch (e: any) {
       console.error('Failed to load NAV history:', e)
@@ -534,7 +535,7 @@ export const useNachosStore = defineStore('nachos', () => {
   const loadConfig = async () => {
     try {
       const actor = await createVaultActor(false)
-      const result = await (actor as any).getConfig()
+      const result = await withTimeout<any>((actor as any).getConfig(), 10_000, 'getConfig')
       if (result) vaultConfig.value = result
     } catch (e: any) {
       console.error('Failed to load vault config:', e)

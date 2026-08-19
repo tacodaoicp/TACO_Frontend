@@ -300,8 +300,11 @@ export function useCrossDexSwap() {
     // still deciding. The allowance check inside approveExchangeDeposit means
     // this only prompts when an approval is actually needed; the TACO leg
     // below then reuses the standing allowance with no second dialog.
+    // The V2 decision for the whole swap, pinned once (store contract: decide
+    // once per user action, never re-read mid-flow).
+    const v2 = store.useV2Deposit(fromAddr)
     const tacoLeg = plan.value.legs.find(l => l.dex === 'taco')
-    if (tacoLeg && store.useV2Deposit(fromAddr)) {
+    if (tacoLeg && v2) {
       try {
         const grossTotal = calculateRequiredDeposit(tacoLeg.amountIn, store.tradingFeeBps, sellToken.transfer_fee)
         setLegStep('taco', 'Approving…')
@@ -331,7 +334,7 @@ export function useCrossDexSwap() {
     const settled = await Promise.allSettled(
       plan.value.legs.map(leg =>
         withTimeout(
-          executeLeg(leg, fromAddr, toAddr, sellToken, slip),
+          executeLeg(leg, fromAddr, toAddr, sellToken, slip, v2),
           180_000,
           `crossdex-leg-${leg.dex}`,
         ).catch((err: any): LegOutcome => ({
@@ -359,7 +362,7 @@ export function useCrossDexSwap() {
         formatTokenAmount(totalOut, Number(tokenTo.value.decimals), tokenTo.value.symbol) + ' received')
     } else if (successes.length > 0) {
       phase.value = 'partial'
-      toast.warning('Partial Fill', `${successes.length}/${results.length} legs filled. Failed legs were refunded.`)
+      toast.warning('Partial Fill', `${successes.length}/${results.length} legs filled. Check each route's status; anything not auto-recovered is on the Recover page.`)
     } else {
       // A dead session fails every leg the same way; reset auth once instead of
       // showing raw signature/expiry text.
@@ -376,9 +379,11 @@ export function useCrossDexSwap() {
   }
 
   /** Execute a single leg. NEVER throws — always resolves to a LegOutcome, with
-   *  funds recovered on failure so nothing is stranded in that exchange. */
+   *  funds recovered on failure so nothing is stranded in that exchange.
+   *  `v2` is the TACO deposit path decision, pinned ONCE in execute() so a
+   *  background gate refresh can never desync it from the hoisted approval. */
   async function executeLeg(
-    leg: CrossDexLeg, fromAddr: string, toAddr: string, sellToken: TokenInfo, slip: number,
+    leg: CrossDexLeg, fromAddr: string, toAddr: string, sellToken: TokenInfo, slip: number, v2: boolean,
   ): Promise<LegOutcome> {
     const minOut = BigInt(Math.floor(Number(leg.expectedOut) * (1 - slip)))
 
@@ -396,13 +401,16 @@ export function useCrossDexSwap() {
       } catch (err: any) {
         console.error('[CrossDEX] ICPSwap leg failed:', err?.message || err)
         setLegStep('icpswap', 'Recovering funds…')
+        // Automatic recovery: sweep with retries (a lost-response depositFrom
+        // credits the pool a few seconds later, so the first look often races
+        // it). Only a sweep that actually moved funds clears the marker;
+        // otherwise the Recover page row stays visible.
         let recovered = false
         try {
-          await icpswap.sweep({ token0Principal: fromAddr, token1Principal: toAddr })
-          icpswap.removePendingSwap(fromAddr, toAddr) // swept while page is open → clear marker
-          recovered = true
-        } catch { /* best-effort; marker stays so the Recover page can sweep later */ }
-        setLegStep('icpswap', recovered ? 'Failed, funds recovered' : 'Failed')
+          recovered = await icpswap.sweepWithRetry({ token0Principal: fromAddr, token1Principal: toAddr })
+          if (recovered) icpswap.removePendingSwap(fromAddr, toAddr)
+        } catch { /* marker stays so the Recover page can sweep later */ }
+        setLegStep('icpswap', recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
         return { dex: 'icpswap', success: false, amountOut: 0n, error: err?.message || 'ICPSwap swap failed', recovered }
       }
     }
@@ -439,15 +447,15 @@ export function useCrossDexSwap() {
     // ── TACO leg ──
     let block: bigint | undefined
     let submitted = false
-    // Path decided ONCE per leg.
-    const v2 = store.useV2Deposit(fromAddr)
     try {
       const transferFee = sellToken.transfer_fee
       // Gross = exactly what the V1 path transfers.
       const grossTotal = calculateRequiredDeposit(leg.amountIn, store.tradingFeeBps, transferFee)
       if (v2) {
-        setLegStep('taco', 'Approving…')
-        await approveExchangeDeposit(fromAddr, grossTotal, transferFee)
+        // The hoisted dialog in execute() already ensured the allowance, and
+        // the V2 decision is pinned there and passed in — approving again here
+        // was the double-dialog bug, and re-reading the gate mid-flow could
+        // desync the deposit path from the approval.
       } else {
         setLegStep('taco', 'Depositing…')
         block = await depositToken(

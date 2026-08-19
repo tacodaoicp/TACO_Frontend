@@ -332,8 +332,8 @@ const summaryLine = computed(() => {
   const total = cx.outcomes.value.reduce((s, o) => s + o.amountOut, 0n)
   const totalStr = formatTo(total)
   if (cx.phase.value === 'success') return `Received ${totalStr}`
-  if (cx.phase.value === 'partial') return `Partial: received ${totalStr}. The failed route's funds were refunded.`
-  if (cx.phase.value === 'error') return 'All routes failed. Your funds were refunded (verify on the Recover page).'
+  if (cx.phase.value === 'partial') return `Partial: received ${totalStr}. Check each route's status above; anything not auto-recovered is on the Recover page.`
+  if (cx.phase.value === 'error') return `All routes failed. Check each route's status above; anything not auto-recovered is on the Recover page.`
   return ''
 })
 

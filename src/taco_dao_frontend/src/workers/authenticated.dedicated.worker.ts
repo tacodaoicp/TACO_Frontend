@@ -237,6 +237,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// Per-request hard abort for the anonymous agent's transport: the app-level 8s
+// key timeout only rejects the promise, so without this a wedged HTTP/2
+// connection holds every retry hostage for tens of seconds.
+const abortingFetch: typeof fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 12_000)
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
 function checkIdleStatus(): void {
   const wasIdle = isIdle
   isIdle = Date.now() - lastActivityTime > IDLE_TIMEOUT_MS
@@ -385,12 +394,28 @@ async function init(): Promise<void> {
     dataStates.set(key, createInitialState())
   }
 
+  // Raced against a timer: a hung openDB (multi-tab upgrade, broken private
+  // window IDB) must never stand between the user and live fetches.
   try {
-    const cached = await getAllCached()
+    const cached = await Promise.race([
+      getAllCached(),
+      new Promise<Map<DataKey, DataState>>((resolve) => setTimeout(() => {
+        console.warn('[AuthWorker-Dedicated] IndexedDB restore timed out after 3s, starting with empty cache')
+        resolve(new Map())
+      }, 3_000)),
+    ])
     for (const [key, state] of cached) {
       if (HANDLED_KEYS.includes(key)) {
+        // Migration: this worker used to cache the whole DataState instead of
+        // the raw data, so old entries come back double-wrapped and every
+        // field read as undefined. Unwrap one level when we see that shape.
+        let data = state.data as any
+        if (data && typeof data === 'object' && 'data' in data && 'lastUpdated' in data && 'loading' in data) {
+          data = data.data
+        }
         dataStates.set(key, {
           ...state,
+          data,
           stale: isStale(key, state.lastUpdated),
         })
         if (debugEnabled) console.log(`[AuthWorker-Dedicated] Loaded cached ${key}`)
@@ -446,9 +471,12 @@ function handleMessage(message: WorkerRequest): void {
 
     case 'SET_ROUTE': {
       const newRoute = message.payload.route || '/'
-      if (newRoute !== currentRoute) {
-        currentRoute = newRoute
-        // Proactively serve cache + prioritize fetches for new route
+      // Runs for SAME-route sends too: the bridge re-sends SET_ROUTE as a
+      // resume kick when the tab becomes visible again, and this body is
+      // idempotent (cache replay + stale-only enqueue with backoff reset).
+      currentRoute = newRoute
+      {
+        // Proactively serve cache + prioritize fetches for the route
         const routeKeys = getInitialLoadKeys(newRoute)
         for (const key of routeKeys) {
           if (!HANDLED_KEYS.includes(key)) continue
@@ -462,9 +490,13 @@ function handleMessage(message: WorkerRequest): void {
               payload: { dataKey: key, data: state.data, state, fromCache: true },
             })
           }
-          // Enqueue stale/missing data as critical priority
+          // Enqueue stale/missing data as critical priority. Admin data is
+          // public but only wanted on /admin routes (the old form fetched it
+          // everywhere).
           const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
-          const canFetch = !requiresAuth || isAuthenticated || PUBLIC_ADMIN_KEYS.includes(key)
+          const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
+            ? newRoute.startsWith('/admin')
+            : (!requiresAuth || isAuthenticated)
           if (canFetch && (!state?.data || isStale(key, state.lastUpdated))) {
             // User explicitly navigated here — clear any leftover backoff so the
             // fetch fires immediately instead of honoring a stale (≤8s) window.
@@ -472,8 +504,6 @@ function handleMessage(message: WorkerRequest): void {
             queue.enqueue(key, 'critical')
           }
         }
-      } else {
-        currentRoute = newRoute
       }
       break
     }
@@ -500,6 +530,57 @@ function handleMessage(message: WorkerRequest): void {
     case 'SET_NETWORK':
       handleSetNetwork(message)
       break
+
+    case 'SET_DEBUG':
+      debugEnabled = !!(message.payload as { enabled?: boolean } | undefined)?.enabled
+      console.log(`[AuthWorker-Dedicated] Debug ${debugEnabled ? 'enabled' : 'disabled'}`)
+      break
+
+    case 'INITIAL_LOAD': {
+      // Parity with the shared worker. Without this case the bridge's first,
+      // route-scoped load was silently ignored and the first fetch waited for
+      // the 5s auto-refresh loop: 6-9s cold loads on every browser without
+      // SharedWorker (Android Chrome, WebViews).
+      const route = message.payload.route || '/'
+      currentRoute = route
+      backoff.resetAll()
+      queue.clearProcessing()
+      const routeKeys = getInitialLoadKeys(route).filter((k: DataKey) => HANDLED_KEYS.includes(k))
+      for (const key of routeKeys) {
+        const state = dataStates.get(key)
+        if (state?.data) {
+          sendResponse({
+            id: generateMessageId(),
+            timestamp: Date.now(),
+            type: 'CACHE_HIT',
+            payload: { dataKey: key, data: state.data, state, fromCache: true },
+          })
+        }
+        const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
+        const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
+          ? route.startsWith('/admin')
+          : (!requiresAuth || isAuthenticated)
+        if (canFetch && (!state?.data || isStale(key, state.lastUpdated))) {
+          backoff.reset(key)
+          queue.enqueue(key, 'critical')
+        }
+      }
+      // Everything else follows at low priority; the concurrency pool drains
+      // critical first, so the landing route's data always wins the first wave.
+      // (Simplified vs the shared worker's deferred-load tracking; same effect.)
+      for (const key of PUBLIC_KEYS) {
+        if (routeKeys.includes(key) || !HANDLED_KEYS.includes(key)) continue
+        const state = dataStates.get(key)
+        const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
+        const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
+          ? route.startsWith('/admin')
+          : (!requiresAuth || isAuthenticated)
+        if (canFetch && (!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
+          queue.enqueue(key, 'low')
+        }
+      }
+      break
+    }
 
     case 'SUBSCRIBE':
       handleSubscribe(message)
@@ -648,6 +729,15 @@ function handleSubscribe(message: WorkerRequest): void {
         },
       })
     }
+    // Parity with the shared worker: subscribing to stale/missing data queues
+    // a fetch (this worker used to only replay cache and never fetch here).
+    const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
+    const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
+      ? currentRoute.startsWith('/admin')
+      : (!requiresAuth || isAuthenticated)
+    if (canFetch && (!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
+      queue.enqueue(key, 'high')
+    }
   }
 }
 
@@ -702,15 +792,27 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   currentNetwork = newNetwork
   setWorkerNetworkOverride(network || null)
 
-  // Recreate anonymous agent with new network settings
-  anonymousAgent = await createAgent({
-    identity: getFrontendIdentity(),
-    host: getHost(),
-    fetchRootKey: shouldFetchRootKey(),
-    // Public read-only data — skip per-query signature verification (saves a
-    // read_state + BLS verify on first query). Authenticated agent stays verified.
-    verifyQuerySignatures: false,
-  })
+  // Recreate anonymous agent with new network settings. A failure here must be
+  // VISIBLE: a silently-null agent leaves processQueue waiting forever and the
+  // page on skeletons with no clue why.
+  try {
+    // HttpAgent.create directly (not @dfinity/utils createAgent, which drops
+    // unknown options like `fetch` instead of forwarding them).
+    anonymousAgent = await HttpAgent.create({
+      identity: getFrontendIdentity(),
+      host: getHost(),
+      shouldFetchRootKey: shouldFetchRootKey(),
+      // Public read-only data — skip per-query signature verification (saves a
+      // read_state + BLS verify on first query). Authenticated agent stays verified.
+      verifyQuerySignatures: false,
+      // Transport-level abort at 12s per HTTP request (see abortingFetch note):
+      // frees wedged connections so retries open fresh ones.
+      fetch: abortingFetch,
+    })
+  } catch (error) {
+    console.error(`[AuthWorker-Dedicated] FAILED to create anonymous agent for host ${getHost()} — no data can load:`, error)
+    throw error
+  }
 
   // If authenticated, recreate authenticated agent with new network settings
   if (isAuthenticated && currentIdentity) {
@@ -793,7 +895,9 @@ async function processQueue(): Promise<void> {
 
       activeFetchCount++
       processSingleFetch(item).finally(() => {
-        activeFetchCount--
+        // Clamp: a RESET/INITIAL_LOAD zeroes the counter while fetches are in
+        // flight; going negative would over-admit fetches.
+        activeFetchCount = Math.max(0, activeFetchCount - 1)
       })
     }
 
@@ -1327,7 +1431,10 @@ async function fetchData(dataKey: DataKey): Promise<void> {
   })
 
   broadcastUpdate(dataKey, data)
-  await setCached(dataKey, dataStates.get(dataKey)!)
+  // Cache the RAW data (parity with the shared worker): setCached wraps it in
+  // its own envelope, and getAllCached rebuilds a DataState around it. Caching
+  // the whole DataState here double-wrapped every restore.
+  await setCached(dataKey, data)
 }
 
 // ============================================================================
@@ -1402,10 +1509,22 @@ async function autoRefreshLoop(): Promise<void> {
 // Start Worker
 // ============================================================================
 
+// Messages can arrive before init() finishes its IndexedDB restore; handling
+// them against empty state used to drop the bridge's INITIAL_LOAD and serve
+// empty caches. Buffer everything (order-preserving) and replay after init.
+const pendingMessages: WorkerRequest[] = []
+
 self.onmessage = (e: MessageEvent<WorkerRequest>) => {
+  if (!isInitialized) {
+    pendingMessages.push(e.data)
+    return
+  }
   handleMessage(e.data)
 }
 
 init().then(() => {
+  for (const m of pendingMessages.splice(0)) {
+    try { handleMessage(m) } catch (err) { console.error('[AuthWorker-Dedicated] Error replaying buffered message:', err) }
+  }
   autoRefreshLoop()
 })

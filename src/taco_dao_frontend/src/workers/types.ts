@@ -285,6 +285,7 @@ export type WorkerRequestType =
   | 'INITIAL_LOAD' // Tell worker the initial route for selective data loading
   | 'SET_USER_PRINCIPAL' // Send user principal to public worker for getVoteDashboard
   | 'SET_ROUTE' // Update current route for admin data gating
+  | 'SET_DEBUG' // Toggle worker debug logging (per-fetch timing telemetry)
 
 export interface WorkerRequest extends BaseMessage {
   type: WorkerRequestType
@@ -299,6 +300,7 @@ export interface WorkerRequest extends BaseMessage {
     network?: 'ic' | 'staging' | 'local' | null
     route?: string // Current route for INITIAL_LOAD
     userPrincipal?: string // Principal text for getVoteDashboard
+    enabled?: boolean // SET_DEBUG
   }
 }
 
