@@ -19,6 +19,7 @@ import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../shared/
 import { getEffectiveNetwork } from '../../config/network-config'
 import { icrcIDL } from '../../shared/icrc-idl'
 import { withTimeout } from '../utils/withTimeout'
+import { mapWithConcurrency } from '../utils/concurrency'
 
 const safeStringify = (obj: unknown) =>
   JSON.stringify(obj, (_, v) => (typeof v === 'bigint' ? v.toString() : v))
@@ -69,11 +70,17 @@ const pylonIDL = ({ IDL }: any) => {
     request_id: IDL.Opt(IDL.Nat32),
     signature: IDL.Opt(IDL.Vec(IDL.Nat8)),
   })
+  // Per-command results inside a batch ok. Only the `transfer` tag is declared
+  // because responses mirror the commands we send, and transfer is the only
+  // command this app ever issues. The batch can be ok while an inner transfer
+  // failed (e.g. dust below the ledger fee), so success must be judged here,
+  // not at the batch level.
+  const CommandResponse = IDL.Variant({ transfer: IDL.Variant({ ok: IDL.Nat64, err: IDL.Text }) })
   const BatchCommandResponse = IDL.Variant({
     err: IDL.Variant({
       caller_not_controller: IDL.Null, duplicate: IDL.Nat, expired: IDL.Null, invalid_signature: IDL.Null, other: IDL.Text,
     }),
-    ok: IDL.Record({}),
+    ok: IDL.Record({ commands: IDL.Vec(CommandResponse) }),
   })
 
   // Per-ledger indexer scan cadence. Declared minimal — Candid record subtyping
@@ -391,4 +398,74 @@ export async function sweep(sell: string, buy: string): Promise<boolean> {
     }
   }
   return recovered
+}
+
+/**
+ * Recover EVERY nonzero virtual balance the pylon holds for the user, across
+ * all ledgers — no pair list needed (icrc55_accounts enumerates them all).
+ * Used by the Recover page's Recover All. Endpoints run in PARALLEL with a
+ * sliding window of 10, and each withdraw gets up to 5 tries. An endpoint
+ * counts as recovered only when the batch response's INNER transfer result is
+ * ok: the pylon can answer ok at the batch level while the actual ledger
+ * transfer inside failed. Retrying a withdraw whose response was lost is safe:
+ * funds only ever move to the user's own wallet, so a duplicate attempt just
+ * errs on an empty balance.
+ */
+export async function sweepAll(): Promise<{
+  recoveredAny: boolean
+  details: Array<{ ledger: string; amount: bigint; ok: boolean }>
+}> {
+  const identity = await getCachedIdentity()
+  const owner = identity.getPrincipal()
+  if (owner.isAnonymous()) throw new Error('Not authenticated')
+  const userAccount = { owner, subaccount: [] as [] }
+  const pylon = await authedPylon()
+  const agent = await getCachedAgent()
+  // Idempotent and cheap. Covers the edge where a deposit happened while the
+  // original registration call had failed: without registration the pylon
+  // never credits the account, so no balance query can see the funds.
+  await ensureRegistered(pylon, userAccount, owner)
+  const accounts = (await pylon.icrc55_accounts({ owner, subaccount: [] })) as any[]
+  const candidates: Array<{ ledger: string; balance: bigint }> = []
+  for (const ae of accounts) {
+    const ep = ae?.endpoint
+    if (ep && 'ic' in ep && (ae.balance as bigint) > 0n) {
+      candidates.push({ ledger: ep.ic.ledger.toText(), balance: ae.balance as bigint })
+    }
+  }
+  const details: Array<{ ledger: string; amount: bigint; ok: boolean }> = []
+  await mapWithConcurrency(candidates, 10, async ({ ledger, balance }) => {
+    // Dust at or below the ledger fee cannot move; skip instead of burning a call.
+    try {
+      const f = (await Actor.createActor(icrcIDL, { agent, canisterId: ledger }).icrc1_fee()) as any
+      const fee = typeof f === 'bigint' ? f : BigInt(f)
+      if (balance <= fee) return
+    } catch { /* fee unknown — attempt the withdraw anyway */ }
+    let ok = false
+    for (let attempt = 0; attempt < 5 && !ok; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 2000))
+      try {
+        const res = (await pylon.icrc55_command({
+          commands: [{
+            transfer: {
+              amount: balance,
+              from: { account: userAccount },
+              ledger: ledgerVar(ledger),
+              memo: [],
+              to: { external_account: { ic: userAccount } },
+            },
+          }],
+          controller: { owner, subaccount: [] },
+          expire_at: [], request_id: [], signature: [],
+        })) as any
+        const inner = res && 'ok' in res ? res.ok.commands?.[0]?.transfer : null
+        ok = !!(inner && 'ok' in inner)
+        if (!ok) console.warn('[neutrinite.sweepAll] withdraw not delivered for', ledger, safeStringify(res))
+      } catch (e) {
+        console.error('[neutrinite.sweepAll] withdraw failed for', ledger, e)
+      }
+    }
+    details.push({ ledger, amount: balance, ok })
+  })
+  return { recoveredAny: details.some(d => d.ok), details }
 }

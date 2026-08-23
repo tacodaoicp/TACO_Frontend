@@ -116,8 +116,18 @@ const factoryIDL = ({ IDL }: any) => {
     tickSpacing: IDL.Int,
     canisterId: IDL.Principal,
   })
+  const FactoryError = IDL.Variant({
+    CommonError: IDL.Null,
+    InternalError: IDL.Text,
+    UnsupportedToken: IDL.Text,
+    InsufficientFunds: IDL.Null,
+  })
   const PoolResult = IDL.Variant({ ok: PoolData, err: IDL.Text })
-  return IDL.Service({ getPool: IDL.Func([GetPoolArgs], [PoolResult], ['query']) })
+  const PoolsResult = IDL.Variant({ ok: IDL.Vec(PoolData), err: FactoryError })
+  return IDL.Service({
+    getPool: IDL.Func([GetPoolArgs], [PoolResult], ['query']),
+    getPools: IDL.Func([], [PoolsResult], ['query']),
+  })
 }
 
 const poolIDL = ({ IDL }: any) => {
@@ -196,6 +206,161 @@ export async function getPoolCanister(token0Principal: string, token1Principal: 
 
 function isZeroForOne(sellTokenPrincipal: string, poolData: PoolData): boolean {
   return sellTokenPrincipal === poolData.token0.address
+}
+
+// ── Full pool enumeration (anonymous; used by the Recover page's Recover All) ──
+
+export interface AllPoolData {
+  canisterId: string
+  token0: Token
+  token1: Token
+  fee: bigint
+}
+
+/**
+ * List every pool the factory knows (one query, ~850 pools). Returns [] on any
+ * failure so callers can treat "factory unreachable" as "nothing to scan".
+ */
+export async function getAllPools(): Promise<AllPoolData[]> {
+  try {
+    const agent = await getAnonAgent()
+    const factoryActor = Actor.createActor(factoryIDL, { agent, canisterId: ICPSWAP_FACTORY_ID })
+    const res = (await factoryActor.getPools()) as any
+    if (!('ok' in res)) {
+      console.warn('[icpswap.getAllPools] factory err:', safeStringify(res.err))
+      return []
+    }
+    return res.ok.map((p: any) => ({
+      canisterId: p.canisterId.toText(),
+      token0: { address: p.token0.address, standard: p.token0.standard },
+      token1: { address: p.token1.address, standard: p.token1.standard },
+      fee: p.fee as bigint,
+    }))
+  } catch (e) {
+    console.error('[icpswap.getAllPools] failed:', e)
+    return []
+  }
+}
+
+/**
+ * One pool's unused balance for `owner` (anonymous query). Null on any failure
+ * so a scan over many pools skips unreadable ones instead of dying.
+ */
+export async function getUnusedBalance(
+  poolId: string,
+  owner: Principal,
+): Promise<{ balance0: bigint; balance1: bigint } | null> {
+  try {
+    const agent = await getAnonAgent()
+    const poolActor = Actor.createActor(poolIDL, { agent, canisterId: poolId })
+    const res = (await poolActor.getUserUnusedBalance(owner)) as any
+    if (!('ok' in res)) return null
+    return { balance0: res.ok.balance0 as bigint, balance1: res.ok.balance1 as bigint }
+  } catch {
+    return null
+  }
+}
+
+// ── Stuck-withdraw inspection (read-only; born from the TACOV2:2134 incident) ──
+// A pool withdraw can die between "internal balance debited" and "ledger
+// transfer executed" (status CreditCompleted). Such records are invisible to
+// every balance query AND to the pool's own getFailedTransactions, so listing
+// them is the only way a user learns where the funds sit. Display-only: the fix
+// is ICPSwap support's, with the record id as the claim.
+const poolTxIDL = ({ IDL }: any) => {
+  const AccountRef = IDL.Record({ owner: IDL.Principal, subaccount: IDL.Opt(IDL.Vec(IDL.Nat8)) })
+  // Records may be REDUCED (Candid skips wire fields we don't declare), but
+  // variant tag sets must be COMPLETE — an unknown tag throws for the whole
+  // response. Tag sets below are the live pool candid (v3.7.0); other pool
+  // versions can differ, which is why callers treat a throw as "no info".
+  const Transfer = IDL.Record({
+    token: IDL.Principal,
+    from: AccountRef,
+    to: AccountRef,
+    amount: IDL.Nat,
+    fee: IDL.Nat,
+  })
+  const WithdrawStatus = IDL.Variant({
+    Completed: IDL.Null,
+    Created: IDL.Null,
+    CreditCompleted: IDL.Null,
+    Failed: IDL.Null,
+  })
+  const WithdrawInfo = IDL.Record({ status: WithdrawStatus, transfer: Transfer, err: IDL.Opt(IDL.Text) })
+  // Full 12-tag Action set; payloads we never read are Reserved (top type —
+  // decodes and discards anything, across pool versions).
+  const Action = IDL.Variant({
+    AddLimitOrder: IDL.Reserved,
+    AddLiquidity: IDL.Reserved,
+    Claim: IDL.Reserved,
+    DecreaseLiquidity: IDL.Reserved,
+    Deposit: IDL.Reserved,
+    ExecuteLimitOrder: IDL.Reserved,
+    OneStepSwap: IDL.Reserved,
+    Refund: IDL.Reserved,
+    RemoveLimitOrder: IDL.Reserved,
+    Swap: IDL.Reserved,
+    TransferPosition: IDL.Reserved,
+    Withdraw: WithdrawInfo,
+  })
+  // timestamp is candid `int` (Motoko Time.Time), NOT nat — nat here throws on decode.
+  const Transaction = IDL.Record({ id: IDL.Nat, timestamp: IDL.Int, action: Action })
+  const PoolError = IDL.Variant({
+    CommonError: IDL.Null,
+    InternalError: IDL.Text,
+    UnsupportedToken: IDL.Text,
+    InsufficientFunds: IDL.Null,
+  })
+  const TxResult = IDL.Variant({ ok: IDL.Vec(IDL.Tuple(IDL.Nat, Transaction)), err: PoolError })
+  return IDL.Service({ getTransactionsByOwner: IDL.Func([IDL.Principal], [TxResult], ['query']) })
+}
+
+export interface StuckPoolWithdraw {
+  recordId: bigint
+  timestamp: bigint // ns
+  tokenAddress: string
+  amount: bigint
+  status: string // 'Created' | 'CreditCompleted' | 'Failed'
+}
+
+// A Created/CreditCompleted record younger than this may just be a swap in
+// flight in another tab; don't alarm the user about it.
+const STUCK_MIN_AGE_NS = 5n * 60n * 1_000_000_000n
+
+/**
+ * List `owner`'s withdraw records inside one pool that never reached Completed
+ * (anonymous query). [] = pool readable, nothing stuck. null = pool unreadable
+ * (different pool version or offline) — "no info", NOT "no problem".
+ */
+export async function getStuckPoolWithdraws(
+  poolId: string,
+  owner: Principal,
+): Promise<StuckPoolWithdraw[] | null> {
+  try {
+    const agent = await getAnonAgent()
+    const actor = Actor.createActor(poolTxIDL, { agent, canisterId: poolId })
+    const res = (await actor.getTransactionsByOwner(owner)) as any
+    if (!('ok' in res)) return []
+    const nowNs = BigInt(Date.now()) * 1_000_000n
+    const stuck: StuckPoolWithdraw[] = []
+    for (const [, tx] of res.ok as Array<[bigint, any]>) {
+      const w = tx.action && 'Withdraw' in tx.action ? tx.action.Withdraw : null
+      if (!w || 'Completed' in w.status) continue
+      const ts = tx.timestamp as bigint
+      if (nowNs - ts < STUCK_MIN_AGE_NS) continue
+      stuck.push({
+        recordId: tx.id as bigint,
+        timestamp: ts,
+        tokenAddress: (w.transfer.token as Principal).toText(),
+        amount: w.transfer.amount as bigint,
+        status: Object.keys(w.status)[0],
+      })
+    }
+    return stuck
+  } catch (e) {
+    console.warn('[icpswap.getStuckPoolWithdraws] unreadable pool', poolId, e)
+    return null
+  }
 }
 
 // ── Quotes (anonymous) ──

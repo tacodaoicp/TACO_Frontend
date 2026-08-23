@@ -17,6 +17,41 @@
         </div>
       </div>
 
+      <!-- Recover All: one button, hunts every recoverable location -->
+      <section class="recover-view__section">
+        <h2 class="recover-view__subtitle">Recover All</h2>
+        <p class="recover-view__desc">
+          One click checks every place funds can get stuck for your wallet: saved deposits on the exchange,
+          interrupted CrossDEX swaps, every ICPSwap pool, the Neutrinite pylon, and pending exchange deposits.
+          Anything found is returned to your wallet. A full run can take a few minutes; you can watch it work below.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="ex-btn ex-btn--primary" :disabled="!store.isAuthenticated || raRunning" @click="recoverAll()">
+            {{ raRunning && raScope === 'all' ? `Running... ${raElapsed}s` : 'Recover All' }}
+          </button>
+          <button class="ex-btn ex-btn--outline" :disabled="!store.isAuthenticated || raRunning" @click="recoverAll('icpswap')">
+            {{ raRunning && raScope === 'icpswap' ? `Running... ${raElapsed}s` : 'ICPSwap Only' }}
+          </button>
+          <button class="ex-btn ex-btn--outline" :disabled="!store.isAuthenticated || raRunning" @click="recoverAll('neutrinite')">
+            {{ raRunning && raScope === 'neutrinite' ? `Running... ${raElapsed}s` : 'Neutrinite Only' }}
+          </button>
+        </div>
+        <p class="recover-view__desc" style="margin:0">The two smaller buttons run just that exchange's checks, same scan, same recovery.</p>
+        <div v-if="!store.isAuthenticated" class="recover-view__desc">Connect your wallet to run this.</div>
+        <div v-if="raRows.length > 0" class="recover-view__stuck-list">
+          <div v-for="row in raRows" :key="row.id" class="recover-view__stuck-item">
+            <div class="recover-view__stuck-info">
+              <span>{{ row.label }}</span>
+              <span :class="row.state === 'failed' ? 'recover-view__stuck-reason' : 'recover-view__ra-detail'">{{ row.detail }}</span>
+            </div>
+            <span class="recover-view__ra-state" :data-state="row.state">
+              {{ row.state === 'running' ? '···' : row.state === 'done' ? '✓' : '✗' }}
+            </span>
+          </div>
+        </div>
+        <div v-if="raSummary" class="ex-success-box">{{ raSummary }}</div>
+      </section>
+
       <!-- Stuck Transaction Detection -->
       <section class="recover-view__section">
         <h2 class="recover-view__subtitle">Stuck Transactions</h2>
@@ -57,7 +92,7 @@
           click "Recover" to get your tokens back.
         </p>
 
-        <button v-if="cachedDeposits.length > 1" class="ex-btn ex-btn--primary" @click="recoverAllCached" :disabled="recovering" style="margin-bottom:var(--space-3)">
+        <button v-if="cachedDeposits.length > 1" class="ex-btn ex-btn--primary" @click="recoverAllCached" :disabled="recovering || raRunning" style="margin-bottom:var(--space-3)">
           {{ recovering ? 'Recovering...' : `Recover All (${cachedDeposits.length} deposits)` }}
         </button>
 
@@ -82,7 +117,7 @@
                   <button
                     class="ex-btn ex-btn--sm ex-btn--primary"
                     @click="recoverCachedDeposit(dep)"
-                    :disabled="recovering"
+                    :disabled="recovering || raRunning"
                   >{{ recovering ? '...' : 'Recover' }}</button>
                   <button
                     class="ex-btn ex-btn--sm ex-btn--outline"
@@ -147,7 +182,7 @@
               <button
                 class="ex-btn ex-btn--sm ex-btn--primary"
                 @click="sweepPending(p)"
-                :disabled="sweeping === p.sell + p.buy"
+                :disabled="sweeping === p.sell + p.buy || raRunning"
               >{{ sweeping === (p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
               <button
                 class="ex-btn ex-btn--sm ex-btn--outline"
@@ -191,7 +226,7 @@
               <button
                 class="ex-btn ex-btn--sm ex-btn--primary"
                 @click="sweepNeuPending(p)"
-                :disabled="sweeping === ('neu:' + p.sell + p.buy)"
+                :disabled="sweeping === ('neu:' + p.sell + p.buy) || raRunning"
               >{{ sweeping === ('neu:' + p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
               <button
                 class="ex-btn ex-btn--sm ex-btn--outline"
@@ -248,14 +283,24 @@
   </div>
 </template>
 
+<script lang="ts">
+// Module-scope run guard: this view sits under keep-alive and can be LRU
+// evicted mid Recover All run. The promises keep running; a re-entered
+// instance must not double-start, so the flag lives outside the component.
+let raActive = false
+</script>
+
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { Principal } from '@dfinity/principal'
 import { onVisible } from '../composables/useVisibilityAware'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { getDepositHistory, removeDepositFromCache } from '../utils/deposit'
 import { useExchangeToast } from '../composables/useExchangeToast'
+import { getCachedIdentity } from '../../shared/auth-cache'
+import { mapWithConcurrency, withRetries } from '../utils/concurrency'
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
 
@@ -448,7 +493,7 @@ const recoverError = ref('')
 const recoverSuccess = ref(false)
 
 const canRecover = computed(() => {
-  return store.isAuthenticated && recoverTokenId.value && recoverBlock.value && !recovering.value
+  return store.isAuthenticated && recoverTokenId.value && recoverBlock.value && !recovering.value && !raRunning.value
 })
 
 async function recoverTokens() {
@@ -506,7 +551,7 @@ function loadPendingSwaps() {
 }
 
 const canSweepManual = computed(() =>
-  store.isAuthenticated && !!sweepTokenA.value.trim() && !!sweepTokenB.value.trim() && !sweeping.value,
+  store.isAuthenticated && !!sweepTokenA.value.trim() && !!sweepTokenB.value.trim() && !sweeping.value && !raRunning.value,
 )
 
 async function sweepPending(p: icpswap.PendingIcpSwap) {
@@ -640,11 +685,325 @@ function formatPullTime(timeNs: bigint): string {
   return formatDepositAge(Number(BigInt(timeNs) / 1_000_000n))
 }
 
+// ── Recover All ──
+// One run hunts every recoverable location, phases in parallel, each feeding
+// the status rows. Only funds that actually moved are reported recovered.
+interface RaRow { id: string; label: string; state: 'running' | 'done' | 'failed'; detail: string }
+const raRunning = ref(false)
+const raElapsed = ref(0)
+const raRows = ref<RaRow[]>([])
+const raSummary = ref('')
+
+function raSet(id: string, label: string, state: RaRow['state'], detail = '') {
+  const row = raRows.value.find(r => r.id === id)
+  if (row) { row.label = label; row.state = state; row.detail = detail }
+  else raRows.value.push({ id, label, state, detail })
+}
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+// Null-returning reads (getUnusedBalance, getStuckPoolWithdraws) signal their
+// errors as null; give transient failures up to 5 tries before giving up.
+async function retryNull<T>(fn: () => Promise<T | null>, attempts = 5, delayMs = 1500): Promise<T | null> {
+  for (let i = 0; i < attempts; i++) {
+    if (i > 0) await sleep(delayMs)
+    const v = await fn()
+    if (v !== null) return v
+  }
+  return null
+}
+
+function formatRa(amount: bigint, address: string): string {
+  const t = store.getTokenByAddress(address)
+  const dec = t ? Number(t.decimals) : 8
+  const v = Number(amount) / 10 ** dec
+  return `${v.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${t?.symbol ?? address.slice(0, 5)}`
+}
+
+// Phase: saved treasury deposits through recoverBatch, in chunks, entries kept on failure.
+async function raTreasury(): Promise<number> {
+  const id = 'treasury'
+  const deposits = [...cachedDeposits.value]
+  if (deposits.length === 0) { raSet(id, 'Saved deposits', 'done', 'None saved, nothing to recover'); return 0 }
+  raSet(id, 'Saved deposits', 'running', `Recovering ${deposits.length} saved deposits...`)
+  const tokenType: Record<string, any> = { ICP: { ICP: null }, ICRC12: { ICRC12: null }, ICRC3: { ICRC3: null } }
+  let recovered = 0
+  for (let i = 0; i < deposits.length; i += 20) {
+    const chunk = deposits.slice(i, i + 20)
+    const batch = chunk.map(dep => ({
+      identifier: dep.token,
+      block: BigInt(dep.block),
+      tType: store.getTokenByAddress(dep.token)?.asset_type ?? tokenType[dep.type] ?? { ICRC12: null },
+    }))
+    let results: any[] | null = null
+    for (let attempt = 0; attempt < 4 && results === null; attempt++) {
+      try {
+        results = await store.recoverBatch(batch)
+      } catch (e: any) {
+        // The store's update-call limiter throws instead of queueing; wait it out.
+        if (String(e?.message ?? e).includes('Rate limit') && attempt < 3) {
+          raSet(id, 'Saved deposits', 'running', 'Waiting out the call rate limit...')
+          await sleep(20_000)
+        } else throw e
+      }
+    }
+    for (const r of results ?? []) {
+      const blockStr = r.block.toString()
+      if (r.success) {
+        recovered++
+        removeDepositFromCache(blockStr)
+        cachedDeposits.value = cachedDeposits.value.filter(d => d.block !== blockStr)
+      }
+      // Failures stay listed in Recent Deposits so support cases stay one click away.
+    }
+  }
+  raSet(id, 'Saved deposits', 'done', recovered > 0
+    ? `Recovered ${recovered} of ${deposits.length}${recovered < deposits.length ? '. The rest were already used or refunded and stay listed above.' : ''}`
+    : 'None needed recovery. They were already used by their trades or already refunded.')
+  return recovered
+}
+
+// Phase: interrupted CrossDEX pairs saved by the swap flow.
+async function raMarkers(): Promise<number> {
+  const id = 'markers'
+  const markers = [...pendingSwaps.value]
+  if (markers.length === 0) { raSet(id, 'Interrupted CrossDEX swaps', 'done', 'No interrupted swaps saved'); return 0 }
+  raSet(id, 'Interrupted CrossDEX swaps', 'running', `Sweeping ${markers.length} saved pairs...`)
+  let swept = 0
+  await mapWithConcurrency(markers, 10, async (p) => {
+    try {
+      const ok = await icpswap.sweepWithRetry({ token0Principal: p.sell, token1Principal: p.buy }, 5)
+      if (ok) {
+        swept++
+        icpswap.removePendingSwap(p.sell, p.buy)
+        pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
+      }
+    } catch (e) { console.error('[RecoverAll] marker sweep failed', p, e) }
+  })
+  raSet(id, 'Interrupted CrossDEX swaps', 'done',
+    swept > 0 ? `Recovered funds from ${swept} of ${markers.length} pairs` : 'Nothing left stranded for those pairs')
+  return swept
+}
+
+// Phase: everything ICPSwap. Scan all pools for unused balances and sweep the
+// hits; deep-check the TACO token pools for hidden subaccount balances; then
+// look for withdraws stuck inside pools (the class that needs ICPSwap support).
+async function raIcpswap(owner: Principal): Promise<{ scanned: number; recovered: number; stuck: number }> {
+  raSet('poolscan', 'ICPSwap pool scan', 'running', 'Listing all pools...')
+  const pools = await icpswap.getAllPools()
+  if (pools.length === 0) {
+    raSet('poolscan', 'ICPSwap pool scan', 'failed', 'Could not list pools from the ICPSwap factory. Try again later.')
+    return { scanned: 0, recovered: 0, stuck: 0 }
+  }
+
+  // Sweep only handles ICRC style ledgers; DIP20/EXT pools would misreport.
+  const icrcOk = (s: string) => s === 'ICP' || s === 'ICRC1' || s === 'ICRC2'
+  const scannable = pools.filter(p => icrcOk(p.token0.standard) && icrcOk(p.token1.standard))
+  let checked = 0
+  const hits: Array<{ pool: icpswap.AllPoolData; balance0: bigint; balance1: bigint }> = []
+  await mapWithConcurrency(scannable, 10, async (p) => {
+    const bal = await retryNull(() => icpswap.getUnusedBalance(p.canisterId, owner))
+    checked++
+    if (checked % 50 === 0 || checked === scannable.length) {
+      raSet('poolscan', 'ICPSwap pool scan', 'running', `Checked ${checked} of ${scannable.length} pools, found ${hits.length} balances...`)
+    }
+    if (bal && (bal.balance0 > 0n || bal.balance1 > 0n)) hits.push({ pool: p, ...bal })
+  })
+
+  let recovered = 0
+  await mapWithConcurrency(hits, 10, async (h) => {
+    const label = `${getTokenSymbol(h.pool.token0.address)}/${getTokenSymbol(h.pool.token1.address)} pool`
+    const amounts = [
+      h.balance0 > 0n ? formatRa(h.balance0, h.pool.token0.address) : '',
+      h.balance1 > 0n ? formatRa(h.balance1, h.pool.token1.address) : '',
+    ].filter(Boolean).join(' + ')
+    const rowId = 'pool:' + h.pool.canisterId
+    raSet(rowId, label, 'running', `Withdrawing ${amounts}...`)
+    try {
+      // Confirmed nonzero balance, so false means a real failure: retry up to 5 times.
+      const ok = await icpswap.sweepWithRetry({
+        token0Principal: h.pool.token0.address,
+        token1Principal: h.pool.token1.address,
+        poolId: h.pool.canisterId,
+      }, 5)
+      if (ok) { recovered++; raSet(rowId, label, 'done', `Returned ${amounts} to your wallet`) }
+      else raSet(rowId, label, 'failed', `Could not withdraw ${amounts}. Try this pair in the manual sweep below, or contact support.`)
+    } catch (e: any) {
+      raSet(rowId, label, 'failed', e?.message || 'Sweep failed')
+    }
+  })
+  raSet('poolscan', 'ICPSwap pool scan', 'done',
+    `Scanned ${scannable.length} pools` +
+    (pools.length !== scannable.length ? ` (${pools.length - scannable.length} non ICRC pools skipped)` : '') +
+    (hits.length === 0 ? ', no stranded balances found' : ''))
+
+  // Deep check: pools of accepted tokens can hold funds in the user's deposit
+  // subaccount that no balance query shows; sweep looks there first.
+  const accepted = new Set(store.tokens.map((t: any) => t.address))
+  const sweptIds = new Set(hits.map(h => h.pool.canisterId))
+  const deepTargets = scannable.filter(p =>
+    accepted.has(p.token0.address) && accepted.has(p.token1.address) && !sweptIds.has(p.canisterId))
+  if (deepTargets.length > 0) {
+    raSet('deep', 'TACO token pools deep check', 'running', `Checking ${deepTargets.length} pools for hidden subaccount balances...`)
+    let deepFound = 0
+    await mapWithConcurrency(deepTargets, 10, async (p) => {
+      try {
+        // Retry only thrown errors here: a false just means the pool holds
+        // nothing hidden, which is the normal outcome for the deep check.
+        const ok = await withRetries(() => icpswap.sweep({
+          token0Principal: p.token0.address,
+          token1Principal: p.token1.address,
+          poolId: p.canisterId,
+        }), 5)
+        if (ok) {
+          deepFound++
+          recovered++
+          raSet('deep:' + p.canisterId,
+            `${getTokenSymbol(p.token0.address)}/${getTokenSymbol(p.token1.address)} pool`,
+            'done', 'Found and returned a hidden balance')
+        }
+      } catch (e) { console.warn('[RecoverAll] deep sweep failed', p.canisterId, e) }
+    })
+    raSet('deep', 'TACO token pools deep check', 'done',
+      deepFound > 0 ? `Recovered hidden balances from ${deepFound} pools` : `Checked ${deepTargets.length} pools, nothing hidden`)
+  }
+
+  // Stuck withdraw detection: records the pool debited but never paid out.
+  // Scoped to accepted token pools and saved marker pairs; other pools run
+  // other pool versions whose records we cannot decode reliably.
+  const markerPairs = icpswap.getPendingSwaps()
+  const stuckTargets = scannable.filter(p =>
+    (accepted.has(p.token0.address) && accepted.has(p.token1.address)) ||
+    markerPairs.some(m =>
+      (m.sell === p.token0.address && m.buy === p.token1.address) ||
+      (m.sell === p.token1.address && m.buy === p.token0.address)))
+  let stuck = 0
+  let unreadable = 0
+  if (stuckTargets.length > 0) {
+    raSet('stuck', 'Stuck ICPSwap withdraw check', 'running', `Reading transaction records in ${stuckTargets.length} pools...`)
+    await mapWithConcurrency(stuckTargets, 10, async (p) => {
+      const recs = await retryNull(() => icpswap.getStuckPoolWithdraws(p.canisterId, owner))
+      if (recs === null) { unreadable++; return }
+      for (const r of recs) {
+        stuck++
+        const pair = `${getTokenSymbol(p.token0.address)}/${getTokenSymbol(p.token1.address)}`
+        raSet(`stuckrec:${p.canisterId}:${r.recordId}`,
+          `Stuck inside the ICPSwap ${pair} pool`, 'failed',
+          `Record id ${r.recordId}, ${formatRa(r.amount, r.tokenAddress)}, status ${r.status}. ` +
+          `The pool debited your balance but its payout never landed on the ledger. Only ICPSwap support can release it: ` +
+          `give them pool ${p.canisterId} and record id ${r.recordId}.`)
+      }
+    })
+    raSet('stuck', 'Stuck ICPSwap withdraw check', 'done',
+      stuck > 0
+        ? `Found ${stuck} stuck withdraw${stuck > 1 ? 's' : ''}. These sit inside ICPSwap itself, see below.`
+        : `No half completed withdraws in ${stuckTargets.length - unreadable} readable pools` +
+          (unreadable > 0 ? ` (${unreadable} pools could not be read)` : ''))
+  }
+
+  return { scanned: scannable.length, recovered, stuck }
+}
+
+// Phase: every balance the Neutrinite pylon holds for the user, all ledgers.
+async function raNeutrinite(): Promise<number> {
+  const id = 'neu'
+  raSet(id, 'Neutrinite pylon', 'running', 'Checking all balances held by the pylon...')
+  try {
+    const { details } = await neutrinite.sweepAll()
+    let n = 0
+    for (const d of details) {
+      if (d.ok) n++
+      raSet('neu:' + d.ledger, 'Neutrinite balance', d.ok ? 'done' : 'failed',
+        (d.ok ? 'Returned ' : 'Could not withdraw ') + formatRa(d.amount, d.ledger))
+    }
+    // A saved pair marker is cleared only when funds for one of its tokens actually moved.
+    for (const m of [...pendingNeu.value]) {
+      if (details.some(d => d.ok && (d.ledger === m.sell || d.ledger === m.buy))) {
+        neutrinite.removePendingSwap(m.sell, m.buy)
+        pendingNeu.value = pendingNeu.value.filter(e => !(e.sell === m.sell && e.buy === m.buy))
+      }
+    }
+    raSet(id, 'Neutrinite pylon', 'done', n > 0 ? `Recovered ${n} balance${n > 1 ? 's' : ''}` : 'No balances held by the pylon')
+    return n
+  } catch (e: any) {
+    raSet(id, 'Neutrinite pylon', 'failed', e?.message || 'Pylon check failed')
+    return 0
+  }
+}
+
+// Phase: exchange side pending pulls (display only, admin resolves).
+async function raPulls(): Promise<void> {
+  const id = 'pulls'
+  raSet(id, 'Pending exchange deposits', 'running', 'Checking...')
+  await loadPendingPulls()
+  const n = pendingPulls.value.length
+  raSet(id, 'Pending exchange deposits', 'done', n > 0
+    ? `${n} deposit${n > 1 ? 's are' : ' is'} tracked on the exchange and will be resolved by an admin. See the section below.`
+    : 'None pending')
+}
+
+type RaScope = 'all' | 'icpswap' | 'neutrinite'
+const raScope = ref<RaScope>('all')
+
+async function recoverAll(scope: RaScope = 'all') {
+  if (raActive || !store.isAuthenticated) return
+  raActive = true
+  raRunning.value = true
+  raScope.value = scope
+  raRows.value = []
+  raSummary.value = ''
+  raElapsed.value = 0
+  const started = Date.now()
+  const timer = setInterval(() => { raElapsed.value = Math.round((Date.now() - started) / 1000) }, 1000)
+  try {
+    const identity = await getCachedIdentity()
+    const owner = identity.getPrincipal()
+    if (owner.isAnonymous()) throw new Error('Connect your wallet first')
+    const wantIcp = scope !== 'neutrinite'
+    const wantNeu = scope !== 'icpswap'
+    const [treasury, markers, icp, neu] = await Promise.all([
+      scope === 'all'
+        ? raTreasury().catch((e: any) => { raSet('treasury', 'Saved deposits', 'failed', e?.message || 'Failed'); return 0 })
+        : Promise.resolve(0),
+      wantIcp
+        ? raMarkers().catch((e: any) => { raSet('markers', 'Interrupted CrossDEX swaps', 'failed', e?.message || 'Failed'); return 0 })
+        : Promise.resolve(0),
+      wantIcp
+        ? raIcpswap(owner).catch((e: any) => {
+            raSet('poolscan', 'ICPSwap pool scan', 'failed', e?.message || 'Failed')
+            return { scanned: 0, recovered: 0, stuck: 0 }
+          })
+        : Promise.resolve({ scanned: 0, recovered: 0, stuck: 0 }),
+      wantNeu ? raNeutrinite() : Promise.resolve(0),
+      scope === 'all' ? raPulls().catch(() => { /* row already shows the state */ }) : Promise.resolve(),
+    ])
+    const total = treasury + markers + icp.recovered + neu
+    const secs = Math.round((Date.now() - started) / 1000)
+    raSummary.value = (total > 0
+      ? `Done in ${secs}s. Recovered funds in ${total} place${total > 1 ? 's' : ''}. Check your wallet balances.`
+      : `Done in ${secs}s. Nothing recoverable found anywhere${icp.scanned > 0 ? ` (${icp.scanned} pools scanned)` : ''}.`)
+      + (icp.stuck > 0 ? ` ${icp.stuck} withdraw${icp.stuck > 1 ? 's are' : ' is'} stuck inside ICPSwap itself and needs their support, see the rows above.` : '')
+    if (total > 0) void store.refreshAfterMutation('swap')
+  } catch (e: any) {
+    toast.error('Recover All failed', e?.message || String(e))
+  } finally {
+    clearInterval(timer)
+    raActive = false
+    raRunning.value = false
+  }
+}
+
 onMounted(() => {
   loadCachedDeposits()
   loadPendingNeu()
   loadPendingSwaps()
   void loadPendingPulls()
+  // If a run from an evicted instance is still going, reflect it and clear
+  // the button once it finishes.
+  if (raActive) {
+    raRunning.value = true
+    const t = setInterval(() => { if (!raActive) { raRunning.value = false; clearInterval(t) } }, 2000)
+  }
 })
 
 // Markers can be written while this tab is hidden (a failed leg in another
@@ -777,6 +1136,21 @@ onVisible(() => {
   &__deposits-table { width: 100%; }
 
   &__token-id { font-size: var(--text-xs); color: var(--text-tertiary); margin-left: 4px; }
+
+  &__ra-detail {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
+  }
+
+  &__ra-state {
+    font-size: var(--text-sm);
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+    margin-left: var(--space-2);
+
+    &[data-state='done'] { color: var(--color-success, #4caf50); }
+    &[data-state='failed'] { color: var(--tx-warning, #d88a3f); }
+  }
 
 }
 </style>
