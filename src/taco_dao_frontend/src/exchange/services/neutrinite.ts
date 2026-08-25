@@ -411,9 +411,9 @@ export async function sweep(sell: string, buy: string): Promise<boolean> {
  * funds only ever move to the user's own wallet, so a duplicate attempt just
  * errs on an empty balance.
  */
-export async function sweepAll(): Promise<{
+export async function sweepAll(extraLedgers: string[] = []): Promise<{
   recoveredAny: boolean
-  details: Array<{ ledger: string; amount: bigint; ok: boolean }>
+  details: Array<{ ledger: string; amount: bigint; ok: boolean; uncredited?: boolean }>
 }> {
   const identity = await getCachedIdentity()
   const owner = identity.getPrincipal()
@@ -433,7 +433,70 @@ export async function sweepAll(): Promise<{
       candidates.push({ ledger: ep.ic.ledger.toText(), balance: ae.balance as bigint })
     }
   }
-  const details: Array<{ ledger: string; amount: bigint; ok: boolean }> = []
+  const details: Array<{ ledger: string; amount: bigint; ok: boolean; uncredited?: boolean }> = []
+
+  // Raw-ledger truth check. A deposit can sit at the user's pylon deposit
+  // subaccount on the LEDGER while the pylon shows no balance and not even a
+  // row for that ledger (proven Aug 2026: stranded NTN and ckUSDT deposits
+  // were invisible to every pylon query). The deposit subaccount is identical
+  // across a user's rows, so any row provides it; the registration above
+  // creates rows for a fresh account. For every accepted ledger, compare the
+  // raw balance against what the pylon credits, and give the indexer time to
+  // credit anything found before withdrawing.
+  let depositSub: number[] | null = null
+  for (const ae of accounts) {
+    const ep = ae?.endpoint
+    if (ep && 'ic' in ep && ep.ic.account.subaccount?.length) {
+      depositSub = Array.from(ep.ic.account.subaccount[0]) as number[]
+      break
+    }
+  }
+  if (depositSub) {
+    const credited = new Set(candidates.map((c) => c.ledger))
+    const toCheck = [...new Set(extraLedgers)].filter((l) => !credited.has(l))
+    const uncredited: Array<{ ledger: string; amount: bigint }> = []
+    await mapWithConcurrency(toCheck, 10, async (ledger) => {
+      try {
+        const a = Actor.createActor(icrcIDL, { agent, canisterId: ledger })
+        const bal = (await a.icrc1_balance_of({
+          owner: Principal.fromText(NEUTRINITE_PYLON),
+          subaccount: [depositSub as number[]],
+        })) as bigint
+        if (bal <= 0n) return
+        let fee = 0n
+        try {
+          const f = (await a.icrc1_fee()) as any
+          fee = typeof f === 'bigint' ? f : BigInt(f)
+        } catch { /* fee unknown — still report */ }
+        if (bal > fee) uncredited.push({ ledger, amount: bal })
+      } catch { /* unreadable ledger — skip */ }
+    })
+    if (uncredited.length > 0) {
+      // Physically present on the ledger. Give the pylon indexer up to ~45s
+      // to credit it now that the account is registered.
+      const pending = new Map(uncredited.map((u) => [u.ledger, u.amount]))
+      for (let round = 0; round < 15 && pending.size > 0; round++) {
+        await new Promise((r) => setTimeout(r, 3000))
+        let rows: any[]
+        try {
+          rows = (await pylon.icrc55_accounts({ owner, subaccount: [] })) as any[]
+        } catch { continue }
+        for (const ae of rows) {
+          const ep = ae?.endpoint
+          if (!ep || !('ic' in ep)) continue
+          const led = ep.ic.ledger.toText()
+          if (pending.has(led) && (ae.balance as bigint) > 0n) {
+            candidates.push({ ledger: led, balance: ae.balance as bigint })
+            pending.delete(led)
+          }
+        }
+      }
+      for (const [ledger, amount] of pending) {
+        console.warn('[neutrinite.sweepAll] deposit sits UNCREDITED at the pylon deposit subaccount:', ledger, amount)
+        details.push({ ledger, amount, ok: false, uncredited: true })
+      }
+    }
+  }
   await mapWithConcurrency(candidates, 10, async ({ ledger, balance }) => {
     // Dust at or below the ledger fee cannot move; skip instead of burning a call.
     try {

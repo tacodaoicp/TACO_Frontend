@@ -909,9 +909,15 @@ async function raNeutrinite(): Promise<number> {
   const id = 'neu'
   raSet(id, 'Neutrinite pylon', 'running', 'Checking all balances held by the pylon...')
   try {
-    const { details } = await neutrinite.sweepAll()
+    const { details } = await neutrinite.sweepAll(store.tokens.map((t: any) => t.address))
     let n = 0
     for (const d of details) {
+      if (d.uncredited) {
+        raSet('neu:' + d.ledger, 'Neutrinite uncredited deposit', 'failed',
+          formatRa(d.amount, d.ledger) + ' sits at the pylon deposit account on the ledger but the pylon has not credited it. ' +
+          'Registration was run and it still did not credit. Contact Neutrinite support with this line; they have admin recovery for unregistered deposits.')
+        continue
+      }
       if (d.ok) n++
       raSet('neu:' + d.ledger, 'Neutrinite balance', d.ok ? 'done' : 'failed',
         (d.ok ? 'Returned ' : 'Could not withdraw ') + formatRa(d.amount, d.ledger))
