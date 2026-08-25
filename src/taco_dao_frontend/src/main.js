@@ -80,6 +80,8 @@ async function bootExchange() {
   app.mount('#app')
   hideBootSpinner()
   clearChunkReloadGuard() // mounted OK — re-arm chunk recovery for future deploys
+  // Expose window.tacoRecover for one-line F12 recovery on the app's own agent.
+  import('./exchange/utils/recoverConsole').then(m => m.installRecoverConsole()).catch(() => {})
 }
 
 // Tear down the static boot spinner from index.html once the exchange has
