@@ -190,6 +190,9 @@ function formatAmount(amount: bigint | undefined, decimals: bigint | undefined):
 .swap-confirm {
   width: 420px;
   max-width: 95vw;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
   background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
   border: 1px solid var(--card-border);
   border-radius: 12px;

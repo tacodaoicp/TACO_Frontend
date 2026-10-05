@@ -40,7 +40,7 @@
       </button>
 
       <div v-if="showChart" class="mobile-trade__chart">
-        <TradingChart v-if="token0 && token1" :token0="token0" :token1="token1" :decimals0="decimals0" :decimals1="decimals1" :datafeed="datafeed" hide-attribution />
+        <TradingChart v-if="token0 && token1" :token0="token0" :token1="token1" :decimals0="decimals0" :decimals1="decimals1" :datafeed="datafeed" hide-attribution page-scroll />
       </div>
 
       <!-- Bottom tabs -->
@@ -152,6 +152,7 @@ onDeactivated(() => { isActive.value = false })
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
 
   background: var(--tx-bg);
 
@@ -179,7 +180,7 @@ onDeactivated(() => { isActive.value = false })
 
     // Reserve space for MobileNav only when it's actually showing.
     @media (max-width: 767px) {
-      padding-bottom: 60px;
+      padding-bottom: var(--tx-mobile-nav-h);
     }
   }
 

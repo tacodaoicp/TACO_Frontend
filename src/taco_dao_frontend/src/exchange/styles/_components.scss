@@ -191,6 +191,14 @@
     background: var(--tx-surface-2);
   }
 
+  @supports (-webkit-touch-callout: none) { // iOS zooms into focused fields under 16px
+    input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea { font-size: 16px !important; }
+    // Big amount fields keep their own size
+    input.swap-card__amount-input { font-size: 18px !important; }
+    input.add-liquidity__amount-input { font-size: 22px !important; }
+    input.add-liquidity__price-input { font-size: 20px !important; }
+  }
+
   // Native select — keep existing chevron pattern, use new tokens
   select.ex-input,
   select.tx-input,
@@ -398,6 +406,11 @@
       background: var(--tx-orange);
       border-radius: 2px;
     }
+  }
+  @media (max-width: 767px) {
+    .tx-tabs { overflow-x: auto; scrollbar-width: none; }
+    .tx-tabs .tx-tab { flex-shrink: 0; white-space: nowrap; }
+    .tx-tabs .tx-tab[aria-selected="true"]::after { bottom: 0; } // the scroller clips -1px
   }
 
   // Legacy `.ex-tab-bar` + `.ex-tab-btn` — reshape to the underline style
@@ -836,6 +849,9 @@
   @media (max-width: 480px) {
     .ex-toast-container { left: 16px; right: 16px; bottom: 16px; width: auto; }
   }
+  @media (max-width: 767px) {
+    .ex-toast-container { bottom: calc(var(--tx-mobile-nav-h) + 12px); }
+  }
 
   // ─── Accessibility helpers ────────────────────────────────────────
   .sr-only {
@@ -901,6 +917,8 @@
     padding: var(--space-6, 24px);
     max-width: 480px;
     width: 90%;
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
     box-shadow: var(--tx-shadow-2, 0 12px 32px rgba(0, 0, 0, 0.45)), 0 0 0 1px var(--tx-line-2, rgba(255, 230, 200, 0.12));
     color: var(--tx-ink, #f2ece2);
   }
@@ -908,4 +926,9 @@
   .ex-modal__title { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
   .ex-modal__text  { font-size: 13px; color: var(--tx-ink-2, #c4bbab); margin: 0 0 8px; }
   .ex-modal__actions { display: flex; gap: 12px; margin-top: 16px; }
+
+  @media (max-width: 480px) {
+    padding: 12px;
+    .ex-modal { width: 100%; padding: 16px; }
+  }
 }

@@ -13,113 +13,30 @@
 
       </router-link>
 
-      <!-- page links -->
+      <!-- page links (one list, see navItems.ts) -->
       <div class="header-bar__page-links">
 
-        <!-- home - router link -->
-        <router-link to="/" class="header-bar__rl">
-                      
-          <span class="header-bar__rl-span">Home</span>
-        
-        </router-link>
-
-        <!-- dao - router link -->
-        <router-link to="/dao" class="header-bar__rl">
-                      
-          <span class="header-bar__rl-span">DAO</span>
-        
-        </router-link>
-
-        <!-- vote - router link -->
-        <router-link to="/vote" class="header-bar__rl">
-
-          <span class="header-bar__rl-span">Vote</span>
-
-        </router-link>
-
-        <!-- performance - router link -->
-        <router-link to="/performance" class="header-bar__rl">
-
-          <span class="header-bar__rl-span">Performance</span>
-
-        </router-link>
-
-        <!-- chat - router link -->
-        <router-link to="/chat/oc" 
-                    class="header-bar__rl">
-          
-          <span class="header-bar__rl-span">Chat</span>
-        
-        </router-link>    
-        
-        <!-- forum - router link -->
-        <router-link to="/chat/forum" 
-                    class="header-bar__rl">
-          
-          <span class="header-bar__rl-span">Forum</span>
-        
-        </router-link>            
-        
-        <!-- reports - router link -->
-        <router-link to="/reports" 
-                    class="header-bar__rl"
-                    :class="{ 'router-link-active': $route.path.startsWith('/reports/') }">
-          
-          <span class="header-bar__rl-span">Reports</span>
-        
-        </router-link>
-        
-        <!-- info - router link -->
-        <router-link to="/info" class="header-bar__rl"
-                     :class="{ 'header-bar__rl--force-inactive': $route.hash === '#roadmap' }">
-
-          <span class="header-bar__rl-span">Info</span>
-
-        </router-link>
-
-        <!-- roadmap - link -->
-        <a href="#" @click.prevent="goToRoadmap()" class="header-bar__rl"
-           :class="{ 'header-bar__rl--force-active': $route.path === '/info' && $route.hash === '#roadmap' }">
-          <span class="header-bar__rl-span">Roadmap</span>
-        </a>
-
-        <!-- wallet - router link -->
-        <router-link to="/wallet" class="header-bar__rl">
-
-          <span class="header-bar__rl-span">Wallet</span>
-
-        </router-link>
-
-        <!-- buy taco - router link -->
-        <router-link to="/buy" class="header-bar__rl">
-          <span class="header-bar__rl-span">Buy</span>
-        </router-link>
-
-        <!-- crossdex swap - external link to the exchange app -->
-        <a :href="crossDexUrl" class="header-bar__rl">
-          <span class="header-bar__rl-span">CrossDEX Swap</span>
-        </a>
-
-        <!-- wizard - router link -->
-        <a v-if="localNeuronsCount < 1" href="#" @click="toggleTacoWizard()" class="header-bar__rl">
-
-          <span class="header-bar__rl-span">🧙Taco Wizard</span>
-
-        </a>
-
-        <!-- vault - router link — positioned last -->
-        <router-link to="/vault" class="header-bar__rl">
-          <span class="header-bar__rl-span">Vault</span>
-        </router-link>
+        <component v-for="item in visibleNavItems"
+                   :key="item.label"
+                   :is="item.to && !item.action ? RouterLink : 'a'"
+                   v-bind="item.to && !item.action ? { to: item.to } : { href: item.href ?? item.to ?? '#' }"
+                   class="header-bar__rl"
+                   :class="{ 'header-bar__rl--active': isNavActive(item, route) }"
+                   @click="onNavClick($event, item)">
+          <span class="header-bar__rl-span">{{ item.label }}</span>
+        </component>
 
       </div>
 
       <!-- environment indicator -->
       <!-- <EnvironmentIndicator /> -->
 
-      <!-- pages menu button -->
+      <!-- menu button, opens the nav drawer -->
       <button class="btn pages-menu__btn"
-              @click="togglePagesMenu()">
+              aria-controls="nav-drawer"
+              :aria-expanded="navDrawerOpen"
+              aria-label="Open menu"
+              @click="openDrawer">
 
         <!-- pages icon -->
         <i class="fa fal fa-bars"></i>
@@ -154,7 +71,7 @@
 
           <!-- user id -->
           <span v-if="userLoggedIn"
-            class="taco-text-black-to-white small text-nowrap"
+            class="header-bar__principal taco-text-black-to-white small text-nowrap"
             :title="userPrincipal"
             data-bs-toggle="tooltip"
             data-bs-placement="bottom"
@@ -201,127 +118,6 @@
 
     </div>
 
-    <!-- pages menu content -->
-    <div v-if="pagesMenuIsVisible"
-         id="pagesMenu" 
-         class="pages-menu"
-         v-click-away="closePagesMenu">
-
-      <!-- list group -->
-      <div class="list-group">
-
-        <!-- wizard - router link -->
-        <a v-if="localNeuronsCount < 1"
-           class="list-group-item"
-           href="#"
-           @click.prevent="toggleTacoWizard(), togglePagesMenu()">
-          
-          <!-- item text -->
-          <span>🧙Taco Wizard</span>
-        </a>          
-
-        <!-- home - router link -->
-        <router-link @click="togglePagesMenu()" to="/" class="list-group-item">
-
-          <!-- item text -->
-          <span>Home</span>
-
-        </router-link>
-
-        <!-- dao - router link -->
-        <router-link @click="togglePagesMenu()" to="/dao" class="list-group-item">
-
-          <!-- item text -->
-          <span>DAO</span>
-
-        </router-link>
-
-        <!-- vote - router link -->
-        <router-link @click="togglePagesMenu()" to="/vote" class="list-group-item">
-
-          <!-- item text -->
-          <span>Vote</span>
-
-        </router-link>
-
-        <!-- performance - router link -->
-        <router-link @click="togglePagesMenu()" to="/performance" class="list-group-item">
-
-          <!-- item text -->
-          <span>Performance</span>
-
-        </router-link>
-
-        <!-- chat - router link -->
-        <router-link @click="togglePagesMenu()" to="/chat/oc" 
-                    class="list-group-item">
-
-          <!-- item text -->
-          <span>Chat</span>
-
-        </router-link>
-
-        <!-- forum - router link -->
-        <router-link @click="togglePagesMenu()" to="/chat/forum" 
-                    class="list-group-item">
-
-          <!-- item text -->
-          <span>Forum</span>
-
-        </router-link>        
-
-        <!-- reports - router link -->
-        <router-link @click="togglePagesMenu()" to="/reports" 
-                    class="list-group-item"
-                    :class="{ 'router-link-active': $route.path.startsWith('/reports/') }">
-
-          <!-- item text -->
-          <span>Reports</span>
-
-        </router-link>         
-        
-        <!-- info - router link -->
-        <router-link @click="togglePagesMenu()" to="/info" class="list-group-item"
-                     :class="{ 'header-bar__rl--force-inactive': $route.hash === '#roadmap' }">
-
-          <!-- item text -->
-          <span>Info</span>
-
-        </router-link>
-
-        <!-- roadmap - link -->
-        <a href="#" @click.prevent="goToRoadmap(); togglePagesMenu()" class="list-group-item"
-           :class="{ 'header-bar__rl--force-active': $route.path === '/info' && $route.hash === '#roadmap' }">
-          <span>Roadmap</span>
-        </a>
-
-        <!-- wallet - router link -->
-        <router-link @click="togglePagesMenu()" to="/wallet" class="list-group-item">
-
-          <!-- item text -->
-          <span>Wallet</span>
-
-        </router-link>
-
-        <!-- buy taco - router link -->
-        <router-link @click="togglePagesMenu()" to="/buy" class="list-group-item">
-          <span>Buy</span>
-        </router-link>
-
-        <!-- crossdex swap - external link to the exchange app -->
-        <a :href="crossDexUrl" @click="togglePagesMenu()" class="list-group-item">
-          <span>CrossDEX Swap</span>
-        </a>
-
-        <!-- vault - router link — positioned last -->
-        <router-link @click="togglePagesMenu()" to="/vault" class="list-group-item">
-          <span>Vault</span>
-        </router-link>
-
-      </div>
-
-    </div>
-
     <!-- account menu content-->
     <div v-if="accountMenuIsVisible"
          id="accountMenu" 
@@ -353,13 +149,104 @@
           <!-- item text -->
           <span>Logout</span>
 
-        </a>    
-      
+        </a>
+
       </div>
 
     </div>
 
   </div>
+
+  <!-- nav drawer (phones and touch tablets), a native modal dialog so it sits above every z-index -->
+  <dialog ref="drawerEl"
+          id="nav-drawer"
+          class="nav-drawer"
+          aria-label="Menu"
+          @close="closeDrawer"
+          @click.self="closeDrawer">
+
+    <!-- panel fills the dialog, so only backdrop clicks reach the dialog itself -->
+    <div class="nav-drawer__panel">
+
+      <!-- logo and close -->
+      <div class="nav-drawer__top">
+
+        <TacoDaoLogo class="nav-drawer__logo"/>
+
+        <button type="button"
+                class="btn nav-drawer__close"
+                aria-label="Close menu"
+                @click="closeDrawer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+
+      </div>
+
+      <!-- prices and dao assets -->
+      <div class="nav-drawer__stats">
+
+        <div class="nav-drawer__stat">
+          <span>ICP</span>
+          <span class="nav-drawer__stat-value">{{ usd(icpPriceUsd, 2) }}</span>
+        </div>
+
+        <div class="nav-drawer__stat">
+          <span>TACO</span>
+          <span class="nav-drawer__stat-value">{{ usd(tacoPriceUsd, 3) }}<span v-if="tacoPriceIcp > 0" class="nav-drawer__stat-sub">{{ Number(tacoPriceIcp).toFixed(3) }} ICP</span></span>
+        </div>
+
+        <!-- fair value, only when TACO trades below it (same rule as the header chip) -->
+        <div v-if="showFair" class="nav-drawer__stat">
+          <span>Fair value</span>
+          <span class="nav-drawer__stat-value">{{ usd(tacoFairValueUsd, 3) }}</span>
+        </div>
+
+        <div class="nav-drawer__stat">
+          <span>DAO assets</span>
+          <span class="nav-drawer__stat-value">{{ daoAssets }}</span>
+        </div>
+
+      </div>
+
+      <!-- wallet (tap to copy) or login -->
+      <div class="nav-drawer__account">
+
+        <button v-if="userLoggedIn"
+                type="button"
+                class="nav-drawer__wallet"
+                :title="userPrincipal"
+                @click="copyFromDrawer">
+          <i class="fa-solid fa-wallet" aria-hidden="true"></i>
+          {{ userPrincipal.slice(0, 5) }}…{{ truncatedPrincipal }}
+          <span aria-live="polite">{{ copied ? 'Copied' : 'Copy' }}</span>
+        </button>
+
+        <button v-else
+                type="button"
+                class="btn taco-btn taco-btn--green"
+                @click="loginFromDrawer">Login</button>
+
+      </div>
+
+      <!-- every page not in the bottom bar -->
+      <nav class="nav-drawer__links" aria-label="More pages">
+
+        <component v-for="item in drawerItems"
+                   :key="item.label"
+                   :is="item.to && !item.action ? RouterLink : 'a'"
+                   v-bind="item.to && !item.action ? { to: item.to } : { href: item.href ?? item.to ?? '#' }"
+                   class="nav-drawer__link"
+                   :class="{ 'nav-drawer__link--active': isNavActive(item, route) }"
+                   @click="onNavClick($event, item)">
+          <i v-if="item.icon" :class="item.icon" aria-hidden="true"></i>
+          <span>{{ item.label }}</span>
+        </component>
+
+      </nav>
+
+    </div>
+
+  </dialog>
 
   <!-- wizard modal -->
   <WizardModal v-if="tacoWizardOpen"/>
@@ -437,19 +324,8 @@
       color: var(--brown);
     }
 
-    // active router links
-    .router-link-active {
-      text-decoration: underline;
-      text-decoration-thickness: 0.2rem;
-    }
-
-    // suppress active state (e.g. Info when on #roadmap)
-    .header-bar__rl--force-inactive {
-      text-decoration: none !important;
-    }
-
-    // force active state (e.g. Roadmap when on #roadmap)
-    .header-bar__rl--force-active {
+    // active page link (see isNavActive in navItems.ts)
+    .header-bar__rl--active {
       text-decoration: underline;
       text-decoration-thickness: 0.2rem;
     }
@@ -571,11 +447,8 @@
       right: 1rem;
     }
 
-    // pages menu
+    // pages menu button (opens the nav drawer)
     .pages-menu {
-      left: 1rem;
-      max-height: calc(100vh - 4rem); // Prevent menu from extending past screen
-      overflow-y: auto; // Allow scrolling if menu is tall
 
       &__btn {
         display: none;
@@ -597,128 +470,207 @@
 
   }
 
+  ////////////////////////////////////////////////////////
+  // nav drawer (native dialog, sibling of .header-bar) //
+  ////////////////////////////////////////////////////////
+
+  // never set display on the dialog, it would override the rule that hides it when closed
+  .nav-drawer {
+    inset: 0 auto 0 0;
+    margin: 0;
+    padding: 0;
+    width: min(20rem, 85vw);
+    height: auto;
+    max-width: none;
+    max-height: none;
+    border: 0;
+    border-right: 2px solid var(--card-border);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    color: var(--text-cream);
+
+    &::backdrop {
+      background: rgba(0, 0, 0, 0.55);
+    }
+
+    &[open] {
+      animation: nav-drawer-in 0.2s ease-out;
+    }
+
+    // own focus ring, the .header-bar rule does not reach this sibling root
+    *:focus-visible {
+      outline: 3px solid var(--dark-orange);
+      outline-offset: -3px;
+      box-shadow: none;
+    }
+
+    // panel
+    &__panel {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding-bottom: 1rem;
+    }
+
+    // logo and close
+    &__top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.5rem 0.5rem 0 1.25rem;
+    }
+
+    &__logo {
+      width: 3rem;
+    }
+
+    &__close {
+      min-width: 44px;
+      min-height: 44px;
+
+      i {
+        font-size: 1.25rem;
+        color: var(--text-cream);
+      }
+    }
+
+    // prices and dao assets
+    &__stats {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0 1.25rem;
+    }
+
+    &__stat {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.75rem;
+      font-size: 0.875rem;
+    }
+
+    &__stat-value {
+      font-family: 'Rubik';
+      font-weight: 700;
+      font-size: 1rem;
+      white-space: nowrap;
+    }
+
+    &__stat-sub {
+      margin-left: 0.5rem;
+      font-family: 'Space Mono';
+      font-weight: 400;
+      font-size: 0.875rem;
+      opacity: 0.75;
+    }
+
+    // wallet or login
+    &__account {
+      padding: 0 1.25rem;
+    }
+
+    &__wallet {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      width: 100%;
+      min-height: 44px;
+      padding: 0 1rem;
+      border: 1px solid var(--card-border);
+      border-radius: 0.5rem;
+      background: none;
+      color: var(--text-cream);
+      font-family: 'Space Mono';
+      font-size: 1rem;
+
+      span {
+        margin-left: auto;
+        color: var(--gold);
+        font-size: 0.875rem;
+      }
+    }
+
+    // page links
+    &__links {
+      display: flex;
+      flex-direction: column;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--table-row-border);
+    }
+
+    &__link {
+      display: flex;
+      align-items: center;
+      min-height: 48px;
+      padding: 0 1.25rem;
+      gap: 0.875rem;
+      font-size: 1rem;
+      color: var(--text-cream);
+      text-decoration: none;
+
+      i {
+        width: 1.25rem;
+        text-align: center;
+      }
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.08);
+      }
+
+      &--active {
+        color: var(--gold);
+        box-shadow: inset 3px 0 0 var(--gold);
+      }
+    }
+
+  }
+
+  // slide in from the left
+  @keyframes nav-drawer-in {
+    from {
+      transform: translateX(-100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nav-drawer[open] {
+      animation: none;
+    }
+  }
+
   ///////////////////
   // media queries //
   ///////////////////
-  
-  // custom 400px breakpoint
-  @media (max-width: 400px) {
 
-    // hide escape hatch
-    .header-bar__escape-hatch {
-      display: none !important;
-    }
+  // phones and touch tablets: logo and menu button left, account and theme right.
+  // chips and principal are only hidden, they stay mounted to fetch the drawer prices
+  @media (max-width: 991.98px), (pointer: coarse) {
 
-  }
-
-  // custom breakpoint
-  @media (max-width: 490px) {
-
-    // 
-    .header-bar__chips {
-      gap: 0.5rem !important;
-      align-items: flex-end;;
-    }    
-
-    // 
-    .header-bar__chips * {
-      // display: none !important;
-    }
-
-  }  
-
-  // phone protrait
-  @media (max-width: 575.98px) {
-
-    // hide inline page links
-    .header-bar__page-links {
-      display: none;
-    }
-
-    // show pages menu button
-    .pages-menu__btn {
-      display: block !important;
-    }
-
-    // reduce gap
-    .header-bar__left {
-      gap: 0;
-    }
-
-    // reduce escape hatch logo margin
-    .escape-hatch-logo {
-      margin-right: 0.25rem !important;
-    }
-
-    // reduce header bar gap
     .header-bar {
       gap: 0.5rem;
+      padding: 0 0.5rem;
     }
 
-    // reduce right gap
-    .header-bar__right {
-      gap: 0.75rem;
+    .header-bar__left {
+      gap: 0;
     }
 
-    // 
-    .header-bar__chips {
-      gap: 0.75rem;
-    }
-
-    // 
-    .header-bar__chips * {
-      font-size: 0.675rem !important;
-    }
-
-  }
-
-  // phone landscape
-  @media (min-width: 576px) and (max-width: 767.98px) {
-    
-    // hide inline page links
-    .header-bar__page-links {
+    .header-bar__page-links,
+    .header-bar__chips,
+    .header-bar__principal {
       display: none;
     }
 
-    // show pages menu button
-    .pages-menu__btn {
-      display: block !important;
+    .header-bar .pages-menu__btn {
+      display: block;
     }
 
-    // 
-    .header-bar__left {
-      gap: 0;
-    } 
-    
-    // 
-    .escape-hatch-logo {
-      margin-right: 0.25rem !important;
+    .header-bar .escape-hatch-logo {
+      margin-right: 0.25rem;
     }
-
-  }  
-
-  // tablet
-  @media (min-width: 767px) and (max-width: 991.98px) {
-    
-    // hide inline page links
-    .header-bar__page-links {
-      display: none;
-    }
-
-    // show pages menu button
-    .pages-menu__btn {
-      display: block !important;
-    }
-
-    // 
-    .header-bar__left {
-      gap: 0;
-    } 
-    
-    // 
-    .escape-hatch-logo {
-      margin-right: 0.25rem !important;
-    }    
 
   }
 
@@ -731,7 +683,8 @@
   /////////////
 
   import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-  import { useRouter, useRoute } from 'vue-router'
+  import { RouterLink, useRouter, useRoute } from 'vue-router'
+  import { navItems, isNavActive, navDrawerOpen, openDrawer, closeDrawer, type NavItem } from './navItems'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
@@ -768,6 +721,8 @@
   const { userPrincipal } = storeToRefs(tacoStore) // reactive
   const { truncatedPrincipal } = storeToRefs(tacoStore); // reactive
   const { tacoWizardOpen } = storeToRefs(tacoStore); // reactive
+  const { icpPriceUsd, tacoPriceUsd, tacoPriceIcp, tacoFairValueUsd } = storeToRefs(tacoStore) // reactive
+  const { totalPortfolioValueInUsd, treasuryValueExTacoInUsd } = storeToRefs(tacoStore) // reactive
 
   /////////////////////
   // Local Variables //
@@ -776,20 +731,37 @@
   // account menu visiblility
   const accountMenuIsVisible = ref(false)
 
-  // pages menu visiblility
-  const pagesMenuIsVisible = ref(false)
-
   // neurons count
   const localNeuronsCount = ref(0)
 
-  // CrossDEX swap link → exchange app. Staging serves the exchange under the
-  // /exchange path; production uses the exchange.tacodao.com subdomain.
-  const crossDexUrl = computed(() => {
-    const host = window.location.hostname
-    if (host.includes('wxunf') || host.includes('localhost') || host.includes('192.168')) {
-      return '/exchange/crossdex'
-    }
-    return 'https://exchange.tacodao.com/crossdex'
+  // nav drawer dialog element
+  const drawerEl = ref<HTMLDialogElement | null>(null)
+
+  // drawer wallet copy feedback
+  const copied = ref(false)
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined
+
+  //////////////
+  // Computed //
+  //////////////
+
+  // header and drawer links, wizard only while the user has no neurons (count loads async)
+  const visibleNavItems = computed(() => navItems.filter(i => i.action !== 'wizard' || localNeuronsCount.value < 1))
+
+  // drawer: every page not in the bottom bar, wizard first
+  const drawerItems = computed(() => {
+    const rest = visibleNavItems.value.filter(i => !i.bottom)
+    return [...rest.filter(i => i.action === 'wizard'), ...rest.filter(i => i.action !== 'wizard')]
+  })
+
+  // fair value only when TACO trades below it (same rule as the header chip)
+  const showFair = computed(() => tacoPriceUsd.value > 0 && tacoFairValueUsd.value > tacoPriceUsd.value)
+
+  // dao assets total, compact (e.g. $1.2M)
+  const compactUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact' })
+  const daoAssets = computed(() => {
+    const total = totalPortfolioValueInUsd.value + treasuryValueExTacoInUsd.value
+    return total > 0 ? compactUsd.format(total) : '…'
   })
 
   ///////////////////
@@ -801,19 +773,50 @@
     accountMenuIsVisible.value = !accountMenuIsVisible.value
   }
 
-  // toggle pages menu
-  const togglePagesMenu = () => {
-    pagesMenuIsVisible.value = !pagesMenuIsVisible.value
-  }  
-
   // close account menu
   const closeAccountMenu = () => {
     accountMenuIsVisible.value = false
   }
 
-  // close pages menu
-  const closePagesMenu = () => {
-    pagesMenuIsVisible.value = false
+  // price for the drawer, ellipsis until loaded
+  const usd = (v: number, d: number) => v > 0 ? '$' + v.toFixed(d) : '…'
+
+  // header and drawer link click: close the drawer, run action items
+  const onNavClick = (e: MouseEvent, item: NavItem) => {
+    closeDrawer()
+    if (!item.action) return
+    e.preventDefault()
+    if (item.action === 'wizard') toggleTacoWizard()
+    else goToRoadmap()
+  }
+
+  // drawer wallet: copy the principal, confirm inline (toasts render under the dialog)
+  const copyFromDrawer = async () => {
+    let ok = false
+    try {
+      await navigator.clipboard.writeText(userPrincipal.value)
+      ok = true
+    } catch {
+      // body is inert under the modal, so the fallback textarea goes inside the dialog
+      const textarea = document.createElement('textarea')
+      textarea.value = userPrincipal.value
+      textarea.style.position = 'fixed'
+      textarea.style.opacity = '0'
+      drawerEl.value?.appendChild(textarea)
+      textarea.select()
+      try { ok = document.execCommand('copy') } catch { ok = false }
+      textarea.remove()
+    }
+    if (!ok) return
+    copied.value = true
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => { copied.value = false }, 1500)
+  }
+
+  // drawer login: close first, or the dialog's top layer covers the loading curtain
+  const loginFromDrawer = () => {
+    closeDrawer()
+    iidLogIn('v2')
   }
 
   // navigate to roadmap section on info page
@@ -915,6 +918,17 @@
       localNeuronsCount.value = 0
     }
   })
+
+  // open and close the native dialog from the shared drawer state
+  watch(navDrawerOpen, (open) => {
+    const el = drawerEl.value
+    if (!el) return
+    if (open && !el.open) el.showModal()
+    else if (!open && el.open) el.close()
+  })
+
+  // any navigation closes the drawer
+  watch(() => route.fullPath, closeDrawer)
 
   onBeforeUnmount(() => {
 

@@ -12506,6 +12506,7 @@ away from being playable.
     // report
     &__report-container {
       padding: 1.5rem 1.5rem;
+      min-width: 0; // flex item, let it shrink on narrow phones instead of pushing the page sideways
 
       // inner
       &__inner {

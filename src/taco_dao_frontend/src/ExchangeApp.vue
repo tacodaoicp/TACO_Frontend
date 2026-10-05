@@ -136,6 +136,7 @@ function handleKeydown(e: KeyboardEvent) {
   // Terminal views (Pro Trade, Mobile Trade): viewport-locked
   &--terminal {
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
   }
 
@@ -169,11 +170,12 @@ function handleKeydown(e: KeyboardEvent) {
     padding-bottom: 0;
   }
 
-  // Non-pro pages: bottom padding for mobile nav, but only on mobile.
-  // Desktop hides MobileNav so no extra space needed.
-  &:not(&--pro) {
+  // Content pages: bottom padding for mobile nav, but only on mobile.
+  // Desktop hides MobileNav so no extra space needed. MobileTradeView
+  // reserves its own space, so terminal routes are left out.
+  &--content {
     @media (max-width: 767px) {
-      padding-bottom: 56px;
+      padding-bottom: var(--tx-mobile-nav-h);
     }
   }
 }

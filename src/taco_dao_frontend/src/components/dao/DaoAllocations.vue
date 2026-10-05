@@ -62,25 +62,22 @@
                     taco-container taco-container--l2
                     p-2 position-relative">
 
-            <!-- dao allocations button -->
-            <button v-if="showCurrentAllocations" 
-                    class="btn taco-nav-btn position-absolute taco-nav-btn--active"
-                    style="top: 0.5rem; left: 0.5rem; z-index: 1000;"
-                    title="View DAO allocations"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="top">
-                DAO
-            </button>
-
-            <!-- my allocations button -->
-            <button v-if="showCurrentAllocations"
-                    class="btn taco-nav-btn position-absolute disabled"
-                    style="top: 0.5rem; right: 0.5rem; z-index: 1000; pointer-events: all;"
-                    title="Coming Soon"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="top">
-                Mine
-            </button>
+            <!-- dao / mine toggle: its own row, so it never covers the chart labels -->
+            <div v-if="showCurrentAllocations" class="d-flex justify-content-between mb-2">
+                <button class="btn taco-nav-btn taco-nav-btn--active"
+                        title="View DAO allocations"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top">
+                    DAO
+                </button>
+                <button class="btn taco-nav-btn disabled"
+                        style="pointer-events: all;"
+                        title="Coming Soon"
+                        data-bs-toggle="tooltip"
+                        data-bs-placement="top">
+                    Mine
+                </button>
+            </div>
 
             <!-- single chart - data updates with animation -->
             <apexchart
@@ -694,6 +691,7 @@ LOCAL METHODS
                 endAngle: 90,
                 customScale: 1,
                 expandOnClick: true,
+                dataLabels: { minAngleToShowLabel: 14 },
             },
         },
         colors: colors,
@@ -707,19 +705,19 @@ LOCAL METHODS
             offsetX: 0,
             offsetY: 0,
             style: {
-                fontSize: '16px',
+                fontSize: '11px',
                 fontFamily: 'Space Mono',
-                fontWeight: 'bold',
+                fontWeight: 'normal',
                 colors: undefined
             },
             background: {
                 enabled: true,
                 foreColor: '#fff',
-                padding: 4,
+                padding: 3,
                 borderRadius: 2,
-                borderWidth: 1,
+                borderWidth: 0,
                 borderColor: '#fff',
-                opacity: 1,
+                opacity: 0.85,
                 dropShadow: {
                     enabled: false,
                     top: 1,

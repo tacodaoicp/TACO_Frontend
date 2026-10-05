@@ -79,6 +79,11 @@ function loadSizes() {
       orderbookWidth.value = parsed.orderbookWidth ?? defaults.orderbookWidth
       orderEntryWidth.value = parsed.orderEntryWidth ?? defaults.orderEntryWidth
       bottomHeight.value = parsed.bottomHeight ?? defaults.bottomHeight
+    } else if (window.innerWidth < 992) {
+      // Portrait tablets: narrower side panels leave the chart usable.
+      // Mouse desktops at 992px and up keep the defaults.
+      orderbookWidth.value = 220
+      orderEntryWidth.value = 280
     }
   } catch { /* use defaults */ }
 }
@@ -156,6 +161,11 @@ defineExpose({ resetLayout })
     overflow: hidden;
     background: var(--tx-bg);
     min-height: 0;
+
+    // Narrow windows: the chart toolbar wraps instead of clipping the fullscreen button
+    @media (max-width: 991.98px) {
+      :deep(.trading-chart__toolbar) { flex-wrap: wrap; row-gap: 4px; }
+    }
   }
 
   &__bottom {

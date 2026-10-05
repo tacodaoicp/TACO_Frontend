@@ -122,6 +122,9 @@
   --space-10: 40px;
   --space-12: 48px;
   --space-16: 64px;
+
+  /* MobileNav height, shared by the nav and the space reserved for it */
+  --tx-mobile-nav-h: calc(60px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ─── Legacy aliases ───────────────────────────────────────────────── */

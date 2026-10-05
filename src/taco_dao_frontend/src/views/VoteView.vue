@@ -3533,6 +3533,7 @@
             endAngle: 90,
             customScale: 1,
             expandOnClick: true,
+            dataLabels: { minAngleToShowLabel: 14 },
         },
     },
     // colors: ['#3b00b9', '#777', '#888', '#f8a01b', '#047b3e'],
@@ -3547,19 +3548,19 @@
         offsetX: 0,
         offsetY: 0,
         style: {
-            fontSize: '16px',
+            fontSize: '11px',
             fontFamily: 'Space Mono',
-            fontWeight: 'bold',
+            fontWeight: 'normal',
             colors: undefined
         },
         background: {
             enabled: true,
             foreColor: '#fff',
-            padding: 4,
+            padding: 3,
             borderRadius: 2,
-            borderWidth: 1,
+            borderWidth: 0,
             borderColor: '#fff',
-            opacity: 1,
+            opacity: 0.85,
             dropShadow: {
                 enabled: false,
                 top: 1,

@@ -27,7 +27,7 @@
 
                 <!-- slogan -->
                 <h2 class="home-view__taco-dao-slogan">
-                  <span class="cs__h2__line1 taco-text-brown-to-white">Crowd-Sourced Crypto, <span class="taco-text-brown-to-white" style="font-weight: 500;">On-Chain</span></span>
+                  <span class="cs__h2__line1 taco-text-brown-to-white">Crowd-Sourced Crypto, <span class="taco-text-brown-to-white text-nowrap" style="font-weight: 500;">On-Chain</span></span>
                 </h2>
 
               </div>
@@ -69,17 +69,16 @@
                 <div class="w-100">
 
                   <!-- tile container inner -->
-                  <div class="position-relative home-view__tile__inner home-view__taco-token-chart taco-container taco-container--l2 p-0">
+                  <div class="position-relative home-view__tile__inner home-view__taco-token-chart">
 
                     <!-- expand button -->
-                    <button v-if="!isMobile"
-                            class="btn taco-nav-btn home-view__taco-token-chart__expand-btn"
+                    <button class="btn taco-nav-btn home-view__taco-token-chart__expand-btn"
                             @click="viewingChartModal = true">
                       <i class="fa-solid fa-expand"></i>
                     </button>
 
                     <!-- chart - lazy loaded for performance -->
-                    <div v-if="!isMobile && shouldLoadDex"
+                    <div v-if="shouldLoadDex && homeSeen"
                          class="home-view__taco-token-chart__inline">
 
                       <!-- pair switch — TACO/ICP always visible (so users know
@@ -114,19 +113,10 @@
                         :decimals0="8"
                         :decimals1="chartQuoteDecimals"
                         :datafeed="chartDatafeed"
-                        :enabled="!viewingChartModal"
+                        :enabled="!viewingChartModal && route.path === '/'"
+                        page-scroll
                         hide-fullscreen
                         hide-attribution />
-                    </div>
-
-                    <!-- if mobile, tap to view -->
-                    <div v-else @click="viewingChartModal = true"
-                          class="home-view__taco-token-chart__mobile"
-                          style="z-index: 2;">
-
-                      <!-- text -->
-                      <span>Tap to View</span>
-
                     </div>
 
                   </div>
@@ -150,7 +140,7 @@
                 </h2>
 
                 <!-- tile container inner -->
-                <div class="home-view__tile__inner taco-container taco-container--l2 p-0">
+                <div class="home-view__tile__inner">
 
                   <!-- video iframe - lazy loaded, using nocookie for faster load -->
                   <iframe v-if="shouldLoadYouTube"
@@ -189,7 +179,7 @@
                 </h2>
 
                 <!-- tile container inner -->
-                <div class="home-view__tile__inner taco-container taco-container--l2 p-0">
+                <div class="home-view__tile__inner">
 
                   <!-- taco assets -->
                   <div class="home-view__taco-assets">
@@ -1214,20 +1204,12 @@
 
     // Override the exchange-theme CSS vars TradingChart reads via getComputedStyle.
     // CSS vars cascade, so the chart picks these up and the dark exchange palette
-    // gives way to the warm DAO theme — letting the parent .taco-container--l2
+    // gives way to the warm DAO theme — letting the parent tile's
     // gradient show through the canvas.
     --tx-bg: transparent;
     --tx-surface-1: var(--card-border);
     --tx-surface-2: var(--card-gradient-to);
     --tx-ink-2: var(--black-to-white);
-
-    // Chrome/Safari: use zoom for better chart visibility
-    zoom: 0.5;
-
-    // Firefox: doesn't support zoom, just show at normal size
-    @supports (-moz-appearance: none) {
-      zoom: unset;
-    }
 
     iframe {
       width: 100%;
@@ -1237,8 +1219,7 @@
     }
 
     // In-house TradingView chart container — fills the tile so its outer
-    // envelope matches the right (Treasury) tile's height. `zoom: 2`
-    // cancels the parent's `zoom: 0.5` so the chart UI renders at 1x.
+    // envelope matches the right (Treasury) tile's height.
     //
     // No min-height here AND we override the chart's internal
     // `__container { min-height: 300px }` to 0, otherwise the chart
@@ -1249,7 +1230,6 @@
       height: 100%;
       border-radius: 0.5rem;
       overflow: hidden;
-      zoom: 2;
 
       :deep(.trading-chart__container) {
         min-height: 0;
@@ -1282,10 +1262,6 @@
         font-size: 0.75rem;
         font-weight: 600;
         letter-spacing: 0.04em;
-      }
-
-      @supports (-moz-appearance: none) {
-        zoom: unset;
       }
     }
 
@@ -1335,51 +1311,8 @@
       top: 0.5rem;
       right: 0.5rem;
       z-index: 1000;
-      color: var(--);
       background-color: var(--yellow-to-dark-orange);
       border: 1px solid var(--dark-orange);
-      // Counteract the container's zoom: 0.5
-      zoom: 2;
-
-      // Firefox: no zoom to counteract
-      @supports (-moz-appearance: none) {
-        zoom: unset;
-      }
-    }
-
-    &__mobile {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      background-image: url("../assets/images/smallchartplaceholder.png");
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      aspect-ratio: 16 / 9;
-      border-radius: 1rem;
-      position: relative;
-      cursor: pointer;
-
-      &:after {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        border-radius: 1rem;
-        z-index: 1;
-      }
-
-      span {
-        font-size: 1rem;
-        color: var(--white);
-        z-index: 2;
-        text-align: center;
-      }
-
     }
 
   }
@@ -1398,6 +1331,8 @@
     margin: 0;
     padding: 2rem;
     overflow: auto;
+    // divs reset to the browser serif, so the chart toolbar buttons need a font
+    font-family: 'Space Mono', monospace;
 
     // dialog
     &__dialog {
@@ -1688,6 +1623,123 @@
 // media queries //
 ///////////////////
 
+// phones, tablets and touch tablets (same query as the bottom bar)
+@media (max-width: 991.98px), (pointer: coarse) {
+  .home-view__above-the-fold {
+    height: auto;
+    min-height: 0;
+  }
+  .home-view__above-the-fold__upper {
+    margin-top: 1.25rem;
+  }
+  .home-view__above-the-fold__lower {
+    display: none;
+  }
+  .home-view__below-the-fold {
+    margin-top: 2rem;
+  }
+  .home-view__above-the-fold__upper__middle {
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+  .home-view__above-the-fold__upper__middle__left,
+  .home-view__above-the-fold__upper__middle__right {
+    width: calc(50% - 0.375rem);
+  }
+  .home-view__above-the-fold__upper__middle__center {
+    width: 100%;
+    order: -1; // video first, right under the exchange button
+  }
+  .home-view__tile {
+    height: 100%;
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  // only the assets panel drops 16/9; the video keeps it until its iframe mounts
+  .home-view__above-the-fold__upper__middle__right .home-view__tile__inner {
+    aspect-ratio: auto;
+    flex-grow: 1;
+  }
+  // width 100% plus a height, so aspect-ratio is ignored
+  .home-view__taco-token-chart {
+    height: 18rem;
+  }
+  .home-view__taco-token-chart__inline {
+    display: flex;
+    flex-direction: column;
+
+    :deep(.trading-chart) {
+      flex: 1;
+      min-height: 0;
+      height: auto;
+    }
+    :deep(.trading-chart__chart-types) {
+      display: none;
+    }
+  }
+  .home-view__taco-token-chart__inline,
+  .home-view__chart-modal__dialog__middle {
+    :deep(.trading-chart__toolbar) {
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      padding-top: 0;
+      padding-bottom: 0;
+      padding-left: 0;
+    }
+    :deep(.trading-chart__tf-btn),
+    :deep(.trading-chart__type-btn) {
+      min-width: 2.75rem;
+      min-height: 2.75rem;
+      padding: 0 0.5rem;
+      font-size: 0.875rem;
+    }
+  }
+  .home-view__taco-token-chart__pair-switch {
+    position: static;
+    order: 1;
+    align-self: flex-start;
+    margin-top: 0.25rem;
+  }
+  .home-view__taco-token-chart__pair-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+  }
+  .home-view__taco-token-chart__expand-btn {
+    top: 0;
+    right: 0;
+  }
+  .home-view__taco-assets {
+    aspect-ratio: auto;
+    background-size: auto 75%;
+  }
+  .home-view__taco-assets__kvp {
+    padding: 0.375rem 0.5rem;
+  }
+  .home-view__social-links {
+    padding: 1.5rem 0;
+    gap: 0.25rem;
+  }
+  .home-view__social-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+  .home-view__exchange-cta__text span,
+  .home-view__powered-by span {
+    font-size: 0.875rem;
+  }
+  .home-view__pitch-points {
+    padding: 0 1rem;
+  }
+}
+
 // extra small
 @media (max-width: 459.98px) {
   .home-view__pitch-point {
@@ -1711,29 +1763,12 @@
 
 // phone protrait
 @media (max-width: 575.98px) {
-  .home-view__above-the-fold {
-    min-height: 780px;
-  }
-  .home-view__above-the-fold__upper__middle {
-    flex-direction: column;
-    align-items: center;
-    margin-top: 1.25rem;
-  }
   .home-view__tagline__container {
     margin-top: 1.75rem;
   }
-  .home-view__above-the-fold__upper {
-    justify-content: start;
-    margin-top: 1.25rem;
-  }
-  .home-view__above-the-fold__upper__middle__center {
-    width: 80%;
-  }  
-  .home-view__above-the-fold__upper__middle__left {
-    display: none;
-  }
+  .home-view__above-the-fold__upper__middle__left,
   .home-view__above-the-fold__upper__middle__right {
-    display: none;
+    width: 100%;
   }
   .container {
     max-width: 100%;
@@ -1741,10 +1776,6 @@
   }  
   .home-view__title__text {
     font-size: 1rem;
-  }  
-  .home-view__tile {
-    padding: 0.5rem 0.5rem 0.5rem;
-    gap: 0.5rem;
   }
   .home-view__taco-dao-slogan {
     line-height: 1;
@@ -1771,9 +1802,6 @@
   .home-view__pitch-point__image {
     width: 7rem;
   }
-  .home-view__pitch-points {
-    padding: 0 1rem;
-  }
   .home-view__pitch-point {
     padding: 0;
     gap: 1.5rem;
@@ -1783,9 +1811,6 @@
     padding-right: 0;
     padding-left: 0 !important;
   }
-  .home-view__pitch-point__description:nth-child(even) {
-    padding-left: 0;
-  }
   .home-view__tagline__container span {
     font-size: 1.125rem;
   }    
@@ -1794,7 +1819,8 @@
     margin-top: 3rem;
   }
   .home-view__speedbump__exchanges {
-    gap: 2rem 3rem;
+    gap: 1.5rem 2rem;
+    padding: 0 1rem;
   }
   .home-view__speedbump__exchange {
     min-width: 140px;
@@ -1819,6 +1845,9 @@
   .home-view__cta {
     margin-top: 4rem;
   }
+  .home-view__cta__top {
+    padding: 0 1rem;
+  }
   .home-view__cta__top span {
     font-size: 1.25rem;
   }
@@ -1836,34 +1865,18 @@
     margin: 3rem 0 1.5rem;
   }  
   .home-view__chart-modal {
-    padding: 1rem;
+    padding: 0.5rem;
   }  
 }
 
 // phone landscape
 @media (min-width: 576px) and (max-width: 767.98px) {
-  .home-view__pitch-points {
-    max-width: 540px;
-  }
-  .home-view__above-the-fold__upper__middle {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-  .home-view__above-the-fold__upper__middle__left,
-  .home-view__above-the-fold__upper__middle__center,
-  .home-view__above-the-fold__upper__middle__right {
-    width: 40%;
-  }
   .container {
     max-width: 100%;
     padding: 0 1rem;
   }
   .home-view__title__text {
     font-size: 1rem;
-  }
-  .home-view__tile {
-    padding: 0.5rem 0.5rem 0.5rem;
-    gap: 0.5rem;
   }
   .home-view__taco-dao-slogan {
     line-height: 1;
@@ -1896,15 +1909,6 @@
   .home-view__pitch-point__description {
     padding-right: 0;
     padding-left: 0 !important;
-  }
-  .home-view__pitch-point__description:nth-child(even) {
-    padding-left: 0;
-  }
-  .home-view__below-the-fold {
-    margin-top: 5rem;
-  }
-  .home-view__above-the-fold {
-    min-height: 908px;
   }
   .home-view__tagline__container span {
     font-size: 1.125rem;
@@ -1955,22 +1959,13 @@
   .home-view__powered-by {
     margin: 3rem 0 2rem;
   }  
-  .home-view__taco-assets span {
-    font-size: 0.75rem;
-  }
-  .home-view__taco-assets__fa-icon {
-    font-size: 1rem;
-  }
-  .home-view__taco-assets__svg {
-    width: 1rem;
-  }
   .home-view__chart-modal {
     padding: 1rem;
   }
 }
 
 // tablet
-@media (min-width: 767px) and (max-width: 991.98px) {
+@media (min-width: 768px) and (max-width: 991.98px) {
   .home-view__pitch-points {
     max-width: 720px;
   }
@@ -1980,10 +1975,6 @@
   }
   .home-view__title__text {
     font-size: 1.125rem;
-  }
-  .home-view__tile {
-    padding: 0.5rem 0.5rem 0.5rem;
-    gap: 0.5rem;
   }
   .home-view__taco-dao-slogan {
     line-height: 1.125;
@@ -2015,9 +2006,6 @@
   .home-view__pitch-point__description {
     padding-right: 0;
     padding-left: 0 !important;
-  }
-  .home-view__pitch-point__description:nth-child(even) {
-    padding-left: 0;
   }
   .home-view__tagline__container span {
     font-size: 1.25rem;
@@ -2062,15 +2050,6 @@
   }
   .home-view__powered-by {
     margin: 3rem 0 2rem;
-  }
-  .home-view__taco-assets span {
-    font-size: 0.75rem;
-  }
-  .home-view__taco-assets__fa-icon {
-    font-size: 1rem;
-  }
-  .home-view__taco-assets__svg {
-    width: 1rem;
   }
   .home-view__chart-modal {
     padding: 1rem;
@@ -2256,9 +2235,6 @@
   // Track intersection state
   const isBelowTheFoldVisible = ref(false)
 
-  // mobile check
-  const isMobile = ref(false)
-
   // viewing chart modal
   const viewingChartModal = ref(false)
 
@@ -2281,7 +2257,7 @@
   const chartQuoteDecimals = computed(() => chartQuote.value === 'icp' ? 8 : 6)
 
   // Only surface the TACO/ckUSDC toggle if the OTC backend actually has
-  // kline history for that pair. Probe once on mount; if it errors or
+  // kline history for that pair. Probe once Home has been shown; if it errors or
   // returns empty, the user only sees the TACO/ICP option.
   const hasCkusdcKlines = ref(false)
   // Defer the OTC probe off the homepage critical path. The toggle it gates
@@ -2290,7 +2266,7 @@
   const idleProbeCkusdc = typeof window !== 'undefined' && window.requestIdleCallback
     ? window.requestIdleCallback
     : (cb) => setTimeout(cb, 200)
-  idleProbeCkusdc(async () => {
+  const probeCkusdc = () => idleProbeCkusdc(async () => {
     try {
       const data = await chartDatafeed.getRange(
         TACO_PRINCIPAL, CKUSDC_PRINCIPAL, { hour: null }, [], 5n,
@@ -2304,8 +2280,13 @@
   // Route for watching navigation
   const route = useRoute()
 
+  // HomeView mounts on every route (KeepAlive + v-show): the chart and its probe wait until Home is shown
+  const homeSeen = ref(route.path === '/')
+  watch(homeSeen, seen => { if (seen) probeCkusdc() }, { immediate: true })
+
   // Pause YouTube when navigating away from home (HomeView stays in DOM via KeepAlive + v-show)
   watch(() => route.path, (newPath) => {
+    if (newPath === '/') homeSeen.value = true
     if (newPath !== '/') {
       // Navigating away from home - pause YouTube video
       if (youtubeIframeRef.value) {
@@ -2564,9 +2545,6 @@
     // get the below the fold element
     const belowTheFold = document.querySelector('.home-view__below-the-fold')
 
-    // check for mobile
-    isMobile.value = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-    
     // if below the fold exists
     if (belowTheFold) {
       

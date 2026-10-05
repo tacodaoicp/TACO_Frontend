@@ -67,10 +67,13 @@ const props = withDefaults(defineProps<{
   hideAttribution?: boolean
   /** Initial timeframe key — one of fivemin | hour | fourHours | day | week. */
   defaultTimeframe?: 'fivemin' | 'hour' | 'fourHours' | 'day' | 'week'
+  /** Let a vertical touch swipe scroll the page instead of the chart (for charts inside a scrolling page). */
+  pageScroll?: boolean
 }>(), {
   hideFullscreen: false,
   hideAttribution: false,
   defaultTimeframe: 'fivemin',
+  pageScroll: false,
 })
 
 // Detect if display pair order is inverted from canonical pool order.
@@ -313,6 +316,7 @@ function initChart() {
       borderColor: 'transparent',
       autoScale: true,
     },
+    handleScroll: { vertTouchDrag: !props.pageScroll },
   })
 
   candleSeries = chart.addSeries(CandlestickSeries, {
@@ -830,6 +834,8 @@ onActivated(() => { void catchUp() })
 // Poll every 5 seconds for faster chart updates after trades
 const enabledRef = computed(() => props.enabled !== false)
 usePolling(pollUpdate, { interval: 5000, immediate: false, enabled: enabledRef })
+// Hosts that hide the chart with v-show toggle `enabled` instead; onActivated never fires there.
+watch(enabledRef, on => { if (on) void catchUp() })
 
 // Reactively update last candle when live price changes (no network dependency).
 // Only the Exchange supplies a livePrice (orderbook-derived). DAO embeds skip this.

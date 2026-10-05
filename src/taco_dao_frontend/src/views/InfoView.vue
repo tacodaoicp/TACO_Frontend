@@ -380,10 +380,10 @@
           <!-- past sales title -->
           <TacoTitle level="h2" emoji="🏆" title="Past Sales" class="mt-5 justify-content-center"/>
 
-          <!-- past sales -->
+          <!-- past sales (the card scrolls the table sideways on narrow screens) -->
           <div class="taco-container
                       taco-container--l1
-                      w-100">
+                      w-100 overflow-x-auto">
 
             <div class="d-flex w-100">
 

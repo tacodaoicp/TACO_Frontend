@@ -50,6 +50,13 @@
     }
   }
 
+  // Phones (MobileTradeView): the tab row scrolls sideways instead of overflowing
+  @media (max-width: 767px) {
+    .pro-bottom__tabs { overflow-x: auto; scrollbar-width: none; }
+    .pro-bottom__tab { flex-shrink: 0; white-space: nowrap; }
+    .pro-bottom__tab--active::after { bottom: 0; }
+  }
+
   // Small count badge used alongside tab labels (Figma shows Open Orders · 3)
   .pro-bottom__badge {
     display: inline-flex;

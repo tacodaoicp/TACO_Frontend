@@ -25,7 +25,6 @@
         v-for="item in items"
         :key="item.route"
         class="tx-tab"
-        :class="{ 'tx-tab--mobile-hide': item.key === 'crossdex' || item.key === 'bridge' }"
         :aria-selected="active === item.key || route.path === item.route"
         @pointerenter="warmDestination(item.route)"
         @focus="warmDestination(item.route)"
@@ -127,12 +126,6 @@ const router = useRouter()
 <style scoped>
 /* Single-row header. When the viewport gets too narrow we hide content
    (stats → brand text → etc) in that order rather than wrapping. */
-
-/* CrossDEX lives in the mobile bottom nav, so drop it from the top bar on
-   phones (desktop keeps both CrossDEX and OTC). */
-@media (max-width: 767px) {
-  .tx-tab--mobile-hide { display: none; }
-}
 .tx-topnav {
   margin-bottom: 20px;
   min-width: 0;
@@ -181,7 +174,11 @@ const router = useRouter()
 @media (max-width: 900px) {
   .tx-topnav__pro-badge { display: none; }
 }
+/* Phones navigate with MobileNav, so the tabs give their room to Connect. */
 @media (max-width: 767px) {
+  .tx-topnav__tabs .tx-tab { display: none; }
+}
+@media (max-width: 991.98px) {
   .tx-topnav__brand-text { display: none; }     /* logo mark only */
   .tx-topnav__tabs .tx-tab {
     padding: 6px 8px;

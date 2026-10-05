@@ -178,7 +178,7 @@ function onOutsideClick(e: MouseEvent) {
   &__principal {
     font-size: 11px;
 
-    @media (max-width: 640px) { display: none; }
+    @media (max-width: 991.98px) { display: none; }
   }
 
   &__dropdown {

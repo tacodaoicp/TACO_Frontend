@@ -18,6 +18,8 @@ html:has([data-theme="exchange"]) body {
   background: var(--tx-bg, #151210);
   margin: 0;
   padding: 0;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 [data-theme="exchange"] {
@@ -25,6 +27,8 @@ html:has([data-theme="exchange"]) body {
   color: var(--tx-ink);
 
   *, *::before, *::after { box-sizing: border-box; }
+
+  a, button, label { touch-action: manipulation; } // pinch zoom stays, double tap zoom on controls goes
 
   a {
     color: var(--tx-orange);

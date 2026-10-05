@@ -66,7 +66,7 @@ function isActive(path: string): boolean {
   left: 0;
   right: 0;
   z-index: 1000;
-  height: 60px;
+  height: var(--tx-mobile-nav-h);
   background: var(--tx-surface-2);
   border-top: 1px solid var(--tx-line);
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.25);

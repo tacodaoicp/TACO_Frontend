@@ -54,4 +54,8 @@ defineProps<{
   font-size: 11px;
   margin-top: 2px;
 }
+@media (max-width: 767px) {
+  .tx-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  .tx-stats__divider { display: none; }
+}
 </style>

@@ -765,6 +765,7 @@ onBeforeUnmount(() => {
 
   &__slippage {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
     font-size: 0.8rem;

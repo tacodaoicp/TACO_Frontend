@@ -34,13 +34,17 @@
       <FooterBar />
     </div>
 
+    <!-- bottom bar (phones and touch tablets), in flow below the content.
+         hidden during the grand tour: its dialog covers the bottom edge and its backdrop blocks taps -->
+    <BottomNav v-if="!grandTourActive" />
+
     <!-- grand tour overlay (lazy loaded) -->
     <GrandTour v-if="grandTourActive"
                :active="grandTourActive"
                @end="grandTourActive = false" />
 
-    <!-- toast container -->
-    <TransitionGroup name="fade" tag="div" class="toast-container position-fixed bottom-0 end-0 m-3">
+    <!-- toast container (max-width keeps the 350px toast inside narrow phones, minus the m-3 margins) -->
+    <TransitionGroup name="fade" tag="div" class="toast-container position-fixed end-0 m-3" style="bottom: var(--bottom-nav-h, 0px); max-width: calc(100% - 2rem)">
     
       <!-- toast -->
       <div v-for="toast in toasts" 
@@ -102,6 +106,7 @@
   // HeaderBar and FooterBar are rendered once in App.vue and persist across all routes
   import HeaderBar from './components/HeaderBar.vue'
   import FooterBar from './components/FooterBar.vue'
+  import BottomNav from './components/BottomNav.vue'
 
   // bootstrap & font-awesome CSS moved to main.js (loads before taco.scss for correct cascade)
   import astronautLoader from './assets/images/astonautLoader.webp'

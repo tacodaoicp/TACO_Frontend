@@ -377,6 +377,7 @@ table {
 // prevent overscroll
 html, body {
   overscroll-behavior-y: none;
+  background-color: var(--card-gradient-from);
 }
 
 // everything
@@ -418,6 +419,10 @@ a, p, span {
 // ┌────────────────────────────────────┐
 // │  4. APP LAYOUT                     │
 // └────────────────────────────────────┘
+
+// bottom nav height (phones and touch tablets only)
+:root { --bottom-nav-h: 0px; }
+@media (max-width: 991.98px), (pointer: coarse) { :root { --bottom-nav-h: calc(56px + env(safe-area-inset-bottom, 0px)); } }
 
 // app
 .app {
@@ -1058,7 +1063,7 @@ a, p, span {
 // taco refresh button (floating, bottom-right)
 .taco-refresh-btn {
   position: fixed;
-  bottom: 1.5rem;
+  bottom: calc(1.5rem + var(--bottom-nav-h));
   right: 1.5rem;
   z-index: 1040;
   background: var(--orange-to-dark-brown);
@@ -1090,10 +1095,8 @@ a, p, span {
   }
 
   @media (max-width: 576px) {
-    bottom: 1rem;
+    bottom: calc(1rem + var(--bottom-nav-h));
     right: 1rem;
-    width: 2.5rem;
-    height: 2.5rem;
     font-size: 0.85rem;
 
     i {
@@ -2068,6 +2071,11 @@ select.form-control {
   height: 100%;
 }
 
+// phones: the page row sits in an unpadded .container.p-0, so drop its gutters (same as g-0) or the page scrolls sideways
+@media (max-width: 575.98px) {
+  .standard-view .container.p-0 > .row { --bs-gutter-x: 0; }
+}
+
 
 // ┌────────────────────────────────────┐
 // │ 22. ANIMATIONS & TRANSITIONS       │
@@ -2101,4 +2109,19 @@ select.form-control {
 
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+}
+
+
+// ┌────────────────────────────────────┐
+// │ 23. TOUCH DEVICES                  │
+// └────────────────────────────────────┘
+
+@media (pointer: coarse) {
+  .btn, .taco-modal-close { min-width: 44px; min-height: 44px; align-content: center; }
+  .btn-close { box-sizing: border-box; min-width: 44px; min-height: 44px; }
+  a, button, label { touch-action: manipulation; } // pinch stays, double tap zoom on controls goes
+}
+@supports (-webkit-touch-callout: none) { // iOS zooms into focused fields under 16px
+  input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea { font-size: 16px !important; }
+  input.amount-input { font-size: 1.5rem !important; } // SwapDialog keeps 24px
 }

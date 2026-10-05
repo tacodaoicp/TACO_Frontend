@@ -47,11 +47,11 @@
                 <div v-show="showOpenChat" class="btn-group">
 
                   <!-- gated access tutorial -->
-                  <button class="btn taco-btn taco-btn--green ms-auto animate__animated animate__delay-1s"
+                  <button class="btn taco-btn taco-btn--green ms-auto animate__animated animate__delay-1s chat-help-btn"
                     :class="{ 'animate__swing': openChatSeenLocalValue }"
                     @click="showAccessTutorial()">
-                    <i class="fa-solid fa-circle-question me-1"></i>
-                    <span class="hide-on-mobile">Gated Access</span>
+                    <i class="fa-solid fa-circle-question"></i>
+                    <span class="hide-on-mobile ms-1">Gated Access</span>
                   </button>                              
 
                 </div>
@@ -359,6 +359,13 @@
 
   }
   
+  // phones: the tabs and the help button share one row
+  @media (max-width: 767.98px) {
+    .taco-toolbar { flex-wrap: nowrap; }
+    .taco-toolbar__left .taco-nav-btn { padding: 0.5rem 0.625rem; font-size: 0.875rem; }
+    .chat-help-btn { padding: 0; width: 2.75rem; }
+  }
+
   // phone landscape
   @media (min-width: 576px) and (max-width: 767.98px) { 
 

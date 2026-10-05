@@ -382,4 +382,9 @@ $bg-color: rgba(10, 10, 20, 0.92);
     }
   }
 }
+
+@media (pointer: coarse) {
+  .vn-dialog__choice-btn { min-height: 44px; }
+  .vn-dialog__skip::after { content: ""; position: absolute; inset: -14px -10px; } // 44px hit area
+}
 </style>
