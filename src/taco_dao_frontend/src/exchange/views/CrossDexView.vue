@@ -19,9 +19,9 @@
         <div class="crossdex-view__tip tx-row">
           <div class="crossdex-view__tip-icon">⇄</div>
           <div>
-            <div class="crossdex-view__tip-title">All legs run in parallel.</div>
+            <div class="crossdex-view__tip-title">Neutrinite goes first when it is part of the mix.</div>
             <div class="tx-ink-3 crossdex-view__tip-body">
-              If one DEX fails, its funds are refunded automatically, so nothing gets stuck.
+              The other routes start once it has your deposit. If one DEX fails, its funds are refunded automatically, so nothing gets stuck.
             </div>
           </div>
         </div>

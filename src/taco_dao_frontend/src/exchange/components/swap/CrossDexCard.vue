@@ -83,7 +83,7 @@
       </div>
       <div v-else class="crossdex-card__info-row">
         <span>Route</span>
-        <span class="num">100% via {{ cx.plan.value.legs[0].dex === 'icpswap' ? 'ICPSwap' : 'TACO' }}</span>
+        <span class="num">100% via {{ dexLabel(cx.plan.value.legs[0].dex) }}</span>
       </div>
       <div v-for="(leg, idx) in cx.plan.value.legs" :key="idx" class="crossdex-card__leg-row">
         <span class="crossdex-card__leg-dex" :class="dexClass(leg.dex)">
@@ -142,7 +142,10 @@
           <span>Routing</span>
           <span class="num">{{ cx.plan.value?.kind === 'split' ? splitSummary : ('100% ' + dexLabel(cx.plan.value?.legs[0].dex ?? 'taco')) }}</span>
         </div>
-        <p class="crossdex-card__confirm-note">
+        <p v-if="cx.neuFirst.value" class="crossdex-card__confirm-note">
+          Neutrinite goes first. The other routes start as soon as it confirms your deposit, usually within seconds, so the swaps land close together. If one fails, its funds are refunded automatically, and the others still complete.
+        </p>
+        <p v-else class="crossdex-card__confirm-note">
           All legs run in parallel. If one fails, its funds are refunded automatically, and the others still complete.
         </p>
         <div class="crossdex-card__confirm-actions">
@@ -160,7 +163,7 @@
           <span class="crossdex-card__exec-status" :class="`is-${cx.phase.value}`">{{ execStatusLabel }}</span>
         </div>
         <p class="crossdex-card__exec-sub">
-          {{ legViews.length }} route{{ legViews.length === 1 ? '' : 's' }} running in parallel · {{ cx.tokenFrom.value?.symbol }} → {{ cx.tokenTo.value?.symbol }}
+          {{ legViews.length }} route{{ legViews.length === 1 ? '' : 's' }}{{ cx.neuFirst.value ? ', Neutrinite first' : ' running in parallel' }} · {{ cx.tokenFrom.value?.symbol }} → {{ cx.tokenTo.value?.symbol }}
         </p>
 
         <!-- one card per leg, live -->
@@ -187,9 +190,11 @@
             <div v-else-if="lv.status === 'failed'" class="crossdex-card__exec-leg-err">
               <div class="crossdex-card__exec-err-msg">{{ lv.outcome?.error || 'Failed' }}</div>
               <div class="crossdex-card__exec-err-note">
-                {{ lv.outcome?.recovered
-                    ? 'Funds were refunded to your wallet.'
-                    : 'Funds were not auto-recovered — use the Recover page to sweep them.' }}
+                {{ lv.outcome?.notStarted
+                    ? 'Your funds for this route stayed in your wallet.'
+                    : lv.outcome?.recovered
+                      ? 'Funds were refunded to your wallet.'
+                      : 'Funds were not recovered automatically. Use the Recover page to sweep them.' }}
               </div>
             </div>
           </div>
@@ -332,8 +337,8 @@ const summaryLine = computed(() => {
   const total = cx.outcomes.value.reduce((s, o) => s + o.amountOut, 0n)
   const totalStr = formatTo(total)
   if (cx.phase.value === 'success') return `Received ${totalStr}`
-  if (cx.phase.value === 'partial') return `Partial: received ${totalStr}. Check each route's status above; anything not auto-recovered is on the Recover page.`
-  if (cx.phase.value === 'error') return `All routes failed. Check each route's status above; anything not auto-recovered is on the Recover page.`
+  if (cx.phase.value === 'partial') return `Partial: received ${totalStr}. Check each route's status above; anything not recovered automatically is on the Recover page.`
+  if (cx.phase.value === 'error') return `All routes failed. Check each route's status above; anything not recovered automatically is on the Recover page.`
   return ''
 })
 

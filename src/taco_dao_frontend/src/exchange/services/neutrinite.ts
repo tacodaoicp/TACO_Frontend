@@ -187,6 +187,8 @@ export async function quoteGrid(sell: string, buy: string, amounts: bigint[]): P
 // fail + sweep, costing the user a wasted transfer fee. Only the Neutrinite DAO
 // can change these (admin_set_ledger_follow_settings), so they're ~static; cache
 // for hours. The BUY/withdraw side never blocks, so we gate the sell token only.
+// CrossDEX splits use a stricter limit, so this one now only decides whether a
+// 100% Neutrinite route is possible.
 export const NEUTRINITE_MAX_SELL_FOLLOW_SEC = 40
 const FOLLOW_TTL_MS = 6 * 60 * 60_000
 let _followMap: Map<string, number> | null = null
@@ -217,17 +219,12 @@ export async function prefetchFollowSettings(): Promise<void> {
 }
 
 /**
- * True if Neutrinite should be SKIPPED as a venue for SELLING `sell`, because the
- * pylon indexes that ledger slower than our deposit-credit poll budget
- * (NEUTRINITE_MAX_SELL_FOLLOW_SEC). Unknown/absent cadence → false (keep trying;
- * fall back to the reactive credit-poll + sweep). Gates the deposit (sell) side
- * only — the buy/withdraw side never blocks.
+ * The pylon's indexer cadence in seconds for SELLING `sell`, or undefined when
+ * unknown (no row, or ledger_follow_settings failed with no cache). Only the
+ * deposit (sell) side matters; the buy/withdraw side never blocks.
  */
-export async function isSellDepositTooSlow(sell: string): Promise<boolean> {
-  try {
-    const sec = (await getFollowSettings()).get(sell)
-    return sec != null && sec > NEUTRINITE_MAX_SELL_FOLLOW_SEC
-  } catch { return false }
+export async function sellFollowSec(sell: string): Promise<number | undefined> {
+  try { return (await getFollowSettings()).get(sell) } catch { return undefined }
 }
 
 // ── Pending-swap cache (localStorage) — survives a tab-close so the Recover page can sweep ──
@@ -265,12 +262,20 @@ export interface NeutriniteSwapParams {
   amountIn: bigint
   minAmountOut: bigint
   onStep?: (step: string) => void
+  /** Checked right before the deposit; false sends nothing. */
+  canDeposit?: () => boolean
+  /** Called once the deposit is credited; false refuses the swap. */
+  onCredited?: () => boolean
+  /** Filled in for the caller's recovery: pylon balances before our deposit, the swap output,
+   *  and whether an earlier swap on this pair had already left a marker. */
+  track?: { before?: { sell: bigint; buy: bigint }; swappedOut?: bigint; hadMarker?: boolean }
 }
 
 /**
  * Execute a synchronous Neutrinite swap: deposit -> (poll credit) -> dex_swap -> withdraw.
  * Funds stay under the user's own pylon Account throughout; on failure the caller
- * should sweep() to reclaim any stranded virtual balance.
+ * should sweep() to reclaim any stranded virtual balance. The pending marker and
+ * `track.before` are set only once funds are about to move.
  */
 export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amountOut: bigint }> {
   const identity = await getCachedIdentity()
@@ -278,8 +283,6 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   if (owner.isAnonymous()) throw new Error('Not authenticated')
   const userAccount = { owner, subaccount: [] as [] }
   const pylon = await authedPylon()
-
-  savePendingSwap(params.sell, params.buy)
 
   // 1. Register (idempotent) so the pylon indexes this account, then resolve the
   // pylon-owned deposit account for the sell ledger (+ current virtual balance).
@@ -290,16 +293,30 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   if (!sellEp) throw new Error('Neutrinite: no deposit endpoint for this token')
   const balanceBefore = sellEp.balance
   const depositAccount = sellEp.account // { owner: pylon, subaccount: [bytes] }
+  const tokenActor = Actor.createActor(icrcIDL, { agent: await getCachedAgent(), canisterId: params.sell })
 
   // 2. Fund the swap: plain icrc1_transfer of the input token into the pylon account.
+  // No await from this check to the transfer call, so a late start sends nothing.
+  if (params.canDeposit?.() === false) throw new Error('Neutrinite was too slow to start, so its share was not sent')
+  // Persist the pair NOW (funds are about to move) so a tab close is recoverable via the Recover page.
+  const hadMarker = getPendingSwaps().some(e => e.sell === params.sell && e.buy === params.buy)
+  savePendingSwap(params.sell, params.buy)
+  if (params.track) {
+    params.track.before = { sell: balanceBefore, buy: findEndpoint(accounts, params.buy)?.balance ?? 0n }
+    params.track.hadMarker = hadMarker
+  }
   params.onStep?.('Depositing…')
-  const tokenActor = Actor.createActor(icrcIDL, { agent: await getCachedAgent(), canisterId: params.sell })
   const tr = (await tokenActor.icrc1_transfer({
     to: { owner: depositAccount.owner, subaccount: depositAccount.subaccount },
     amount: params.amountIn,
     fee: [], memo: [], from_subaccount: [], created_at_time: [],
   })) as any
-  if ('Err' in tr) throw new Error('Neutrinite deposit failed: ' + safeStringify(tr.Err))
+  if ('Err' in tr) {
+    // Nothing moved. Keep a marker an earlier failed swap on this pair left behind.
+    if (params.track) params.track.before = undefined
+    if (!hadMarker) removePendingSwap(params.sell, params.buy)
+    throw new Error('Neutrinite deposit failed: ' + safeStringify(tr.Err))
+  }
 
   // 3. Wait for the pylon's indexer to credit the virtual balance. The pylon
   // credits slightly LESS than the deposited amount (it nets a ledger fee), so
@@ -320,7 +337,10 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
     } catch { /* keep polling */ }
     params.onStep?.(`Confirming deposit… (${Math.round((Date.now() - started) / 1000)}s)`)
   }
-  if (creditedDelta <= 0n) throw new Error('Neutrinite: deposit not credited in time (recoverable via sweep)')
+  if (creditedDelta <= 0n) throw new Error('Neutrinite did not confirm the deposit in time')
+  // Releasing the gate only queues microtasks, so the dex_swap call below starts first.
+  if (params.onCredited?.() === false)
+    throw new Error('Neutrinite confirmed the deposit too late, so it was not swapped')
 
   // 4. Swap exactly the credited amount (synchronous, slippage-protected). Scale
   // the slippage floor down to the credited amount so a fee-trimmed deposit
@@ -336,8 +356,10 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   })) as any
   if (!('ok' in sw)) throw new Error('Neutrinite swap failed: ' + safeStringify(sw.err))
   const amountOut = sw.ok.amount_out as bigint
+  if (params.track) params.track.swappedOut = amountOut
 
-  // 5. Withdraw the output back to the user's wallet.
+  // 5. Withdraw the output back to the user's wallet. Judge the INNER transfer
+  // result: the batch can be ok while the ledger transfer inside failed.
   params.onStep?.('Withdrawing…')
   const cmd = (await pylon.icrc55_command({
     commands: [{
@@ -352,52 +374,74 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
     controller: { owner, subaccount: [] },
     expire_at: [], request_id: [], signature: [],
   })) as any
-  if (!('ok' in cmd)) throw new Error('Neutrinite withdraw failed: ' + safeStringify(cmd.err))
+  const inner = cmd && 'ok' in cmd ? cmd.ok.commands?.[0]?.transfer : null
+  if (!(inner && 'ok' in inner)) {
+    console.warn('[neutrinite] output withdraw not delivered:', safeStringify(cmd))
+    throw new Error('Neutrinite swapped, but sending the output to your wallet failed')
+  }
 
   removePendingSwap(params.sell, params.buy)
   return { amountOut }
 }
 
 /**
- * Recover any stranded virtual balance for a pair back to the user's wallet.
- * Safe to call anytime. Returns true if it actually withdrew something.
+ * Recover stranded virtual balance for a pair back to the user's wallet. Safe
+ * to call anytime. With `before` (a swap's pre-deposit balances) it withdraws
+ * only what sits above them, so an earlier swap's leftover never passes for
+ * this swap's recovery; without it (the Recover page) it withdraws everything.
+ * Dust at or below the ledger fee is skipped. Returns true when something was
+ * found AND every withdraw's inner transfer succeeded, false when nothing above
+ * the fee was found, and THROWS when a found balance could not be withdrawn, so
+ * a caller never reports funds that are still on the pylon as "nothing there".
  *
  * NOTE: does NOT clear the pending marker — the caller clears it only when a
  * withdraw succeeded, so a deposit that hasn't credited YET (sweep finds 0) keeps
  * its marker and stays visible on the Recover page once it does credit.
  */
-export async function sweep(sell: string, buy: string): Promise<boolean> {
+export async function sweep(sell: string, buy: string, before?: { sell: bigint; buy: bigint }): Promise<boolean> {
   const identity = await getCachedIdentity()
   const owner = identity.getPrincipal()
   if (owner.isAnonymous()) throw new Error('Not authenticated')
   const userAccount = { owner, subaccount: [] as [] }
   const pylon = await authedPylon()
+  const agent = await getCachedAgent()
   const accounts = (await pylon.icrc55_accounts({ owner, subaccount: [] })) as any[]
-  let recovered = false
-  for (const tok of [sell, buy]) {
-    const ep = findEndpoint(accounts, tok)
-    if (ep && ep.balance > 0n) {
-      try {
-        const res = (await pylon.icrc55_command({
-          commands: [{
-            transfer: {
-              amount: ep.balance,
-              from: { account: userAccount },
-              ledger: ledgerVar(tok),
-              memo: [],
-              to: { external_account: { ic: userAccount } },
-            },
-          }],
-          controller: { owner, subaccount: [] },
-          expire_at: [], request_id: [], signature: [],
-        })) as any
-        if ('ok' in res) recovered = true
-      } catch (e) {
-        console.error('[neutrinite.sweep] withdraw failed for', tok, e)
+  let foundAny = false
+  let allOk = true
+  for (const [tok, base] of [[sell, before?.sell ?? 0n], [buy, before?.buy ?? 0n]] as const) {
+    const amount = (findEndpoint(accounts, tok)?.balance ?? 0n) - base
+    if (amount <= 0n) continue
+    try {
+      const f = (await Actor.createActor(icrcIDL, { agent, canisterId: tok }).icrc1_fee()) as any
+      if (amount <= (typeof f === 'bigint' ? f : BigInt(f))) continue
+    } catch { /* fee unknown, attempt the withdraw anyway */ }
+    foundAny = true
+    try {
+      const res = (await pylon.icrc55_command({
+        commands: [{
+          transfer: {
+            amount,
+            from: { account: userAccount },
+            ledger: ledgerVar(tok),
+            memo: [],
+            to: { external_account: { ic: userAccount } },
+          },
+        }],
+        controller: { owner, subaccount: [] },
+        expire_at: [], request_id: [], signature: [],
+      })) as any
+      const inner = res && 'ok' in res ? res.ok.commands?.[0]?.transfer : null
+      if (!(inner && 'ok' in inner)) {
+        allOk = false
+        console.warn('[neutrinite.sweep] withdraw not delivered for', tok, safeStringify(res))
       }
+    } catch (e) {
+      allOk = false
+      console.error('[neutrinite.sweep] withdraw failed for', tok, e)
     }
   }
-  return recovered
+  if (!allOk) throw new Error('Neutrinite has funds for this pair that could not be sent back to your wallet yet. Try again in a minute, or use Recover All.')
+  return foundAny
 }
 
 /**

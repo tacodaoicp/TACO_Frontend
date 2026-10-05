@@ -49,6 +49,8 @@ export interface IcpSwapParams {
   amountIn: bigint
   minAmountOut: bigint
   onStep?: (step: string) => void
+  /** Awaited after the approve and before any funds move; a throw here leaves no marker. */
+  beforeDeposit?: () => Promise<void>
 }
 
 // ── Module state ──
@@ -411,8 +413,10 @@ export async function quoteGrid(
 
 /**
  * Execute an ICRC2-based swap on ICPSwap: approve → depositFrom → swap → withdraw.
- * On swap/withdraw failure, best-effort sweep to recover stranded funds, then throw.
- * Returns the gross amount out (before the output ledger's transfer fee).
+ * Throws on any failure without sweeping; the caller runs the recovery
+ * (sweepWithRetry). `beforeDeposit`, when given, runs between the approve and
+ * the first move of funds. Returns the gross amount out (before the output
+ * ledger's transfer fee).
  */
 export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: bigint }> {
   const authedAgent = await getCachedAgent()
@@ -447,6 +451,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     expires_at: [],
   })) as any
   if ('Err' in approvalResult) throw new Error(`Approval failed: ${safeStringify(approvalResult.Err)}`)
+  if (params.beforeDeposit) await params.beforeDeposit()
 
   // 3. depositFrom (pool pulls via icrc2_transfer_from)
   // Persist the pair NOW (funds are about to move) so a tab-close mid-swap is

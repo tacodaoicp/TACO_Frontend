@@ -1,13 +1,18 @@
 /**
- * CrossDEX swap flow — splits one swap across ICPSwap + TACO + Neutrinite and
- * executes the legs FULLY IN PARALLEL.
+ * CrossDEX swap flow: splits one swap across ICPSwap + TACO + Neutrinite.
  *
- * Safety contract (per product requirement): the legs run concurrently and each
- * leg's failure is contained — on ANY error a leg recovers its own funds so
- * nothing is ever stranded in any exchange:
+ * The legs run concurrently, except that a split which includes Neutrinite goes
+ * Neutrinite first: ICPSwap (after its approve) and TACO wait at a one-way gate
+ * until the pylon credits our Neutrinite deposit, that leg fails, or
+ * NEU_GATE_MAX_MS passes. Our dex_swap is sent in the tick that opens the gate,
+ * and a credit that comes after the gate opened some other way is refused and
+ * swept back, so no other venue of ours moves the price before Neutrinite swaps.
+ *
+ * Safety contract (per product requirement): each leg's failure is contained,
+ * and on ANY error a leg recovers its own funds so nothing is ever stranded:
  *   • ICPSwap leg    → `icpswap.sweep` (withdraws stranded pool/subaccount balances)
  *   • TACO leg       → `store.recoverWronglysent` (refunds the unspent deposit)
- *   • Neutrinite leg → `neutrinite.sweep` (withdraws the user's pylon virtual balance)
+ *   • Neutrinite leg → `neutrinite.sweep` (withdraws this swap's pylon virtual balance)
  * A failure in one leg never blocks the others or their recovery (Promise.allSettled).
  */
 
@@ -38,10 +43,21 @@ export interface LegOutcome {
   amountOut: bigint
   error?: string
   recovered?: boolean
+  /** Nothing left the wallet for this route. */
+  notStarted?: boolean
 }
 
 const GRID_BPS = [1000n, 2000n, 3000n, 4000n, 5000n, 6000n, 7000n, 8000n, 9000n, 10000n]
 const MAX_ROUTES_PER_FRACTION = 5n
+
+// Neutrinite-first gate (splits that include Neutrinite).
+const NEU_GATE_MAX_MS = 20_000
+const NEU_STALE_MS = NEU_GATE_MAX_MS + 5_000 // past this the page was paused: start nothing new
+const NEU_SPLIT_MAX_FOLLOW_SEC = 10
+const NEU_WAIT_STEP = 'Waiting for Neutrinite to confirm your deposit…'
+const NOT_STARTED = 'Not started, your funds stayed in your wallet'
+type NeuGate = { open: (why: string) => boolean; isOpen: () => boolean; wait: (dex: CrossDexVenue) => Promise<boolean> }
+const isNeuFirst = (legs: CrossDexLeg[]) => legs.length > 1 && legs.some(l => l.dex === 'neutrinite')
 
 export function useCrossDexSwap() {
   const store = useExchangeStore()
@@ -95,6 +111,8 @@ export function useCrossDexSwap() {
     phase.value === 'ready' && plan.value !== null && plan.value.totalExpectedOut > 0n && isAmountValid.value,
   )
 
+  const neuFirst = computed(() => isNeuFirst(plan.value?.legs ?? []))
+
   function setLegStep(dex: CrossDexVenue, step: string) {
     legSteps.value = { ...legSteps.value, [dex]: step }
   }
@@ -132,7 +150,8 @@ export function useCrossDexSwap() {
       // SELL token's cadence exceeds our credit-poll budget the deposit can't
       // credit in time, so exclude Neutrinite for this pair (feed it a zero grid
       // → the optimizer never allocates it). The buy/withdraw side never blocks.
-      const skipNeu = await neutrinite.isSellDepositTooSlow(fromAddr)
+      const followSec = await neutrinite.sellFollowSec(fromAddr)
+      const skipNeu = followSec != null && followSec > neutrinite.NEUTRINITE_MAX_SELL_FOLLOW_SEC
       if (skipNeu) console.info('[CrossDEX] Neutrinite skipped — sell token indexer cadence >',
         neutrinite.NEUTRINITE_MAX_SELL_FOLLOW_SEC + 's')
 
@@ -146,6 +165,10 @@ export function useCrossDexSwap() {
       ])
       if (mySeq !== seq) return // superseded by a newer quote
 
+      // A split holds the other venues until Neutrinite credits, so only a known fast cadence may join one.
+      const neuPlanGrid = followSec != null && followSec <= NEU_SPLIT_MAX_FOLLOW_SEC
+        ? neuGrid : neuGrid.map((v, i) => (i === neuGrid.length - 1 ? v : 0n))
+
       // Within-TACO optimum at each 10% fraction (single or internal split).
       const tacoGrid: TacoGridEntry[] = []
       for (let j = 0; j < 10; j++) {
@@ -155,7 +178,7 @@ export function useCrossDexSwap() {
       }
 
       // Show the coarse 10%-grid result immediately…
-      const coarse = buildCrossDexPlan(icpGrid, tacoGrid, neuGrid, total, outTransferFee)
+      const coarse = buildCrossDexPlan(icpGrid, tacoGrid, neuPlanGrid, total, outTransferFee)
       plan.value = coarse
       phase.value = 'ready'
       console.info('[CrossDEX] coarse', {
@@ -164,12 +187,13 @@ export function useCrossDexSwap() {
         total: coarse.totalExpectedOut.toString(),
         icpGrid: icpGrid.map(v => v.toString()),
         tacoGrid: tacoGrid.map(t => t.expectedOut.toString()),
-        neuGrid: neuGrid.map(v => v.toString()),
+        neuGrid: neuPlanGrid.map(v => v.toString()),
+        neuFollowSec: followSec,
       })
 
       // …then refine to a precise (0.1%) split in the background and verify it.
       if (coarse.kind === 'split') {
-        void refinePlan(mySeq, total, fromAddr, toAddr, sellTransferFee, icpGrid, tacoGrid, neuGrid, coarse)
+        void refinePlan(mySeq, total, fromAddr, toAddr, sellTransferFee, icpGrid, tacoGrid, neuPlanGrid, coarse)
       }
     } catch (err: any) {
       console.error('[CrossDEX] quote failed:', err)
@@ -282,6 +306,8 @@ export function useCrossDexSwap() {
 
   async function execute() {
     if (!tokenFrom.value || !tokenTo.value || !plan.value) return
+    seq++ // a refine still in flight must not replace the plan these legs run
+    const legs = plan.value.legs
     const fromAddr = tokenFrom.value.address
     const toAddr = tokenTo.value.address
     const sellToken = tokenFrom.value
@@ -303,7 +329,7 @@ export function useCrossDexSwap() {
     // The V2 decision for the whole swap, pinned once (store contract: decide
     // once per user action, never re-read mid-flow).
     const v2 = store.useV2Deposit(fromAddr)
-    const tacoLeg = plan.value.legs.find(l => l.dex === 'taco')
+    const tacoLeg = legs.find(l => l.dex === 'taco')
     if (tacoLeg && v2) {
       try {
         const grossTotal = calculateRequiredDeposit(tacoLeg.amountIn, store.tradingFeeBps, sellToken.transfer_fee)
@@ -325,29 +351,50 @@ export function useCrossDexSwap() {
       }
     }
 
+    // Neutrinite first: a split that includes Neutrinite holds ICPSwap (after its
+    // approve) and TACO at a one-way gate until our pylon deposit is credited,
+    // the Neutrinite leg fails, or NEU_GATE_MAX_MS passes. Each leg waits inside
+    // itself, so the per-leg backstop below still bounds the modal.
+    let gate: NeuGate | undefined
+    let blockUnload: ((e: BeforeUnloadEvent) => void) | undefined
+    if (isNeuFirst(legs)) {
+      const t0 = Date.now()
+      const fresh = () => Date.now() - t0 < NEU_STALE_MS
+      let isOpen = false, release!: () => void
+      const opened = new Promise<void>(r => { release = r })
+      // Judged by the clock, not only the cap timer: after a page freeze a network
+      // callback can run before the overdue timer, and must still count as late.
+      const open = (why: string) => {
+        if (isOpen) return false
+        isOpen = true; clearTimeout(cap); release()
+        const late = Date.now() - t0 >= NEU_GATE_MAX_MS
+        console.info('[CrossDEX] gate open:', late && why === 'credit' ? 'cap (credit seen late)' : why, Date.now() - t0, 'ms')
+        return !late
+      }
+      const cap = setTimeout(() => open('cap'), NEU_GATE_MAX_MS)
+      gate = { open, isOpen: () => isOpen || Date.now() - t0 >= NEU_GATE_MAX_MS,
+        wait: async dex => { if (!isOpen) { setLegStep(dex, NEU_WAIT_STEP); await opened } return fresh() } }
+      blockUnload = e => { e.preventDefault(); e.returnValue = '' } // per run, never shared
+      window.addEventListener('beforeunload', blockUnload)
+    }
+
     // Fire ALL legs concurrently. Promise.allSettled guarantees one leg's
     // failure never aborts another leg or its recovery. Each leg also gets a
     // generous backstop timeout so a hung inner call (dropped connection, stuck
     // poll) can NEVER leave the execution modal spinning forever — on timeout the
     // leg resolves to a failed outcome (its own recovery keeps running in the
     // background; refreshAfterMutation reconciles real balances afterwards).
-    const settled = await Promise.allSettled(
-      plan.value.legs.map(leg =>
-        withTimeout(
-          executeLeg(leg, fromAddr, toAddr, sellToken, slip, v2),
-          180_000,
-          `crossdex-leg-${leg.dex}`,
-        ).catch((err: any): LegOutcome => ({
-          dex: leg.dex, success: false, amountOut: 0n,
-          error: err?.message || 'Leg timed out',
-        })),
-      ),
-    )
+    const settled = await Promise.allSettled(legs.map(leg =>
+      withTimeout(executeLeg(leg, fromAddr, toAddr, sellToken, slip, v2, gate), 180_000, `crossdex-leg-${leg.dex}`)
+        .catch((err: any): LegOutcome => ({ dex: leg.dex, success: false, amountOut: 0n,
+          error: /timed out after/.test(err?.message ?? '')
+            ? 'This route took too long. Check your wallet and the Recover page.' : err?.message || 'Leg failed' })),
+    )).finally(() => { if (blockUnload) window.removeEventListener('beforeunload', blockUnload) })
 
     const results: LegOutcome[] = settled.map((s, i) =>
       s.status === 'fulfilled'
         ? s.value
-        : { dex: plan.value!.legs[i].dex, success: false, amountOut: 0n, error: (s as PromiseRejectedResult).reason?.message ?? 'Unknown error' },
+        : { dex: legs[i].dex, success: false, amountOut: 0n, error: (s as PromiseRejectedResult).reason?.message ?? 'Unknown error' },
     )
     outcomes.value = results
 
@@ -362,7 +409,7 @@ export function useCrossDexSwap() {
         formatTokenAmount(totalOut, Number(tokenTo.value.decimals), tokenTo.value.symbol) + ' received')
     } else if (successes.length > 0) {
       phase.value = 'partial'
-      toast.warning('Partial Fill', `${successes.length}/${results.length} legs filled. Check each route's status; anything not auto-recovered is on the Recover page.`)
+      toast.warning('Partial Fill', `${successes.length}/${results.length} legs filled. Check each route's status; anything not recovered automatically is on the Recover page.`)
     } else {
       // A dead session fails every leg the same way; reset auth once instead of
       // showing raw signature/expiry text.
@@ -381,9 +428,11 @@ export function useCrossDexSwap() {
   /** Execute a single leg. NEVER throws — always resolves to a LegOutcome, with
    *  funds recovered on failure so nothing is stranded in that exchange.
    *  `v2` is the TACO deposit path decision, pinned ONCE in execute() so a
-   *  background gate refresh can never desync it from the hoisted approval. */
+   *  background gate refresh can never desync it from the hoisted approval.
+   *  `gate` is set only for Neutrinite first plans (see execute()). */
   async function executeLeg(
     leg: CrossDexLeg, fromAddr: string, toAddr: string, sellToken: TokenInfo, slip: number, v2: boolean,
+    gate?: NeuGate,
   ): Promise<LegOutcome> {
     const minOut = BigInt(Math.floor(Number(leg.expectedOut) * (1 - slip)))
 
@@ -395,10 +444,18 @@ export function useCrossDexSwap() {
           amountIn: leg.amountIn,
           minAmountOut: minOut,
           onStep: s => setLegStep('icpswap', s),
+          beforeDeposit: gate && (async () => {
+            if (!(await gate.wait('icpswap'))) throw Object.assign(new Error(NOT_STARTED), { notStarted: true })
+          }),
         })
         setLegStep('icpswap', 'Done')
         return { dex: 'icpswap', success: true, amountOut: r.amountOut }
       } catch (err: any) {
+        if (err?.notStarted) {
+          // Released too late (page paused): only the approve ran, no funds moved, nothing to sweep.
+          setLegStep('icpswap', NOT_STARTED)
+          return { dex: 'icpswap', success: false, amountOut: 0n, error: NOT_STARTED, notStarted: true }
+        }
         console.error('[CrossDEX] ICPSwap leg failed:', err?.message || err)
         setLegStep('icpswap', 'Recovering funds…')
         // Automatic recovery: sweep with retries (a lost-response depositFrom
@@ -416,6 +473,7 @@ export function useCrossDexSwap() {
     }
 
     if (leg.dex === 'neutrinite') {
+      const track: NonNullable<neutrinite.NeutriniteSwapParams['track']> = {}
       try {
         const r = await neutrinite.executeSwap({
           sell: fromAddr,
@@ -423,28 +481,48 @@ export function useCrossDexSwap() {
           amountIn: leg.amountIn,
           minAmountOut: minOut,
           onStep: s => setLegStep('neutrinite', s),
+          canDeposit: gate && (() => !gate.isOpen()),
+          onCredited: gate && (() => gate.open('credit')),
+          track,
         })
         setLegStep('neutrinite', 'Done')
         return { dex: 'neutrinite', success: true, amountOut: r.amountOut }
       } catch (err: any) {
+        gate?.open('neutrinite failed')
         console.error('[CrossDEX] Neutrinite leg failed:', err?.message || err)
+        const error = err?.message || 'Neutrinite swap failed'
+        if (!track.before) {
+          // Failed before the deposit, or the transfer was refused: nothing to sweep.
+          setLegStep('neutrinite', 'Failed, nothing left your wallet')
+          return { dex: 'neutrinite', success: false, amountOut: 0n, error, notStarted: true }
+        }
         setLegStep('neutrinite', 'Recovering funds…')
+        // Sweep only what this swap added on the pylon, retried because a deposit
+        // can credit a few seconds after we gave up. Clear the marker only once
+        // that amount came back, and never one an earlier failed swap on this
+        // pair left (its funds are still there); otherwise the Recover page keeps it.
         let recovered = false
-        try {
-          // sweep returns true only if it actually withdrew a credited balance.
-          // Clear the marker only then; otherwise keep it so the Recover page can
-          // sweep once a late deposit credits.
-          if (await neutrinite.sweep(fromAddr, toAddr)) {
-            neutrinite.removePendingSwap(fromAddr, toAddr)
-            recovered = true
-          }
-        } catch { /* best-effort; marker stays so the Recover page can sweep later */ }
-        setLegStep('neutrinite', recovered ? 'Failed, funds recovered' : 'Failed — recover on the Recover page')
-        return { dex: 'neutrinite', success: false, amountOut: 0n, error: err?.message || 'Neutrinite swap failed', recovered }
+        for (let i = 0; i < 3 && !recovered; i++) {
+          if (i > 0) await new Promise(r => setTimeout(r, 5000))
+          try { recovered = await neutrinite.sweep(fromAddr, toAddr, track.before) }
+          catch (e) { console.error(`[CrossDEX] Neutrinite sweep attempt ${i + 1} failed:`, e) }
+        }
+        if (recovered && !track.hadMarker) neutrinite.removePendingSwap(fromAddr, toAddr)
+        if (recovered && track.swappedOut != null) {
+          // The swap filled and the retry delivered its output.
+          setLegStep('neutrinite', 'Done')
+          return { dex: 'neutrinite', success: true, amountOut: track.swappedOut }
+        }
+        setLegStep('neutrinite', recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
+        return { dex: 'neutrinite', success: false, amountOut: 0n, error, recovered }
       }
     }
 
     // ── TACO leg ──
+    if (gate && !(await gate.wait('taco'))) {
+      setLegStep('taco', NOT_STARTED)
+      return { dex: 'taco', success: false, amountOut: 0n, error: NOT_STARTED, notStarted: true }
+    }
     let block: bigint | undefined
     let submitted = false
     try {
@@ -505,6 +583,7 @@ export function useCrossDexSwap() {
           outSymbol: tokenTo.value!.symbol,
           v2Settled: true,
         })
+        let notStarted = false
         if ('SlippageExceeded' in raw.Err) {
           // Settled on chain: the below-minimum output was already delivered.
           void store.refreshAfterMutation('swap')
@@ -513,9 +592,21 @@ export function useCrossDexSwap() {
           void store.refreshAfterMutation('swap')
           setLegStep('taco', 'Failed, deposit tracked on the Recover page')
         } else {
-          setLegStep('taco', 'Failed, no funds moved')
+          // Only errors returned before the pull leave the wallet untouched. After
+          // it, RouteFailed, 'Funds not received' and the pull race can move funds.
+          const e = raw.Err as any
+          const prePull = 'NotAuthorized' in e
+            || ('InvalidInput' in e && !String(e.InvalidInput).includes('already claimed by a concurrent'))
+            || ('InsufficientFunds' in e && String(e.InsufficientFunds).startsWith('V2 pull declined'))
+          if (prePull) {
+            setLegStep('taco', 'Failed, no funds moved')
+            notStarted = true
+          } else {
+            void store.refreshAfterMutation('swap')
+            setLegStep('taco', 'Failed, check your wallet and the Recover page')
+          }
         }
-        return { dex: 'taco', success: false, amountOut: 0n, error: classified.message, recovered: false }
+        return { dex: 'taco', success: false, amountOut: 0n, error: classified.message, recovered: false, notStarted }
       }
       throw new Error(classifyExchangeError(raw.Err, {
         outDecimals: Number(tokenTo.value!.decimals),
@@ -537,7 +628,7 @@ export function useCrossDexSwap() {
         // No block to recover. Before submit nothing left the wallet; after an
         // ambiguous submit the user must check history before retrying.
         setLegStep('taco', submitted ? 'Failed, check your history and the Recover page' : 'Failed, no funds moved')
-        return { dex: 'taco', success: false, amountOut: 0n, error: err?.message || 'TACO swap failed', recovered: false }
+        return { dex: 'taco', success: false, amountOut: 0n, error: err?.message || 'TACO swap failed', recovered: false, notStarted: !submitted }
       }
       // Recover the unspent deposit so funds are never stuck in the treasury.
       setLegStep('taco', 'Recovering funds…')
@@ -565,7 +656,7 @@ export function useCrossDexSwap() {
     // state
     phase, tokenFrom, tokenTo, amountIn, plan, refining, errorMsg, quoteError, outcomes, legSteps, slippage,
     // computed
-    amountInBigInt, isAmountValid, canSwap, fromBalance,
+    amountInBigInt, isAmountValid, canSwap, fromBalance, neuFirst,
     // actions
     fetchPlan, confirmSwap, cancelConfirm, execute, reset,
   }

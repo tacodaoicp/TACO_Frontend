@@ -96,38 +96,40 @@
           {{ recovering ? 'Recovering...' : `Recover All (${cachedDeposits.length} deposits)` }}
         </button>
 
-        <table class="ex-table recover-view__deposits-table">
-          <thead>
-            <tr>
-              <th>Token</th>
-              <th>Block</th>
-              <th>Type</th>
-              <th>When</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="dep in cachedDeposits" :key="dep.block">
-              <td>{{ getTokenSymbol(dep.token) }} <span class="recover-view__token-id">{{ dep.token.slice(0, 10) }}...</span></td>
-              <td class="num">{{ dep.block }}</td>
-              <td>{{ dep.type }}</td>
-              <td>{{ formatDepositAge(dep.timestamp) }}</td>
-              <td>
-                <div style="display:flex;gap:4px">
-                  <button
-                    class="ex-btn ex-btn--sm ex-btn--primary"
-                    @click="recoverCachedDeposit(dep)"
-                    :disabled="recovering || raRunning"
-                  >{{ recovering ? '...' : 'Recover' }}</button>
-                  <button
-                    class="ex-btn ex-btn--sm ex-btn--outline"
-                    @click="dismissDeposit(dep.block)"
-                  >Dismiss</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="ex-table-wrap">
+          <table class="ex-table recover-view__deposits-table">
+            <thead>
+              <tr>
+                <th>Token</th>
+                <th>Block</th>
+                <th>Type</th>
+                <th>When</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="dep in cachedDeposits" :key="dep.block">
+                <td>{{ getTokenSymbol(dep.token) }} <span class="recover-view__token-id">{{ dep.token.slice(0, 10) }}...</span></td>
+                <td class="num">{{ dep.block }}</td>
+                <td>{{ dep.type }}</td>
+                <td>{{ formatDepositAge(dep.timestamp) }}</td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button
+                      class="ex-btn ex-btn--sm ex-btn--primary"
+                      @click="recoverCachedDeposit(dep)"
+                      :disabled="recovering || raRunning"
+                    >{{ recovering ? '...' : 'Recover' }}</button>
+                    <button
+                      class="ex-btn ex-btn--sm ex-btn--outline"
+                      @click="dismissDeposit(dep.block)"
+                    >Dismiss</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- Exchange V2 pending pulls (unknown-outcome deposits, tracked on chain) -->
@@ -141,26 +143,28 @@
         <button class="ex-btn ex-btn--outline" @click="loadPendingPulls" :disabled="pullsLoading" style="margin-bottom:var(--space-3)">
           {{ pullsLoading ? 'Checking...' : 'Refresh' }}
         </button>
-        <table class="ex-table recover-view__deposits-table">
-          <thead>
-            <tr>
-              <th>Pull</th>
-              <th>Amount</th>
-              <th>Context</th>
-              <th>When</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="p in pendingPulls" :key="p.id.toString()">
-              <td class="num">#{{ p.id.toString() }}</td>
-              <td>{{ formatPullAmount(p) }}</td>
-              <td>{{ p.context }}</td>
-              <td>{{ formatPullTime(p.time) }}</td>
-              <td>{{ p.note }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="ex-table-wrap">
+          <table class="ex-table recover-view__deposits-table">
+            <thead>
+              <tr>
+                <th>Pull</th>
+                <th>Amount</th>
+                <th>Context</th>
+                <th>When</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in pendingPulls" :key="p.id.toString()">
+                <td class="num">#{{ p.id.toString() }}</td>
+                <td>{{ formatPullAmount(p) }}</td>
+                <td>{{ p.context }}</td>
+                <td>{{ formatPullTime(p.time) }}</td>
+                <td>{{ p.note }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <!-- ICPSwap Recovery (sweep stranded pool funds) -->
@@ -629,8 +633,9 @@ async function sweepNeuPending(p: neutrinite.PendingNeutrinite) {
       sweepSuccess.value = true
       toast.success('Sweep Complete')
     } else {
-      sweepError.value = 'Nothing to recover yet. If you just swapped, the deposit may still be crediting — try again in a few seconds.'
-      toast.warning('Nothing to sweep yet', sweepError.value)
+      // false: nothing above the fee was found (a failed withdraw throws and lands in the catch below)
+      sweepError.value = 'Nothing to recover yet. If you just swapped, the deposit may still be crediting, so try again in a few seconds. If nothing shows up after a few minutes, you can dismiss this row.'
+      toast.warning('Not recovered yet', sweepError.value)
     }
   } catch (err: any) {
     sweepError.value = err.message || 'Sweep failed'
@@ -651,8 +656,8 @@ async function sweepNeuManual() {
       sweepSuccess.value = true
       toast.success('Sweep Complete')
     } else {
-      sweepError.value = 'Nothing to recover for this pair (no stranded balance in the Neutrinite pylon).'
-      toast.warning('Nothing to sweep', sweepError.value)
+      sweepError.value = 'Nothing to recover for this pair. The Neutrinite pylon holds nothing above the transfer fee for these two tokens.'
+      toast.warning('Not recovered', sweepError.value)
     }
   } catch (err: any) {
     sweepError.value = err.message || 'Sweep failed'
