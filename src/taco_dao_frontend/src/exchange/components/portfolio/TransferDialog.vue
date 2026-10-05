@@ -56,12 +56,11 @@
           <label class="transfer-dialog__label">Amount</label>
           <div class="transfer-dialog__amount-row">
             <input
-              type="number"
+              type="text"
+              inputmode="decimal"
               class="ex-input transfer-dialog__input transfer-dialog__input--amount num"
               v-model="amountStr"
               placeholder="0.00"
-              min="0"
-              step="any"
               :class="{ 'transfer-dialog__input--error': amountError }"
             />
             <button class="transfer-dialog__max-btn" @click="setMaxAmount">MAX</button>

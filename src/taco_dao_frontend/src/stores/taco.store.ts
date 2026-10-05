@@ -1488,8 +1488,8 @@ export const useTacoStore = defineStore('taco', () => {
     const SOLUM_PRICE_USD = 0.25
     const SOLUM_QUANTITY = 420_069
 
-    // simwin: fixed off-chain reserve valued at $30,000
-    const SIMWIN_VALUE_USD = 30_000
+    // simwin: fixed off-chain reserve, $30,000 initial + $90,000 added
+    const SIMWIN_VALUE_USD = 30_000 + 90_000
 
     // off-chain ICP held outside the SNS treasury (locked-neuron + reserve)
     const EXTRA_ICP_HOLDINGS = 7832
