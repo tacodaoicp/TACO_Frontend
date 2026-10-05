@@ -2,28 +2,23 @@
 
   <div v-if="hasData" class="nav-chart">
 
-    <!-- section title -->
-    <h3 class="nav-chart__title">NAV History</h3>
+    <!-- section title + currency toggle -->
+    <div class="nav-chart__head">
+      <h3 class="nav-chart__title">NAV History</h3>
+      <div class="btn-group nav-chart__toggle" role="group" aria-label="Chart currency">
+        <button v-for="u in UNITS" :key="u"
+                type="button"
+                class="btn taco-nav-btn"
+                :class="{ 'taco-nav-btn--active': shownUnit === u }"
+                :aria-pressed="shownUnit === u"
+                :disabled="u === 'usd' && !nachosStore.navHistoryUSD.length"
+                @click="unit = u">{{ u.toUpperCase() }}</button>
+      </div>
+    </div>
 
     <!-- chart -->
     <div class="nav-chart__wrap taco-container taco-container--l1">
       <div ref="chartContainer" class="nav-chart__inner"></div>
-
-      <!-- legend -->
-      <div class="nav-chart__legend">
-        <span class="nav-chart__legend-item">
-          <span class="nav-chart__legend-dot" :style="{ background: COLORS.usd }"></span> USD (left)
-        </span>
-        <span class="nav-chart__legend-item">
-          <span class="nav-chart__legend-dot" :style="{ background: COLORS.icp }"></span> ICP (right)
-        </span>
-        <span
-          class="nav-chart__legend-item nav-chart__legend-item--info"
-          title="NACHO compared to a passive 50/50 ICP/stables portfolio bought on day one. Starts at 100 — above means NACHO beat the balanced mix, below means it lagged."
-        >
-          <span class="nav-chart__legend-dot" :style="{ background: COLORS.combined }"></span> vs 50/50 Benchmark
-        </span>
-      </div>
     </div>
 
   </div>
@@ -32,190 +27,106 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick } from 'vue'
+import { useSessionStorage } from '@vueuse/core'
 import {
-  createChart, LineSeries, ColorType,
-  type IChartApi, type ISeriesApi, type LineData, type Time, type UTCTimestamp,
+  createChart, AreaSeries, ColorType, LineStyle,
+  type IChartApi, type ISeriesApi, type UTCTimestamp,
 } from 'lightweight-charts'
 import { useNachosStore } from '../../stores/nachos.store'
 
 const nachosStore = useNachosStore()
 const chartContainer = ref<HTMLDivElement | null>(null)
 
+// Same palette as PerformanceChart; the l1 card stays dark brown in both themes
 const COLORS = {
-  icp: '#4CAF50',
-  usd: '#FFD700',
-  mint: '#4CAF50',
-  burn: '#F44336',
-  manual: '#FF9800',
-  combined: '#9C27B0',
+  icp: '#7CDC86',
+  usd: '#FEC800',
+  axisText: '#FEEAC1',
+  gridLine: '#DA8D28',
+  crosshair: '#DA8D28',
+  crosshairLabelBg: '#934A17',
 }
+
+// hex (#RRGGBB) + alpha 0..1 → #RRGGBBAA
+function withAlpha(hex: string, a: number) {
+  const n = Math.max(0, Math.min(255, Math.round(a * 255)))
+  return hex + n.toString(16).padStart(2, '0')
+}
+
+const UNITS = ['usd', 'icp'] as const
+const unit = useSessionStorage<(typeof UNITS)[number]>('navChartUnit', 'usd')
+// USD history can arrive after ICP; show ICP until it does
+const shownUnit = computed(() => (unit.value === 'usd' && !nachosStore.navHistoryUSD.length ? 'icp' : unit.value))
 
 const hasData = computed(() => nachosStore.navHistory.length > 0)
 
+// Snapshots for the selected unit, skipping the first (genesis / initialization point)
+const snapshots = computed(() => {
+  const history: any[] = shownUnit.value === 'usd' ? nachosStore.navHistoryUSD : nachosStore.navHistory
+  return history.slice(history.length > 1 ? 1 : 0)
+})
+
 let chart: IChartApi | null = null
-let icpSeries: ISeriesApi<'Line'> | null = null
-let usdSeries: ISeriesApi<'Line'> | null = null
-let combinedSeries: ISeriesApi<'Line'> | null = null
+let series: ISeriesApi<'Area'> | null = null
 let resizeObserver: ResizeObserver | null = null
 
 // ns → UNIX seconds (lightweight-charts time format)
 const toUnixSec = (nsTimestamp: bigint): UTCTimestamp =>
   Number(nsTimestamp / 1_000_000_000n) as UTCTimestamp
 
-function buildIcpData(history: any[]): LineData[] {
-  // Skip first snapshot (genesis / initialization point)
-  const start = history.length > 1 ? 1 : 0
-  const out: LineData[] = []
-  for (let i = start; i < history.length; i++) {
-    const s = history[i]
-    out.push({
-      time: toUnixSec(s.timestamp),
-      value: Number(s.navPerTokenE8s) / 1e8,
-    })
-  }
-  return out
-}
-
-function buildUsdData(history: any[]): LineData[] {
-  const start = history.length > 1 ? 1 : 0
-  const out: LineData[] = []
-  for (let i = start; i < history.length; i++) {
-    const s = history[i]
-    out.push({
-      time: toUnixSec(s.timestamp),
-      value: s.navPerTokenUSD,
-    })
-  }
-  return out
-}
-
-// Vault USD return divided by a passive 50/50 ICP/stables buy-and-hold portfolio, rebased to 100.
-// ICP price (USD per ICP) at each snapshot = NACHO_USD_price / NACHO_ICP_price.
-// Benchmark USD value starts at 1 (= $0.50 in ICP + $0.50 in stables) and tracks: 0.5 * (P_icp / P_icp_0) + 0.5.
-// Above 100 means the vault outperformed the balanced 50/50 mix; below 100 means it lagged it.
-function buildCombinedData(icpHistory: any[], usdHistory: any[]): LineData[] {
-  const n = Math.min(icpHistory.length, usdHistory.length)
-  if (n < 2) return []
-
-  const baseIcp = Number(icpHistory[1].navPerTokenE8s) / 1e8
-  const baseUsd = Number(usdHistory[1].navPerTokenUSD)
-  if (baseIcp === 0 || baseUsd === 0) return []
-  const baseIcpPrice = baseUsd / baseIcp
-  if (baseIcpPrice === 0) return []
-
-  const out: LineData[] = []
-  for (let i = 1; i < n; i++) {
-    const icpVal = Number(icpHistory[i].navPerTokenE8s) / 1e8
-    const usdVal = Number(usdHistory[i].navPerTokenUSD)
-    if (icpVal <= 0 || usdVal <= 0) continue
-    const icpPrice = usdVal / icpVal
-    const benchmark = 0.5 * (icpPrice / baseIcpPrice) + 0.5
-    if (benchmark <= 0) continue
-    const vaultReturn = usdVal / baseUsd
-    out.push({
-      time: toUnixSec(icpHistory[i].timestamp),
-      value: (vaultReturn / benchmark) * 100,
-    })
-  }
-  return out
-}
-
-function buildMarkers(history: any[]) {
-  const start = history.length > 1 ? 1 : 0
-  const markers: Array<{
-    time: Time
-    position: 'inBar' | 'aboveBar' | 'belowBar'
-    color: string
-    shape: 'circle' | 'square'
-    text?: string
-  }> = []
-  for (let i = start; i < history.length; i++) {
-    const s = history[i]
-    if ('Scheduled' in s.reason) continue
-    let color = COLORS.mint
-    if ('Burn' in s.reason) color = COLORS.burn
-    else if ('Manual' in s.reason) color = COLORS.manual
-    markers.push({
-      time: toUnixSec(s.timestamp),
-      position: 'inBar',
-      color,
-      shape: 'circle',
-    })
-  }
-  return markers
-}
-
 function applyData() {
-  if (!icpSeries || !usdSeries) return
-  icpSeries.setData(buildIcpData(nachosStore.navHistory))
-  usdSeries.setData(buildUsdData(nachosStore.navHistoryUSD))
-  combinedSeries?.setData(buildCombinedData(nachosStore.navHistory, nachosStore.navHistoryUSD))
-  // setMarkers is the legacy API but still supported in v5; cast for type compatibility
-  if (typeof (icpSeries as any).setMarkers === 'function') {
-    (icpSeries as any).setMarkers(buildMarkers(nachosStore.navHistory))
-  }
+  if (!series) return
+  const usd = shownUnit.value === 'usd'
+  const color = usd ? COLORS.usd : COLORS.icp
+  series.applyOptions({
+    lineColor: color,
+    topColor: withAlpha(color, 0.30),
+    bottomColor: withAlpha(color, 0.05),
+    priceFormat: usd
+      ? { type: 'price', precision: 2, minMove: 0.01 }
+      : { type: 'price', precision: 4, minMove: 0.0001 },
+  })
+  series.setData(snapshots.value.map(s => ({
+    time: toUnixSec(s.timestamp),
+    value: usd ? s.navPerTokenUSD : Number(s.navPerTokenE8s) / 1e8,
+  })))
   chart?.timeScale().fitContent()
 }
 
 function setupChart() {
   if (!chartContainer.value || chart) return
 
-  const textColor =
-    getComputedStyle(document.documentElement).getPropertyValue('--black-to-white').trim() || '#ddd'
-
   chart = createChart(chartContainer.value, {
     layout: {
-      // Transparent canvas — parent .nav-chart__inner background shows through, matches site theme.
       background: { type: ColorType.Solid, color: 'transparent' },
-      textColor,
-      attributionLogo: false, // remove TradingView logo
+      textColor: COLORS.axisText,
+      attributionLogo: false,
     },
     grid: {
-      vertLines: { color: 'rgba(128, 128, 128, 0.15)' },
-      horzLines: { color: 'rgba(128, 128, 128, 0.15)' },
+      vertLines: { color: withAlpha(COLORS.gridLine, 0.25), style: LineStyle.Dashed },
+      horzLines: { color: withAlpha(COLORS.gridLine, 0.25), style: LineStyle.Dashed },
     },
     crosshair: {
-      vertLine: { width: 1, style: 2, labelBackgroundColor: '#222' },
-      horzLine: { width: 1, style: 2, labelBackgroundColor: '#222' },
+      vertLine: { color: withAlpha(COLORS.crosshair, 0.6), width: 1, style: LineStyle.Solid, labelBackgroundColor: COLORS.crosshairLabelBg },
+      horzLine: { color: withAlpha(COLORS.crosshair, 0.6), width: 1, style: LineStyle.Solid, labelBackgroundColor: COLORS.crosshairLabelBg },
     },
     timeScale: {
       borderColor: 'transparent',
       timeVisible: true,
       secondsVisible: false,
+      // Only with fixed edges does lightweight-charts pull the first and last
+      // time labels inside the chart instead of clipping them ("Aug" → "ug")
+      fixLeftEdge: true,
+      fixRightEdge: true,
     },
-    rightPriceScale: { borderColor: 'transparent', visible: true },
-    leftPriceScale: { borderColor: 'transparent', visible: true },
+    rightPriceScale: { borderColor: 'transparent', autoScale: true },
+    // Vertical swipes scroll the page on phones instead of panning the price axis
+    handleScroll: { vertTouchDrag: false },
     width: chartContainer.value.clientWidth,
     height: chartContainer.value.clientHeight,
   })
 
-  icpSeries = chart.addSeries(LineSeries, {
-    priceScaleId: 'right',
-    color: COLORS.icp,
-    lineWidth: 2,
-    title: 'ICP',
-    priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
-    priceLineVisible: false, // hide the horizontal dashed line to last price
-  })
-
-  usdSeries = chart.addSeries(LineSeries, {
-    priceScaleId: 'left',
-    color: COLORS.usd,
-    lineWidth: 2,
-    title: 'USD',
-    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
-    priceLineVisible: false,
-  })
-
-  // Overlay scale (any id other than 'left'/'right') — line is drawn, axis is hidden.
-  combinedSeries = chart.addSeries(LineSeries, {
-    priceScaleId: 'combined-overlay',
-    color: COLORS.combined,
-    lineWidth: 2,
-    title: 'vs 50/50 Benchmark',
-    priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
-    priceLineVisible: false,
-  })
+  series = chart.addSeries(AreaSeries, { lineWidth: 2, priceLineVisible: false })
 
   applyData()
 
@@ -240,19 +151,14 @@ watch(hasData, (now) => {
   if (now) nextTick(() => setupChart())
 })
 
-watch(
-  () => [nachosStore.navHistory, nachosStore.navHistoryUSD],
-  () => applyData(),
-)
+watch(snapshots, () => applyData())
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   resizeObserver = null
   chart?.remove()
   chart = null
-  icpSeries = null
-  usdSeries = null
-  combinedSeries = null
+  series = null
 })
 </script>
 
@@ -264,6 +170,13 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 300px;
 
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
   &__title {
     font-size: 1rem;
     font-family: 'Space Mono', monospace;
@@ -271,6 +184,15 @@ onBeforeUnmount(() => {
     letter-spacing: 0.05em;
     color: var(--gold);
     margin-bottom: 0;
+  }
+
+  &__toggle .btn {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
+
+    @media (pointer: coarse) {
+      min-height: 44px;
+    }
   }
 
   &__wrap {
@@ -286,35 +208,6 @@ onBeforeUnmount(() => {
     background: rgba(0, 0, 0, 0.08);
     border-radius: 0.375rem;
     overflow: hidden;
-  }
-
-  &__legend {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    font-size: 0.75rem;
-    font-family: 'Space Mono', monospace;
-    opacity: 0.7;
-    flex-wrap: wrap;
-    padding-top: 0.5rem;
-  }
-
-  &__legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-
-    &--info {
-      cursor: help;
-      border-bottom: 1px dotted currentColor;
-    }
-  }
-
-  &__legend-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    display: inline-block;
   }
 }
 </style>
