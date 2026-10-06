@@ -2,7 +2,11 @@
 
   <div class="app" 
       :class="{ 'overflow-hidden': appLoading }"
-      :style="{ backgroundColor: appBackgroundColor }">
+      :style="{ backgroundColor: showPageFx ? 'transparent' : appBackgroundColor }">
+
+    <!-- decorative page background behind every page except home;
+         it paints the base colour itself, so the app background above goes transparent -->
+    <DrawerFx v-if="showPageFx" page :active="true" :base="appBackgroundColor" />
 
     <!-- app loading curtain -->
     <div v-if="appLoading" class="app__loading-curtain">
@@ -107,6 +111,8 @@
   import HeaderBar from './components/HeaderBar.vue'
   import FooterBar from './components/FooterBar.vue'
   import BottomNav from './components/BottomNav.vue'
+  import DrawerFx from './components/DrawerFx.vue'
+  import { fx } from './components/fxState'
 
   // bootstrap & font-awesome CSS moved to main.js (loads before taco.scss for correct cascade)
   import astronautLoader from './assets/images/astonautLoader.webp'
@@ -151,6 +157,23 @@
 
   // route
   const route = useRoute()
+
+  const showPageFx = computed(() => fx.value.page && route.path !== '/')
+
+  // browser bar and phone status bar in the page colour (Chrome on Android reads theme-color)
+  const syncThemeColor = () => {
+    const colour = getComputedStyle(document.documentElement).getPropertyValue('--card-gradient-from').trim()
+    if (!colour) return
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      document.head.appendChild(meta)
+    }
+    meta.content = colour
+  }
+  const { darkModeToggled } = storeToRefs(tacoStore)
+  watch(darkModeToggled, () => requestAnimationFrame(syncThemeColor))
   const router = useRouter()
 
   // Track if router is ready (prevents flash when navigating directly to non-home routes)
@@ -340,6 +363,9 @@
 
   // onMounted
   onMounted(async () => {
+
+    // the theme sets its colour variables on mount, so read them a frame later
+    requestAnimationFrame(syncThemeColor)
 
     // log
     // // console.log('app mounted')

@@ -377,7 +377,14 @@ table {
 // prevent overscroll
 html, body {
   overscroll-behavior-y: none;
+}
+// the page colour lives on html only: a body background would be painted over the
+// page background effect layer that sits behind the app
+html {
   background-color: var(--card-gradient-from);
+}
+body {
+  background-color: transparent;
 }
 
 // everything
@@ -2069,6 +2076,20 @@ select.form-control {
   flex-direction: column;
   justify-content: space-between;
   height: 100%;
+}
+
+// page background effect showing through the outer panels: they turn partly see-through, so the
+// moving layer behind the app shows in them with the same animation. Inner panels (normally a
+// see-through dark overlay) get a solid version of their usual colour so they stay clean.
+.fx-panels .taco-container--l1 {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--card-gradient-from) var(--fx-panel-alpha, 100%), transparent),
+    color-mix(in srgb, var(--card-gradient-to) var(--fx-panel-alpha, 100%), transparent));
+}
+html.fx-panels .taco-container--l1 .taco-container--l2:not(.taco-container--l2--dark),
+html.fx-panels .taco-report-explorer__report-container__inner {
+  background: linear-gradient(rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.15)),
+    linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
 }
 
 // phones: the page row sits in an unpadded .container.p-0, so drop its gutters (same as g-0) or the page scrolls sideways
