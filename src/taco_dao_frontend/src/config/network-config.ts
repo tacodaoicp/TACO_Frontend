@@ -432,8 +432,8 @@ Note: Network changes clear all caches and persist across refreshes.
     },
   }
 
-  // Show help on startup in dev/staging environments only
-  if (isDevEnvironment()) {
+  // Show help only when the site is opened at /helpp (the router then redirects home)
+  if (location.pathname === '/helpp') {
     ;(window as any).tacoConfig.help()
   }
 }
