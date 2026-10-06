@@ -54,7 +54,7 @@
           <div class="home-view__above-the-fold__upper__middle">
 
             <!-- left -->
-            <div class="home-view__above-the-fold__upper__middle__left">
+            <div v-if="!isShell" class="home-view__above-the-fold__upper__middle__left">
 
               <!-- tile container -->
               <div class="home-view__tile taco-container taco-container--l1">
@@ -168,7 +168,7 @@
             </div>
 
             <!-- right -->
-            <div class="home-view__above-the-fold__upper__middle__right">
+            <div v-if="!isShell" class="home-view__above-the-fold__upper__middle__right">
 
               <!-- tile container -->
               <div class="home-view__tile taco-container taco-container--l1">
@@ -2146,6 +2146,76 @@
   }    
 }
 
+// phones and tablets: compact hero so the video and its Grand Tour button fit the first screen
+@media (max-width: 991.98px), (pointer: coarse) {
+  .home-view__above-the-fold__upper {
+    margin-top: 0.75rem;
+  }
+  .home-view__taco-dao-logo {
+    width: 84px;
+    min-width: 84px;
+    min-height: 48px;
+    margin-bottom: 0.5rem;
+  }
+  .home-view__taco-dao-slogan span {
+    font-size: 1.375rem;
+  }
+  .home-view__exchange-cta {
+    width: fit-content;
+    max-width: min(100%, 21rem);
+    min-height: 2.75rem;
+    margin: 0.75rem auto 0;
+    padding: 0.625rem 1.125rem;
+    gap: 0.75rem;
+  }
+  .home-view__exchange-cta__icon {
+    font-size: 1.5rem;
+  }
+  .home-view__exchange-cta__text strong {
+    font-size: 1rem;
+  }
+  .home-view__exchange-cta__text span {
+    font-size: 0.75rem;
+  }
+  .home-view__above-the-fold__upper__middle {
+    margin-top: 0.75rem;
+  }
+}
+// phones: the floating tacos climb 40rem instead of 15rem in the same time, so they reach
+// higher up the screen on the taller phone page
+@media (max-width: 767.98px) {
+  .home-view .floating-tacos li:nth-child(odd) {
+    animation-name: turnTacosClockwiseTall;
+  }
+  .home-view .floating-tacos li:nth-child(even) {
+    animation-name: turnTacosCounterClockwiseTall;
+  }
+}
+@keyframes turnTacosClockwiseTall {
+  0% { transform: translate3d(0, 0, 0) rotate(0); opacity: 0.5; }
+  100% { transform: translate3d(0, -40rem, 0) rotate(360deg); opacity: 0; }
+}
+@keyframes turnTacosCounterClockwiseTall {
+  0% { transform: translate3d(0, 0, 0) rotate(0); opacity: 0.5; }
+  100% { transform: translate3d(0, -40rem, 0) rotate(-360deg); opacity: 0; }
+}
+
+// phones: the small one line exchange button
+@media (max-width: 575.98px) {
+  .home-view__exchange-cta {
+    padding: 0.5rem 1rem;
+    gap: 0.625rem;
+  }
+  .home-view__exchange-cta__icon {
+    font-size: 1.25rem;
+  }
+  .home-view__exchange-cta__text strong {
+    font-size: 0.9375rem;
+  }
+  .home-view__exchange-cta__text span {
+    display: none;
+  }
+}
 </style>
 
 <script setup lang="ts">
@@ -2160,6 +2230,7 @@
   /////////////
 
   import { ref, onMounted, computed, onUnmounted, watch } from "vue";
+  import { useMediaQuery } from '@vueuse/core'
   import { useRoute } from 'vue-router'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
@@ -2281,6 +2352,8 @@
   const route = useRoute()
 
   // HomeView mounts on every route (KeepAlive + v-show): the chart and its probe wait until Home is shown
+  // phones and tablets (same query as the bottom bar) show only the video tile
+  const isShell = useMediaQuery('(max-width: 991.98px), (pointer: coarse)')
   const homeSeen = ref(route.path === '/')
   watch(homeSeen, seen => { if (seen) probeCkusdc() }, { immediate: true })
 
