@@ -1603,15 +1603,13 @@ export const useTacoStore = defineStore('taco', () => {
     // The DAO canister's ICP price wins while it is fresh. A canister that stopped syncing
     // (the staging DAO last synced months ago) falls back to the live external feeds.
     const ON_CHAIN_PRICE_MAX_AGE_MS = 60 * 60 * 1000
-    const freshOnChainIcpPrice = (): number => {
-        const icpEntry = fetchedTokenDetails.value.find(
-            (e) => e[0].toText() === ICP_LEDGER_CANISTER_ID
-        )
-        if (!icpEntry) return 0
-        const price = Number(icpEntry[1].priceInUSD)
-        const syncedMs = Number((icpEntry[1] as any).lastTimeSynced ?? 0) / 1e6
-        return price > 0 && Date.now() - syncedMs < ON_CHAIN_PRICE_MAX_AGE_MS ? price : 0
+    const freshOnChainDetails = (ledger: string) => {
+        const entry = fetchedTokenDetails.value.find((e) => e[0].toText() === ledger)
+        if (!entry) return null
+        const syncedMs = Number((entry[1] as any).lastTimeSynced ?? 0) / 1e6
+        return Number(entry[1].priceInUSD) > 0 && Date.now() - syncedMs < ON_CHAIN_PRICE_MAX_AGE_MS ? entry[1] : null
     }
+    const freshOnChainIcpPrice = (): number => Number(freshOnChainDetails(ICP_LEDGER_CANISTER_ID)?.priceInUSD ?? 0)
 
     watch(
         fetchedTokenDetails,
@@ -1632,6 +1630,27 @@ export const useTacoStore = defineStore('taco', () => {
     const setExternalIcpPrice = (price: number) => {
         if (!freshOnChainIcpPrice() && price > 0) icpPriceUsd.value = price
     }
+
+    // TACO: the live market price (GeckoTerminal) comes first. Until one arrives this session,
+    // a fresh DAO canister price fills in, so a blocked or rate limited feed never leaves TACO
+    // and fair value empty
+    let liveTacoPrice = false
+    const setExternalTacoPrice = (usd: number, icp: number) => {
+        if (usd > 0) { tacoPriceUsd.value = usd; liveTacoPrice = true }
+        if (icp > 0) tacoPriceIcp.value = icp
+    }
+    watch(
+        fetchedTokenDetails,
+        () => {
+            if (liveTacoPrice) return
+            const taco = freshOnChainDetails(TACO_LEDGER_CANISTER_ID)
+            if (!taco) return
+            tacoPriceUsd.value = Number(taco.priceInUSD)
+            const icp = Number(taco.priceInICP) / 1e8
+            if (icp > 0) tacoPriceIcp.value = icp
+        },
+        { immediate: true }
+    )
 
     // treasury
     const fetchedTradingStatus = ref()
@@ -1743,8 +1762,7 @@ export const useTacoStore = defineStore('taco', () => {
                     const prices = data as { icp: number; btc: number; taco: number; tacoIcp: number; dkp: number }
                     setExternalIcpPrice(prices.icp)
                     keepPositive(btcPriceUsd, prices.btc)
-                    keepPositive(tacoPriceUsd, prices.taco)
-                    keepPositive(tacoPriceIcp, prices.tacoIcp)
+                    setExternalTacoPrice(prices.taco, prices.tacoIcp)
                     keepPositive(dkpPriceUsd, prices.dkp)
                     lastPriceUpdate.value = Date.now()
                 }
@@ -3191,11 +3209,8 @@ export const useTacoStore = defineStore('taco', () => {
                 const baseTokenPriceQuoteToken = Number(body.data.attributes.base_token_price_quote_token)
                 const basePrice  = Number(body.data.attributes.base_token_price_usd)
                 
-                // set the base price
-                keepPositive(tacoPriceUsd, basePrice || 0)
-
-                // set the base token price quote token
-                keepPositive(tacoPriceIcp, baseTokenPriceQuoteToken || 0)
+                // set the TACO price in USD and in ICP
+                setExternalTacoPrice(basePrice || 0, baseTokenPriceQuoteToken || 0)
 
                 // set last price update
                 lastPriceUpdate.value = now                
