@@ -192,14 +192,23 @@
 
         <div class="nav-drawer__stat">
           <span>TACO</span>
-          <span class="nav-drawer__stat-value">{{ usd(tacoPriceUsd, 3) }}<span v-if="tacoPriceIcp > 0" class="nav-drawer__stat-sub">{{ Number(tacoPriceIcp).toFixed(3) }} ICP</span></span>
+          <span class="nav-drawer__stat-value"><span v-if="tacoPriceIcp > 0" class="nav-drawer__stat-sub">{{ Number(tacoPriceIcp).toFixed(3) }} ICP</span>{{ usd(tacoPriceUsd, 3) }}</span>
         </div>
 
         <!-- fair value, only when TACO trades below it (same rule as the header chip) -->
-        <div v-if="showFair" class="nav-drawer__stat">
-          <span>Fair value</span>
-          <span class="nav-drawer__stat-value">{{ usd(tacoFairValueUsd, 3) }}</span>
-        </div>
+        <template v-if="showFair">
+          <button type="button" class="nav-drawer__stat nav-drawer__stat--button"
+                  :aria-expanded="fairInfoOpen" @click="fairInfoOpen = !fairInfoOpen">
+            <span>Fair value <i class="fa-solid fa-circle-info nav-drawer__info-icon" aria-hidden="true"></i></span>
+            <span class="nav-drawer__stat-value">{{ usd(tacoFairValueUsd, 3) }}</span>
+          </button>
+          <p v-if="fairInfoOpen" class="nav-drawer__fair-info">
+            Fair value is the backing behind each TACO in circulation.
+            The backing is every treasury asset except TACO (ICP, DKP, Solum, Simwin and NTN), plus the treasury's share of the NACHO vault portfolio: {{ fairBacking }}.
+            That is split over the TACO in circulation, which is the total supply minus all TACO the DAO holds: {{ fairSupply }} TACO.
+            {{ fairBacking }} / {{ fairSupply }} = {{ usd(tacoFairValueUsd, 3) }} per TACO, and TACO trades {{ Math.abs(tacoBelowFairPct).toFixed(1) }}% below it.
+          </p>
+        </template>
 
         <div class="nav-drawer__stat">
           <span>DAO assets</span>
@@ -243,6 +252,9 @@
         </component>
 
       </nav>
+
+      <!-- decorative background (plus the style lab on staging) -->
+      <DrawerFx :active="navDrawerOpen" />
 
     </div>
 
@@ -507,11 +519,18 @@
 
     // panel
     &__panel {
+      position: relative;
       min-height: 100%;
       display: flex;
       flex-direction: column;
       gap: 1rem;
       padding-bottom: 1rem;
+
+      // content sits above the decorative background layer
+      > :not(.drawer-fx) {
+        position: relative;
+        z-index: 1;
+      }
     }
 
     // logo and close
@@ -560,11 +579,35 @@
     }
 
     &__stat-sub {
-      margin-left: 0.5rem;
+      margin-right: 0.5rem;
       font-family: 'Space Mono';
       font-weight: 400;
       font-size: 0.875rem;
       opacity: 0.75;
+    }
+
+    // the fair value row opens its explanation
+    &__stat--button {
+      width: 100%;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    &__info-icon {
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+
+    &__fair-info {
+      margin: -0.25rem 0 0;
+      font-size: 0.8125rem;
+      line-height: 1.45;
+      opacity: 0.85;
     }
 
     // wallet or login
@@ -684,10 +727,11 @@
 
   import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
   import { RouterLink, useRouter, useRoute } from 'vue-router'
-  import { navItems, isNavActive, navDrawerOpen, openDrawer, closeDrawer, type NavItem } from './navItems'
+  import { navItems, isNavActive, navDrawerOpen, openDrawer, closeDrawer, inBottomBar, type NavItem } from './navItems'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
+  import DrawerFx from "./DrawerFx.vue"
   import IcpValueChip from "../components/misc/IcpValueChip.vue"
   import TacoTokenPriceChip from "../components/misc/TacoTokenPriceChip.vue"
   import TacoEntityValueChip from "../components/misc/TacoEntityValueChip.vue"
@@ -722,6 +766,7 @@
   const { truncatedPrincipal } = storeToRefs(tacoStore); // reactive
   const { tacoWizardOpen } = storeToRefs(tacoStore); // reactive
   const { icpPriceUsd, tacoPriceUsd, tacoPriceIcp, tacoFairValueUsd } = storeToRefs(tacoStore) // reactive
+  const { tacoBackingValueUsd, tacoCirculatingSupply, tacoBelowFairPct } = storeToRefs(tacoStore) // reactive
   const { totalPortfolioValueInUsd, treasuryValueExTacoInUsd } = storeToRefs(tacoStore) // reactive
 
   /////////////////////
@@ -750,12 +795,18 @@
 
   // drawer: every page not in the bottom bar, wizard first
   const drawerItems = computed(() => {
-    const rest = visibleNavItems.value.filter(i => !i.bottom)
+    const rest = visibleNavItems.value.filter(i => !inBottomBar(i, userLoggedIn.value))
     return [...rest.filter(i => i.action === 'wizard'), ...rest.filter(i => i.action !== 'wizard')]
   })
 
   // fair value only when TACO trades below it (same rule as the header chip)
   const showFair = computed(() => tacoPriceUsd.value > 0 && tacoFairValueUsd.value > tacoPriceUsd.value)
+
+  // fair value explanation figures
+  const fairInfoOpen = ref(false)
+  const compactNum = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 })
+  const fairBacking = computed(() => compactUsd.format(tacoBackingValueUsd.value))
+  const fairSupply = computed(() => compactNum.format(tacoCirculatingSupply.value))
 
   // dao assets total, compact (e.g. $1.2M)
   const compactUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact' })

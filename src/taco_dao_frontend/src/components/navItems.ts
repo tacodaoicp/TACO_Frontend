@@ -32,6 +32,10 @@ export const navItems: NavItem[] = [
   { label: 'Vault', to: '/vault', icon: 'fa-solid fa-vault' },
 ]
 
+// Vote needs a login, so logged out visitors get DAO in its place in the bottom bar
+export const inBottomBar = (item: NavItem, loggedIn: boolean) =>
+  loggedIn ? !!item.bottom : (!!item.bottom && item.to !== '/vote') || item.to === '/dao'
+
 // drawer state shared by the header menu button and the bottom bar Menu tab
 export const navDrawerOpen = ref(false)
 export const openDrawer = () => { navDrawerOpen.value = true }

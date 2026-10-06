@@ -39,7 +39,8 @@
     justify-content: center;
     height: var(--bottom-nav-h);
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: linear-gradient(135deg, var(--card-gradient-from), var(--card-gradient-to));
+    // same solid colour as html/body, which Chrome also paints behind the phone's own buttons
+    background: var(--card-gradient-from);
     border-top: 2px solid var(--card-border);
 
     // page link or menu button
@@ -100,13 +101,16 @@
 
   import { computed } from 'vue'
   import { useRoute } from 'vue-router'
-  import { navItems, isNavActive, navDrawerOpen, openDrawer } from './navItems'
+  import { storeToRefs } from 'pinia'
+  import { navItems, isNavActive, navDrawerOpen, openDrawer, inBottomBar } from './navItems'
+  import { useTacoStore } from '../stores/taco.store'
 
   const route = useRoute()
 
-  const bottomItems = navItems.filter(i => i.bottom)
+  const { userLoggedIn } = storeToRefs(useTacoStore())
+  const bottomItems = computed(() => navItems.filter(i => inBottomBar(i, userLoggedIn.value)))
 
   // every page outside the bar lives in the drawer, so Menu is the active tab there
-  const inMenu = computed(() => !bottomItems.some(i => isNavActive(i, route)))
+  const inMenu = computed(() => !bottomItems.value.some(i => isNavActive(i, route)))
 
 </script>
