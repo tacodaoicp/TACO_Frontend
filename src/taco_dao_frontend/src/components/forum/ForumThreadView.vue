@@ -45,7 +45,7 @@
             <div class="forum-thread-view__navigation__left">
                 
                 <!-- buttons -->
-                <div class="d-flex gap-2 flex-wrap">
+                <div class="d-flex gap-2 flex-wrap forum-thread-view__tabs">
 
                     <!-- discussion -->
                     <button class="btn taco-nav-btn"
@@ -2339,6 +2339,24 @@
   }
 }
 
+
+// long words (hashes, links) in titles wrap instead of pushing the page sideways
+.forum-thread-view__header__title,
+.forum-thread-view__details__title,
+.forum-thread-view__details__title-text {
+  overflow-wrap: anywhere;
+}
+
+// phones: the three thread tabs share one row
+@media (max-width: 767.98px) {
+  .forum-thread-view__tabs {
+    flex-wrap: nowrap !important;
+  }
+  .forum-thread-view__tabs .taco-nav-btn {
+    padding: 0.5rem 0.625rem;
+    font-size: 0.875rem;
+  }
+}
 </style> 
 
 <script setup lang="ts">
