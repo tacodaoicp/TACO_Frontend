@@ -229,7 +229,8 @@ const chartOptions = computed(() => ({
           },
           total: {
             show: true,
-            showAlways: true,
+            // off, so a tapped or hovered slice shows its name and share in the centre
+            showAlways: false,
             label: 'Portfolio',
             color: 'var(--gold)',
             fontFamily: 'Space Mono, monospace',

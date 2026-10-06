@@ -132,6 +132,8 @@
                           @dataPointSelection="handleChartSegmentClick">
                         </apexchart>
 
+                        <div v-if="allocationCount > 0 && selectedSliceLabel" class="vote-allocations__selected-slice">{{ selectedSliceLabel }}</div>
+
                       </div>
 
                       <!-- bottom - container - l2 -->
@@ -2196,6 +2198,25 @@
     font-family: 'Space Mono', monospace;
   }
 
+
+// the tapped slice, shown at the hub of the half circle (like the vault donut centre)
+.vote-allocations__selected-slice {
+  position: absolute;
+  left: 50%;
+  bottom: 0.75rem;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
 </style>
 
 <script setup lang="ts">
@@ -2325,6 +2346,11 @@
   // chart
   const series = ref([100])
   const seriesNames = ref(['loading'])
+  // the tapped slice for the hub label (name and share), like the vault donut centre
+  const selectedSliceLabel = computed(() => {
+    const i = seriesNames.value.indexOf(currentTokenSymbol.value)
+    return i < 0 ? '' : `${currentTokenSymbol.value.toUpperCase()} ${Number(series.value[i]).toFixed(2)}%`
+  })
   const colors = ref(['#ccc'])
 
   // token count
@@ -3548,7 +3574,7 @@
         offsetX: 0,
         offsetY: 0,
         style: {
-            fontSize: '11px',
+            fontSize: '13px',
             fontFamily: 'Space Mono',
             fontWeight: 'normal',
             colors: undefined
@@ -3558,8 +3584,8 @@
             foreColor: '#fff',
             padding: 3,
             borderRadius: 2,
-            borderWidth: 0,
-            borderColor: '#fff',
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.45)',
             opacity: 0.85,
             dropShadow: {
                 enabled: false,
