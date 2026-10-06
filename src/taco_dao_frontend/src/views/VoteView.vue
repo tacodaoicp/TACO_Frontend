@@ -129,7 +129,7 @@
                         <apexchart type="pie" :options="chartOptions" :series="series"
                           class="vote-allocations__taco-chart"
                           @mounted="refitVoteChart"
-                          @dataPointSelection="handleChartSegmentClick">
+                          @dataPointSelection="onSliceTap">
                         </apexchart>
 
                         <div v-if="allocationCount > 0 && selectedSliceLabel" class="vote-allocations__selected-slice">{{ selectedSliceLabel }}</div>
@@ -2346,10 +2346,18 @@
   // chart
   const series = ref([100])
   const seriesNames = ref(['loading'])
-  // the tapped slice for the hub label (name and share), like the vault donut centre
+  // the hub label (name and share, like the vault donut centre) only follows a slice the
+  // user tapped, not the automatic first pick on load; tapping it again hides it
+  const tappedSlice = ref('')
+  const onSliceTap = (event: any, chartContext: any, config: any) => {
+    handleChartSegmentClick(event, chartContext, config)
+    if (!event) return
+    const on = config?.selectedDataPoints?.[0]?.includes(config.dataPointIndex)
+    tappedSlice.value = on ? seriesNames.value[config.dataPointIndex] ?? '' : ''
+  }
   const selectedSliceLabel = computed(() => {
-    const i = seriesNames.value.indexOf(currentTokenSymbol.value)
-    return i < 0 ? '' : `${currentTokenSymbol.value.toUpperCase()} ${Number(series.value[i]).toFixed(2)}%`
+    const i = seriesNames.value.indexOf(tappedSlice.value)
+    return i < 0 ? '' : `${tappedSlice.value.toUpperCase()} ${Number(series.value[i]).toFixed(2)}%`
   })
   const colors = ref(['#ccc'])
 
