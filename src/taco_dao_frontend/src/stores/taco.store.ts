@@ -1600,19 +1600,38 @@ export const useTacoStore = defineStore('taco', () => {
             : 0
     )
 
-    // also source ICP price from fetchedTokenDetails (reuses existing fetch; other providers stay as fallbacks)
+    // The DAO canister's ICP price wins while it is fresh. A canister that stopped syncing
+    // (the staging DAO last synced months ago) falls back to the live external feeds.
+    const ON_CHAIN_PRICE_MAX_AGE_MS = 60 * 60 * 1000
+    const freshOnChainIcpPrice = (): number => {
+        const icpEntry = fetchedTokenDetails.value.find(
+            (e) => e[0].toText() === ICP_LEDGER_CANISTER_ID
+        )
+        if (!icpEntry) return 0
+        const price = Number(icpEntry[1].priceInUSD)
+        const syncedMs = Number((icpEntry[1] as any).lastTimeSynced ?? 0) / 1e6
+        return price > 0 && Date.now() - syncedMs < ON_CHAIN_PRICE_MAX_AGE_MS ? price : 0
+    }
+
     watch(
         fetchedTokenDetails,
-        (newDetails) => {
-            const icpEntry = newDetails.find(
-                (e) => e[0].toText() === ICP_LEDGER_CANISTER_ID
-            )
-            if (!icpEntry) return
-            const price = Number(icpEntry[1].priceInUSD)
+        () => {
+            const price = freshOnChainIcpPrice()
             if (price > 0) icpPriceUsd.value = price
         },
         { immediate: true }
     )
+
+    // A failed or partial price fetch (often right after the phone wakes the page up) must not
+    // wipe the last good price, so feed values only land when they are above 0
+    const keepPositive = (target: { value: number }, price: number) => {
+        if (price > 0) target.value = price
+    }
+
+    // External feeds only write while no fresh on-chain price exists, and never write 0
+    const setExternalIcpPrice = (price: number) => {
+        if (!freshOnChainIcpPrice() && price > 0) icpPriceUsd.value = price
+    }
 
     // treasury
     const fetchedTradingStatus = ref()
@@ -1722,11 +1741,11 @@ export const useTacoStore = defineStore('taco', () => {
             workerBridge.subscribe('cryptoPrices', (data: unknown) => {
                 if (data && typeof data === 'object') {
                     const prices = data as { icp: number; btc: number; taco: number; tacoIcp: number; dkp: number }
-                    icpPriceUsd.value = prices.icp
-                    btcPriceUsd.value = prices.btc
-                    tacoPriceUsd.value = prices.taco
-                    tacoPriceIcp.value = prices.tacoIcp
-                    dkpPriceUsd.value = prices.dkp
+                    setExternalIcpPrice(prices.icp)
+                    keepPositive(btcPriceUsd, prices.btc)
+                    keepPositive(tacoPriceUsd, prices.taco)
+                    keepPositive(tacoPriceIcp, prices.tacoIcp)
+                    keepPositive(dkpPriceUsd, prices.dkp)
                     lastPriceUpdate.value = Date.now()
                 }
             })
@@ -3051,9 +3070,9 @@ export const useTacoStore = defineStore('taco', () => {
                 const dkpData = data.find((coin: { id: string }) => coin.id === 'draggin-karma-points')
 
                 // Set the prices
-                icpPriceUsd.value = icpData?.current_price || 0
-                btcPriceUsd.value = btcData?.current_price || 0
-                dkpPriceUsd.value = dkpData?.current_price || 0
+                setExternalIcpPrice(icpData?.current_price || 0)
+                keepPositive(btcPriceUsd, btcData?.current_price || 0)
+                keepPositive(dkpPriceUsd, dkpData?.current_price || 0)
 
                 // set last price update
                 lastPriceUpdate.value = now
@@ -3102,12 +3121,12 @@ export const useTacoStore = defineStore('taco', () => {
 
                     if (icpResp.ok) {
                         const icpData = await icpResp.json()
-                        icpPriceUsd.value = parseFloat(icpData.data?.priceUsd) || 0
+                        setExternalIcpPrice(parseFloat(icpData.data?.priceUsd) || 0)
                     }
 
                     if (btcResp.ok) {
                         const btcData = await btcResp.json()
-                        btcPriceUsd.value = parseFloat(btcData.data?.priceUsd) || 0
+                        keepPositive(btcPriceUsd, parseFloat(btcData.data?.priceUsd) || 0)
                     }
 
                     lastPriceUpdate.value = now
@@ -3131,12 +3150,12 @@ export const useTacoStore = defineStore('taco', () => {
 
                         if (icpResp.ok) {
                             const icpData = await icpResp.json()
-                            icpPriceUsd.value = parseFloat(icpData.price) || 0
+                            setExternalIcpPrice(parseFloat(icpData.price) || 0)
                         }
 
                         if (btcResp.ok) {
                             const btcData = await btcResp.json()
-                            btcPriceUsd.value = parseFloat(btcData.price) || 0
+                            keepPositive(btcPriceUsd, parseFloat(btcData.price) || 0)
                         }
 
                         lastPriceUpdate.value = now
@@ -3173,10 +3192,10 @@ export const useTacoStore = defineStore('taco', () => {
                 const basePrice  = Number(body.data.attributes.base_token_price_usd)
                 
                 // set the base price
-                tacoPriceUsd.value = basePrice || 0
+                keepPositive(tacoPriceUsd, basePrice || 0)
 
                 // set the base token price quote token
-                tacoPriceIcp.value = baseTokenPriceQuoteToken || 0
+                keepPositive(tacoPriceIcp, baseTokenPriceQuoteToken || 0)
 
                 // set last price update
                 lastPriceUpdate.value = now                
