@@ -4,6 +4,7 @@ import environment from 'vite-plugin-environment';
 import vue from '@vitejs/plugin-vue';
 import dotenv from 'dotenv';
 import immutableAssets from './build/immutable-assets.js';
+import { vendorChunks, checkVendorChunk } from './build/vendor-chunk.js';
 
 // Load base .env first, then environment-specific overrides
 dotenv.config({ path: '../../.env' });
@@ -15,6 +16,12 @@ if (process.env.NODE_ENV === 'production') {
 export default defineConfig({
   build: {
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Vue and Pinia in a stable chunk of their own, so an app edit no longer renames nearly every chunk
+        manualChunks: vendorChunks,
+      },
+    },
   },
   optimizeDeps: {
     esbuildOptions: {
@@ -46,6 +53,7 @@ export default defineConfig({
     environment('all', { prefix: 'DFX_' }),
     // assets/ is served as immutable (public/.ic-assets.json5): hash the boot script, guard the names
     immutableAssets(),
+    checkVendorChunk(),
   ],
   preview: {
     host: true,
