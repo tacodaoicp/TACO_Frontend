@@ -120,6 +120,7 @@
                     v-model="followPrincipalInput"
                     type="text"
                     class="taco-input flex-grow-1"
+                    style="min-width: 0"
                     placeholder="Enter principal ID (e.g. abc12-xyz...)"
                     @keyup.enter="followByPrincipal"
                   />
