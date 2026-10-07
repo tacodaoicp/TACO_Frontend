@@ -129,7 +129,7 @@ export const tourScript: TourScene[] = [
     route: '/dao',
     lines: [
       line('taco', 'happy', 'idle', "This is the DAO page! The big brain center!"),
-      line('taco', 'neutral', 'idle', "See all those holdings? That's the treasury. The tokens the DAO actually owns right now.", {
+      line('taco', 'neutral', 'idle', "See all those holdings? That's the portfolio the DAO trades. These are the real balances right now.", {
         scrollTo: '#dao-allocations',
         highlight: '#dao-allocations',
       }),

@@ -287,11 +287,11 @@
                         <!-- key -->
                         <span class="home-view__taco-assets__kvp__key">
                             <i class="fa-solid fa-chart-pie  home-view__taco-assets__fa-icon"></i>
-                            Portfolio
+                            Portfolio (DAO share)
                         </span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(totalPortfolioValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">{{ nachoOwnershipFraction > 0 ? '$' + formatNumber(daoVaultShareUsd) : '…' }}</span>
 
                     </div>
 
@@ -304,7 +304,7 @@
                         <span class="home-view__taco-assets__kvp__key">Total</span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">${{formatNumber(treasuryValueExTacoInUsd + totalPortfolioValueInUsd)}}</span>
+                        <span class="home-view__taco-assets__kvp__value">{{ nachoOwnershipFraction > 0 ? '$' + formatNumber(daoAssetsDisplayUsd) : '…' }}</span>
 
                     </div>
 
@@ -2288,7 +2288,7 @@
   const { userLoggedIn } = storeToRefs(tacoStore)
 
   // dao
-  const { totalPortfolioValueInUsd, treasuryValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+  const { daoAssetsDisplayUsd, daoVaultShareUsd, nachoOwnershipFraction, treasuryValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
   /////////////////////
   // Local Variables //

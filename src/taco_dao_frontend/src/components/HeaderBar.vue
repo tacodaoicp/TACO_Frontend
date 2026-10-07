@@ -204,8 +204,10 @@
           </button>
           <p v-if="fairInfoOpen" class="nav-drawer__fair-info">
             Fair value is the backing behind each TACO in circulation.
-            The backing is every treasury asset except TACO (ICP, DKP, Solum, Simwin and NTN), plus the treasury's share of the NACHO vault portfolio: {{ fairBacking }}.
-            That is split over the TACO in circulation, which is the total supply minus all TACO the DAO holds: {{ fairSupply }} TACO.
+            The backing is every treasury asset except TACO (ICP, DKP, Solum, Simwin and NTN), worth {{ fairTreasury }}, plus the DAO's part of the NACHO vault portfolio.
+            The treasury holds {{ fairNachoPct }} of all NACHO, so it counts for {{ fairNachoShare }} of the {{ fairPortfolio }} portfolio (TACO left out).
+            Together that is {{ fairBacking }}.
+            That is split over the TACO in circulation, which is the total supply minus the TACO the DAO holds (in the treasury, in its ICPSwap positions and its part of the vault's TACO): {{ fairSupply }} TACO.
             {{ fairBacking }} / {{ fairSupply }} = {{ usd(tacoFairValueUsd, 3) }} per TACO, and TACO trades {{ Math.abs(tacoBelowFairPct).toFixed(1) }}% below it.
           </p>
         </template>
@@ -767,7 +769,8 @@
   const { tacoWizardOpen } = storeToRefs(tacoStore); // reactive
   const { icpPriceUsd, tacoPriceUsd, tacoPriceIcp, tacoFairValueUsd } = storeToRefs(tacoStore) // reactive
   const { tacoBackingValueUsd, tacoCirculatingSupply, tacoBelowFairPct } = storeToRefs(tacoStore) // reactive
-  const { totalPortfolioValueInUsd, treasuryValueExTacoInUsd } = storeToRefs(tacoStore) // reactive
+  const { treasuryValueExTacoInUsd } = storeToRefs(tacoStore) // reactive
+  const { portfolioValueExTacoInUsd, nachoOwnershipFraction, daoAssetsDisplayUsd } = storeToRefs(tacoStore) // reactive
 
   /////////////////////
   // Local Variables //
@@ -805,15 +808,19 @@
   // fair value explanation figures
   const fairInfoOpen = ref(false)
   const compactNum = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 })
-  const fairBacking = computed(() => compactUsd.format(tacoBackingValueUsd.value))
+  // the note's total is the sum of the rounded parts it prints, so the sentence always adds up
+  const fairBacking = computed(() => compactUsd.format(daoAssetsDisplayUsd.value))
+  const fairTreasury = computed(() => compactUsd.format(treasuryValueExTacoInUsd.value))
+  const fairPortfolio = computed(() => compactUsd.format(portfolioValueExTacoInUsd.value))
+  const fairNachoShare = computed(() => compactUsd.format(portfolioValueExTacoInUsd.value * nachoOwnershipFraction.value))
+  const fairNachoPct = computed(() => `${(nachoOwnershipFraction.value * 100).toFixed(1)}%`)
   const fairSupply = computed(() => compactNum.format(tacoCirculatingSupply.value))
 
   // dao assets total, compact (e.g. $1.2M)
   const compactUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact' })
-  const daoAssets = computed(() => {
-    const total = totalPortfolioValueInUsd.value + treasuryValueExTacoInUsd.value
-    return total > 0 ? compactUsd.format(total) : '…'
-  })
+  // (the treasury part is never 0 because of the fixed Solum and Simwin values, so wait for the NACHO share)
+  // same rounded parts as the fair value note above it, so both rows always show the same total
+  const daoAssets = computed(() => nachoOwnershipFraction.value > 0 ? fairBacking.value : '…')
 
   ///////////////////
   // Local Methods //

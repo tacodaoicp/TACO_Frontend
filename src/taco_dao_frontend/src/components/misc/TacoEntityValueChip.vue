@@ -13,7 +13,7 @@
             <TacoDaoTacoT />
 
             <!-- price in usd -->
-            <span class="taco-text-black-to-white">${{ formatNumber(totalPortfolioValueInUsd + treasuryValueExTacoInUsd) }}</span>
+            <span class="taco-text-black-to-white">{{ nachoOwnershipFraction > 0 ? '$' + formatNumber(daoAssetsDisplayUsd) : '…' }}</span>
 
         </span>
 
@@ -145,12 +145,12 @@
                 <span class="taco-entity-value-chip__tooltip__kvp__key 
                     taco-text-black-to-white">
                     <i class="fa-solid fa-chart-pie"></i>
-                    Portfolio
+                    Portfolio (DAO share)
                 </span>
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(totalPortfolioValueInUsd)}}</span>
+                    taco-text-black-to-white">{{ nachoOwnershipFraction > 0 ? '$' + formatNumber(daoVaultShareUsd) : '…' }}</span>
 
             </div>
 
@@ -163,7 +163,7 @@
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">${{formatNumber(treasuryValueExTacoInUsd + totalPortfolioValueInUsd)}}</span>
+                    taco-text-black-to-white">{{ nachoOwnershipFraction > 0 ? '$' + formatNumber(daoAssetsDisplayUsd) : '…' }}</span>
 
             </div>
 
@@ -326,7 +326,7 @@
     // # STATE #
 
     // dao
-    const { totalPortfolioValueInUsd, treasuryValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+    const { daoAssetsDisplayUsd, daoVaultShareUsd, nachoOwnershipFraction, treasuryValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
     // prices (for watching)
     const { icpPriceUsd, tacoPriceUsd, dkpPriceUsd } = storeToRefs(tacoStore)

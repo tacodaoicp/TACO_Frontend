@@ -1508,6 +1508,7 @@ export const useTacoStore = defineStore('taco', () => {
     const snsTreasuryDkpAmount = ref<number>(0)
     const snsTreasuryNtnHoldings = ref<number>(NTN_DEFAULT_HOLDINGS)
     const snsTreasuryNachoAmount = ref<number>(0)  // treasury-held NACHO, whole tokens
+    const snsTreasuryLpTacoAmount = ref<number>(0) // TACO in the treasury's ICPSwap LP positions, whole tokens
     const nachoTotalSupply = ref<number>(0)        // NACHO ledger total supply, whole tokens
 
     // total TACO supply (whole tokens), written by fetchTacoTotalSupply via the ledger icrc1_total_supply query
@@ -1570,22 +1571,30 @@ export const useTacoStore = defineStore('taco', () => {
     const treasuryValueExTacoInUsd = computed<number>(
         () => Math.max(0, totalTreasuryValueInUsd.value - snsTreasuryTacoValueInUsd.value)
     )
-    // TACO's share of the portfolio = treasury-held NACHO / NACHO total supply.
-    // Applied to the fair value backing only; every other display keeps the full portfolio.
+    // the DAO's share of the portfolio = treasury-held NACHO / NACHO total supply.
+    // Applies to every figure about what the DAO owns; only the vault displays show the full basket.
     const nachoOwnershipFraction = computed<number>(
         () => nachoTotalSupply.value > 0
             ? Math.min(1, snsTreasuryNachoAmount.value / nachoTotalSupply.value)
             : 0
     )
-    // circulating = total supply minus every TACO the DAO holds (treasury + portfolio)
+    // the DAO's part of the vault portfolio (its NACHO share, the vault's TACO left out)
+    const daoVaultShareUsd = computed<number>(() => portfolioValueExTacoInUsd.value * nachoOwnershipFraction.value)
+    // everything the DAO owns except TACO: the treasury plus its part of the vault (DAO asset totals and fair value backing)
+    const daoAssetsUsd = computed<number>(() => treasuryValueExTacoInUsd.value + daoVaultShareUsd.value)
+    // the total the DAO asset displays print: the sum of the parts they show, each rounded to whole thousands,
+    // so "Treasury + Portfolio (DAO share) = Total" always adds up on screen (math keeps using daoAssetsUsd)
+    const daoAssetsDisplayUsd = computed<number>(
+        () => Math.round(treasuryValueExTacoInUsd.value / 1000) * 1000 + Math.round(daoVaultShareUsd.value / 1000) * 1000
+    )
+    // circulating = total supply minus the TACO the DAO holds: in the treasury, in its ICPSwap LP positions and its
+    // NACHO share of the portfolio's TACO (the other NACHO holders can redeem their part, so it stays in circulation)
     const tacoCirculatingSupply = computed<number>(
-        () => Math.max(0, tacoTotalSupply.value - snsTreasuryTacoAmount.value - portfolioTacoAmount.value)
+        () => Math.max(0, tacoTotalSupply.value - snsTreasuryTacoAmount.value - snsTreasuryLpTacoAmount.value
+            - portfolioTacoAmount.value * nachoOwnershipFraction.value)
     )
-    // backing = (treasury minus its TACO) + TACO's NACHO-weighted share of (portfolio minus its TACO)
-    const tacoBackingValueUsd = computed<number>(
-        () => (totalTreasuryValueInUsd.value - snsTreasuryTacoValueInUsd.value)
-            + portfolioValueExTacoInUsd.value * nachoOwnershipFraction.value
-    )
+    // backing = everything the DAO owns except TACO
+    const tacoBackingValueUsd = computed<number>(() => daoAssetsUsd.value)
     const tacoFairValueUsd = computed<number>(
         () => tacoCirculatingSupply.value > 0
             ? tacoBackingValueUsd.value / tacoCirculatingSupply.value
@@ -3338,7 +3347,8 @@ export const useTacoStore = defineStore('taco', () => {
 
         // if we've already fetched treasury balances, return (unless forced)
         // (use a balance ref as the signal — totalTreasuryValueInUsd is now reactive and includes Solum, which is non-zero before any on-chain fetch)
-        if (snsTreasuryTacoAmount.value > 0 && !forceRefetch) {
+        // (a failed NACHO read leaves the supply at 0, so later calls retry it instead of keeping the DAO totals at '…')
+        if (snsTreasuryTacoAmount.value > 0 && nachoTotalSupply.value > 0 && !forceRefetch) {
             return true
         }
 
@@ -3425,7 +3435,7 @@ export const useTacoStore = defineStore('taco', () => {
         // fetch NACHO treasury balance + supply     //
         //////////////////////////////////////////////
 
-        // TACO owns treasuryNacho/totalSupply of the portfolio (fair value calc only)
+        // the DAO owns treasuryNacho/totalSupply of the portfolio
         const NACHO_LEDGER_CANISTER_ID = 'o6ncl-lyaaa-aaaan-q6dua-cai'
         const snsTreasuryNachoBalance = await icrc1BalanceOf(
             NACHO_LEDGER_CANISTER_ID,
@@ -3433,8 +3443,10 @@ export const useTacoStore = defineStore('taco', () => {
         )
         const nachoSupply = await icrc1TotalSupply(NACHO_LEDGER_CANISTER_ID)
 
-        // ponytail: DAO's ICPSwap TACO/ICP LP (SNS-treasury positions in pool vhoia). Count the ICP side; skip TACO.
+        // ponytail: DAO's ICPSwap TACO/ICP LP (SNS-treasury positions in pool vhoia). The ICP side counts as backing,
+        // the TACO side is DAO held, so it leaves the circulating supply.
         let lpIcp = 0
+        let lpTaco = 0
         try {
             const poolMod = await import("../../../declarations/icp_swap/icp_swap.did.js")
             const pool = await getAnonymousActor('vhoia-myaaa-aaaar-qbmja-cai', () => poolMod.idlFactory)
@@ -3442,7 +3454,10 @@ export const useTacoStore = defineStore('taco', () => {
             const ids = new Set<string>((idsRes.ok ?? []).map((n: bigint) => n.toString()))
             if (ids.size) {
                 const page: any = await pool.getUserPositionWithTokenAmount(0n, 5000n) // ponytail: 5000 cap; paginate if pool grows
-                for (const p of (page.ok?.content ?? [])) if (ids.has(p.id.toString())) lpIcp += (Number(p.token1Amount) + Number(p.tokensOwed1)) / 1e8 // token1 = ICP, + uncollected ICP fees
+                for (const p of (page.ok?.content ?? [])) if (ids.has(p.id.toString())) {
+                    lpIcp += (Number(p.token1Amount) + Number(p.tokensOwed1)) / 1e8 // token1 = ICP, + uncollected ICP fees
+                    lpTaco += (Number(p.token0Amount) + Number(p.tokensOwed0)) / 1e8 // token0 = TACO, + uncollected TACO fees
+                }
             }
         } catch (e) { console.error('ICPSwap LP fetch failed', e) }
 
@@ -3457,6 +3472,7 @@ export const useTacoStore = defineStore('taco', () => {
 
         snsTreasuryTacoAmount.value = tacoBalance / Math.pow(10, 8)
         snsTreasuryIcpAmount.value = icpBalance / Math.pow(10, 8) + lpIcp
+        snsTreasuryLpTacoAmount.value = lpTaco
         snsTreasuryDkpAmount.value = dkpBalance / Math.pow(10, 8)
         snsTreasuryNtnHoldings.value = ntnBalance / Math.pow(10, 8)
         // keep previous NACHO values on a failed read; fraction 0 only until the first success (conservative)
@@ -9192,6 +9208,10 @@ export const useTacoStore = defineStore('taco', () => {
         snsTreasuryNtnValueInUsd,
         portfolioValueExTacoInUsd,
         treasuryValueExTacoInUsd,
+        nachoOwnershipFraction,
+        daoVaultShareUsd,
+        daoAssetsUsd,
+        daoAssetsDisplayUsd,
         tacoTotalSupply,
         tacoCirculatingSupply,
         tacoBackingValueUsd,

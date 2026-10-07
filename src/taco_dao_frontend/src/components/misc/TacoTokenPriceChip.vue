@@ -59,7 +59,7 @@
 
             <!-- explanation -->
             <p class="taco-token-price-chip__modal__note">
-                Fair value is the backing behind each circulating TACO. We total every treasury and portfolio asset except TACO, then divide by the circulating supply. Shown in dollars and ICP.
+                Fair value is the backing behind each circulating TACO. We total every treasury asset except TACO and add the DAO's part of the NACHO vault portfolio, without the vault's TACO. The DAO's part is its share of all NACHO. Then we divide by the circulating supply. Shown in dollars and ICP.
             </p>
 
         </div>
