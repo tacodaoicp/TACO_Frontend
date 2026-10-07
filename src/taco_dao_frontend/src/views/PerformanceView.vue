@@ -243,6 +243,10 @@ import { useTacoStore } from "../stores/taco.store"
 import { storeToRefs } from "pinia"
 import workerBridge from '../stores/worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/transfer'
+import { createPerfGraphSession } from '../workers/performance-graph-client'
+import { getNetworkHost } from '../shared/auth-cache'
+import { getEffectiveNetwork } from '../config/network-config'
+import { getCanisterId } from '../constants/canisterIds'
 import { yieldToMain } from '../utils/yieldToMain'
 import DfinityLogo from "../assets/images/dfinityLogo.vue"
 import MyPerformance from "../components/performance/MyPerformance.vue"
@@ -507,74 +511,36 @@ export default {
     // Initialize subscription immediately
     setupPerformanceSubscription()
 
-    // Staging website: load the demo principal's full performance (numbers + chart)
-    // via the proven anonymous rewards actor. Shaping mirrors the worker's
-    // fetchUserPerformanceData but is inlined here so we DON'T pull that heavy module
-    // (rewards IDL + agent) into the core bundle for every user.
+    // Staging website: load the demo principal's MyPerformance numbers (the chart
+    // loads its own data) via an anonymous rewards query. The fetch, Candid decode
+    // and shaping run in the performance-graph worker: decoding this ~1 MiB reply on
+    // the main thread froze the page (every tap blocked) for 30 s on desktop and over
+    // 2 min on phones. Here we only deserialize cooperatively, like the logged-in
+    // worker payload.
+    // The session is created with the view (no worker starts until a request is sent)
+    // and disposed after its single load or on unmount, whichever comes first, so
+    // this loader runs once per mount; leaving before the load begins makes the late
+    // load return without starting a worker.
+    const demoPerfSession = isStagingHost ? createPerfGraphSession() : null
     const loadStagingDemoPerformance = async () => {
       try {
         isLoadingUserPerformance.value = true
-        const { Principal } = await import('@dfinity/principal')
-        const actor = await tacoStore.createRewardsActorAnonymous()
-        const principal = Principal.fromText(STAGING_DEMO_PRINCIPAL)
-        const endTime = BigInt(Date.now()) * BigInt(1_000_000)
-        const startTime = BigInt(Date.UTC(2026, 1, 1)) * BigInt(1_000_000) // Feb 1, 2026 (leaderboard data start)
-        const result = await actor.getUserPerformanceGraphData(principal, startTime, endTime)
-        if (!result || !('ok' in result)) throw new Error('performance graph unavailable')
-        const graphData = result.ok
-        const sorted = [...(graphData.neurons || [])].sort((a, b) =>
-          (b.performanceScoreICP?.[0] ?? -Infinity) - (a.performanceScoreICP?.[0] ?? -Infinity)
-        )
-        const wAvg = (getVal) => {
-          let tw = BigInt(0), ws = 0
-          for (const n of sorted) {
-            const v = getVal(n); const vp = n.votingPower ?? BigInt(0)
-            if (v !== null && v !== undefined && vp > 0) { ws += v * Number(vp); tw += vp }
-          }
-          return tw > 0 ? [ws / Number(tw)] : []
-        }
-        const neurons = sorted.map((nd) => ({
-          neuronId: nd.neuronId,
-          votingPower: nd.votingPower ?? BigInt(0),
-          distributionsParticipated: nd.checkpoints?.length ?? 0,
-          checkpoints: nd.checkpoints ?? [],
-          performanceScoreUSD: nd.performanceScoreUSD,
-          performanceScoreICP: nd.performanceScoreICP,
-          performance: {
-            allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
-            allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
-            oneWeekUSD: nd.oneWeekUSD?.length > 0 ? [nd.oneWeekUSD[0]] : [],
-            oneWeekICP: nd.oneWeekICP?.length > 0 ? [nd.oneWeekICP[0]] : [],
-            oneMonthUSD: nd.oneMonthUSD?.length > 0 ? [nd.oneMonthUSD[0]] : [],
-            oneMonthICP: nd.oneMonthICP?.length > 0 ? [nd.oneMonthICP[0]] : [],
-            oneYearUSD: nd.oneYearUSD?.length > 0 ? [nd.oneYearUSD[0]] : [],
-            oneYearICP: nd.oneYearICP?.length > 0 ? [nd.oneYearICP[0]] : [],
-          },
-        }))
-        const totalCheckpoints = neurons.reduce((s, n) => s + n.distributionsParticipated, 0)
-        const totalVotingPower = neurons.reduce((s, n) => s + (n.votingPower || BigInt(0)), BigInt(0))
-        userPerformance.value = {
-          principal,
-          totalVotingPower,
-          distributionsParticipated: totalCheckpoints,
-          lastActivity: graphData.timeframe.endTime,
-          aggregatedPerformance: {
-            allTimeUSD: wAvg(n => n.performanceScoreUSD),
-            allTimeICP: wAvg(n => n.performanceScoreICP?.[0]),
-            oneWeekUSD: wAvg(n => n.oneWeekUSD?.[0]),
-            oneWeekICP: wAvg(n => n.oneWeekICP?.[0]),
-            oneMonthUSD: wAvg(n => n.oneMonthUSD?.[0]),
-            oneMonthICP: wAvg(n => n.oneMonthICP?.[0]),
-            oneYearUSD: wAvg(n => n.oneYearUSD?.[0]),
-            oneYearICP: wAvg(n => n.oneYearICP?.[0]),
-          },
-          neurons,
-        }
+        const r = await demoPerfSession.loadUserPerformance({
+          principal: STAGING_DEMO_PRINCIPAL,
+          host: getNetworkHost(),
+          canisterId: getCanisterId('rewards'),
+          fetchRootKey: getEffectiveNetwork() === 'local',
+          startMs: Date.UTC(2026, 1, 1), // Feb 1, 2026 (leaderboard data start)
+        })
+        if (r.error === 'disposed') return // left the page before or during the load
+        if (r.error) throw new Error(r.error)
+        userPerformance.value = await deserializePerformanceCooperative(r.data)
         userPerformanceError.value = ''
       } catch (e) {
         console.error('staging demo performance load failed', e)
         userPerformanceError.value = 'Failed to load demo performance data'
       } finally {
+        demoPerfSession.dispose()
         isLoadingUserPerformance.value = false
       }
     }
@@ -684,7 +650,8 @@ export default {
       isLoading.value = true
       // Worker handles performance data - just load follower info
       // Set loading state for performance (worker will update when data arrives)
-      if (userLoggedIn.value && !userPerformance.value) {
+      // (not on staging: the demo numbers load once per mount, so nothing would clear this spinner)
+      if (userLoggedIn.value && !userPerformance.value && !isStagingHost) {
         isLoadingUserPerformance.value = true
       }
       await loadFollowerInfo(true)
@@ -879,11 +846,12 @@ export default {
       loadDisplayName()
     })
 
-    // Cleanup subscription on unmount
+    // Cleanup subscription (and the staging demo worker) on unmount
     onUnmounted(() => {
       if (unsubscribePerformance) {
         unsubscribePerformance()
       }
+      demoPerfSession?.dispose()
     })
 
     return {

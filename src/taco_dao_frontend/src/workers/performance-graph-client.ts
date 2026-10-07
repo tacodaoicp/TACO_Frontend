@@ -10,6 +10,10 @@
  * Requests carry a per-session reqId so overlapping recomputes (rapid baseline
  * changes) can't resolve the wrong promise. There is no app-wide singleton here,
  * so none of the cross-deploy fragility of a pooled worker applies.
+ *
+ * PerformanceView's staging demo uses a session of its own for
+ * loadUserPerformance (the MyPerformance numbers, see the worker); it returns
+ * transfer-format data for the caller to deserialize.
  */
 import PerfGraphWorkerUrl from './performance-graph.worker.ts?worker&url'
 import type { SerializedCheckpoint } from './shared/chart-compute'
@@ -24,6 +28,14 @@ export interface PerfGraphLoadParams {
   isLocal?: boolean
 }
 
+export interface UserPerfLoadParams {
+  principal: string
+  host: string
+  canisterId: string
+  fetchRootKey: boolean
+  startMs: number
+}
+
 export interface ChartData {
   usdSeries: any[]
   icpSeries: any[]
@@ -35,6 +47,7 @@ export interface LoadData extends ChartData { meta: CompactMeta[] }
 export interface PerfGraphSession {
   load(params: PerfGraphLoadParams): Promise<{ data?: LoadData; error?: string }>
   recompute(baselineIndex: number, tokenSymbolMap: Record<string, string>, isLocal: boolean): Promise<{ data?: ChartData; error?: string }>
+  loadUserPerformance(params: UserPerfLoadParams): Promise<{ data?: unknown; error?: string }>
   dispose(): void
 }
 
@@ -75,7 +88,8 @@ export function createPerfGraphSession(): PerfGraphSession {
       const reqId = nextId++
       let done = false
       const finish = (r: any) => { if (done) return; done = true; pending.delete(reqId); clearTimeout(timer); resolve(r) }
-      const timer = setTimeout(() => finish({ ok: false, error: 'Timed out loading performance data' }), timeoutMs)
+      // timeoutMs 0 = no timeout
+      const timer = timeoutMs > 0 ? setTimeout(() => finish({ ok: false, error: 'Timed out loading performance data' }), timeoutMs) : undefined
       pending.set(reqId, finish)
       try { w.postMessage({ ...msg, reqId }) } catch (err: any) { finish({ ok: false, error: err?.message || 'postMessage failed' }) }
     })
@@ -91,6 +105,13 @@ export function createPerfGraphSession(): PerfGraphSession {
       const r = await send({ type: 'recompute', baselineIndex, tokenSymbolMap, isLocal }, 30_000)
       if (!r.ok) return { error: r.error || 'Failed to recompute' }
       return { data: { usdSeries: r.usdSeries || [], icpSeries: r.icpSeries || [], tooltipData: r.tooltipData || {} } }
+    },
+    async loadUserPerformance(params) {
+      // No timeout, like the main-thread call this replaces: the decode alone
+      // takes ~30 s on desktop for the current demo graph, more on a phone.
+      const r = await send({ type: 'userPerformance', ...params }, 0)
+      if (!r.ok) return { error: r.error || 'Failed to load data' }
+      return { data: r.data }
     },
     dispose() {
       disposed = true

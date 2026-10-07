@@ -1,5 +1,6 @@
 /**
- * Performance Graph Worker (DedicatedWorker, one per PerformanceChart instance)
+ * Performance Graph Worker (DedicatedWorker, one per PerformanceChart instance,
+ * plus one for PerformanceView's staging demo numbers)
  *
  * Fetches a user's performance graph (getUserPerformanceGraphData), does the
  * expensive Candid DECODE off the main thread, then HOLDS the decoded checkpoints
@@ -13,6 +14,11 @@
  *
  * Correlation: each message carries a per-session reqId (this worker is created
  * fresh per chart, so there is no cross-tab/cross-deploy singleton fragility).
+ *
+ * A `userPerformance` message serves the staging demo's MyPerformance payload:
+ * fetched, decoded and shaped here, returned in the transfer format for the
+ * view's cooperative deserialize. Only the numbers cross: neurons[].checkpoints
+ * is sent empty because nothing on the page reads it (the chart loads its own).
  */
 
 // @ts-ignore - generated .did.js has no type declarations
@@ -21,6 +27,7 @@ import { HttpAgent, Actor } from '@dfinity/agent'
 import { Principal } from '@dfinity/principal'
 import type { SerializedCheckpoint } from './shared/chart-compute'
 import { computeAll } from './shared/chart-compute'
+import { serializeForTransfer } from './shared/transfer'
 
 interface BaseMsg {
   reqId: number
@@ -37,6 +44,15 @@ interface LoadMsg extends BaseMsg {
 }
 interface RecomputeMsg extends BaseMsg {
   type: 'recompute'
+}
+interface UserPerfMsg {
+  reqId: number
+  type: 'userPerformance'
+  principal: string
+  host: string
+  canisterId: string
+  fetchRootKey: boolean
+  startMs: number
 }
 
 // Per-instance state: the decoded checkpoints stay HERE, off the main thread.
@@ -124,10 +140,80 @@ async function fetchCheckpoints(
   }))
 }
 
-self.onmessage = async (e: MessageEvent<LoadMsg | RecomputeMsg>) => {
-  const msg = (e.data || {}) as LoadMsg | RecomputeMsg
+// Staging demo MyPerformance payload. Same request and shaping as the inline
+// loader PerformanceView used to run on the main thread (mirrors the data
+// worker's fetchUserPerformanceData), except that neurons[].checkpoints is left
+// empty; decoding this reply there froze every tap.
+async function fetchUserPerformance(m: UserPerfMsg): Promise<unknown> {
+  const agent = new HttpAgent({ host: m.host, verifyQuerySignatures: false })
+  if (m.fetchRootKey) await agent.fetchRootKey()
+  const actor: any = Actor.createActor(idlFactory, { agent, canisterId: m.canisterId })
+  const principal = Principal.fromText(m.principal)
+  const endTime = BigInt(Date.now()) * 1_000_000n
+  const startTime = BigInt(m.startMs) * 1_000_000n
+  const result = await actor.getUserPerformanceGraphData(principal, startTime, endTime)
+  if (!result || !('ok' in result)) throw new Error('performance graph unavailable')
+  const graphData = result.ok
+  const sorted: any[] = [...(graphData.neurons || [])].sort((a: any, b: any) =>
+    (b.performanceScoreICP?.[0] ?? -Infinity) - (a.performanceScoreICP?.[0] ?? -Infinity)
+  )
+  const wAvg = (getVal: (n: any) => any) => {
+    let tw = BigInt(0), ws = 0
+    for (const n of sorted) {
+      const v = getVal(n); const vp = n.votingPower ?? BigInt(0)
+      if (v !== null && v !== undefined && vp > 0) { ws += v * Number(vp); tw += vp }
+    }
+    return tw > 0 ? [ws / Number(tw)] : []
+  }
+  const neurons = sorted.map((nd) => ({
+    neuronId: nd.neuronId,
+    votingPower: nd.votingPower ?? BigInt(0),
+    distributionsParticipated: nd.checkpoints?.length ?? 0,
+    // Not sent: the raw history (~5 MiB) would cost a main-thread clone and
+    // deserialize, and no consumer of userPerformance reads it.
+    checkpoints: [],
+    performanceScoreUSD: nd.performanceScoreUSD,
+    performanceScoreICP: nd.performanceScoreICP,
+    performance: {
+      allTimeUSD: nd.performanceScoreUSD ? [nd.performanceScoreUSD] : [],
+      allTimeICP: nd.performanceScoreICP?.length > 0 ? [nd.performanceScoreICP[0]] : [],
+      oneWeekUSD: nd.oneWeekUSD?.length > 0 ? [nd.oneWeekUSD[0]] : [],
+      oneWeekICP: nd.oneWeekICP?.length > 0 ? [nd.oneWeekICP[0]] : [],
+      oneMonthUSD: nd.oneMonthUSD?.length > 0 ? [nd.oneMonthUSD[0]] : [],
+      oneMonthICP: nd.oneMonthICP?.length > 0 ? [nd.oneMonthICP[0]] : [],
+      oneYearUSD: nd.oneYearUSD?.length > 0 ? [nd.oneYearUSD[0]] : [],
+      oneYearICP: nd.oneYearICP?.length > 0 ? [nd.oneYearICP[0]] : [],
+    },
+  }))
+  const totalCheckpoints = neurons.reduce((s, n) => s + n.distributionsParticipated, 0)
+  const totalVotingPower = neurons.reduce((s, n) => s + (n.votingPower || BigInt(0)), BigInt(0))
+  return serializeForTransfer({
+    principal,
+    totalVotingPower,
+    distributionsParticipated: totalCheckpoints,
+    lastActivity: graphData.timeframe.endTime,
+    aggregatedPerformance: {
+      allTimeUSD: wAvg(n => n.performanceScoreUSD),
+      allTimeICP: wAvg(n => n.performanceScoreICP?.[0]),
+      oneWeekUSD: wAvg(n => n.oneWeekUSD?.[0]),
+      oneWeekICP: wAvg(n => n.oneWeekICP?.[0]),
+      oneMonthUSD: wAvg(n => n.oneMonthUSD?.[0]),
+      oneMonthICP: wAvg(n => n.oneMonthICP?.[0]),
+      oneYearUSD: wAvg(n => n.oneYearUSD?.[0]),
+      oneYearICP: wAvg(n => n.oneYearICP?.[0]),
+    },
+    neurons,
+  })
+}
+
+self.onmessage = async (e: MessageEvent<LoadMsg | RecomputeMsg | UserPerfMsg>) => {
+  const msg = (e.data || {}) as LoadMsg | RecomputeMsg | UserPerfMsg
   const reqId = msg.reqId
   try {
+    if (msg.type === 'userPerformance') {
+      self.postMessage({ reqId, ok: true, data: await fetchUserPerformance(msg) })
+      return
+    }
     if (msg.type === 'recompute') {
       const r = computeAll({
         checkpoints: storedCheckpoints, baselineIndex: msg.baselineIndex || 0,
