@@ -2081,7 +2081,8 @@ select.form-control {
 // page background effect showing through the outer panels: they turn partly see-through, so the
 // moving layer behind the app shows in them with the same animation. Inner panels (normally a
 // see-through dark overlay) get a solid version of their usual colour so they stay clean.
-.fx-panels .taco-container--l1 {
+// hover popups (header value and price chips) stay solid; :where keeps the specificity unchanged
+.fx-panels .taco-container--l1:not(:where(.taco-entity-value-chip__tooltip, .taco-token-price-chip__modal)) {
   background: linear-gradient(135deg,
     color-mix(in srgb, var(--card-gradient-from) var(--fx-panel-alpha, 100%), transparent),
     color-mix(in srgb, var(--card-gradient-to) var(--fx-panel-alpha, 100%), transparent));
