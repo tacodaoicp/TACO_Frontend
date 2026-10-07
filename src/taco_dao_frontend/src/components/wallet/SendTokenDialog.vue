@@ -225,8 +225,8 @@
               <button 
                 type="submit" 
                 class="btn taco-btn taco-btn--green"
-                :disabled="!canSend || submitting">
-                {{ submitting ? 'Sending...' : 'Send Transaction' }}
+                :disabled="!canSend || submitting || sending">
+                {{ submitting || sending ? 'Sending...' : 'Send Transaction' }}
               </button>
 
             </div>
@@ -375,6 +375,8 @@ interface SendTokenProps {
     fee: bigint
     priceUSD?: number
   } | null
+  // the parent's transfer is in flight
+  sending?: boolean
 }
 
 interface SendTokenEmits {
@@ -620,8 +622,8 @@ const handleClose = () => {
 
 const handleSend = async () => {
   
-  if (!canSend.value || submitting.value) return
-  
+  if (!canSend.value || submitting.value || props.sending) return
+
   // Final validation
   validateRecipient()
   validateAmount()

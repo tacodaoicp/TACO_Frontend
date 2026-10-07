@@ -217,6 +217,7 @@
     <SendTokenDialog 
       :show="showSendDialog"
       :token="selectedToken"
+      :sending="sendingSession !== 0 && sendingSession === sendDialogSession"
       @close="closeSendDialog"
       @send="handleSendToken"
     />
@@ -540,6 +541,9 @@ const showAsLoggedIn = computed(() => tacoStore.userLoggedIn || tacoStore.tourBy
 
 // # STATE #
 const showSendDialog = ref(false)
+// each opening of the send dialog is a session; a send only drives (and closes) the dialog it came from
+const sendDialogSession = ref(0)
+const sendingSession = ref(0)
 const tacoTokenCardRef = ref<any | null>(null)
 const selectedToken = ref<WalletToken | null>(null)
 const showStakeDialog = ref(false)
@@ -1000,6 +1004,7 @@ const loadAllBalances = async (showSpinner = false) => {
 // open send dialog
 const openSendDialog = (token: WalletToken) => {
   selectedToken.value = token
+  sendDialogSession.value++
   showSendDialog.value = true
 }
 
@@ -1011,31 +1016,33 @@ const closeSendDialog = () => {
 
 // handle send token
 const handleSendToken = async (params: { recipient: string; amount: bigint; memo?: string; addressType: 'principal' | 'accountId'; subaccount?: string }) => {
-  if (!selectedToken.value) return
-
-  // turn on app loading
-  appLoadingOn()
+  // the dialog shows "Sending..." instead of a full page loader, and it can be closed
+  // mid send, so work on this token and session even if selectedToken changes meanwhile
+  const token = selectedToken.value
+  if (!token) return
+  const session = sendDialogSession.value
+  sendingSession.value = session
 
   try {
     if (params.addressType === 'accountId') {
       await tacoStore.sendIcpByAccountId(
         params.recipient,
         params.amount,
-        selectedToken.value.fee,
+        token.fee,
         params.memo
       )
     } else {
       await tacoStore.sendToken(
-        selectedToken.value.principal,
+        token.principal,
         params.recipient,
         params.amount,
-        selectedToken.value.fee,
+        token.fee,
         params.memo,
         params.subaccount
       )
     }
-    
-    const decimals = selectedToken.value.decimals
+
+    const decimals = token.decimals
     const divisor = 10n ** BigInt(decimals)
     const whole = params.amount / divisor
     const frac = params.amount % divisor
@@ -1047,17 +1054,17 @@ const handleSendToken = async (params: { recipient: string; amount: bigint; memo
       code: 'send-success',
       title: 'Transaction Sent',
       icon: 'fa-solid fa-check',
-      message: `Successfully sent ${formattedAmount} ${selectedToken.value.symbol}`
+      message: `Successfully sent ${formattedAmount} ${token.symbol}`
     })
-    
+
     // Refresh balance
     const newBalance = await tacoStore.fetchUserTokenBalance(
-      selectedToken.value.principal, 
-      selectedToken.value.decimals
+      token.principal,
+      token.decimals
     )
-    allTokenBalances.value.set(selectedToken.value.principal, newBalance)
-    
-    closeSendDialog()
+    allTokenBalances.value.set(token.principal, newBalance)
+
+    if (sendDialogSession.value === session) closeSendDialog()
   } catch (error) {
     console.error('Error sending token:', error)
     tacoStore.addToast({
@@ -1068,7 +1075,7 @@ const handleSendToken = async (params: { recipient: string; amount: bigint; memo
       message: 'Failed to send token'
     })
   } finally {
-    appLoadingOff()
+    if (sendingSession.value === session) sendingSession.value = 0
   }
 }
 
