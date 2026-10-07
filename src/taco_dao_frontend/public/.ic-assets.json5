@@ -19,6 +19,30 @@
         }
     },
     {
+        // Every file name under assets/ carries a hash of its content (vite build,
+        // checked by build/immutable-assets.js), so browsers may keep these for a year.
+        // Headers merge with the rule above, so CORS and CSP stay.
+        "match": "assets/**/*",
+        "headers": {
+            "Cache-Control": "public, max-age=31536000, immutable"
+        }
+    },
+    {
+        // Scripts and styles are stored gzip only. The IC edge cache ignores
+        // Accept-Encoding, so without a plain copy it can never keep handing
+        // browsers an uncompressed file while the long cache above lasts.
+        "match": "assets/**/*.{js,css}",
+        "encodings": ["gzip"]
+    },
+    {
+        // The page itself is always revalidated, so a new deploy shows on the next load.
+        // Unknown paths fall back to this file and get the same header.
+        "match": "index.html",
+        "headers": {
+            "Cache-Control": "no-cache"
+        }
+    },
+    {
         "match": ".well-known",
         "ignore": false
     },

@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import environment from 'vite-plugin-environment';
 import vue from '@vitejs/plugin-vue';
 import dotenv from 'dotenv';
+import immutableAssets from './build/immutable-assets.js';
 
 // Load base .env first, then environment-specific overrides
 dotenv.config({ path: '../../.env' });
@@ -43,6 +44,8 @@ export default defineConfig({
     vue(),
     environment('all', { prefix: 'CANISTER_' }),
     environment('all', { prefix: 'DFX_' }),
+    // assets/ is served as immutable (public/.ic-assets.json5): hash the boot script, guard the names
+    immutableAssets(),
   ],
   preview: {
     host: true,
