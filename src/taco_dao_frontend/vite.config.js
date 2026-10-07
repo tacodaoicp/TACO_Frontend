@@ -5,6 +5,7 @@ import vue from '@vitejs/plugin-vue';
 import dotenv from 'dotenv';
 import immutableAssets from './build/immutable-assets.js';
 import { vendorChunks, checkVendorChunk } from './build/vendor-chunk.js';
+import latin1Output from './build/latin1-output.js';
 
 // Load base .env first, then environment-specific overrides
 dotenv.config({ path: '../../.env' });
@@ -14,6 +15,8 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export default defineConfig({
+  // Escape non-ASCII in the JS and CSS output (with build/latin1-output.js) so Chrome can store the files one byte per char
+  esbuild: { charset: 'ascii' },
   build: {
     emptyOutDir: true,
     rollupOptions: {
@@ -45,6 +48,7 @@ export default defineConfig({
     plugins: [
       environment('all', { prefix: 'CANISTER_' }),
       environment('all', { prefix: 'DFX_' }),
+      latin1Output(),
     ],
   },
   plugins: [
@@ -54,6 +58,7 @@ export default defineConfig({
     // assets/ is served as immutable (public/.ic-assets.json5): hash the boot script, guard the names
     immutableAssets(),
     checkVendorChunk(),
+    latin1Output(),
   ],
   preview: {
     host: true,
