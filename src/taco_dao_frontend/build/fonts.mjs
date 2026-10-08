@@ -42,7 +42,9 @@ export default function faSubset() {
         const missing = [...wanted].filter(([cp]) => !cps.includes(cp))
         if (missing.length) fail(`fa-${style}-${weight}.ttf has no glyph for ${missing.map(([cp, n]) => `${n} (U+${cp.toString(16)})`).join(', ')}`)
         writeIfChanged(path.join(OUT, file), woff2(ttf))
-        // U+0020 keeps the subset the first available font of the family, so the full face is never loaded for line metrics
+        // U+0020 in the range makes the subset the first available font of the family in Chrome, so Chrome never loads
+        // the full face for line metrics. Safari and Firefox also want a space glyph there, which neither font has, so
+        // they load the full face as well and only get the text font saving. Icons look the same either way.
         css += `@font-face {\n  font-family: 'Font Awesome 6 Pro';\n  font-style: normal;\n  font-weight: ${weight};\n  font-display: block;\n` +
           `  src: url("./assets/fonts/fa-subset/${file}") format("woff2");\n  unicode-range: ${ranges([0x20, ...cps])};\n}\n`
       }
