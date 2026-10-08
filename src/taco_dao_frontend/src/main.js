@@ -95,11 +95,11 @@ function hideBootSpinner() {
 
 // ─── DAO App (original code, lazily loaded when not on exchange) ──────
 async function bootDAO() {
-  const [
-    { createRouter, createWebHistory },
-    { default: App },
-    { default: VueClickAway },
-  ] = await Promise.all([
+  // App and the pre-mount CSS load together (awaited below), instead of the
+  // CSS starting only once App has loaded. Keep this call first: the <link>
+  // for App's own CSS is added when import('./App.vue') is called, and it has
+  // to stay ahead of the sheets below, as it was before.
+  const appModules = Promise.all([
     import('vue-router'),
     import('./App.vue'),
     import('vue3-click-away'),
@@ -113,7 +113,7 @@ async function bootDAO() {
   // shared selectors like .btn / .taco-nav-btn, so index.scss MUST come last.
   // (See the matching comment in App.vue: "loads before taco.scss for correct
   // cascade".) FA Pro brands is deferred post-mount below.
-  await Promise.all([
+  const bootCss = Promise.all([
     import('bootstrap/dist/css/bootstrap.css'),
     import('@fortawesome/fontawesome-pro/css/fontawesome.css'),
     import('@fortawesome/fontawesome-pro/css/light.css'),
@@ -127,6 +127,12 @@ async function bootDAO() {
     import('@fortawesome/fontawesome-pro/css/v4-shims.css'),
     import('./index.scss'),
   ])
+
+  const [[
+    { createRouter, createWebHistory },
+    { default: App },
+    { default: VueClickAway },
+  ]] = await Promise.all([appModules, bootCss])
 
   // Lazy-loaded views - reduces initial bundle size significantly
   const HomeView = () => import("./views/HomeView.vue")
