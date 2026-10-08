@@ -394,6 +394,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { depositTokenForLiquidity, removeDepositFromCache, approveExchangeDeposit } from '../../utils/deposit'
+import { setItemWithCacheEviction } from '../../utils/persistCache'
 import { isApprovalDeclined } from '../../utils/approvalPrompt'
 import {
   calculateAmounts,
@@ -913,7 +914,10 @@ interface PendingDeposit { token: string; block: string; symbol: string; timesta
 const pendingDeposit = ref<PendingDeposit | null>(null)
 function savePendingDeposit(token: string, block: bigint, symbol: string) {
   const entry = { token, block: block.toString(), symbol, timestamp: Date.now() }
-  localStorage.setItem('taco_pending_lp_deposit', JSON.stringify(entry))
+  // Runs right after a deposit has moved funds: a full storage must not throw
+  // here. Cache entries are freed first; the in memory copy is kept either way.
+  try { setItemWithCacheEviction('taco_pending_lp_deposit', JSON.stringify(entry)) }
+  catch (err) { console.warn('[AddLiquidity] could not save pending deposit:', err) }
   pendingDeposit.value = entry
 }
 function clearPendingDeposit() {
@@ -1013,13 +1017,19 @@ async function submitFullRange() {
   let submitted = false
   let prePositionCount = 0
   let preLiqByPair = new Map<string, bigint>()
-
-  try {
-    try {
-      const pre = await store.getUserLiquidityDetailed()
+  // Snapshot for the transport error probe: a network read (a saved list
+  // missing a newer position would make the probe report success for an add
+  // that never landed), started before any funds move but only awaited by the
+  // probe, so the flow is not slowed.
+  const preDone = store.userLpQuery.refresh()
+    .then(async (v) => {
+      const pre = v ?? await store.getUserLiquidityDetailed()
       prePositionCount = pre.length
       preLiqByPair = new Map(pre.map((p: any) => [`${p.token0}|${p.token1}`, p.liquidity]))
-    } catch { /* probe falls back to 'unknown' */ }
+    })
+    .catch(() => { /* probe falls back to 'unknown' */ })
+
+  try {
 
     if (v2) {
       phase.value = 'deposit0'
@@ -1112,7 +1122,9 @@ async function submitFullRange() {
     if (isTransportError(err) && submitted) {
       const probe = async (): Promise<VerifyStatus> => {
         try {
-          const post: any[] = await store.getUserLiquidityDetailed()
+          await preDone
+          const post = await store.userLpQuery.refetch() as any[] | null
+          if (!post) return 'unknown'
           if (post.length > prePositionCount) return 'succeeded'
           for (const p of post) {
             const key = `${p.token0}|${p.token1}`
@@ -1217,11 +1229,11 @@ async function submitConcentrated() {
   let block1 = 0n
   let submitted = false
   let prePositionCount = 0
+  // Network snapshot for the probe, not awaited here (see submitFullRange).
+  const preDone = store.userLpQuery.refresh()
+    .then(async (v) => { prePositionCount = (v ?? await store.getUserLiquidityDetailed()).length })
+    .catch(() => { /* fall back to 'unknown' */ })
   try {
-    try {
-      const pre = await store.getUserLiquidityDetailed()
-      prePositionCount = pre.length
-    } catch { /* fall back to 'unknown' */ }
 
     if (v2) {
       phase.value = 'deposit0'
@@ -1309,7 +1321,9 @@ async function submitConcentrated() {
     if (isTransportError(err) && submitted) {
       const probe = async (): Promise<VerifyStatus> => {
         try {
-          const post: any[] = await store.getUserLiquidityDetailed()
+          await preDone
+          const post = await store.userLpQuery.refetch() as any[] | null
+          if (!post) return 'unknown'
           if (post.length > prePositionCount) return 'succeeded'
           return 'unknown'
         } catch { return 'unknown' }

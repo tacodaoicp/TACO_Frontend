@@ -313,7 +313,8 @@ async function confirmRemove() {
     if (isTransportError(err)) {
       const probe = async (): Promise<VerifyStatus> => {
         try {
-          const post: any[] = await store.getUserLiquidityDetailed()
+          const post = await store.userLpQuery.refetch() as any[] | null
+          if (!post) return 'unknown'
           const match = post.find((p: any) =>
             p.token0 === target.token0 && p.token1 === target.token1
             && (!target.isConcentrated || (p.positionId?.length && p.positionId[0] === target.positionId))
@@ -371,7 +372,8 @@ async function claimFees(pos: UnifiedPosition) {
     if (isTransportError(err)) {
       const probe = async (): Promise<VerifyStatus> => {
         try {
-          const post: any[] = await store.getUserLiquidityDetailed()
+          const post = await store.userLpQuery.refetch() as any[] | null
+          if (!post) return 'unknown'
           const match = post.find((p: any) =>
             p.token0 === pos.token0 && p.token1 === pos.token1
             && (!pos.isConcentrated || (p.positionId?.length && p.positionId[0] === pos.positionId))
@@ -430,7 +432,8 @@ async function claimAllFees() {
       // component state immediately after could be stale.
       const probe = async (): Promise<VerifyStatus> => {
         try {
-          const post: any[] = await store.getUserLiquidityDetailed()
+          const post = await store.userLpQuery.refetch() as any[] | null
+          if (!post) return 'unknown'
           const postPositionsWithFees = post.filter((p: any) => p.fee0 > 0n || p.fee1 > 0n).length
           if (postPositionsWithFees < prePositionsWithFees) return 'succeeded'
           if (postPositionsWithFees === prePositionsWithFees) return 'failed'
@@ -472,58 +475,68 @@ async function loadPositions() {
       }
     } catch { /* no pool data */ }
 
-    const frPositions: UnifiedPosition[] = []
-    const clPositions: UnifiedPosition[] = []
-
-    for (const pos of allPositionsRaw) {
-      const t0 = pos.token0 ?? ''
-      const t1 = pos.token1 ?? ''
-      const dec0 = getDecimals(t0)
-      const dec1 = getDecimals(t1)
-      const isConcentrated = pos.positionType && 'concentrated' in pos.positionType
-      const posId = pos.positionId?.length > 0 ? pos.positionId[0] : 0n
-
-      // Range (concentrated only)
-      const hasRange = pos.ratioLower?.length > 0 && pos.ratioUpper?.length > 0
-      const priceLower = hasRange ? ratioToHumanPrice(pos.ratioLower[0], dec0, dec1) : 0
-      const priceUpper = hasRange ? ratioToHumanPrice(pos.ratioUpper[0], dec0, dec1) : Infinity
-      const fullRange = !isConcentrated || (hasRange && isFullRange(pos.ratioLower[0], pos.ratioUpper[0]))
-
-      // In-range detection
-      const currentPrice = poolPrices.get(`${t0}|${t1}`) || 0
-      const inRange = fullRange || (currentPrice > 0 && currentPrice >= priceLower && currentPrice <= priceUpper)
-
-      const unified: UnifiedPosition = {
-        key: isConcentrated ? `cl-${posId}` : `fr-${t0}-${t1}`,
-        token0: t0,
-        token1: t1,
-        lpTokens: pos.liquidity ?? 0n,
-        amount0: pos.token0Amount ?? 0n,
-        amount1: pos.token1Amount ?? 0n,
-        shareOfPool: Number(pos.shareOfPool ?? 0),
-        fee0: pos.fee0 ?? 0n,
-        fee1: pos.fee1 ?? 0n,
-        isConcentrated: isConcentrated && !fullRange,
-        positionId: posId,
-        priceLower: fullRange ? 0 : priceLower,
-        priceUpper: fullRange ? Infinity : priceUpper,
-        inRange,
-      }
-
-      if (isConcentrated && !fullRange) {
-        clPositions.push(unified)
-      } else {
-        frPositions.push(unified)
-      }
+    buildPositions(allPositionsRaw, poolPrices)
+    // The read above returns saved positions at once and refreshes behind
+    // them; show the refreshed answer too (it joins the same request).
+    if (store.userLpQuery.isFetching) {
+      const fresh = await store.userLpQuery.refresh() as any[] | null
+      if (fresh) buildPositions(fresh, poolPrices)
     }
-
-    fullRangePositions.value = frPositions
-    concentratedPositions.value = clPositions
   } catch (err) {
     console.error('[LPPositionsTab] Load error:', err)
   } finally {
     loading.value = false
   }
+}
+
+function buildPositions(allPositionsRaw: any[], poolPrices: Map<string, number>) {
+  const frPositions: UnifiedPosition[] = []
+  const clPositions: UnifiedPosition[] = []
+
+  for (const pos of allPositionsRaw) {
+    const t0 = pos.token0 ?? ''
+    const t1 = pos.token1 ?? ''
+    const dec0 = getDecimals(t0)
+    const dec1 = getDecimals(t1)
+    const isConcentrated = pos.positionType && 'concentrated' in pos.positionType
+    const posId = pos.positionId?.length > 0 ? pos.positionId[0] : 0n
+
+    // Range (concentrated only)
+    const hasRange = pos.ratioLower?.length > 0 && pos.ratioUpper?.length > 0
+    const priceLower = hasRange ? ratioToHumanPrice(pos.ratioLower[0], dec0, dec1) : 0
+    const priceUpper = hasRange ? ratioToHumanPrice(pos.ratioUpper[0], dec0, dec1) : Infinity
+    const fullRange = !isConcentrated || (hasRange && isFullRange(pos.ratioLower[0], pos.ratioUpper[0]))
+
+    // In-range detection
+    const currentPrice = poolPrices.get(`${t0}|${t1}`) || 0
+    const inRange = fullRange || (currentPrice > 0 && currentPrice >= priceLower && currentPrice <= priceUpper)
+
+    const unified: UnifiedPosition = {
+      key: isConcentrated ? `cl-${posId}` : `fr-${t0}-${t1}`,
+      token0: t0,
+      token1: t1,
+      lpTokens: pos.liquidity ?? 0n,
+      amount0: pos.token0Amount ?? 0n,
+      amount1: pos.token1Amount ?? 0n,
+      shareOfPool: Number(pos.shareOfPool ?? 0),
+      fee0: pos.fee0 ?? 0n,
+      fee1: pos.fee1 ?? 0n,
+      isConcentrated: isConcentrated && !fullRange,
+      positionId: posId,
+      priceLower: fullRange ? 0 : priceLower,
+      priceUpper: fullRange ? Infinity : priceUpper,
+      inRange,
+    }
+
+    if (isConcentrated && !fullRange) {
+      clPositions.push(unified)
+    } else {
+      frPositions.push(unified)
+    }
+  }
+
+  fullRangePositions.value = frPositions
+  concentratedPositions.value = clPositions
 }
 
 useStaleAwareLoad({

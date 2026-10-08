@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, onActivated, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import WalletTab from '../components/portfolio/WalletTab.vue'
 import OpenOrdersTab from '../components/portfolio/OpenOrdersTab.vue'
@@ -84,6 +84,7 @@ import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import StatCluster from '../components/common/StatCluster.vue'
 import AllocationBar from '../components/common/AllocationBar.vue'
 import { useExchangeStore, type TokenTrend7d } from '../store/exchange.store'
+import type { CachedQuery } from '../utils/cachedQuery'
 import { ADMIN_PRINCIPALS } from '../../composables/useAdminCheck'
 import { isVisible as isDocumentVisible } from '../composables/useVisibilityAware'
 
@@ -112,24 +113,30 @@ const netWorthText = computed(() =>
 )
 
 // 7-day trend per held token — powers both the 7d PnL stat and the
-// Wallet tab sparklines. One `get_token_trends_7d` query per holdings
-// refresh; refreshed every 5 min while the view is mounted.
-const trendsByToken = ref<Map<string, TokenTrend7d>>(new Map())
+// Wallet tab sparklines. Bound to the shared trends query's data, so the
+// background refresh that follows a saved first paint reaches the screen
+// (a copied value stayed old for the whole 5 min window). Refreshed every
+// 5 min while the view is mounted.
+const trendsQuery = shallowRef<CachedQuery<TokenTrend7d[]> | null>(null)
+// Last answer shown; kept while a new token set's query has no data yet so
+// the sparklines don't blink out when the token list changes.
+const trendsList = shallowRef<TokenTrend7d[]>([])
+watch(() => trendsQuery.value?.data.value, (v) => { if (v) trendsList.value = v }, { immediate: true })
+const trendsByToken = computed<Map<string, TokenTrend7d>>(() => {
+  const next = new Map<string, TokenTrend7d>()
+  for (const t of trendsList.value) next.set(t.token, t)
+  return next
+})
 let trendsTimer: number | null = null
 
-async function loadTrends(addresses: string[]) {
+function loadTrends(addresses: string[]) {
   if (addresses.length === 0) {
-    trendsByToken.value = new Map()
+    trendsQuery.value = null
+    trendsList.value = []
     return
   }
-  try {
-    const trends = await store.getTokenTrends7d(addresses)
-    const next = new Map<string, TokenTrend7d>()
-    for (const t of trends) next.set(t.token, t)
-    trendsByToken.value = next
-  } catch (e) {
-    console.warn('[Portfolio] trends fetch failed:', e)
-  }
+  trendsQuery.value = store.trendsQueryFor(addresses)
+  void trendsQuery.value.ensure()
 }
 
 // 7d return — "how has my current basket moved vs. 7d ago?"
@@ -284,7 +291,7 @@ const TREND_REFRESH_MS = 5 * 60 * 1000
 // store, so this view no longer needs onMutation subscriptions or auth
 // watchers — every reactive consumer here updates automatically.
 
-onMounted(() => {
+function ensureUserData() {
   // Touch the queries so they ensure() — cache-first when warm (zero network),
   // or background refresh when cold. The Promise is fire-and-forget; nothing
   // here awaits it because the template reads the reactive .data refs.
@@ -292,13 +299,25 @@ onMounted(() => {
     void store.userTradesQuery.ensure()
     void store.userLpQuery.ensure()
   }
+}
+
+onMounted(() => {
+  ensureUserData()
   // Periodic trend refresh while the view is mounted — visibility-gated so
-  // we don't burn a 28-sample query while the tab is hidden.
+  // we don't burn a 28-sample query while the tab is hidden. A forced read:
+  // the timer equals the query's freshness window, so ensure() found it
+  // fresh and never fetched.
   trendsTimer = window.setInterval(() => {
     if (!isDocumentVisible.value) return
-    const addrs = listedTokenKey.value.split('|').filter(Boolean)
-    if (addrs.length) loadTrends(addrs)
+    void trendsQuery.value?.refresh()
   }, TREND_REFRESH_MS)
+})
+
+// The view is kept alive: coming back to it re-checks orders, LP and trends
+// (each only fetches when older than its window).
+onActivated(() => {
+  ensureUserData()
+  void trendsQuery.value?.ensure()
 })
 
 onUnmounted(() => {

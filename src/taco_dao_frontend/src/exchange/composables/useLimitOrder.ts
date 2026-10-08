@@ -166,11 +166,12 @@ export function useLimitOrder(
 
       // Snapshot of open-order accesscodes before submission — used by the
       // transport-error probe below to decide whether an order actually landed.
-      let preCodes = new Set<string>()
-      try {
-        const pre = await store.getUserTrades()
-        preCodes = new Set(pre.map((o: any) => o.accesscode))
-      } catch { /* probe will fall back to 'unknown' */ }
+      // A network read (a saved list can miss orders placed since it was
+      // saved), started before the order call but only awaited by the probe,
+      // so the order is not delayed.
+      const preCodesP: Promise<Set<string>> = store.userTradesQuery.refresh()
+        .then(async (v) => new Set((v ?? await store.getUserTrades()).map((o: any) => o.accesscode)))
+        .catch(() => new Set<string>())
 
       const onFilledImmediately = () => {
         phase.value = 'success'
@@ -261,7 +262,10 @@ export function useLimitOrder(
         if (isTransportError(orderErr)) {
           const probe = async (): Promise<VerifyStatus> => {
             try {
-              const post = await store.getUserTrades()
+              // A read that starts after the failed call (never a saved list).
+              const preCodes = await preCodesP
+              const post = await store.userTradesQuery.refetch()
+              if (!post) return 'unknown'
               const newOrder = post.find((o: any) =>
                 !preCodes.has(o.accesscode)
                 && o.token_sell_identifier === tokenSell

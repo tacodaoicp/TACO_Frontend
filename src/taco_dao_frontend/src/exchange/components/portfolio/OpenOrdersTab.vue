@@ -138,7 +138,15 @@ const router = useRouter()
 const store = useExchangeStore()
 const toast = useExchangeToast()
 
-const orders = ref<TradePrivate2[]>([])
+// Bound to the shared orders query, so every refresh (poll, mutation, login)
+// reaches the table. A copied list showed the saved orders until the next
+// 5 s tick, and a cancelled order could come back from the saved copy.
+const orders = computed<TradePrivate2[]>(() => store.userTradesQuery.data ?? [])
+/** Optimistic removal through the query itself, so no saved or in flight
+ *  read can bring the order back. */
+function removeOrders(codes: Set<string>) {
+  store.userTradesQuery.set(orders.value.filter(o => !codes.has(o.accesscode)))
+}
 const loading = ref(true)
 const currentPairOnly = ref(false)
 const cancelTarget = ref<TradePrivate2 | null>(null)
@@ -311,7 +319,7 @@ async function confirmCancel() {
   try {
     const result = await store.revokeTrade(accessCode, { Initiator: null })
     if ('Ok' in result) {
-      orders.value = orders.value.filter(o => o.accesscode !== accessCode)
+      removeOrders(new Set([accessCode]))
       cancelTarget.value = null
       void store.refreshAfterMutation('revoke')
       toast.success('Order Cancelled')
@@ -325,7 +333,8 @@ async function confirmCancel() {
     if (isTransportError(err)) {
       const probe = async (): Promise<VerifyStatus> => {
         try {
-          const post = await store.getUserTrades()
+          const post = await store.userTradesQuery.refetch()
+          if (!post) return 'unknown'
           const stillOpen = post.some(o => o.accesscode === accessCode)
           return stillOpen ? 'failed' : 'succeeded'
         } catch {
@@ -334,7 +343,7 @@ async function confirmCancel() {
       }
       const status = await verifyAfterTransportError(probe)
       if (status === 'succeeded') {
-        orders.value = orders.value.filter(o => o.accesscode !== accessCode)
+        removeOrders(new Set([accessCode]))
         cancelTarget.value = null
         void store.refreshAfterMutation('revoke')
         toast.success('Order Cancelled', 'Network hiccup during submit — confirmed via query.')
@@ -377,8 +386,7 @@ async function confirmCancelAll() {
       if (results[j].status === 'fulfilled') {
         const val = (results[j] as PromiseFulfilledResult<any>).value
         if ('Ok' in val) {
-          const idx = orders.value.findIndex(o => o.accesscode === batch[j].accesscode)
-          if (idx !== -1) orders.value.splice(idx, 1)
+          removeOrders(new Set([batch[j].accesscode]))
           completed++
         }
       }
@@ -408,10 +416,8 @@ const initialLoadDone = ref(false)
 async function loadOrders() {
   if (!initialLoadDone.value) loading.value = true
   try {
-    const result = await store.getUserTrades()
-    // Don't blank good data on a nullish result (defensive — matches the
-    // cachedQuery.ts guard one layer down).
-    if (result != null) orders.value = result
+    // The table reads the query's data; this only makes sure a read happens.
+    await store.getUserTrades()
   } catch (err) {
     console.error('[OpenOrdersTab] Load error:', err)
   } finally {

@@ -157,9 +157,10 @@ async function claimAll() {
     if (isTransportError(err)) {
       const probe = async (): Promise<VerifyStatus> => {
         try {
-          const post = await store.checkFeesReferrer()
+          const post = await store.userFeesReferrerQuery.refetch()
+          if (post == null) return 'unknown'
           // Claim succeeded if the unclaimed list dropped (or went to empty).
-          if (!post || post.length < preEarnings.length) return 'succeeded'
+          if (post.length < preEarnings.length) return 'succeeded'
           return 'failed'
         } catch {
           return 'unknown'
@@ -186,15 +187,29 @@ async function claimAll() {
   }
 }
 
+function applyReferralState(earningsResult: [string, bigint][], referralInfo: unknown) {
+  rawEarnings.value = earningsResult
+  if (referralInfo && (referralInfo as any).referrer) {
+    referredBy.value = (referralInfo as any).referrer
+  }
+}
+
 async function loadReferralState() {
   try {
     const [earningsResult, referralInfo] = await Promise.all([
       store.checkFeesReferrer().catch(() => []),
       store.getUserReferralInfo().catch(() => null),
     ])
-    rawEarnings.value = earningsResult
-    if (referralInfo && (referralInfo as any).referrer) {
-      referredBy.value = (referralInfo as any).referrer
+    applyReferralState(earningsResult, referralInfo)
+    loadingEarnings.value = false
+    // Saved values come back at once with a refresh behind them; show the
+    // refreshed answer too (refresh() joins the request already in flight).
+    if (store.userFeesReferrerQuery.isFetching || store.userReferralQuery.isFetching) {
+      const [freshEarnings, freshInfo] = await Promise.all([
+        store.userFeesReferrerQuery.isFetching ? store.userFeesReferrerQuery.refresh() : null,
+        store.userReferralQuery.isFetching ? store.userReferralQuery.refresh() : null,
+      ])
+      applyReferralState(freshEarnings ?? rawEarnings.value, freshInfo ?? referralInfo)
     }
   } finally {
     loadingEarnings.value = false

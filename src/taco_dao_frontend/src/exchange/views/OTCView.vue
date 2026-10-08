@@ -299,6 +299,7 @@ import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { useTokenBalance } from '../composables/useTokenBalance'
 import { depositToken, approveExchangeDeposit, calculateRequiredDeposit } from '../utils/deposit'
+import { setItemWithCacheEviction } from '../utils/persistCache'
 import { isApprovalDeclined } from '../utils/approvalPrompt'
 import { fillPercentage, orderPrice } from '../utils/price-math'
 import type { TradePosition, TradePrivate2 } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
@@ -384,11 +385,19 @@ async function cancelPrivateOrder(code: string) {
 
 async function loadMyPrivateOrders() {
   if (!store.isAuthenticated) return
-  try {
-    const all = await store.getUserTrades()
+  const apply = (all: TradePrivate2[]) => {
     myPrivateOrders.value = all.filter(o =>
       !o.accesscode.startsWith('Public') && o.trade_done === 0n
     )
+  }
+  try {
+    apply(await store.getUserTrades())
+    // Saved orders come back at once with a refresh behind them; show the
+    // refreshed list too (refresh() joins the request already in flight).
+    if (store.userTradesQuery.isFetching) {
+      const fresh = await store.userTradesQuery.refresh()
+      if (fresh) apply(fresh)
+    }
   } catch { /* ignore */ }
 }
 
@@ -637,7 +646,9 @@ function loadCache(): CachedCode[] {
 }
 
 function saveCache(codes: CachedCode[]) {
-  localStorage.setItem(CACHE_KEY, JSON.stringify(codes.slice(0, MAX_CACHED)))
+  // A full storage must not throw out of the order flows that call this.
+  try { setItemWithCacheEviction(CACHE_KEY, JSON.stringify(codes.slice(0, MAX_CACHED))) }
+  catch (err) { console.warn('[OTC] could not save order codes:', err) }
 }
 
 function addToCache(code: string, trade: TradePosition) {
