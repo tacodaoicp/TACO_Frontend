@@ -112,8 +112,7 @@ async function bootDAO() {
   // <link> wins. taco.scss (loaded via index.scss) overrides bootstrap on
   // shared selectors like .btn / .taco-nav-btn, so index.scss MUST come last.
   // (See the matching comment in App.vue: "loads before taco.scss for correct
-  // cascade".) Truly non-critical sheets (FA Pro brands, duotone, animate.css)
-  // are deferred post-mount below.
+  // cascade".) FA Pro brands is deferred post-mount below.
   await Promise.all([
     import('bootstrap/dist/css/bootstrap.css'),
     import('@fortawesome/fontawesome-pro/css/fontawesome.css'),
@@ -278,17 +277,14 @@ async function bootDAO() {
   clearChunkReloadGuard() // mounted OK — re-arm chunk recovery for future deploys
 
   // Fire-and-forget the genuinely non-critical CSS post-mount: FA brands (one
-  // github icon, not above the fold), FA duotone, and animate.css. Saves weight
-  // off the critical path without FOUC risk.
+  // github icon, not above the fold). Saves weight off the critical path
+  // without FOUC risk. (The help button swing from animate.css lives in
+  // ChatView.vue; FA duotone is not used anywhere.)
   const idle = (cb) =>
     typeof requestIdleCallback === 'function'
       ? requestIdleCallback(cb, { timeout: 1500 })
       : setTimeout(cb, 200)
   idle(() => {
-    void Promise.all([
-      import('@fortawesome/fontawesome-pro/css/brands.css'), // fa-brands (e.g. fa-github), not above the fold
-      import('@fortawesome/fontawesome-pro/css/duotone.css'),
-      import('animate.css'),
-    ]).catch(() => {})
+    import('@fortawesome/fontawesome-pro/css/brands.css').catch(() => {}) // fa-brands (e.g. fa-github), not above the fold
   })
 }
