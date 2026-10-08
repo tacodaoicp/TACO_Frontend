@@ -2,6 +2,9 @@
 // TACO DAO — Unified Stylesheet (taco.scss)
 // ═══════════════════════════════════════════════
 
+// Font Awesome faces cut down to the icons in use, written by build/fonts.mjs on every build
+@use "../assets/fonts/fa-subset/faces";
+
 
 // ┌────────────────────────────────────┐
 // │  1. CSS RESET                      │

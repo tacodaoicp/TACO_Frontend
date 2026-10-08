@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import immutableAssets from './build/immutable-assets.js';
 import { vendorChunks, checkVendorChunk } from './build/vendor-chunk.js';
 import latin1Output from './build/latin1-output.js';
+import faSubset from './build/fonts.mjs';
 
 // Load base .env first, then environment-specific overrides
 dotenv.config({ path: '../../.env' });
@@ -53,6 +54,7 @@ export default defineConfig({
   },
   plugins: [
     vue(),
+    faSubset(),
     environment('all', { prefix: 'CANISTER_' }),
     environment('all', { prefix: 'DFX_' }),
     // assets/ is served as immutable (public/.ic-assets.json5): hash the boot script, guard the names

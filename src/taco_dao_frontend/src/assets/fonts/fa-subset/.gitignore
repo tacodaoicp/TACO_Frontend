@@ -1,0 +1,4 @@
+# Font Awesome Pro subsets and their @font-face rules, written by build/fonts.mjs on every build.
+# Not committed: the Font Awesome Pro license does not allow its font files in a public repo.
+*
+!.gitignore
