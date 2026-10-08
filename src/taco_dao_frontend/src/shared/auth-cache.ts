@@ -121,6 +121,11 @@ export async function getCachedIdentity(): Promise<Identity> {
         await authClient.logout()
         clearAuthCache()
         currentIdentity = (await getCachedAuthClient()).getIdentity() // anonymous now
+        // Tell the exchange UI (this tab and others) the session is gone.
+        // Before, the UI stayed "connected" until the next tab focus, and the
+        // balance poll kept running with no identity behind it.
+        try { localStorage.removeItem('taco_exchange_auth') } catch { /* ignore */ }
+        try { new BroadcastChannel('taco-exchange-auth').postMessage({ type: 'logout' }) } catch { /* ignore */ }
       }
     } catch { /* best-effort; never block reads on validation */ }
   }

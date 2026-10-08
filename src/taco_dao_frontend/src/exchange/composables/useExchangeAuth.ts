@@ -14,6 +14,19 @@ import { onVisible } from './useVisibilityAware'
 let bootChecked = false
 let bootBroadcastWired = false
 
+/** Earliest expiry (ms) in the identity's delegation chain, if it has one. */
+function delegationExpiryMs(identity: unknown): number | undefined {
+  try {
+    const dels = (identity as any)?.getDelegation?.()?.delegations as Array<{ delegation: { expiration: bigint } }> | undefined
+    if (!dels?.length) return undefined
+    let min = Infinity
+    for (const d of dels) min = Math.min(min, Number(BigInt(d.delegation.expiration) / 1_000_000n))
+    return Number.isFinite(min) ? min : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function useExchangeAuth() {
   const exchangeStore = useExchangeStore()
   const toast = useExchangeToast()
@@ -39,8 +52,10 @@ export function useExchangeAuth() {
     try {
       const raw = localStorage.getItem('taco_exchange_auth')
       if (raw) {
-        const v = JSON.parse(raw) as { principal?: string }
-        if (v?.principal) {
+        const v = JSON.parse(raw) as { principal?: string; exp?: number }
+        // Skip when the saved session has already expired: showing it as
+        // connected let the balance poll run with no identity behind it.
+        if (v?.principal && !(typeof v.exp === 'number' && v.exp <= Date.now())) {
           exchangeStore.isAuthenticated = true
           exchangeStore.principalText = v.principal
         }
@@ -58,7 +73,7 @@ export function useExchangeAuth() {
         const principal = identity.getPrincipal().toText()
         exchangeStore.isAuthenticated = true
         exchangeStore.principalText = principal
-        try { localStorage.setItem('taco_exchange_auth', JSON.stringify({ principal, at: Date.now() })) } catch { /* ignore */ }
+        try { localStorage.setItem('taco_exchange_auth', JSON.stringify({ principal, at: Date.now(), exp: delegationExpiryMs(identity) })) } catch { /* ignore */ }
       } else {
         // IDB says we're anonymous → drop the optimistic flag.
         exchangeStore.isAuthenticated = false
@@ -117,7 +132,7 @@ export function useExchangeAuth() {
       // Optimistic auth paint cache: next window open paints the connect pill
       // before the IDB read completes.
       try {
-        localStorage.setItem('taco_exchange_auth', JSON.stringify({ principal, at: Date.now() }))
+        localStorage.setItem('taco_exchange_auth', JSON.stringify({ principal, at: Date.now(), exp: delegationExpiryMs(identity) }))
       } catch { /* ignore */ }
 
       // Cross-tab notification — other open tabs flip to connected immediately.
@@ -202,12 +217,17 @@ export function useExchangeAuth() {
             void import('../../shared/auth-cache').then(m => m.clearAuthCache())
             try { localStorage.removeItem('taco_exchange_auth') } catch { /* ignore */ }
           } else if (data?.type === 'login' && data.principal) {
-            exchangeStore.isAuthenticated = true
-            exchangeStore.principalText = data.principal
-            exchangeStore.clearActorCache()
-            // Drop this tab's in-memory identity so the next call re-reads the
-            // fresh delegation the other tab just wrote to IDB.
-            void import('../../shared/auth-cache').then(m => m.clearAuthCache())
+            const principal = data.principal
+            // Drop this tab's in-memory identity BEFORE flipping the state: the
+            // login watchers start the new account's reads right away, and they
+            // must use the delegation the other tab just wrote to IDB (with
+            // the old cache they failed as not authenticated).
+            void import('../../shared/auth-cache').then((m) => {
+              m.clearAuthCache()
+              exchangeStore.isAuthenticated = true
+              exchangeStore.principalText = principal
+              exchangeStore.clearActorCache()
+            })
           }
         }
       } catch { /* BroadcastChannel unavailable — fall back to localStorage events */ }
@@ -224,10 +244,14 @@ export function useExchangeAuth() {
           try {
             const v = JSON.parse(e.newValue) as { principal?: string }
             if (v?.principal && v.principal !== exchangeStore.principalText) {
-              exchangeStore.isAuthenticated = true
-              exchangeStore.principalText = v.principal
-              exchangeStore.clearActorCache()
-              void import('../../shared/auth-cache').then(m => m.clearAuthCache())
+              const principal = v.principal
+              // Same order as the BroadcastChannel login above.
+              void import('../../shared/auth-cache').then((m) => {
+                m.clearAuthCache()
+                exchangeStore.isAuthenticated = true
+                exchangeStore.principalText = principal
+                exchangeStore.clearActorCache()
+              })
             }
           } catch { /* ignore */ }
         }
