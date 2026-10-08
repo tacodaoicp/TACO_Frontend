@@ -442,8 +442,10 @@ async function loadPools(force = false) {
       // Initial sort by hasLiquidity only — TVL/Vol sorting happens in `filteredPools`
       // and stays live as prices update (it reads the derived `pools` computed).
       rawPools.value.sort((a, b) => (a.hasLiquidity === b.hasLiquidity) ? 0 : (a.hasLiquidity ? -1 : 1))
-    } else {
-      // Fallback to old method if getAllPoolStats not available
+    } else if (rawPools.value.length === 0) {
+      // Fallback to old method if getAllPoolStats not available. Only when
+      // there are no rows at all: a failed refresh must not swap good rows
+      // for bare ones without TVL or volume.
       const info = store.exchangeInfoData
       const ammPools = await store.getAllAMMPools().catch(() => []) as any[]
       const ammByPair = new Map<string, any>()

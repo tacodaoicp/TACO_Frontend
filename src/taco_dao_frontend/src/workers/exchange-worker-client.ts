@@ -11,6 +11,7 @@ import { serializeForTransfer, deserializeFromTransfer } from './shared/transfer
 import { getNetworkHost } from '../shared/auth-cache'
 import { getEffectiveNetwork } from '../config/network-config'
 import { getCanisterId } from '../constants/canisterIds'
+import { noteCallOk, noteCallError } from '../exchange/utils/connectivity'
 
 interface NetCfg { host: string; canisterId: string; fetchRootKey: boolean }
 export interface SerializedIdentity { delegationChainJson: string; sessionKeyJson: string }
@@ -38,8 +39,14 @@ function ensureWorker(): Worker {
     if (!p) return
     pending.delete(id)
     clearTimeout(p.timer)
-    if (ok) p.resolve(deserializeFromTransfer(result))
-    else p.reject(new Error(error || 'exchange worker error'))
+    if (ok) {
+      noteCallOk()
+      p.resolve(deserializeFromTransfer(result))
+    } else {
+      const err = new Error(error || 'exchange worker error')
+      noteCallError(err)
+      p.reject(err)
+    }
   }
   worker.onerror = (e) => {
     for (const [, p] of pending) { clearTimeout(p.timer); p.reject(new Error(e.message || 'exchange worker crashed')) }
@@ -95,7 +102,9 @@ export function callExchangeQuery<T = unknown>(method: string, args: unknown[] =
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
       pending.delete(id)
-      reject(new Error(`exchange worker call '${method}' timed out`))
+      const err = new Error(`exchange worker call '${method}' timed out`)
+      noteCallError(err)
+      reject(err)
     }, timeoutMs)
     pending.set(id, { resolve, reject, timer })
     w.postMessage({ type: 'CALL', id, method, args: args.map(serializeForTransfer), auth: !!opts.auth })

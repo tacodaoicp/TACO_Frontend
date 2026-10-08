@@ -454,7 +454,8 @@ async function scanStuck() {
   scanning.value = true
   stuckTrades.value = []
   try {
-    const trades = await store.getUserTrades()
+    // A scan must read the canister, not a saved list.
+    const trades = (await store.userTradesQuery.refresh()) ?? await store.getUserTrades()
     stuckTrades.value = trades
       .filter(t => t.trade_done === 1n && ((t as any).init_paid2 === 0n || (t as any).seller_paid2 === 0n))
       .map(t => ({

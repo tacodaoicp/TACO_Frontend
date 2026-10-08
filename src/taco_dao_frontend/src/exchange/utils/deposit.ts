@@ -14,6 +14,7 @@ import { icrcIDL } from '../../shared/icrc-idl'
 import { getCanisterId } from '../../constants/canisterIds'
 import { requestApproval, ApprovalDeclined } from './approvalPrompt'
 import { useExchangeStore } from '../store/exchange.store'
+import { setItemWithCacheEviction } from './persistCache'
 import { withTimeout } from './withTimeout'
 
 /** JSON replacer that converts BigInt to string (prevents "Do not know how to serialize a BigInt") */
@@ -322,7 +323,8 @@ function saveDepositToCache(tokenCanisterId: string, block: bigint, amount: bigi
     // Prune old entries + cap size
     const now = Date.now()
     const pruned = history.filter(e => now - e.timestamp < MAX_AGE_MS).slice(0, MAX_ENTRIES)
-    localStorage.setItem(CACHE_KEY, JSON.stringify(pruned))
+    // Recovery record: on a full storage, free exchange cache space and retry.
+    setItemWithCacheEviction(CACHE_KEY, JSON.stringify(pruned))
   } catch { /* localStorage full or unavailable — ignore */ }
 }
 
@@ -361,6 +363,7 @@ export async function depositTokenForLiquidity(
   treasuryAccountIdHex: string,
   treasuryPrincipalText: string,
 ): Promise<bigint> {
+  useExchangeStore().assertCanTrade()
   const agent = await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
 
@@ -419,6 +422,7 @@ export async function depositToken(
   treasuryAccountIdHex: string,
   treasuryPrincipalText: string,
 ): Promise<bigint> {
+  useExchangeStore().assertCanTrade()
   let block: bigint
   const typeStr = 'ICP' in assetType ? 'ICP' : 'ICRC3' in assetType ? 'ICRC3' : 'ICRC12'
 

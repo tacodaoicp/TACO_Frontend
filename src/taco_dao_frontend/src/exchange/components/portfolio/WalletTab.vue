@@ -472,7 +472,9 @@ async function addToExchange(row: WalletRow) {
     if ('Ok' in result) {
       addResult.value = `Added ${row.symbol} to exchange: ${result.Ok}`
       toast.success('Token Added', row.symbol + ' added to exchange')
-      await store.initExchange()
+      // Re-read the token list (applies to the store when it lands). Re-running
+      // init skipped the network for 24 h and re-applied the saved list.
+      await store.refreshTokens()
     } else {
       const { classifyExchangeError } = await import('../../utils/errors')
       const classified = classifyExchangeError(result.Err)

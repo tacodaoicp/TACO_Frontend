@@ -37,22 +37,33 @@ import type {
 import { getCanisterId } from '../../constants/canisterIds'
 import { getCachedAgent, getCachedIdentity, getNetworkHost, isSessionAuthError, clearAuthCache, EXCHANGE_AUTH_DB_NAME } from '../../shared/auth-cache'
 import { getEffectiveNetwork } from '../../config/network-config'
-import { readCache, writeCache } from '../utils/persistCache'
+import { readCache, writeCache, isWithinAge, sweepCache, purgeUserCache } from '../utils/persistCache'
 import { createCachedQuery, createKeyedQueryFactory, type CachedQuery } from '../utils/cachedQuery'
 import { isVisible as isDocumentVisible } from '../composables/useVisibilityAware'
+import { callsFailingSince, connectivityTick, lastCallOkAt, noteCallOk, noteCallError } from '../utils/connectivity'
 
-// TTLs for the persistent (localStorage) cache. Tokens + treasury + fees
-// are practically static (rarely change between sessions); pool data is
-// refreshed every 15 s so a 5-min cache is fine for a stale-while-revalidate
-// first paint; prices change often but a 5-min stale read is still better
-// than blank fields on F5.
+// Refresh windows for the saved boot values. Tokens are practically static;
+// pool data is refreshed every 15 s, so a 5 min window is fine for a first
+// paint that the refresh then replaces on screen; prices change often but a
+// 5 min old read is still better than blank fields on F5.
 const CACHE_TTL = {
   tokens:   24 * 60 * 60 * 1000, // 24 h
   info:           5 * 60 * 1000, // 5 min
   prices:         5 * 60 * 1000, // 5 min
-  treasury: 30 * 24 * 60 * 60 * 1000, // 30 d
-  fees:     30 * 24 * 60 * 60 * 1000, // 30 d
 }
+
+// Saved pools (prices, reserves, TVL inputs) and saved orderbooks older than
+// this are not shown at boot: the loading state stays until fresh data lands
+// (1 to 3 s). Younger saved data paints first and the refresh replaces it.
+const MAX_SAVED_POOLS_AGE_MS = 12 * 60 * 60 * 1000
+const MAX_SAVED_ORDERBOOK_AGE_MS = 12 * 60 * 60 * 1000
+// While the pools on screen come from a save older than this, the DAO's
+// direct token prices win over prices derived from those pools.
+const OLD_POOLS_PRICE_AGE_MS = 10 * 60 * 1000
+// "Live data paused" shows after this long without a successful exchange call
+// once a call has failed.
+const LIVE_DATA_PAUSED_AFTER_MS = 10_000
+const PAGE_STARTED_AT = Date.now()
 
 // 7-day trend record for a single token — returned by get_token_trends_7d.
 // `points` is 28 samples, oldest-first, one every 6h. `points[0]` is the
@@ -93,11 +104,19 @@ export const useExchangeStore = defineStore('exchange', () => {
   const revokeFeeDivisor = ref(5n)
   const referralFeePct = ref(20n)
   const isFrozen = ref(false)
+  // The boot frozen check failed for network reasons (no answer from the
+  // canister): the app keeps going on saved data and shows a note instead of
+  // the frozen banner. Cleared by the first frozen check that gets an answer.
+  const frozenUnknown = ref(false)
   // Exchange V2 (approve+pull) gate state — dark by default. Populated by the
   // gate queries below via onSuccess; read through useV2Deposit().
   const v2Enabled = ref(false)
   const v2AllowedTokens = ref<Set<string>>(new Set())
-  const icpPriceUSD = ref(0) // from external APIs (CoinGecko/CoinCap/Binance)
+  const icpPriceUSD = ref(0) // from external APIs (CoinGecko/Binance), the DAO, or a pool estimate
+  // Where icpPriceUSD came from. An external or DAO price is never replaced by
+  // a pool estimate; a pool estimate is replaced by a recent DAO price.
+  const icpSrc = ref<'ext' | 'dao' | 'pool' | null>(null)
+  let lastRefIcpPrice = 0 // last external or recent DAO ICP price, sanity bound for pool estimates
   const externalPricesUSD = ref<Map<string, number>>(new Map()) // known external token prices
   const tokenPricesUSD = ref<Map<string, number>>(new Map())
   // Last-resort price fallback seeded by `getTokenDetailsWithoutPastPrices` on the
@@ -106,6 +125,8 @@ export const useExchangeStore = defineStore('exchange', () => {
   // the exchange's own `fetchTokenPricesUSD` poll has populated `tokenPricesUSD`
   // for low-volume tokens.
   const daoFallbackPrices = ref<Map<string, number>>(new Map())
+  // True while exchangeInfoData came from a save older than OLD_POOLS_PRICE_AGE_MS.
+  const poolsFromOldSave = ref(false)
 
   // Rate limiter
   const rateLimitCalls = ref<number[]>([])  // timestamps of update calls
@@ -141,12 +162,33 @@ export const useExchangeStore = defineStore('exchange', () => {
       await agent.fetchRootKey()
     }
 
-    _queryActor = Actor.createActor<_SERVICE>(idlFactory, {
+    _queryActor = withCallTracking(Actor.createActor<_SERVICE>(idlFactory, {
       agent,
       canisterId: getExchangeCanisterId(),
-    })
+    }))
 
     return _queryActor
+  }
+
+  /** Record every main thread query's outcome in the connectivity signal (the
+   *  worker client records the off thread ones). */
+  function withCallTracking<T extends object>(actor: T): T {
+    return new Proxy(actor, {
+      get(target, prop, receiver) {
+        const v = Reflect.get(target, prop, receiver)
+        if (typeof v !== 'function') return v
+        return async (...args: unknown[]) => {
+          try {
+            const r = await (v as (...a: unknown[]) => Promise<unknown>).apply(target, args)
+            noteCallOk()
+            return r
+          } catch (err) {
+            noteCallError(err)
+            throw err
+          }
+        }
+      },
+    })
   }
 
   /** Authenticated actor for update calls (counted, rate-limited) */
@@ -225,28 +267,51 @@ export const useExchangeStore = defineStore('exchange', () => {
     return callsRemaining.value > 0
   }
 
+  /** Called before a deposit moves funds (V1 flows transfer first and call the
+   *  exchange after). Refuses when the exchange is known to be frozen or the
+   *  update budget is spent, so funds never leave the wallet for an exchange
+   *  call that would be refused, and a freeze gets its own message instead of
+   *  "Rate limit reached". The backend still rejects trades itself on a freeze
+   *  this tab has not seen yet. */
+  function assertCanTrade(): void {
+    if (isFrozen.value) throw new Error('Exchange is currently frozen. No funds were moved.')
+    if (callsRemaining.value <= 0) throw new Error('Rate limit reached. Wait before making more trades.')
+  }
+
   // ── Frozen state detection ──
   let frozenPollTimer: ReturnType<typeof setInterval> | null = null
 
+  function isMissingMethodError(err: unknown): boolean {
+    const msg = (err as any)?.message || String(err)
+    return msg.includes('has no query method') || msg.includes('method not found') || msg.includes('IC0536')
+  }
+
+  /**
+   * Ask the canister whether the exchange is frozen. Only a real answer
+   * changes the state: a network error or timeout keeps the last known value
+   * (it used to read as "frozen", which stopped the info poll and blocked
+   * trades on every short connection drop). The backend still rejects trades
+   * itself while frozen.
+   */
   async function checkFrozenStatus(): Promise<boolean> {
     try {
       const actor = await getQueryActor()
-      const frozen = await actor.isExchangeFrozen()
+      const frozen = await withTimeout(actor.isExchangeFrozen(), 8_000, 'isExchangeFrozen')
       isFrozen.value = frozen
+      frozenUnknown.value = false
       return frozen
     } catch (err: any) {
       // If method doesn't exist on canister yet, assume not frozen
-      const msg = err?.message || String(err)
-      if (msg.includes('has no query method') || msg.includes('method not found') || msg.includes('IC0536')) {
+      if (isMissingMethodError(err)) {
         isFrozen.value = false
+        frozenUnknown.value = false
         return false
       }
-      // Other errors (network, etc.) — assume frozen as safe default
-      isFrozen.value = true
-      return true
+      return isFrozen.value
     }
   }
 
+  let initCompleted = false
   function startFrozenPolling() {
     if (frozenPollTimer) return
     frozenPollTimer = setInterval(async () => {
@@ -257,7 +322,12 @@ export const useExchangeStore = defineStore('exchange', () => {
       const stillFrozen = await checkFrozenStatus()
       if (!stillFrozen) {
         stopFrozenPolling()
-        initExchange() // re-init when unfrozen
+        // Frozen mid session: the info poll is still scheduled, run its body
+        // now. Re-running init here used to put the page load pool snapshot
+        // back on screen. Frozen at boot: init never got past the check, so
+        // run it now.
+        if (initCompleted) void runInfoPoll()
+        else void initExchange()
       }
     }, 30000)
   }
@@ -267,38 +337,85 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
 
   // ═══════════════════════════════════════════
+  // Apply helpers
+  // ═══════════════════════════════════════════
+  // Every way a boot value reaches the store goes through these: the saved
+  // copy at first paint, the boot query's network refresh (onSuccess) and the
+  // in-session refreshes. Before, the refresh only reached localStorage and
+  // the screen kept the saved value for the whole session.
+
+  function applyTokens(v: [] | [TokenInfo[]] | null | undefined) {
+    const list = v && v.length > 0 ? v[0] ?? [] : []
+    // Never blank the list (the getAcceptedTokens fallback may have filled it).
+    if (list.length > 0 && list !== tokens.value) tokens.value = list
+  }
+
+  // Signature of the pool data ON SCREEN. The poll compares fresh data with
+  // this, not with its own previous answer, so whatever is shown gets replaced
+  // as soon as the network says something different.
+  let _onScreenInfoSig = ''
+  function applyInfo(p: pool | null | undefined, fetchedAt: number, rerunPrices = true) {
+    if (!p) return
+    let changed = false
+    const sig = exchangeInfoSig(p)
+    if (sig !== _onScreenInfoSig || !exchangeInfoData.value) {
+      _onScreenInfoSig = sig
+      exchangeInfoData.value = p
+      changed = true
+    }
+    const old = !isWithinAge(fetchedAt, OLD_POOLS_PRICE_AGE_MS)
+    if (old !== poolsFromOldSave.value) {
+      poolsFromOldSave.value = old
+      changed = true
+    }
+    if (changed && rerunPrices) void fetchTokenPricesUSD()
+  }
+
+  function applyPaused(v: [] | [string[]] | null | undefined) {
+    if (v && v.length > 0) pausedTokens.value = v[0] ?? []
+  }
+
+  /** Paint the saved boot values right away (before any await), so first paint
+   *  does not wait for the frozen check. Saved pools older than
+   *  MAX_SAVED_POOLS_AGE_MS are skipped: the loading state shows instead. A
+   *  value stamped in the future is never painted. */
+  function seedFromSaved() {
+    const seed = <T>(q: CachedQuery<T>, maxAgeMs: number, apply: (v: T) => void) => {
+      const v = q.data.value
+      if (v !== null && isWithinAge(q.lastFetchedAt.value, maxAgeMs)) apply(v)
+    }
+    seed(acceptedTokensQuery, Infinity, applyTokens)
+    seed(exchangeInfoQuery, MAX_SAVED_POOLS_AGE_MS, v => applyInfo(v[0], exchangeInfoQuery.lastFetchedAt.value))
+    seed(pausedTokensQuery, Infinity, applyPaused)
+    seed(treasuryAcctQuery, Infinity, v => { if (v) treasuryAccountId.value = v })
+    seed(treasuryPrincQuery, Infinity, v => { if (v) treasuryPrincipal.value = v })
+    seed(tradingFeeQuery, Infinity, v => { tradingFeeBps.value = v })
+    seed(revokeFeeQuery, Infinity, v => { revokeFeeDivisor.value = v })
+    seed(refFeeQuery, Infinity, v => { referralFeePct.value = v })
+  }
+
+  // ═══════════════════════════════════════════
   // Initialization
   // ═══════════════════════════════════════════
+
+  let sweptCache = false
 
   async function initExchange() {
     initError.value = ''
     warmExchangeWorker() // spin up the query worker now so first reads don't pay its cold-start
 
-    // Stale-while-revalidate: hydrate from localStorage so views see populated
-    // state on the first paint after F5. Fresh canister fetches below
-    // overwrite reactively when they land. None of these reads block the
-    // canister calls — they just give the UI something to show immediately.
+    if (!sweptCache) {
+      sweptCache = true
+      sweepCache() // legacy single copy keys, old chart and orderbook entries
+    }
+
+    // First paint from the saved boot entries. The fetches below replace these
+    // on screen when they land (onSuccess on each boot query).
+    seedFromSaved()
     try {
-      const cTokens = readCache<TokenInfo[]>('tokens', CACHE_TTL.tokens)
-      if (cTokens && cTokens.length > 0 && tokens.value.length === 0) {
-        tokens.value = cTokens
-      }
-      const cInfo = readCache<pool>('info', CACHE_TTL.info)
-      if (cInfo && !exchangeInfoData.value) exchangeInfoData.value = cInfo
       const cPrices = readCache<Array<[string, number]>>('prices', CACHE_TTL.prices)
       if (cPrices && tokenPricesUSD.value.size === 0) {
         tokenPricesUSD.value = new Map(cPrices)
-      }
-      const cTreasury = readCache<{ acct: string; princ: string }>('treasury', CACHE_TTL.treasury)
-      if (cTreasury) {
-        if (!treasuryAccountId.value) treasuryAccountId.value = cTreasury.acct
-        if (!treasuryPrincipal.value) treasuryPrincipal.value = cTreasury.princ
-      }
-      const cFees = readCache<{ trading: bigint; revoke: bigint; ref: bigint }>('fees', CACHE_TTL.fees)
-      if (cFees) {
-        if (tradingFeeBps.value === 0n) tradingFeeBps.value = cFees.trading
-        if (revokeFeeDivisor.value === 0n) revokeFeeDivisor.value = cFees.revoke
-        if (referralFeePct.value === 0n) referralFeePct.value = cFees.ref
       }
     } catch { /* best-effort hydration */ }
 
@@ -319,35 +436,38 @@ export const useExchangeStore = defineStore('exchange', () => {
       // are correct fast without depending on the slow external price chain.
       const daoPricesPromise = fetchDaoPrices().catch(() => { /* best-effort */ })
 
-      // CRITICAL batch: gate-opening pair + frozen check. The Pro view gate
-      // `v-if="selectedToken0 && selectedToken1"` only needs tokens +
-      // exchangeInfo to populate; everything else (fees / treasury /
-      // paused-tokens) was previously bundled here but isn't required to
-      // flip the gate. Splitting cuts time-to-gate-open from "slowest of 9"
-      // to "slowest of 3" on cold load. Frozen stays critical: a frozen
-      // exchange short-circuits the rest of init.
-      // All three are wrapped in cachedQuery (persist:true), so on warm
-      // boot tokens/info resolve from localStorage on the first microtask.
-      // withTimeout so a stuck IC response can't leave the exchange hanging on a
-      // loading state — on timeout the call rejects, allSettled settles, and we
-      // fall back to cached/stale data (or the initError banner below).
+      // CRITICAL batch: the pair gate (tokens + pools) and the frozen check, in
+      // parallel. Tokens and pools apply as soon as each is ready instead of
+      // waiting for the frozen check; each apply reads query.data at that
+      // moment, so a refresh that already landed is never overwritten by the
+      // older saved value. withTimeout so a stuck IC response can't leave the
+      // exchange hanging on a loading state.
       const criticalResults = await Promise.allSettled([
-        withTimeout(acceptedTokensQuery.ensure(CACHE_TTL.tokens), 15_000, 'getAcceptedTokensInfo'), // 0 — gate
-        withTimeout(exchangeInfoQuery.ensure(CACHE_TTL.info), 15_000, 'exchangeInfo'),               // 1 — gate
-        withTimeout(actor.isExchangeFrozen(), 8_000, 'isExchangeFrozen'),                            // 2 — admin
+        withTimeout(acceptedTokensQuery.ensure(CACHE_TTL.tokens), 15_000, 'getAcceptedTokensInfo')
+          .then(() => applyTokens(acceptedTokensQuery.data.value)),                                // 0 — gate
+        withTimeout(exchangeInfoQuery.ensure(CACHE_TTL.info), 15_000, 'exchangeInfo')
+          .then(() => {
+            if (exchangeInfoQuery.isFresh(MAX_SAVED_POOLS_AGE_MS)) {
+              applyInfo(exchangeInfoQuery.data.value?.[0], exchangeInfoQuery.lastFetchedAt.value)
+            }
+          }),                                                                                      // 1 — gate
+        withTimeout(actor.isExchangeFrozen(), 8_000, 'isExchangeFrozen'),                          // 2 — admin
       ])
 
-      // Frozen short-circuit — mirrors checkFrozenStatus() error semantics:
-      // missing method ⇒ not frozen; any other failure ⇒ treat as frozen.
+      // Frozen: three states. A real answer of true is frozen; a missing method
+      // is not frozen; any other failure (network, timeout) is unknown and the
+      // app keeps working on saved data with a note instead of the banner.
       const frozenSettled = criticalResults[2]
-      let frozen: boolean
+      let frozen = false
+      let unknown = false
       if (frozenSettled.status === 'fulfilled') {
         frozen = Boolean(frozenSettled.value)
-      } else {
-        const msg = (frozenSettled.reason as any)?.message || String(frozenSettled.reason)
-        frozen = !(msg.includes('has no query method') || msg.includes('method not found') || msg.includes('IC0536'))
+      } else if (!isMissingMethodError(frozenSettled.reason)) {
+        unknown = true
+        console.warn('[Exchange] Frozen check got no answer, continuing with saved data:', frozenSettled.reason)
       }
       isFrozen.value = frozen
+      frozenUnknown.value = unknown
       if (frozen) {
         initError.value = 'Exchange is currently frozen. Retrying every 30 seconds...'
         console.log('[Exchange] Exchange is frozen — waiting for unfreeze')
@@ -355,25 +475,15 @@ export const useExchangeStore = defineStore('exchange', () => {
         return
       }
 
-      const getCritical = <T>(i: number): T | null => {
+      for (let i = 0; i < 2; i++) {
         const r = criticalResults[i]
-        if (r.status === 'fulfilled') return r.value as T
-        console.error(`[Exchange] Init critical call ${i} failed:`, r.reason)
-        return null
+        if (r.status === 'rejected') console.error(`[Exchange] Init critical call ${i} failed:`, r.reason)
       }
-
-      const tokensResult = getCritical<[] | [TokenInfo[]]>(0)
-      const infoResult   = getCritical<[] | [pool]>(1)
-
-      if (tokensResult && tokensResult.length > 0) tokens.value = tokensResult[0] ?? []
-      if (infoResult   && infoResult.length > 0)   exchangeInfoData.value = infoResult[0] ?? null
 
       // DEFERRED batch: config / fees / paused-tokens. NOT required to flip the
       // Pro view gate. Fired on the next microtask so the gate watcher
-      // (ProTradeView) runs first; these refs populate reactively when the calls
-      // land. writeCache for the legacy 'treasury'/'fees' sync-hydration keys
-      // also moves here so it sees real values (was racing the original
-      // synchronous write against the still-pending deferred batch).
+      // (ProTradeView) runs first. Each query applies its network result via
+      // onSuccess; the apply below covers a saved value served without a fetch.
       queueMicrotask(() => {
         void Promise.allSettled([
           pausedTokensQuery.ensure(5 * 60_000),
@@ -382,46 +492,19 @@ export const useExchangeStore = defineStore('exchange', () => {
           tradingFeeQuery.ensure(60 * 60_000),
           revokeFeeQuery.ensure(60 * 60_000),
           refFeeQuery.ensure(60 * 60_000),
-          // V2 gates — APPENDED (getD below unpacks by index). Refs populate
-          // via each query's onSuccess, so no unpacking here.
+          // V2 gates. Refs populate via each query's onSuccess.
           v2EnabledQuery.ensure(5 * 60_000),
           v2AllowedTokensQuery.ensure(5 * 60_000),
         ]).then((deferredResults) => {
-          const getD = <T>(i: number): T | null => {
-            const r = deferredResults[i]
-            if (r.status === 'fulfilled') return r.value as T
-            console.error(`[Exchange] Init deferred call ${i} failed:`, r.reason)
-            return null
-          }
-
-          const pausedResult  = getD<[] | [string[]]>(0)
-          const treasuryAcct  = getD<string>(1)
-          const treasuryPrinc = getD<string>(2)
-          const fee           = getD<bigint>(3)
-          const revFee        = getD<bigint>(4)
-          const refFee        = getD<bigint>(5)
-
-          if (pausedResult && pausedResult.length > 0) pausedTokens.value = pausedResult[0] ?? []
-          if (treasuryAcct)  treasuryAccountId.value  = treasuryAcct
-          if (treasuryPrinc) treasuryPrincipal.value  = treasuryPrinc
-          if (fee    !== null) tradingFeeBps.value    = fee
-          if (revFee !== null) revokeFeeDivisor.value = revFee
-          if (refFee !== null) referralFeePct.value   = refFee
-
-          // Persist for sync-hydration on next F5 (legacy 'treasury'/'fees'
-          // keys read at lines 250-271). cachedQuery's persist layer caches
-          // each under boot.* keys too, but the manual readCache there paints
-          // a tick earlier on F5 because it runs synchronously.
-          if (treasuryAccountId.value && treasuryPrincipal.value) {
-            writeCache('treasury', { acct: treasuryAccountId.value, princ: treasuryPrincipal.value })
-          }
-          if (tradingFeeBps.value > 0n) {
-            writeCache('fees', {
-              trading: tradingFeeBps.value,
-              revoke:  revokeFeeDivisor.value,
-              ref:     referralFeePct.value,
-            })
-          }
+          deferredResults.forEach((r, i) => {
+            if (r.status === 'rejected') console.error(`[Exchange] Init deferred call ${i} failed:`, r.reason)
+          })
+          applyPaused(pausedTokensQuery.data.value)
+          if (treasuryAcctQuery.data.value)  treasuryAccountId.value = treasuryAcctQuery.data.value
+          if (treasuryPrincQuery.data.value) treasuryPrincipal.value = treasuryPrincQuery.data.value
+          if (tradingFeeQuery.data.value !== null) tradingFeeBps.value    = tradingFeeQuery.data.value
+          if (revokeFeeQuery.data.value  !== null) revokeFeeDivisor.value = revokeFeeQuery.data.value
+          if (refFeeQuery.data.value     !== null) referralFeePct.value   = refFeeQuery.data.value
         })
       })
 
@@ -457,16 +540,11 @@ export const useExchangeStore = defineStore('exchange', () => {
       // ICP/ckUSDC pool; fetchDaoPrices (fired in parallel above) also anchors ICP
       // and seeds DAO prices that already price most tokens directly. The external
       // cryptoPricesPromise still runs and re-runs fetchTokenPricesUSD to refine.
-      if (icpPriceUSD.value <= 0) estimateIcpFromPool()
+      // No pool estimate from an old saved snapshot.
+      if (icpPriceUSD.value <= 0 && !poolsFromOldSave.value) estimateIcpFromPool()
       void fetchTokenPricesUSD()
 
       console.log(`[Exchange] Init complete: ${tokens.value.length} tokens, info=${!!exchangeInfoData.value}`)
-
-      // Persist tokens + info for sync-hydration on next F5 (lines 250-271).
-      // treasury + fees are persisted inside the deferred microtask above, since
-      // their values aren't populated yet at this point in the critical path.
-      if (tokens.value.length > 0) writeCache('tokens', tokens.value)
-      if (exchangeInfoData.value) writeCache('info', exchangeInfoData.value)
 
       // Prices are already racing in parallel — kicked off above before
       // Promise.allSettled. Just keep the in-flight handle around so any
@@ -476,6 +554,7 @@ export const useExchangeStore = defineStore('exchange', () => {
 
       // Start periodic exchangeInfo refresh (every 15s)
       startExchangeInfoPolling()
+      initCompleted = true
 
       if (tokens.value.length === 0) {
         // "Can't reach canister" needs only the critical batch — deferred can
@@ -483,9 +562,11 @@ export const useExchangeStore = defineStore('exchange', () => {
         const allFailed = criticalResults.every(r => r.status === 'rejected')
         if (allFailed) {
           initError.value = `Cannot reach exchange canister (${getExchangeCanisterId()}). Check canister ID and deployment.`
-        } else {
+        } else if (!unknown) {
           initError.value = 'No tokens configured on the exchange. An admin must add tokens via the Admin panel.'
         }
+        // unknown: no answer from the canister at all; the network note says
+        // so, and the info poll loads tokens and pools once it gets through.
       }
     } catch (err: any) {
       initError.value = `Failed to initialize exchange: ${err.message || err}`
@@ -493,7 +574,13 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
   }
 
-  // ── External crypto price fetch (CoinGecko → CoinCap → Binance) ──
+  /** Re-fetch everything the boot loaded that can change: tokens (new listings),
+   *  for WalletTab after an admin adds a token. Applies via onSuccess. */
+  async function refreshTokens(): Promise<void> {
+    await acceptedTokensQuery.refresh()
+  }
+
+  // ── External crypto price fetch (CoinGecko → Binance) ──
   let lastPriceUpdate = 0
 
   async function fetchCryptoPrices() {
@@ -516,8 +603,8 @@ export const useExchangeStore = defineStore('exchange', () => {
       const data = await response.json()
       const icpData = data.find((c: { id: string }) => c.id === 'internet-computer')
       const dkpData = data.find((c: { id: string }) => c.id === 'draggin-karma-points')
-      if (icpData?.current_price) {
-        icpPriceUSD.value = icpData.current_price
+      if (icpData?.current_price > 0) {
+        setIcpAnchor(icpData.current_price, 'ext')
         icpFromCoingecko = true
       }
       if (dkpData?.current_price) dkpUsdResolved = dkpData.current_price
@@ -555,23 +642,7 @@ export const useExchangeStore = defineStore('exchange', () => {
       return
     }
 
-    // Fallback 1: CoinCap
-    try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 5000)
-      const resp = await fetch('https://api.coincap.io/v2/assets/internet-computer', { signal: controller.signal })
-      clearTimeout(timeout)
-      if (resp.ok) {
-        const d = await resp.json()
-        icpPriceUSD.value = parseFloat(d.data?.priceUsd) || 0
-      }
-      lastPriceUpdate = now
-      return
-    } catch {
-      console.warn('[Exchange] CoinCap price fetch failed, trying Binance...')
-    }
-
-    // Fallback 2: Binance
+    // Fallback: Binance
     try {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 5000)
@@ -579,7 +650,8 @@ export const useExchangeStore = defineStore('exchange', () => {
       clearTimeout(timeout)
       if (resp.ok) {
         const d = await resp.json()
-        icpPriceUSD.value = parseFloat(d.price) || 0
+        const p = parseFloat(d.price) || 0
+        if (p > 0) setIcpAnchor(p, 'ext')
       }
       lastPriceUpdate = now
     } catch {
@@ -592,26 +664,44 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
   }
 
+  function setIcpAnchor(price: number, src: 'ext' | 'dao' | 'pool') {
+    icpPriceUSD.value = price
+    icpSrc.value = src
+    if (src !== 'pool') lastRefIcpPrice = price
+  }
+
+  /** Last resort ICP anchor from an ICP/ckUSDC pool. Never replaces an external
+   *  or DAO price. Rows with no 24h volume are skipped (a duplicate pool frozen
+   *  at an old price sits first in the list on prod), as are rows far from the
+   *  last known good price; among the rest the most traded row wins. */
   function estimateIcpFromPool() {
+    if (icpSrc.value === 'ext' || icpSrc.value === 'dao') return
     const info = exchangeInfoData.value
     if (!info?.pool_canister) return
     const ICP = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
     const CKUSDC = 'xevnm-gaaaa-aaaar-qafnq-cai'
+    let best = 0
+    let bestVol = 0n
     for (let i = 0; i < info.pool_canister.length; i++) {
       const [t0, t1] = info.pool_canister[i]
-      if ((t0 === ICP && t1 === CKUSDC) || (t0 === CKUSDC && t1 === ICP)) {
-        const price = info.last_traded_price?.[i] ?? 0
-        if (price > 0) {
-          icpPriceUSD.value = t0 === ICP ? price : (1 / price)
-          console.log('[Exchange] ICP price from pool fallback:', icpPriceUSD.value)
-          return
-        }
-      }
+      if (!((t0 === ICP && t1 === CKUSDC) || (t0 === CKUSDC && t1 === ICP))) continue
+      const price = info.last_traded_price?.[i] ?? 0
+      if (price <= 0) continue
+      const vol = BigInt(info.volume_24h?.[i] ?? 0n)
+      if (vol <= 0n) continue
+      const usd = t0 === ICP ? price : (1 / price)
+      if (lastRefIcpPrice > 0 && Math.abs(usd / lastRefIcpPrice - 1) > 0.25) continue
+      if (vol > bestVol) { bestVol = vol; best = usd }
+    }
+    if (best > 0) {
+      setIcpAnchor(best, 'pool')
+      console.log('[Exchange] ICP price from pool fallback:', best)
     }
   }
 
   async function fetchTokenPricesUSD() {
     if (icpPriceUSD.value <= 0) return
+    const anchor = icpPriceUSD.value
     const map = new Map<string, number>()
 
     // Try backend first
@@ -626,6 +716,9 @@ export const useExchangeStore = defineStore('exchange', () => {
     } catch {
       // Backend failed — will derive from pools below
     }
+    // The ICP anchor moved while the backend call was out: whoever moved it
+    // runs this again with the new anchor, so drop this now outdated pass.
+    if (icpPriceUSD.value !== anchor) return
 
     // Seed known prices: ICP, ckUSDC, DKP
     const ICP = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
@@ -655,7 +748,12 @@ export const useExchangeStore = defineStore('exchange', () => {
     if (changed) {
       tokenPricesUSD.value = map
       console.log('[Exchange] Token USD prices updated:', Object.fromEntries(map))
-      writeCache('prices', Array.from(map.entries()))
+      // Save only a map built from fresh pools and a non pool ICP anchor, so a
+      // reload never paints prices rebuilt from an old snapshot (or the bare
+      // seed prices of a boot that could not load pools).
+      if (exchangeInfoData.value && !poolsFromOldSave.value && icpSrc.value !== 'pool') {
+        writeCache('prices', Array.from(map.entries()))
+      }
     }
   }
 
@@ -681,7 +779,13 @@ export const useExchangeStore = defineStore('exchange', () => {
         const price = Number(details?.priceInUSD ?? 0)
         if (price > 0) {
           entries.push([addr, price])
-          if (addr === ICP && icpPriceUSD.value <= 0) icpPriceUSD.value = price
+          if (addr === ICP) {
+            // A recent DAO price replaces a pool estimate (or nothing); an
+            // external price stays. An old DAO price only fills an empty anchor.
+            const syncedMs = Number(BigInt(details?.lastTimeSynced ?? 0n) / 1_000_000n)
+            const recent = syncedMs > 0 && isWithinAge(syncedMs, 6 * 60 * 60_000)
+            if (icpPriceUSD.value <= 0 || (recent && icpSrc.value !== 'ext')) setIcpAnchor(price, 'dao')
+          }
         }
       }
       if (entries.length > 0) {
@@ -729,6 +833,12 @@ export const useExchangeStore = defineStore('exchange', () => {
     ['cngnf-vqaaa-aaaar-qag4q-cai', 1], // ckUSDT
   ])
   function getTokenPriceUSD(address: string): number {
+    // Pools on screen came from an old save: prices derived from them can be
+    // far off, so the DAO's direct price wins until fresh pools land.
+    if (poolsFromOldSave.value) {
+      const d = daoFallbackPrices.value.get(address) ?? 0
+      if (d > 0) return d
+    }
     const p = tokenPricesUSD.value.get(address) ?? 0
     if (p > 0) return p
     const stable = STABLE_USD_FALLBACK.get(address) ?? 0
@@ -753,25 +863,36 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
 
   let infoPollingTimer: ReturnType<typeof setInterval> | null = null
+  let infoPollRunning = false
+  /** One info poll: frozen check, pools and the external ICP price in
+   *  parallel, then USD prices from the fresh pools. allSettled so one failed
+   *  or slow part never skips the others. */
+  async function runInfoPoll(): Promise<void> {
+    if (infoPollRunning) return
+    infoPollRunning = true
+    try {
+      const [frozenR] = await Promise.allSettled([
+        checkFrozenStatus(),
+        refreshExchangeInfo(false),
+        fetchCryptoPrices(),
+      ])
+      if (frozenR.status === 'fulfilled' && frozenR.value) {
+        startFrozenPolling()
+        return
+      }
+      await fetchTokenPricesUSD()
+    } catch { /* ignore */ } finally {
+      infoPollRunning = false
+    }
+  }
   function startExchangeInfoPolling() {
     if (infoPollingTimer) return
-    infoPollingTimer = setInterval(async () => {
+    infoPollingTimer = setInterval(() => {
       // Skip the canister + external price calls while the tab is hidden;
       // when the user comes back, the next tick within 15s catches us up.
       if (!isDocumentVisible.value) return
       if (isFrozen.value) return
-      try {
-        const frozen = await checkFrozenStatus()
-        if (frozen) {
-          startFrozenPolling()
-          return
-        }
-        await Promise.all([
-          refreshExchangeInfo(),
-          fetchCryptoPrices(),
-          fetchTokenPricesUSD(),
-        ])
-      } catch { /* ignore */ }
+      void runInfoPoll()
     }, 15000)
   }
 
@@ -779,30 +900,45 @@ export const useExchangeStore = defineStore('exchange', () => {
   // Query Methods (free, unlimited)
   // ═══════════════════════════════════════════
 
-  // Cheap change-signature over only the volatile arrays (pool count + prices +
-  // reserves). The previous full `JSON.stringify` of the whole nested pool
-  // struct (twice, every 15s) cost ~100-300ms of main-thread jank on mobile.
-  let _lastInfoSig = ''
+  // Cheap change-signature over only the volatile arrays (pool count, prices,
+  // reserves, 24h volume, previous day price). The previous full
+  // `JSON.stringify` of the whole nested pool struct (twice, every 15s) cost
+  // ~100-300ms of main-thread jank on mobile. asset_* are left out (static).
   function exchangeInfoSig(p: pool | null): string {
     if (!p) return ''
-    return `${p.pool_canister?.length ?? 0}|${(p.last_traded_price ?? []).join(',')}|${(p.amm_reserve0 ?? []).join(',')}|${(p.amm_reserve1 ?? []).join(',')}`
+    return `${p.pool_canister?.length ?? 0}|${(p.last_traded_price ?? []).join(',')}|${(p.amm_reserve0 ?? []).join(',')}|${(p.amm_reserve1 ?? []).join(',')}|${(p.volume_24h ?? []).join(',')}|${(p.price_day_before ?? []).join(',')}`
   }
-  async function refreshExchangeInfo() {
+  let _infoReqSeq = 0
+  let _infoAppliedSeq = 0
+  async function refreshExchangeInfo(rerunPrices = true) {
     // Piggyback V2 gate freshness on this poll (runs every 15s and on every
     // mutation; the 5-min TTL caps it at one fetch per window) so an admin
     // flipping the gates reaches open tabs without a reload.
     void v2EnabledQuery.ensure(5 * 60_000)
     void v2AllowedTokensQuery.ensure(5 * 60_000)
+    // Same for the other boot values: each applies through its onSuccess, so
+    // a pause, fee change, new token or treasury change reaches open tabs.
+    void pausedTokensQuery.ensure(5 * 60_000)
+    void tradingFeeQuery.ensure(60 * 60_000)
+    void revokeFeeQuery.ensure(60 * 60_000)
+    void refFeeQuery.ensure(60 * 60_000)
+    void acceptedTokensQuery.ensure(30 * 60_000)
+    void treasuryAcctQuery.ensure(24 * 60 * 60_000)
+    void treasuryPrincQuery.ensure(24 * 60 * 60_000)
     // exchangeInfo is a large struct decoded every 15s — off the main thread.
+    const seq = ++_infoReqSeq
     const result = await callExchangeQuery<[] | [pool]>('exchangeInfo')
-    if (result.length > 0) {
-      const fresh = result[0] ?? null
-      const sig = exchangeInfoSig(fresh)
-      if (sig !== _lastInfoSig) {
-        _lastInfoSig = sig
-        exchangeInfoData.value = fresh
-        if (fresh) writeCache('info', fresh)
+    const fresh = result.length > 0 ? result[0] ?? null : null
+    // seq: a slower, older call never overwrites a newer answer.
+    if (fresh && seq > _infoAppliedSeq) {
+      _infoAppliedSeq = seq
+      // Keep the saved copy in step with the screen, on a change and every 10
+      // minutes when nothing changed (so its timestamp stays the real time the
+      // data was confirmed). set() also stops a slower boot read landing on top.
+      if (exchangeInfoSig(fresh) !== _onScreenInfoSig || !exchangeInfoQuery.isFresh(10 * 60_000)) {
+        exchangeInfoQuery.set(result)
       }
+      applyInfo(fresh, Date.now(), rerunPrices)
     }
     return exchangeInfoData.value
   }
@@ -931,9 +1067,15 @@ export const useExchangeStore = defineStore('exchange', () => {
   // that takes the principal as its argument — no signing required, and using
   // the authed agent causes HTTP 400 for tokens not in the II delegation's
   // `targets`. Identical reasoning to getUserBalance below.
-  async function fetchIcrc1Balance(address: string): Promise<bigint> {
+  async function fetchIcrc1Balance(address: string): Promise<bigint | null> {
+    // The owner is fixed before any await. No identity, an anonymous one (an
+    // expired session) or a different account than the one this query belongs
+    // to gives "no answer" (null): the cached balance stays and nothing is
+    // saved. It used to return 0n, which saved zero balances as fresh.
+    const owner = principalText.value
+    if (!owner) return null
     const identity = await getCachedIdentity()
-    if (!identity || identity.getPrincipal().isAnonymous()) return 0n
+    if (!identity || identity.getPrincipal().isAnonymous() || identity.getPrincipal().toText() !== owner) return null
     const { HttpAgent } = await import('@dfinity/agent')
     // Anonymous read (icrc1_balance_of takes the principal as an arg). Skip
     // per-query signature verification — an advisory display value; the ledger
@@ -958,12 +1100,11 @@ export const useExchangeStore = defineStore('exchange', () => {
   }))
 
   function refreshAllBalances() {
-    // Refresh every per-token query we've ever opened, sharing the in-flight
-    // dedup per address. Cheap because untouched queries don't exist.
-    for (const t of tokens.value) {
-      const q = userBalanceQuery(t.address)
-      if (q.data !== null) void q.refresh()
-    }
+    // Refresh every per-token query a view has opened, sharing the in-flight
+    // dedup per address. values() never creates a query: looping over every
+    // listed token created (and fetched) all of them every 7 s. A query whose
+    // first read failed is retried here too.
+    for (const q of userBalanceQuery.values()) void q.refresh()
   }
 
   // ── V2 allowance cache (user → exchange, per token) ──
@@ -988,7 +1129,8 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
   }
 
-  const userAllowanceQuery = createKeyedQueryFactory<string, { allowance: bigint; expiresAt: bigint | null } | null>((address) => createCachedQuery({
+  type AllowanceInfo = { allowance: bigint; expiresAt: bigint | null }
+  const userAllowanceQuery = createKeyedQueryFactory<string, AllowanceInfo | null>((address) => createCachedQuery<AllowanceInfo | null>({
     key: `user.allowance:${address}`,
     fetcher: () => fetchExchangeAllowance(address),
     maxAgeMs: 30_000,
@@ -1005,9 +1147,8 @@ export const useExchangeStore = defineStore('exchange', () => {
 
   function refreshAllAllowances() {
     // Pulls consume allowance; keep every opened allowance query in sync.
-    for (const t of tokens.value) {
-      const q = userAllowanceQuery(t.address)
-      if (q.data !== null) void q.refresh()
+    for (const q of userAllowanceQuery.values()) {
+      if (q.data.value !== null) void q.refresh()
     }
   }
 
@@ -1054,20 +1195,20 @@ export const useExchangeStore = defineStore('exchange', () => {
   }
   startBalancePolling()
 
-  // Auth-flip handling:
-  //   true→false: drop personal data from memory + localStorage so it can't
-  //               leak into the UI of whoever logs in next on the same machine.
-  //   false→true: eagerly prefetch the most-likely-needed user queries so the
-  //               first nav after login paints from a hot cache. Runs in
-  //               parallel with whatever view is mounting.
+  // Logout or account switch: remove the previous account's saved data (LP,
+  // orders, referral, balances) so it can't leak into the UI of whoever logs
+  // in next on the same machine. Keyed on the principal itself: every logout
+  // path clears principalText in the same tick as isAuthenticated, so the old
+  // clear() calls ran with the key already ':anon' and removed nothing.
+  // Memory is reset by each query's own principal watcher.
+  watch(principalText, (p, prev) => {
+    if (prev && p !== prev) purgeUserCache(prev)
+  })
+
+  // Login: eagerly prefetch the most-likely-needed user queries so the
+  // first nav after login paints from a hot cache. Runs in parallel with
+  // whatever view is mounting.
   watch(isAuthenticated, (v, prev) => {
-    if (!v && prev) {
-      userLpQuery.clear()
-      userTradesQuery.clear()
-      userReferralQuery.clear()
-      userFeesReferrerQuery.clear()
-      return
-    }
     if (v && !prev) {
       // Eager prefetch — the user's first nav post-login has hot data ready.
       void userLpQuery.refresh()
@@ -1245,14 +1386,30 @@ export const useExchangeStore = defineStore('exchange', () => {
 
   async function refreshPoolStats() {
     // Forced fetch (bypasses the 30s TTL) — for pollers like PoolList's interval.
-    return (await poolStatsQuery.refresh()) ?? ([] as any)
+    // A failed refresh keeps the last good stats instead of returning [] (which
+    // made PoolList swap its rows for bare fallback rows without TVL).
+    return (await poolStatsQuery.refresh()) ?? poolStatsQuery.data.value ?? ([] as any)
   }
 
-  async function getOrderbookCombined(token0: string, token1: string, numLevels: bigint, stepPercent: bigint) {
-    // Routes through orderbookQuery so the syncProPair prefetch + the 3s poller
-    // share one in-flight request, and a warm pair revisit hits localStorage.
+  /**
+   * Orderbook for a pair and depth. Routes through orderbookQuery so the
+   * prefetch and the 3 s poller share one in-flight request.
+   *   'cached'  first paint: the saved book (if younger than 12 h) or the
+   *             network; starts a refresh when the saved book is old.
+   *   'pending' the refresh 'cached' started, if one is running (else null),
+   *             so the fresh book replaces the saved one as soon as it lands.
+   *   'live'    polls: a network read (joins one in flight).
+   * Returns null when there is no answer: callers keep the rows they show.
+   */
+  async function getOrderbookCombined(
+    token0: string, token1: string, numLevels: bigint, stepPercent: bigint,
+    mode: 'cached' | 'pending' | 'live' = 'cached',
+  ) {
     const key = `${token0}|${token1}|${numLevels.toString()}|${stepPercent.toString()}`
-    return (await orderbookQuery(key).ensure()) ?? ({} as any)
+    const q = orderbookQuery(key)
+    if (mode === 'live') return q.refresh()
+    if (mode === 'pending') return q.isFetching.value ? q.refresh() : null
+    return q.ensure()
   }
 
   // Kline factory: each unique (pair, timeframe, initialGet) tuple gets its
@@ -1286,6 +1443,9 @@ export const useExchangeStore = defineStore('exchange', () => {
 
   async function getKlineData(token1: string, token2: string, timeframe: TimeFrame, initialGet: boolean): Promise<KlineData[]> {
     const key = `${token1}|${token2}|${timeframeKey(timeframe)}|${initialGet ? 'true' : 'false'}`
+    // The chart's 5 s live poll (initialGet=false) must read the network:
+    // ensure() handed it the previous poll's answer and refreshed behind it.
+    if (!initialGet) return (await klineQuery(key).refresh()) ?? []
     return (await klineQuery(key).ensure()) ?? []
   }
 
@@ -1369,8 +1529,13 @@ export const useExchangeStore = defineStore('exchange', () => {
 
   async function getTokenTrends7d(tokenAddresses: string[]): Promise<TokenTrend7d[]> {
     if (tokenAddresses.length === 0) return []
-    const key = [...tokenAddresses].sort().join('|')
-    return (await trendsQuery(key).ensure()) ?? []
+    return (await trendsQueryFor(tokenAddresses).ensure()) ?? []
+  }
+
+  /** The shared trends query for a token set, for views that bind to its data
+   *  (so its background refresh reaches the screen). */
+  function trendsQueryFor(tokenAddresses: string[]): CachedQuery<TokenTrend7d[]> {
+    return trendsQuery([...tokenAddresses].sort().join('|'))
   }
 
   // ─── Boot-batch cached queries (persist:true) ────────────────────────────
@@ -1379,6 +1544,11 @@ export const useExchangeStore = defineStore('exchange', () => {
   // first microtask instead of blocking the Pro view gate on a network round-trip.
   // Only `isExchangeFrozen` stays raw (admin state — correctness > perf).
 
+  // Each boot query applies its network result to the store refs in
+  // onSuccess (same trap as the V2 gates below: a bare refresh only updates
+  // query.data and localStorage). These saved entries are the only saved copy
+  // of their values; they are written only from fetch results (or set() with
+  // a fetch result), so their timestamp is the real fetch time.
   const acceptedTokensQuery: CachedQuery<[] | [TokenInfo[]]> = createCachedQuery({
     key: 'boot.acceptedTokens',
     fetcher: () => callExchangeQuery<[] | [TokenInfo[]]>('getAcceptedTokensInfo'),
@@ -1386,6 +1556,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     maxAgeMs: CACHE_TTL.tokens,    // 24h — matches existing manual hydration TTL
     shallow: true,
     timeoutMs: 20_000,
+    onSuccess: applyTokens,
   })
 
   const exchangeInfoQuery: CachedQuery<[] | [pool]> = createCachedQuery({
@@ -1393,8 +1564,10 @@ export const useExchangeStore = defineStore('exchange', () => {
     fetcher: () => callExchangeQuery<[] | [pool]>('exchangeInfo'),
     persist: true,
     maxAgeMs: CACHE_TTL.info,      // 5 min
+    maxServeAgeMs: MAX_SAVED_POOLS_AGE_MS,
     shallow: true,
     timeoutMs: 15_000,
+    onSuccess: (v) => applyInfo(v[0], Date.now()),
   })
 
   const pausedTokensQuery: CachedQuery<[] | [string[]]> = createCachedQuery({
@@ -1404,6 +1577,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     maxAgeMs: 5 * 60_000,          // 5 min — admin can pause/unpause; want fresh-ish
     shallow: true,
     timeoutMs: 15_000,
+    onSuccess: applyPaused,
   })
 
   const treasuryAcctQuery: CachedQuery<string> = createCachedQuery({
@@ -1413,6 +1587,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     maxAgeMs: 24 * 60 * 60_000,    // 24h — practically static
     shallow: true,
     timeoutMs: 15_000,
+    onSuccess: (v) => { if (v) treasuryAccountId.value = v },
   })
 
   const treasuryPrincQuery: CachedQuery<string> = createCachedQuery({
@@ -1422,6 +1597,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     maxAgeMs: 24 * 60 * 60_000,    // 24h — practically static
     shallow: true,
     timeoutMs: 15_000,
+    onSuccess: (v) => { if (v) treasuryPrincipal.value = v },
   })
 
   const tradingFeeQuery: CachedQuery<bigint> = createCachedQuery({
@@ -1431,6 +1607,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     maxAgeMs: 60 * 60_000,         // 1h — fee changes are rare
     shallow: true,
     timeoutMs: 15_000,
+    onSuccess: (v) => { tradingFeeBps.value = v },
   })
 
   const revokeFeeQuery: CachedQuery<bigint> = createCachedQuery({
@@ -1440,6 +1617,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     maxAgeMs: 60 * 60_000,         // 1h
     shallow: true,
     timeoutMs: 15_000,
+    onSuccess: (v) => { revokeFeeDivisor.value = v },
   })
 
   const refFeeQuery: CachedQuery<bigint> = createCachedQuery({
@@ -1449,6 +1627,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     maxAgeMs: 60 * 60_000,         // 1h
     shallow: true,
     timeoutMs: 15_000,
+    onSuccess: (v) => { referralFeePct.value = v },
   })
 
   // ── Exchange V2 (approve+pull) gates ──
@@ -1528,8 +1707,11 @@ export const useExchangeStore = defineStore('exchange', () => {
   })
 
   // Orderbook per (pair, depth, stepBps) — wrap so prefetch (from syncProPair)
-  // and concurrent subscribers dedup. 5s TTL stays under the 3s poll, persisted
-  // so a same-pair revisit shows real rows instantly instead of the skeleton.
+  // and concurrent subscribers dedup. Persisted so a same-pair revisit shows
+  // real rows instantly instead of the skeleton; a saved book older than 12 h
+  // waits for the network (skeleton) instead. The 3 s poll reads the network
+  // every tick ('live' in getOrderbookCombined); the 5 s window only serves
+  // first paints and prefetches.
   const orderbookQuery = createKeyedQueryFactory<string, Awaited<ReturnType<_SERVICE['getOrderbookCombined']>>>((compositeKey) => {
     const [token0, token1, numLevelsStr, stepPctStr] = compositeKey.split('|')
     return createCachedQuery({
@@ -1540,6 +1722,7 @@ export const useExchangeStore = defineStore('exchange', () => {
       ),
       persist: true,
       maxAgeMs: 5_000,
+      maxServeAgeMs: MAX_SAVED_ORDERBOOK_AGE_MS,
       shallow: true,
       timeoutMs: 15_000,
     })
@@ -2227,10 +2410,29 @@ export const useExchangeStore = defineStore('exchange', () => {
     return (await userBalanceQuery(tokenAddress).ensure()) ?? 0n
   }
 
+  // One small note under the nav when the data on screen may be behind:
+  //  - the boot frozen check got no answer (network): the app runs on saved data;
+  //  - an exchange call failed and nothing succeeded for about 10 s.
+  // Cleared by the next answer / success.
+  const dataNote = computed<string>(() => {
+    if (frozenUnknown.value) return "Can't reach the exchange right now. Showing saved data."
+    void connectivityTick.value
+    if (!callsFailingSince.value) return ''
+    const lastOk = lastCallOkAt()
+    if (Date.now() - (lastOk || PAGE_STARTED_AT) < LIVE_DATA_PAUSED_AFTER_MS) return ''
+    const shownAt = lastOk || exchangeInfoQuery.lastFetchedAt.value
+    if (!shownAt) return ''
+    const d = new Date(shownAt)
+    const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    return `Live data paused. Showing data from ${hhmm}. Retrying.`
+  })
+
   return {
     // State
     isAuthenticated,
     isFrozen,
+    frozenUnknown,
+    dataNote,
     principalText,
     initError,
     selectedToken0,
@@ -2253,9 +2455,11 @@ export const useExchangeStore = defineStore('exchange', () => {
     // Rate limiter
     callsRemaining,
     canMakeUpdateCall,
+    assertCanTrade,
 
     // Init
     initExchange,
+    refreshTokens,
 
     // Mutation event bus
     refreshAfterMutation,
@@ -2290,6 +2494,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     getKlineData,
     getKlineDataRange,
     getTokenTrends7d,
+    trendsQueryFor,
     getPoolHistory,
     getPrivateTrade,
     getUserTrades,

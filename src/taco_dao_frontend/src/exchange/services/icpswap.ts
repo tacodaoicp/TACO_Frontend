@@ -18,6 +18,7 @@ import { principalToSubAccount } from '@dfinity/utils'
 import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../shared/auth-cache'
 import { getEffectiveNetwork } from '../../config/network-config'
 import { icrcIDL } from '../../shared/icrc-idl'
+import { setItemWithCacheEviction } from '../utils/persistCache'
 
 // BigInt-safe JSON.stringify for IC canister error objects
 const safeStringify = (obj: unknown) =>
@@ -76,7 +77,8 @@ export function savePendingSwap(sell: string, buy: string): void {
     deduped.unshift({ sell, buy, timestamp: Date.now() })
     const now = Date.now()
     const pruned = deduped.filter((e) => now - e.timestamp < PENDING_MAX_AGE_MS).slice(0, PENDING_MAX)
-    localStorage.setItem(PENDING_KEY, JSON.stringify(pruned))
+    // Recovery record: on a full storage, free exchange cache space and retry.
+    setItemWithCacheEviction(PENDING_KEY, JSON.stringify(pruned))
   } catch { /* localStorage full or unavailable — ignore */ }
 }
 

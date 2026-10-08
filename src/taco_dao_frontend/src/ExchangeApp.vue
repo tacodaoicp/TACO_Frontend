@@ -8,6 +8,10 @@
         Go to Admin Panel
       </router-link>
     </div>
+    <!-- Saved data note: no answer from the exchange (network), or live updates paused -->
+    <div v-else-if="exchangeStore.dataNote" class="exchange-app__banner exchange-app__banner--note" role="status">
+      {{ exchangeStore.dataNote }}
+    </div>
     <router-view v-slot="{ Component }">
       <keep-alive :max="8">
         <component :is="Component" :key="$route.name" />
@@ -155,6 +159,13 @@ function handleKeydown(e: KeyboardEvent) {
       background: rgba(196, 48, 48, 0.13);
       color: var(--color-sell);
       border-bottom: 1px solid rgba(196, 48, 48, 0.27);
+    }
+
+    &--note {
+      padding: 4px 16px;
+      font-size: 12px;
+      background: var(--tx-warning-dim);
+      color: var(--tx-warning);
     }
   }
 
