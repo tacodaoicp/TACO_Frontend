@@ -28,6 +28,8 @@ import {
 } from './minter-idl'
 import { useExchangeStore } from '../store/exchange.store'
 import { useExchangeToast } from '../composables/useExchangeToast'
+import { cachedLedgerLogo, ledgerLogoDue, fetchLedgerLogo } from '../utils/token-icons'
+import { setItemWithCacheEviction } from '../utils/persistCache'
 
 // ── Types ──
 
@@ -228,7 +230,7 @@ export const useBridgeStore = defineStore('bridge', () => {
   }
   function saveJournal(): void {
     if (!journalOwner) return
-    try { localStorage.setItem(journalKey(journalOwner), JSON.stringify(journal.value)) } catch { /* ignore */ }
+    try { setItemWithCacheEviction(journalKey(journalOwner), JSON.stringify(journal.value)) } catch { /* ignore */ }
   }
   /** Upsert into `owner`'s journal. An operation started by one account that
    *  finishes after a switch lands in that account's journal, not the new one. */
@@ -246,7 +248,7 @@ export const useBridgeStore = defineStore('bridge', () => {
     const i = list.findIndex(e => e.id === entry.id)
     if (i >= 0) list[i] = entry
     else list.unshift(entry)
-    try { localStorage.setItem(journalKey(owner), JSON.stringify(list)) } catch { /* ignore */ }
+    try { setItemWithCacheEviction(journalKey(owner), JSON.stringify(list)) } catch { /* ignore */ }
   }
   function newEntry(kind: JournalKind, partial: Partial<JournalEntry>, owner: string = journalOwner): JournalEntry {
     const entry: JournalEntry = {
@@ -733,28 +735,24 @@ export const useBridgeStore = defineStore('bridge', () => {
     saveJournal()
   }
 
-  // ── Token logos from ledger icrc1_metadata (canonical, always current) ──
+  // ── Token logos from ledger icrc1_metadata ──
+  // Saved per ledger and rechecked in the background once a week (shared with
+  // the token selector through token-icons, one request per ledger at a time).
 
   const tokenLogos = ref<Record<string, string>>({})
   async function loadTokenLogo(ledgerId: string): Promise<string | null> {
     if (tokenLogos.value[ledgerId] !== undefined) return tokenLogos.value[ledgerId] || null
-    const cacheKey = `taco_bridge_logo:${ledgerId}`
-    try {
-      const cached = localStorage.getItem(cacheKey)
-      if (cached) { tokenLogos.value[ledgerId] = cached; return cached }
-    } catch { /* ignore */ }
-    try {
-      const ledger = await queryActor(ledgerId, icrcIDL)
-      const metadata: [string, any][] = await ledger.icrc1_metadata()
-      const logo = metadata.find(([k]) => k === 'icrc1:logo')?.[1]
-      const url = logo && 'Text' in logo ? logo.Text : ''
-      tokenLogos.value[ledgerId] = url
-      if (url) { try { localStorage.setItem(cacheKey, url) } catch { /* quota */ } }
-      return url || null
-    } catch {
-      tokenLogos.value[ledgerId] = ''
-      return null
+    const cached = cachedLedgerLogo(ledgerId)
+    if (cached) {
+      tokenLogos.value[ledgerId] = cached
+      if (ledgerLogoDue(ledgerId)) {
+        void fetchLedgerLogo(ledgerId).then((url) => { if (url) tokenLogos.value[ledgerId] = url })
+      }
+      return cached
     }
+    const url = await fetchLedgerLogo(ledgerId)
+    tokenLogos.value[ledgerId] = url
+    return url || null
   }
 
   return {
