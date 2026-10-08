@@ -44,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangeToast } from '../../composables/useExchangeToast'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
@@ -53,8 +53,10 @@ const exchangeStore = useExchangeStore()
 const toast = useExchangeToast()
 const auth = useExchangeAuth()
 
-const isConnected = ref(false)
-const principalText = ref('')
+// Bound to the store so every login, logout and account switch (this tab or
+// another) shows the account the exchange actually acts for.
+const isConnected = computed(() => exchangeStore.isAuthenticated)
+const principalText = computed(() => exchangeStore.principalText)
 const accountIdHex = ref('')
 const showMenu = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -71,18 +73,20 @@ const walletInitials = computed(() => {
 })
 
 async function deriveAccountId() {
-  if (!principalText.value) { accountIdHex.value = ''; return }
+  const p = principalText.value
+  if (!p) { accountIdHex.value = ''; return }
   try {
     const { Principal } = await import('@dfinity/principal')
     const { AccountIdentifier } = await import('@dfinity/ledger-icp')
-    const principal = Principal.fromText(principalText.value)
-    accountIdHex.value = AccountIdentifier
-      .fromPrincipal({ principal, subAccount: undefined })
+    const hex = AccountIdentifier
+      .fromPrincipal({ principal: Principal.fromText(p), subAccount: undefined })
       .toHex()
+    if (principalText.value === p) accountIdHex.value = hex
   } catch {
     accountIdHex.value = ''
   }
 }
+watch(principalText, () => { void deriveAccountId() }, { immediate: true })
 
 async function copyText(text: string, message: string) {
   try {
@@ -94,19 +98,11 @@ async function copyText(text: string, message: string) {
 async function connectWallet() {
   // Single shared login path: 30-day TTL, localStorage cache, cross-tab notify.
   await auth.connect()
-  if (exchangeStore.isAuthenticated) {
-    principalText.value = exchangeStore.principalText
-    isConnected.value = true
-    deriveAccountId()
-  }
 }
 
 async function disconnectWallet() {
   showMenu.value = false
   await auth.disconnect()
-  isConnected.value = false
-  principalText.value = ''
-  accountIdHex.value = ''
 }
 
 // Hydrate from cached identity on mount
@@ -115,11 +111,8 @@ onMounted(async () => {
     const { getCachedIdentity } = await import('../../../shared/auth-cache')
     const identity = await getCachedIdentity()
     if (identity && !identity.getPrincipal().isAnonymous()) {
-      principalText.value = identity.getPrincipal().toText()
-      isConnected.value = true
+      exchangeStore.principalText = identity.getPrincipal().toText()
       exchangeStore.isAuthenticated = true
-      exchangeStore.principalText = principalText.value
-      deriveAccountId()
     }
   } catch {
     // not authenticated

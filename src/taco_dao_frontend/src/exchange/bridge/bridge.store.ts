@@ -17,7 +17,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Principal } from '@dfinity/principal'
 import { Actor, HttpAgent } from '@dfinity/agent'
 import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../shared/auth-cache'
@@ -99,7 +99,14 @@ export const useBridgeStore = defineStore('bridge', () => {
   // token list: BTC + ETH constant, ckERC20s discovered live from the minter
   const erc20Tokens = ref<BridgeToken[]>([])
   const journal = ref<JournalEntry[]>([])
-  const btcDepositAddress = ref('')
+  // The principal whose journal is loaded in `journal`. Writes go to this
+  // owner's key only, never to another account's key and never to ''.
+  let journalOwner = ''
+  // BTC deposit addresses keyed by the principal the minter call was made for.
+  // The address shown is always the current account's, so an in place account
+  // switch can never show (and receive BTC on) the previous account's address.
+  const btcAddressByPrincipal = ref<Record<string, string>>({})
+  const btcDepositAddress = computed(() => btcAddressByPrincipal.value[principalText()] || '')
   const ckbtcInfo = ref<{ minConfirmations: number; retrieveBtcMinAmount: bigint; checkFee: bigint } | null>(null)
   const ckethInfo = ref<{
     depositHelper: string
@@ -203,23 +210,45 @@ export const useBridgeStore = defineStore('bridge', () => {
   function principalText(): string {
     return exchangeStore.principalText || ''
   }
-  function loadJournal(): void {
+  /** The account an operation acts for: the identity that signs its calls. */
+  async function opOwner(): Promise<string> {
+    const id = await getCachedIdentity()
+    return id.getPrincipal().isAnonymous() ? '' : id.getPrincipal().toText()
+  }
+  function readJournal(owner: string): JournalEntry[] {
+    if (!owner) return []
     try {
-      const raw = localStorage.getItem(journalKey(principalText()))
-      journal.value = raw ? JSON.parse(raw) : []
-    } catch { journal.value = [] }
+      const raw = localStorage.getItem(journalKey(owner))
+      return raw ? JSON.parse(raw) : []
+    } catch { return [] }
+  }
+  function loadJournal(): void {
+    journalOwner = principalText()
+    journal.value = readJournal(journalOwner)
   }
   function saveJournal(): void {
-    try { localStorage.setItem(journalKey(principalText()), JSON.stringify(journal.value)) } catch { /* ignore */ }
+    if (!journalOwner) return
+    try { localStorage.setItem(journalKey(journalOwner), JSON.stringify(journal.value)) } catch { /* ignore */ }
   }
-  function upsertEntry(entry: JournalEntry): void {
-    const i = journal.value.findIndex(e => e.id === entry.id)
+  /** Upsert into `owner`'s journal. An operation started by one account that
+   *  finishes after a switch lands in that account's journal, not the new one. */
+  function upsertEntry(entry: JournalEntry, owner: string = journalOwner): void {
     entry.updatedAt = Date.now()
-    if (i >= 0) journal.value[i] = entry
-    else journal.value.unshift(entry)
-    saveJournal()
+    if (owner === journalOwner) {
+      const i = journal.value.findIndex(e => e.id === entry.id)
+      if (i >= 0) journal.value[i] = entry
+      else journal.value.unshift(entry)
+      saveJournal()
+      return
+    }
+    if (!owner) return
+    const list = readJournal(owner)
+    const i = list.findIndex(e => e.id === entry.id)
+    if (i >= 0) list[i] = entry
+    else list.unshift(entry)
+    try { localStorage.setItem(journalKey(owner), JSON.stringify(list)) } catch { /* ignore */ }
   }
-  function newEntry(kind: JournalKind, partial: Partial<JournalEntry>): JournalEntry {
+  function newEntry(kind: JournalKind, partial: Partial<JournalEntry>, owner: string = journalOwner): JournalEntry {
     const entry: JournalEntry = {
       id: `${kind}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
       kind,
@@ -229,7 +258,7 @@ export const useBridgeStore = defineStore('bridge', () => {
       token: '',
       ...partial,
     }
-    upsertEntry(entry)
+    upsertEntry(entry, owner)
     return entry
   }
   const pendingEntries = computed(() =>
@@ -241,22 +270,27 @@ export const useBridgeStore = defineStore('bridge', () => {
     if (btcDepositAddress.value) return btcDepositAddress.value
     const identity = await getCachedIdentity()
     if (identity.getPrincipal().isAnonymous()) throw new Error('Not authenticated. Please connect your wallet.')
+    const owner = identity.getPrincipal()
     const minter = await updateActor(CKBTC_MINTER_ID, ckbtcMinterIDL)
-    const addr = await minter.get_btc_address({ owner: [identity.getPrincipal()], subaccount: [] })
-    btcDepositAddress.value = addr
+    const addr = await minter.get_btc_address({ owner: [owner], subaccount: [] })
+    // Stored under the principal the address was derived for. The view reads
+    // btcDepositAddress (current account only), so a reply that lands after an
+    // account switch is never shown for the new account.
+    btcAddressByPrincipal.value = { ...btcAddressByPrincipal.value, [owner.toText()]: addr }
     return addr
   }
 
   /** "Check for BTC" — returns a human summary; mints anything confirmed. */
   async function checkBtcDeposits(): Promise<{ minted: bigint; pending: { valueSat: bigint; confirmations: number; required: number }[] }> {
     const identity = await getCachedIdentity()
+    const owner = identity.getPrincipal().isAnonymous() ? '' : identity.getPrincipal().toText()
     const minter = await updateActor(CKBTC_MINTER_ID, ckbtcMinterIDL)
     const res = await minter.update_balance({ owner: [identity.getPrincipal()], subaccount: [] })
     if ('Ok' in res) {
       let minted = 0n
       for (const s of res.Ok) if ('Minted' in s) minted += BigInt(s.Minted.minted_amount)
       if (minted > 0n) {
-        newEntry('btc-mint', { state: 'confirmed', token: 'BTC', amount: minted.toString(), note: 'ckBTC minted' })
+        newEntry('btc-mint', { state: 'confirmed', token: 'BTC', amount: minted.toString(), note: 'ckBTC minted' }, owner)
         void exchangeStore.refreshAllBalances()
       }
       return { minted, pending: [] }
@@ -312,6 +346,7 @@ export const useBridgeStore = defineStore('bridge', () => {
   }
 
   async function withdrawBtc(amountSat: bigint, address: string): Promise<JournalEntry> {
+    const owner = await opOwner()
     await loadMinterInfo()
     if (ckbtcInfo.value && amountSat < ckbtcInfo.value.retrieveBtcMinAmount) {
       throw new Error(`Minimum withdrawal is ${Number(ckbtcInfo.value.retrieveBtcMinAmount) / 1e8} BTC.`)
@@ -321,7 +356,7 @@ export const useBridgeStore = defineStore('bridge', () => {
     const ledgerFee = BigInt(await ledger.icrc1_fee())
     await ensureAllowance(CKBTC_LEDGER_ID, CKBTC_MINTER_ID, amountSat + ledgerFee)
 
-    const entry = newEntry('btc-dissolve', { token: 'BTC', amount: amountSat.toString(), address })
+    const entry = newEntry('btc-dissolve', { token: 'BTC', amount: amountSat.toString(), address }, owner)
     const minter = await updateActor(CKBTC_MINTER_ID, ckbtcMinterIDL)
     let res: any
     try {
@@ -331,7 +366,7 @@ export const useBridgeStore = defineStore('bridge', () => {
       // pending and let the poller resolve it via withdrawal status later
       entry.state = 'pending'
       entry.note = 'Submitted during a network issue. Status will update automatically.'
-      upsertEntry(entry)
+      upsertEntry(entry, owner)
       throw err
     }
     if ('Err' in res) {
@@ -345,12 +380,12 @@ export const useBridgeStore = defineStore('bridge', () => {
         : 'AlreadyProcessing' in e ? 'Another withdrawal is processing. Try again shortly.'
         : 'TemporarilyUnavailable' in e ? `Minter busy: ${e.TemporarilyUnavailable}`
         : e.GenericError?.error_message || 'Withdrawal rejected'
-      upsertEntry(entry)
+      upsertEntry(entry, owner)
       throw new Error(entry.note)
     }
     entry.state = 'pending'
     entry.blockIndex = res.Ok.block_index.toString()
-    upsertEntry(entry)
+    upsertEntry(entry, owner)
     void exchangeStore.refreshAllBalances()
     return entry
   }
@@ -371,6 +406,7 @@ export const useBridgeStore = defineStore('bridge', () => {
   }
 
   async function withdrawEth(amountWei: bigint, recipient: string): Promise<JournalEntry> {
+    const owner = await opOwner()
     if (!isEthAddress(recipient)) throw new Error('Invalid Ethereum address.')
     await loadMinterInfo()
     if (ckethInfo.value && amountWei < ckethInfo.value.minimumWithdrawalAmount) {
@@ -380,7 +416,7 @@ export const useBridgeStore = defineStore('bridge', () => {
     const ledgerFee = BigInt(await ledger.icrc1_fee())
     await ensureAllowance(CKETH_LEDGER_ID, CKETH_MINTER_ID, amountWei + ledgerFee)
 
-    const entry = newEntry('eth-dissolve', { token: 'ETH', amount: amountWei.toString(), address: recipient })
+    const entry = newEntry('eth-dissolve', { token: 'ETH', amount: amountWei.toString(), address: recipient }, owner)
     const minter = await updateActor(CKETH_MINTER_ID, ckethMinterIDL)
     let res: any
     try {
@@ -388,7 +424,7 @@ export const useBridgeStore = defineStore('bridge', () => {
     } catch (err) {
       entry.state = 'pending'
       entry.note = 'Submitted during a network issue. Status will update automatically.'
-      upsertEntry(entry)
+      upsertEntry(entry, owner)
       throw err
     }
     if ('Err' in res) {
@@ -400,12 +436,12 @@ export const useBridgeStore = defineStore('bridge', () => {
         : 'InsufficientAllowance' in e ? 'Approval was too low. Try again.'
         : 'RecipientAddressBlocked' in e ? 'This address is blocked.'
         : `Minter busy: ${e.TemporarilyUnavailable}`
-      upsertEntry(entry)
+      upsertEntry(entry, owner)
       throw new Error(entry.note)
     }
     entry.state = 'pending'
     entry.blockIndex = res.Ok.block_index.toString()
-    upsertEntry(entry)
+    upsertEntry(entry, owner)
     void exchangeStore.refreshAllBalances()
     return entry
   }
@@ -430,6 +466,7 @@ export const useBridgeStore = defineStore('bridge', () => {
   }
 
   async function withdrawErc20(token: BridgeToken, amount: bigint, recipient: string): Promise<JournalEntry> {
+    const owner = await opOwner()
     if (!isEthAddress(recipient)) throw new Error('Invalid Ethereum address.')
     // 1. live gas quote and balance pre-check (exact shortfall messaging)
     const pf = await preflightErc20Withdrawal(token)
@@ -448,7 +485,7 @@ export const useBridgeStore = defineStore('bridge', () => {
 
     // 3. withdraw — if the minter still reports the ckETH allowance short, it
     // tells us the exact burn it needs; approve that and retry once, silently.
-    const entry = newEntry('erc20-dissolve', { token: token.key, amount: amount.toString(), address: recipient })
+    const entry = newEntry('erc20-dissolve', { token: token.key, amount: amount.toString(), address: recipient }, owner)
     const minter = await updateActor(CKETH_MINTER_ID, ckethMinterIDL)
     const callWithdraw = () => minter.withdraw_erc20({
       amount,
@@ -470,7 +507,7 @@ export const useBridgeStore = defineStore('bridge', () => {
     } catch (err) {
       entry.state = 'pending'
       entry.note = 'Submitted during a network issue. Status will update automatically.'
-      upsertEntry(entry)
+      upsertEntry(entry, owner)
       throw err
     }
     if ('Err' in res) {
@@ -487,12 +524,12 @@ export const useBridgeStore = defineStore('bridge', () => {
         : 'CkEthLedgerError' in e ? ledgerErrText(e.CkEthLedgerError.error, 18, 'ckETH')
         : 'CkErc20LedgerError' in e ? ledgerErrText(e.CkErc20LedgerError.error, token.decimals, token.symbol)
         : `Minter busy: ${e.TemporarilyUnavailable}`
-      upsertEntry(entry)
+      upsertEntry(entry, owner)
       throw new Error(entry.note)
     }
     entry.state = 'pending'
     entry.blockIndex = res.Ok.cketh_block_index.toString()
-    upsertEntry(entry)
+    upsertEntry(entry, owner)
     void exchangeStore.refreshAllBalances()
     return entry
   }
@@ -521,6 +558,8 @@ export const useBridgeStore = defineStore('bridge', () => {
   }
 
   async function depositEth(amountWei: bigint): Promise<JournalEntry> {
+    const owner = principalText()
+    if (!owner) throw new Error('Not authenticated. Please connect your wallet.')
     await loadMinterInfo()
     const helper = ckethInfo.value?.depositHelper
     if (!helper) throw new Error('Bridge configuration not loaded. Try again.')
@@ -533,7 +572,7 @@ export const useBridgeStore = defineStore('bridge', () => {
         outputs: [],
       }],
       functionName: 'depositEth',
-      args: [principalToBytes32(principalText()), ZERO_SUBACCOUNT],
+      args: [principalToBytes32(owner), ZERO_SUBACCOUNT],
     })
     const txHash: string = await (window as any).ethereum.request({
       method: 'eth_sendTransaction',
@@ -542,11 +581,13 @@ export const useBridgeStore = defineStore('bridge', () => {
     const entry = newEntry('eth-mint', {
       state: 'sent-eth-tx', token: 'ETH', amount: amountWei.toString(), txHash,
       note: 'ckETH is minted after the Ethereum transaction finalizes (about 20 minutes).',
-    })
+    }, owner)
     return entry
   }
 
   async function depositErc20(token: BridgeToken, amount: bigint): Promise<JournalEntry> {
+    const owner = principalText()
+    if (!owner) throw new Error('Not authenticated. Please connect your wallet.')
     await loadMinterInfo()
     const helper = ckethInfo.value?.depositHelper
     if (!helper || !token.erc20Address) throw new Error('Bridge configuration not loaded. Try again.')
@@ -580,7 +621,7 @@ export const useBridgeStore = defineStore('bridge', () => {
         outputs: [],
       }],
       functionName: 'depositErc20',
-      args: [token.erc20Address as `0x${string}`, amount, principalToBytes32(principalText()), ZERO_SUBACCOUNT],
+      args: [token.erc20Address as `0x${string}`, amount, principalToBytes32(owner), ZERO_SUBACCOUNT],
     })
     const txHash: string = await eth.request({
       method: 'eth_sendTransaction',
@@ -589,7 +630,7 @@ export const useBridgeStore = defineStore('bridge', () => {
     const entry = newEntry('erc20-mint', {
       state: 'sent-eth-tx', token: token.key, amount: amount.toString(), txHash,
       note: `${token.symbol} is minted after the Ethereum transaction finalizes (about 20 minutes).`,
-    })
+    }, owner)
     return entry
   }
 
@@ -608,6 +649,11 @@ export const useBridgeStore = defineStore('bridge', () => {
 
   async function pollEntry(entry: JournalEntry): Promise<void> {
     const stateBefore = entry.state
+    // The entry belongs to the journal loaded now. If the account changes
+    // while a status call is in flight, its result is dropped here instead of
+    // being written into the next account's journal.
+    const owner = journalOwner
+    const sameOwner = () => owner === journalOwner
     try {
       if (entry.kind === 'btc-dissolve' && entry.blockIndex) {
         const minter = await queryActor(CKBTC_MINTER_ID, ckbtcMinterIDL)
@@ -616,6 +662,7 @@ export const useBridgeStore = defineStore('bridge', () => {
         else if ('Submitted' in s) { entry.txid = hexFromBytes(new Uint8Array(s.Submitted.txid).reverse()); entry.note = 'BTC transaction submitted, waiting for confirmations.' }
         else if ('Reimbursed' in s || 'WillReimburse' in s) entry.state = 'reimbursed'
         else if ('AmountTooLow' in s) { entry.state = 'failed'; entry.note = 'Amount too low to cover network fees.' }
+        if (!sameOwner()) return
         upsertEntry(entry)
       } else if ((entry.kind === 'eth-dissolve' || entry.kind === 'erc20-dissolve') && entry.blockIndex) {
         const minter = await queryActor(CKETH_MINTER_ID, ckethMinterIDL)
@@ -632,6 +679,7 @@ export const useBridgeStore = defineStore('bridge', () => {
           entry.txHash = st.TxSent.transaction_hash
           entry.note = 'Ethereum transaction sent. It may already show success on Etherscan; the minter marks it complete after Ethereum finality, about 15 minutes.'
         }
+        if (!sameOwner()) return
         upsertEntry(entry)
       } else if ((entry.kind === 'eth-mint' || entry.kind === 'erc20-mint')
                  && Date.now() - entry.createdAt > 40 * 60_000) {
@@ -639,6 +687,7 @@ export const useBridgeStore = defineStore('bridge', () => {
         // processed it and let the balance (auto-refreshed) be the truth.
         entry.state = 'confirmed'
         entry.note = 'Deposit window elapsed. Check your balance.'
+        if (!sameOwner()) return
         upsertEntry(entry)
         void exchangeStore.refreshAllBalances()
       }
@@ -646,6 +695,7 @@ export const useBridgeStore = defineStore('bridge', () => {
       // network/poll failure: keep waiting, never mark failed
       console.warn('[Bridge] status poll failed (will retry):', err)
     }
+    if (!sameOwner()) return
     notifyStateChange(entry, stateBefore)
     if (entry.state === 'confirmed' && stateBefore !== 'confirmed') void exchangeStore.refreshAllBalances()
   }
@@ -659,13 +709,24 @@ export const useBridgeStore = defineStore('bridge', () => {
     }, 30_000)
   }
 
+  let initialized = false
   async function init(): Promise<void> {
+    initialized = true
+    // Older builds saved the journal under the empty principal after a logout.
+    try { localStorage.removeItem(journalKey('')) } catch { /* ignore */ }
     loadJournal()
     startPolling()
     void loadMinterInfo()
     // resume immediately for anything left pending from a previous session
     for (const e of pendingEntries.value) void pollEntry(e)
   }
+
+  // Account switch, login or logout: show and poll the new account's journal.
+  watch(() => exchangeStore.principalText, (p) => {
+    if (!initialized || p === journalOwner) return
+    loadJournal()
+    for (const e of pendingEntries.value) void pollEntry(e)
+  })
 
   function clearFinished(): void {
     journal.value = journal.value.filter(e => !['confirmed', 'reimbursed', 'failed'].includes(e.state))

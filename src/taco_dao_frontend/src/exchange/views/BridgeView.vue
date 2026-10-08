@@ -232,7 +232,9 @@ const amount = ref('')
 const destination = ref('')
 const busy = ref(false)
 const actionError = ref('')
-const btcAddress = ref('')
+// Always the current account's address (the store keys addresses by principal),
+// so an account switch can never leave the previous account's address on screen.
+const btcAddress = computed(() => bridge.btcDepositAddress)
 const btcQr = ref('')
 const btcCheckResult = ref('')
 const btcFeeText = ref('')
@@ -311,13 +313,22 @@ async function copy(text: string) {
 
 // ── BTC ──
 
+watch(btcAddress, async (addr) => {
+  btcQr.value = ''
+  btcCheckResult.value = ''
+  if (!addr) return
+  try {
+    const QRCode = (await import('qrcode')).default
+    const qr = await QRCode.toDataURL(addr, { width: 200, margin: 1 })
+    if (btcAddress.value === addr) btcQr.value = qr
+  } catch { /* the address text and Copy button still work */ }
+}, { immediate: true })
+
 async function loadBtcAddress() {
   busy.value = true
   actionError.value = ''
   try {
-    btcAddress.value = await bridge.fetchBtcDepositAddress()
-    const QRCode = (await import('qrcode')).default
-    btcQr.value = await QRCode.toDataURL(btcAddress.value, { width: 200, margin: 1 })
+    await bridge.fetchBtcDepositAddress()
   } catch (err: any) {
     if (!(await auth.handleSessionError(err))) actionError.value = err.message || 'Could not load deposit address'
   } finally { busy.value = false }
