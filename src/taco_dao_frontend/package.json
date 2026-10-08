@@ -17,6 +17,7 @@
     "@vueuse/core": "^11.3.0",
     "bignumber.js": "^9.1.2",
     "dotenv": "^16.3.1",
+    "magic-string": "^0.30.21",
     "prettier": "^2.8.8",
     "sass": "^1.63.6",
     "typescript": "^5.1.3",
