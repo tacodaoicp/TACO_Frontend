@@ -42,12 +42,14 @@ import { createCachedQuery, createKeyedQueryFactory, type CachedQuery } from '..
 import { isVisible as isDocumentVisible } from '../composables/useVisibilityAware'
 import { callsFailingSince, connectivityTick, lastCallOkAt, noteCallOk, noteCallError } from '../utils/connectivity'
 
-// Refresh windows for the saved boot values. Tokens are practically static;
-// pool data is refreshed every 15 s, so a 5 min window is fine for a first
-// paint that the refresh then replaces on screen; prices change often but a
-// 5 min old read is still better than blank fields on F5.
+// Refresh windows for the saved boot values. A saved value paints first and
+// is replaced on screen when the refresh lands. Tokens rarely change, but a
+// boot more than 30 min after the last read re-reads them (one small query)
+// so a new listing shows within seconds; pool data is refreshed every 15 s, so
+// a 5 min window is fine; prices change often but a 5 min old read is still
+// better than blank fields on F5.
 const CACHE_TTL = {
-  tokens:   24 * 60 * 60 * 1000, // 24 h
+  tokens:        30 * 60 * 1000, // 30 min
   info:           5 * 60 * 1000, // 5 min
   prices:         5 * 60 * 1000, // 5 min
 }
@@ -127,6 +129,10 @@ export const useExchangeStore = defineStore('exchange', () => {
   const daoFallbackPrices = ref<Map<string, number>>(new Map())
   // True while exchangeInfoData came from a save older than OLD_POOLS_PRICE_AGE_MS.
   const poolsFromOldSave = ref(false)
+  // True while tokenPricesUSD was derived from such old pools. Stays on until
+  // the prices are rebuilt from fresh pools (a moment after they land), so the
+  // DAO price keeps winning through that gap too.
+  const pricesFromOldPools = ref(false)
 
   // Rate limiter
   const rateLimitCalls = ref<number[]>([])  // timestamps of update calls
@@ -743,6 +749,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     }
 
     // Walk pools to derive prices for all connected tokens
+    const fromOldPools = poolsFromOldSave.value
     derivePoolPrices(map)
 
     // Only update if prices actually changed
@@ -759,10 +766,11 @@ export const useExchangeStore = defineStore('exchange', () => {
       // Save only a map built from fresh pools and a non pool ICP anchor, so a
       // reload never paints prices rebuilt from an old snapshot (or the bare
       // seed prices of a boot that could not load pools).
-      if (exchangeInfoData.value && !poolsFromOldSave.value && icpSrc.value !== 'pool') {
+      if (exchangeInfoData.value && !fromOldPools && icpSrc.value !== 'pool') {
         writeCache('prices', Array.from(map.entries()))
       }
     }
+    pricesFromOldPools.value = fromOldPools
   }
 
   // Seed prices from the DAO backend's getTokenDetailsWithoutPastPrices (returns
@@ -841,9 +849,9 @@ export const useExchangeStore = defineStore('exchange', () => {
     ['cngnf-vqaaa-aaaar-qag4q-cai', 1], // ckUSDT
   ])
   function getTokenPriceUSD(address: string): number {
-    // Pools on screen came from an old save: prices derived from them can be
-    // far off, so the DAO's direct price wins until fresh pools land.
-    if (poolsFromOldSave.value) {
+    // Prices were derived from pools of an old save: they can be far off, so
+    // the DAO's direct price wins until they are rebuilt from fresh pools.
+    if (pricesFromOldPools.value || poolsFromOldSave.value) {
       const d = daoFallbackPrices.value.get(address) ?? 0
       if (d > 0) return d
     }
@@ -930,7 +938,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     void tradingFeeQuery.ensure(60 * 60_000)
     void revokeFeeQuery.ensure(60 * 60_000)
     void refFeeQuery.ensure(60 * 60_000)
-    void acceptedTokensQuery.ensure(30 * 60_000)
+    void acceptedTokensQuery.ensure(CACHE_TTL.tokens)
     void treasuryAcctQuery.ensure(24 * 60 * 60_000)
     void treasuryPrincQuery.ensure(24 * 60 * 60_000)
     // exchangeInfo is a large struct decoded every 15s — off the main thread.
@@ -1561,7 +1569,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     key: 'boot.acceptedTokens',
     fetcher: () => callExchangeQuery<[] | [TokenInfo[]]>('getAcceptedTokensInfo'),
     persist: true,
-    maxAgeMs: CACHE_TTL.tokens,    // 24h — matches existing manual hydration TTL
+    maxAgeMs: CACHE_TTL.tokens,    // 30 min, same window as the in-session check
     shallow: true,
     timeoutMs: 20_000,
     onSuccess: applyTokens,
