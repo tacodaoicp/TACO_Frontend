@@ -12,6 +12,8 @@
  *                       is the cache-first read path used by views.
  *   refresh()         → forces a fetch but returns the in-flight promise if
  *                       one is pending. Used by mutation handlers and pollers.
+ *   refetch()         → like refresh(), but never joins a read that started
+ *                       earlier. For checks that must see state after an action.
  *   prefetch()        → fire-and-forget refresh, no-op when fresh. Used by
  *                       hover-intent prefetching from nav links.
  *   invalidate()      → reset `lastFetchedAt` to 0 (keeps in-memory data). The
@@ -25,17 +27,22 @@
  */
 
 import { ref, shallowRef, watch, type Ref } from 'vue'
-import { readCacheEntry, writeCache, removeCache } from './persistCache'
+import { readCacheEntry, writeCache, removeCache, isWithinAge } from './persistCache'
 
 export interface CachedQueryOpts<T> {
   /** Logical key, e.g. 'user.lp' or `pair.kline:${pair}:${interval}`. */
   key: string
-  /** Async fetcher. Errors are caught; lastFetchedAt is not bumped on error. */
-  fetcher: () => Promise<T>
+  /** Async fetcher. Errors are caught; lastFetchedAt is not bumped on error.
+   *  A nullish result means "no answer": cached data is kept and not rewritten. */
+  fetcher: () => Promise<T | null | undefined>
   /** When true, persist results to localStorage (survives F5). */
   persist?: boolean
   /** Default staleness window for ensure() when caller doesn't pass one. */
   maxAgeMs?: number
+  /** Saved data older than this (or stamped in the future) is not served by
+   *  ensure(): it waits for the network instead, so a loading state shows
+   *  rather than very old numbers. */
+  maxServeAgeMs?: number
   /** When provided, namespace persisted key by current principal. */
   principalRef?: Ref<string>
   /** Use shallowRef for the data — recommended for large arrays. */
@@ -53,6 +60,10 @@ export interface CachedQuery<T> {
   error: Ref<unknown>
   ensure: (staleMs?: number) => Promise<T | null>
   refresh: () => Promise<T | null>
+  refetch: () => Promise<T | null>
+  /** True when data is present and was fetched no longer than `windowMs` ago
+   *  (and not stamped in the future). */
+  isFresh: (windowMs: number) => boolean
   prefetch: () => void
   invalidate: () => void
   /** Write a known-true value; supersedes any in-flight fetch (see impl). */
@@ -114,6 +125,9 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
   // not (covers cold-load auth restore, logout, and direct identity switch).
   // Persisted queries re-hydrate from the new principal's cache; non-persisted
   // ones reset so one principal's data can never serve another.
+  // flush 'sync': the switch happens the moment principalText changes. A
+  // deferred watcher ran after the login handlers had already started the new
+  // principal's refresh, then bumped the generation and threw that result away.
   if (opts.principalRef) {
     watch(opts.principalRef, () => {
       generation++
@@ -125,7 +139,7 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
         dataRef.value = null
         lastFetchedAt.value = 0
       }
-    }, { immediate: true })
+    }, { immediate: true, flush: 'sync' })
   }
 
   async function refresh(): Promise<T | null> {
@@ -167,12 +181,15 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
     return promise
   }
 
+  function isFresh(windowMs: number): boolean {
+    return dataRef.value !== null && isWithinAge(lastFetchedAt.value, windowMs)
+  }
+
   async function ensure(staleMs?: number): Promise<T | null> {
     const window = staleMs ?? ttl
     if (opts.persist) hydrateFromCache()
-    const isStale = Date.now() - lastFetchedAt.value > window
-    if (!isStale && dataRef.value !== null) return dataRef.value
-    if (dataRef.value !== null) {
+    if (isFresh(window)) return dataRef.value
+    if (dataRef.value !== null && (opts.maxServeAgeMs === undefined || isWithinAge(lastFetchedAt.value, opts.maxServeAgeMs))) {
       // Stale-while-revalidate: return cached value now, refresh in background.
       void refresh()
       return dataRef.value
@@ -181,8 +198,15 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
   }
 
   function prefetch(): void {
-    if (Date.now() - lastFetchedAt.value <= ttl && dataRef.value !== null) return
+    if (isFresh(ttl)) return
     void refresh()
+  }
+
+  async function refetch(): Promise<T | null> {
+    // Let a read that started before this call finish first; its answer may
+    // predate whatever the caller is checking for.
+    if (inFlight) await inFlight
+    return refresh()
   }
 
   function invalidate(): void {
@@ -220,6 +244,8 @@ export function createCachedQuery<T>(opts: CachedQueryOpts<T>): CachedQuery<T> {
     error: errorRef,
     ensure,
     refresh,
+    refetch,
+    isFresh,
     prefetch,
     invalidate,
     set,
@@ -240,6 +266,11 @@ function raceTimeout<T>(promise: Promise<T>, timeoutMs: number, key: string): Pr
   })
 }
 
+export type KeyedQueryFactory<K extends string, T> = ((key: K) => CachedQuery<T>) & {
+  /** The queries created so far (does not create any). */
+  values: () => IterableIterator<CachedQuery<T>>
+}
+
 /**
  * Factory variant — memoize cachedQuery instances by a derived key. Use for
  * per-pair / per-interval queries (orderbook, kline, current-liquidity) so
@@ -248,9 +279,9 @@ function raceTimeout<T>(promise: Promise<T>, timeoutMs: number, key: string): Pr
  */
 export function createKeyedQueryFactory<K extends string, T>(
   build: (key: K) => CachedQuery<T>,
-): (key: K) => CachedQuery<T> {
+): KeyedQueryFactory<K, T> {
   const cache = new Map<K, CachedQuery<T>>()
-  return (key: K) => {
+  const get = (key: K) => {
     let q = cache.get(key)
     if (!q) {
       q = build(key)
@@ -258,4 +289,5 @@ export function createKeyedQueryFactory<K extends string, T>(
     }
     return q
   }
+  return Object.assign(get, { values: () => cache.values() })
 }

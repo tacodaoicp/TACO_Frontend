@@ -77,7 +77,9 @@ export function useStaleAwareLoad(opts: StaleAwareOptions) {
   }
 
   async function loadIfStale(): Promise<void> {
-    if (Date.now() - lastFetchedAt > staleMs) await load()
+    const age = Date.now() - lastFetchedAt
+    // A negative age (clock moved back) is stale too, not fresh forever.
+    if (age < 0 || age > staleMs) await load()
   }
 
   // Visibility-aware ticker: skip the network call while the tab is hidden;
