@@ -75,92 +75,38 @@ export function useOrderbook(
     return { stepBps: 1n, numLevels: 100n } // 16dp+
   }
 
-  async function fetchOrderbook() {
+  function bookKey(): string {
+    const { stepBps, numLevels } = getStepAndLevels()
+    return `${token0.value}|${token1.value}|${numLevels}|${stepBps}`
+  }
+  // The pair and depth the rows on screen belong to.
+  let shownKey = ''
+
+  /**
+   * 'first' (mount, pair or depth change): the saved book paints at once (a
+   * book older than 12 h waits for the network instead), then the fresh book
+   * replaces it as soon as that read lands. 'live' (polls, tab return): a
+   * network read every time; a failed one keeps the rows on screen.
+   */
+  async function fetchOrderbook(mode: 'first' | 'live' = 'live') {
     if (!token0.value || !token1.value) return
 
     const mySwitchId = switchId
     try {
       const { stepBps, numLevels } = getStepAndLevels()
+      const key = bookKey()
+      const read = (m: 'cached' | 'pending' | 'live') =>
+        store.getOrderbookCombined(token0.value, token1.value, numLevels, stepBps, m)
 
-      const result = await store.getOrderbookCombined(
-        token0.value,
-        token1.value,
-        numLevels,
-        stepBps,
-      )
-
-      if (mySwitchId !== switchId) return
-
-      if (!result) {
-        isLoading.value = false
-        return
-      }
-
-      const r = result as any
-      const dec0 = decimals0.value
-      console.log(`[Orderbook] query(${token0.value}, ${token1.value}) dec0=${dec0} → ammMidPrice=${r.ammMidPrice}, bestAsk=${r.asks?.[0]?.price}, bestBid=${r.bids?.[0]?.price}, firstAskAmmAmt=${r.asks?.[0]?.ammAmount?.toString()}, firstAskLimitAmt=${r.asks?.[0]?.limitAmount?.toString()}, nAsks=${r.asks?.length}, nBids=${r.bids?.length}`)
-
-      function toLevels(rawLevels: any[], side: 'bids' | 'asks'): OrderbookLevel[] {
-        const levels: OrderbookLevel[] = rawLevels.map((l: any) => {
-          const ammAmt = Number(l.ammAmount) / (10 ** dec0)
-          const limitAmt = Number(l.limitAmount) / (10 ** dec0)
-          return {
-            price: l.price,
-            amount: ammAmt + limitAmt,
-            total: 0,
-            source: (ammAmt > 0 && limitAmt > 0) ? 'Both' as const
-              : ammAmt > 0 ? 'AMM' as const : 'Limit' as const,
-            ammAmount: ammAmt,
-            limitAmount: limitAmt,
-            orders: Number(l.limitOrders),
-          }
-        }).filter(l => l.amount > 0)
-
-        if (side === 'bids') {
-          levels.sort((a, b) => b.price - a.price)
-        } else {
-          levels.sort((a, b) => a.price - b.price)
+      if (mode === 'first') {
+        applyBook(await read('cached'), mySwitchId, key)
+        if (mySwitchId === switchId && key === bookKey()) {
+          const fresh = await read('pending')
+          if (fresh) applyBook(fresh, mySwitchId, key)
         }
-
-        let cum = 0
-        for (const l of levels) { cum += l.amount; l.total = cum }
-        return levels
+      } else {
+        applyBook(await read('live'), mySwitchId, key)
       }
-
-      const newBids = toLevels(r.bids ?? [], 'bids')
-      const newAsks = toLevels(r.asks ?? [], 'asks')
-
-      console.log('[Orderbook] Poll update:', newBids.length, 'bids,', newAsks.length, 'asks')
-      bids.value = newBids
-      asks.value = newAsks
-
-      if (newBids.length > 0) bestBid.value = newBids[0].price
-      if (newAsks.length > 0) bestAsk.value = newAsks[0].price
-
-      if (bestBid.value > 0 && bestAsk.value > 0) {
-        midPrice.value = (bestBid.value + bestAsk.value) / 2
-        spread.value = spreadPercent(bestBid.value, bestAsk.value)
-      } else if (r.ammMidPrice > 0) {
-        midPrice.value = r.ammMidPrice
-      }
-
-      // Fetch last trade price + direction every 3rd poll (~9s)
-      pollCount++
-      if (pollCount % 3 === 1) {
-        fetchLastTrade()
-      }
-
-      // Update store effective price: use lastTradePrice if within spread, else midPrice
-      if (lastTradePrice.value > 0 && bestBid.value > 0 && bestAsk.value > 0
-          && lastTradePrice.value >= bestBid.value && lastTradePrice.value <= bestAsk.value) {
-        store.effectivePrice = lastTradePrice.value
-      } else if (midPrice.value > 0) {
-        store.effectivePrice = midPrice.value
-      }
-      store.effectivePriceDirection = lastTradeDirection.value
-
-      isLoading.value = false
-      isStale.value = false
     } catch (err: any) {
       if (mySwitchId !== switchId) return
       console.error('[Orderbook] Fetch error:', err?.message || err)
@@ -168,11 +114,90 @@ export function useOrderbook(
     }
   }
 
+  function applyBook(result: unknown, mySwitchId: number, key: string) {
+    if (mySwitchId !== switchId || key !== bookKey()) return
+
+    if (!result) {
+      // No answer: keep rows of this pair and depth; drop rows left from
+      // another pair or depth (they were never this book).
+      if (shownKey !== key) { bids.value = []; asks.value = [] }
+      isLoading.value = false
+      return
+    }
+
+    const r = result as any
+    const dec0 = decimals0.value
+    console.log(`[Orderbook] query(${token0.value}, ${token1.value}) dec0=${dec0} → ammMidPrice=${r.ammMidPrice}, bestAsk=${r.asks?.[0]?.price}, bestBid=${r.bids?.[0]?.price}, firstAskAmmAmt=${r.asks?.[0]?.ammAmount?.toString()}, firstAskLimitAmt=${r.asks?.[0]?.limitAmount?.toString()}, nAsks=${r.asks?.length}, nBids=${r.bids?.length}`)
+
+    function toLevels(rawLevels: any[], side: 'bids' | 'asks'): OrderbookLevel[] {
+      const levels: OrderbookLevel[] = rawLevels.map((l: any) => {
+        const ammAmt = Number(l.ammAmount) / (10 ** dec0)
+        const limitAmt = Number(l.limitAmount) / (10 ** dec0)
+        return {
+          price: l.price,
+          amount: ammAmt + limitAmt,
+          total: 0,
+          source: (ammAmt > 0 && limitAmt > 0) ? 'Both' as const
+            : ammAmt > 0 ? 'AMM' as const : 'Limit' as const,
+          ammAmount: ammAmt,
+          limitAmount: limitAmt,
+          orders: Number(l.limitOrders),
+        }
+      }).filter(l => l.amount > 0)
+
+      if (side === 'bids') {
+        levels.sort((a, b) => b.price - a.price)
+      } else {
+        levels.sort((a, b) => a.price - b.price)
+      }
+
+      let cum = 0
+      for (const l of levels) { cum += l.amount; l.total = cum }
+      return levels
+    }
+
+    const newBids = toLevels(r.bids ?? [], 'bids')
+    const newAsks = toLevels(r.asks ?? [], 'asks')
+
+    console.log('[Orderbook] Poll update:', newBids.length, 'bids,', newAsks.length, 'asks')
+    bids.value = newBids
+    asks.value = newAsks
+
+    if (newBids.length > 0) bestBid.value = newBids[0].price
+    if (newAsks.length > 0) bestAsk.value = newAsks[0].price
+
+    if (bestBid.value > 0 && bestAsk.value > 0) {
+      midPrice.value = (bestBid.value + bestAsk.value) / 2
+      spread.value = spreadPercent(bestBid.value, bestAsk.value)
+    } else if (r.ammMidPrice > 0) {
+      midPrice.value = r.ammMidPrice
+    }
+
+    // Fetch last trade price + direction every 3rd poll (~9s)
+    pollCount++
+    if (pollCount % 3 === 1) {
+      fetchLastTrade()
+    }
+
+    // Update store effective price: use lastTradePrice if within spread, else midPrice
+    if (lastTradePrice.value > 0 && bestBid.value > 0 && bestAsk.value > 0
+        && lastTradePrice.value >= bestBid.value && lastTradePrice.value <= bestAsk.value) {
+      store.effectivePrice = lastTradePrice.value
+    } else if (midPrice.value > 0) {
+      store.effectivePrice = midPrice.value
+    }
+    store.effectivePriceDirection = lastTradeDirection.value
+
+    shownKey = key
+    isLoading.value = false
+    isStale.value = false
+  }
+
   let pollTimer: ReturnType<typeof setInterval> | null = null
 
   function startPolling() {
     stopPolling()
-    fetchOrderbook()
+    fetchOrderbook('first')
     // Visibility-gated: while tab is hidden, skip the canister call entirely.
     // The hidden→visible flip below catches up with one immediate fetch.
     pollTimer = setInterval(() => {
@@ -196,11 +221,11 @@ export function useOrderbook(
     lastTradeDirection.value = 'neutral'
     store.effectivePrice = 0
     store.effectivePriceDirection = 'neutral'
-    Promise.all([fetchOrderbook(), fetchLastTrade()])
+    Promise.all([fetchOrderbook('first'), fetchLastTrade()])
   })
 
   if (precision) {
-    watch(precision, () => fetchOrderbook())
+    watch(precision, () => fetchOrderbook('first'))
   }
 
   let offVisible: (() => void) | null = null
@@ -275,6 +300,6 @@ export function useOrderbook(
     lastTradePrice,
     lastTradeDirection,
     toggleDisplayMode,
-    refresh: fetchOrderbook,
+    refresh: () => fetchOrderbook('live'),
   }
 }

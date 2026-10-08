@@ -70,6 +70,10 @@ const props = withDefaults(defineProps<{
   /** Let a vertical touch swipe scroll the page instead of the chart (for charts inside a scrolling page). */
   pageScroll?: boolean
 }>(), {
+  // Live 5 s update on unless a host turns it off. Without a default Vue reads
+  // a missing Boolean prop as false, so the exchange charts (which don't pass
+  // it) never polled. The DAO home page passes it explicitly.
+  enabled: true,
   hideFullscreen: false,
   hideAttribution: false,
   defaultTimeframe: 'fivemin',
