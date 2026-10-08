@@ -375,14 +375,21 @@ export const useExchangeStore = defineStore('exchange', () => {
     if (v && v.length > 0) pausedTokens.value = v[0] ?? []
   }
 
+  /** The query's value when it may be painted: present, not stamped in the
+   *  future (a clock that was set back) and no older than maxAgeMs. */
+  function paintable<T>(q: CachedQuery<T>, maxAgeMs = Infinity): T | null {
+    const v = q.data.value
+    return v !== null && isWithinAge(q.lastFetchedAt.value, maxAgeMs) ? v : null
+  }
+
   /** Paint the saved boot values right away (before any await), so first paint
    *  does not wait for the frozen check. Saved pools older than
    *  MAX_SAVED_POOLS_AGE_MS are skipped: the loading state shows instead. A
    *  value stamped in the future is never painted. */
   function seedFromSaved() {
     const seed = <T>(q: CachedQuery<T>, maxAgeMs: number, apply: (v: T) => void) => {
-      const v = q.data.value
-      if (v !== null && isWithinAge(q.lastFetchedAt.value, maxAgeMs)) apply(v)
+      const v = paintable(q, maxAgeMs)
+      if (v !== null) apply(v)
     }
     seed(acceptedTokensQuery, Infinity, applyTokens)
     seed(exchangeInfoQuery, MAX_SAVED_POOLS_AGE_MS, v => applyInfo(v[0], exchangeInfoQuery.lastFetchedAt.value))
@@ -444,13 +451,9 @@ export const useExchangeStore = defineStore('exchange', () => {
       // exchange hanging on a loading state.
       const criticalResults = await Promise.allSettled([
         withTimeout(acceptedTokensQuery.ensure(CACHE_TTL.tokens), 15_000, 'getAcceptedTokensInfo')
-          .then(() => applyTokens(acceptedTokensQuery.data.value)),                                // 0 — gate
+          .then(() => applyTokens(paintable(acceptedTokensQuery))),                                // 0 — gate
         withTimeout(exchangeInfoQuery.ensure(CACHE_TTL.info), 15_000, 'exchangeInfo')
-          .then(() => {
-            if (exchangeInfoQuery.isFresh(MAX_SAVED_POOLS_AGE_MS)) {
-              applyInfo(exchangeInfoQuery.data.value?.[0], exchangeInfoQuery.lastFetchedAt.value)
-            }
-          }),                                                                                      // 1 — gate
+          .then(() => applyInfo(paintable(exchangeInfoQuery, MAX_SAVED_POOLS_AGE_MS)?.[0], exchangeInfoQuery.lastFetchedAt.value)), // 1 — gate
         withTimeout(actor.isExchangeFrozen(), 8_000, 'isExchangeFrozen'),                          // 2 — admin
       ])
 
@@ -499,12 +502,17 @@ export const useExchangeStore = defineStore('exchange', () => {
           deferredResults.forEach((r, i) => {
             if (r.status === 'rejected') console.error(`[Exchange] Init deferred call ${i} failed:`, r.reason)
           })
-          applyPaused(pausedTokensQuery.data.value)
-          if (treasuryAcctQuery.data.value)  treasuryAccountId.value = treasuryAcctQuery.data.value
-          if (treasuryPrincQuery.data.value) treasuryPrincipal.value = treasuryPrincQuery.data.value
-          if (tradingFeeQuery.data.value !== null) tradingFeeBps.value    = tradingFeeQuery.data.value
-          if (revokeFeeQuery.data.value  !== null) revokeFeeDivisor.value = revokeFeeQuery.data.value
-          if (refFeeQuery.data.value     !== null) referralFeePct.value   = refFeeQuery.data.value
+          applyPaused(paintable(pausedTokensQuery))
+          const acct = paintable(treasuryAcctQuery)
+          const princ = paintable(treasuryPrincQuery)
+          const fee = paintable(tradingFeeQuery)
+          const revFee = paintable(revokeFeeQuery)
+          const refFee = paintable(refFeeQuery)
+          if (acct)  treasuryAccountId.value = acct
+          if (princ) treasuryPrincipal.value = princ
+          if (fee    !== null) tradingFeeBps.value    = fee
+          if (revFee !== null) revokeFeeDivisor.value = revFee
+          if (refFee !== null) referralFeePct.value   = refFee
         })
       })
 
