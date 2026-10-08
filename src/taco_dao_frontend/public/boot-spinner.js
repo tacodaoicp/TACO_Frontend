@@ -15,7 +15,7 @@
   // Normal teardown happens in bootExchange() within ~1-2s (and it mounts within
   // a 7s timeout even if the initial route stalls). If the app STILL hasn't
   // mounted by the deadline, show a recoverable error instead of a blank screen.
-  // (DOM-built, no inline handlers — the asset-canister CSP blocks inline JS.)
+  // (DOM-built, no inline handlers, since the asset-canister CSP blocks inline JS.)
   setTimeout(function () {
     var n = document.getElementById('ex-boot');
     if (!n) return;

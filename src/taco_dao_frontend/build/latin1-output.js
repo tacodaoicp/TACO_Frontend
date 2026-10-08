@@ -8,7 +8,8 @@ import MagicString from 'magic-string'
 // those too. It runs in renderChunk, before Rollup hashes the chunk, so file
 // names still follow their content (assets/ is cached as immutable). Anything
 // else left over, such as a tagged template whose raw text must not change,
-// fails the build, and so does any such character in a CSS file.
+// fails the build, and so does any such character in a CSS file or in a script
+// emitted as an asset (the hashed boot spinner from build/immutable-assets.js).
 
 const NOT_LATIN1 = /[^\x00-\xff]/u
 const EACH_NOT_LATIN1 = /[^\x00-\xff]/gu
@@ -58,11 +59,11 @@ export default function latin1Output() {
       },
     },
     generateBundle: {
-      order: 'post', // once every CSS file is emitted
+      order: 'post', // once every CSS file and copied script is emitted
       handler(_, bundle) {
         for (const file of Object.values(bundle)) {
-          if (file.type === 'asset' && file.fileName.endsWith('.css') && NOT_LATIN1.test(Buffer.from(file.source).toString())) {
-            this.error(`${file.fileName} has characters above U+00FF, so the browser would store it two-byte. Check esbuild.charset in vite.config.js.`)
+          if (file.type === 'asset' && /\.(css|js)$/.test(file.fileName) && NOT_LATIN1.test(Buffer.from(file.source).toString())) {
+            this.error(`${file.fileName} has characters above U+00FF, so the browser would store it two-byte. For CSS check esbuild.charset in vite.config.js, for a copied script edit its source.`)
           }
         }
       },
