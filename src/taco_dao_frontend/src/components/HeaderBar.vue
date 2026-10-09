@@ -769,7 +769,7 @@
   const { tacoWizardOpen } = storeToRefs(tacoStore); // reactive
   const { icpPriceUsd, tacoPriceUsd, tacoPriceIcp, tacoFairValueUsd } = storeToRefs(tacoStore) // reactive
   const { tacoBackingValueUsd, tacoCirculatingSupply, tacoBelowFairPct } = storeToRefs(tacoStore) // reactive
-  const { treasuryValueExTacoInUsd } = storeToRefs(tacoStore) // reactive
+  const { treasuryValueExTacoInUsd, totalPortfolioValueInUsd } = storeToRefs(tacoStore) // reactive
   const { portfolioValueExTacoInUsd, nachoOwnershipFraction, daoAssetsDisplayUsd } = storeToRefs(tacoStore) // reactive
 
   /////////////////////
@@ -818,9 +818,11 @@
 
   // dao assets total, compact (e.g. $1.2M)
   const compactUsd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact' })
-  // (the treasury part is never 0 because of the fixed Solum and Simwin values, so wait for the NACHO share)
-  // same rounded parts as the fair value note above it, so both rows always show the same total
-  const daoAssets = computed(() => nachoOwnershipFraction.value > 0 ? fairBacking.value : '…')
+  // same total as the header value card: treasury without TACO plus the whole vault portfolio with its TACO,
+  // summed from parts rounded to thousands (the treasury part is never 0, so wait for the portfolio)
+  const daoAssets = computed(() => totalPortfolioValueInUsd.value > 0
+    ? compactUsd.format(Math.round(treasuryValueExTacoInUsd.value / 1000) * 1000 + Math.round(totalPortfolioValueInUsd.value / 1000) * 1000)
+    : '…')
 
   ///////////////////
   // Local Methods //

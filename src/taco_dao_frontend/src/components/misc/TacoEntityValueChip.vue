@@ -13,7 +13,7 @@
             <TacoDaoTacoT />
 
             <!-- price in usd -->
-            <span class="taco-text-black-to-white">{{ nachoOwnershipFraction > 0 ? '$' + formatNumber(daoAssetsDisplayUsd) : '…' }}</span>
+            <span class="taco-text-black-to-white">{{ totalPortfolioValueInUsd > 0 ? '$' + formatNumber(cardTotalUsd) : '…' }}</span>
 
         </span>
 
@@ -145,12 +145,12 @@
                 <span class="taco-entity-value-chip__tooltip__kvp__key 
                     taco-text-black-to-white">
                     <i class="fa-solid fa-chart-pie"></i>
-                    Portfolio (DAO share)
+                    Portfolio
                 </span>
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">{{ nachoOwnershipFraction > 0 ? '$' + formatNumber(daoVaultShareUsd) : '…' }}</span>
+                    taco-text-black-to-white">{{ totalPortfolioValueInUsd > 0 ? '$' + formatNumber(totalPortfolioValueInUsd) : '…' }}</span>
 
             </div>
 
@@ -163,7 +163,7 @@
 
                 <!-- value -->
                 <span class="taco-entity-value-chip__tooltip__kvp__value 
-                    taco-text-black-to-white">{{ nachoOwnershipFraction > 0 ? '$' + formatNumber(daoAssetsDisplayUsd) : '…' }}</span>
+                    taco-text-black-to-white">{{ totalPortfolioValueInUsd > 0 ? '$' + formatNumber(cardTotalUsd) : '…' }}</span>
 
             </div>
 
@@ -326,7 +326,7 @@
     // # STATE #
 
     // dao
-    const { daoAssetsDisplayUsd, daoVaultShareUsd, nachoOwnershipFraction, treasuryValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+    const { totalPortfolioValueInUsd, treasuryValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
 
     // prices (for watching)
     const { icpPriceUsd, tacoPriceUsd, dkpPriceUsd } = storeToRefs(tacoStore)
@@ -359,6 +359,10 @@
     // returns //
 
     // format number
+    // this card shows the whole vault portfolio (with its TACO), not the DAO's share: the total is the treasury
+    // without TACO plus that full portfolio, summed from the rounded parts so the rows add up on screen
+    const cardTotalUsd = computed(() => Math.round(treasuryValueExTacoInUsd.value / 1000) * 1000 + Math.round(totalPortfolioValueInUsd.value / 1000) * 1000)
+
     const formatNumber = computed(() => {
         return (num) => {
             if (typeof num !== 'number') {
