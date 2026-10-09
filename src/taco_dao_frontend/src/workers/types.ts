@@ -70,6 +70,7 @@ export type DataKey =
   | 'nachosVaultDashboard'  // Composite vault state (portfolio, NAV, estimates, fees, status)
   | 'nachosConfig'          // Vault configuration (fees, rate limits, operation limits)
   | 'nachosNavHistory'      // Historical NAV snapshots with timestamps and reasons
+  | 'nachosVaultAnalytics'  // Lifetime mint/burn totals, volumes, fees, global 4h usage
 
 // ============================================================================
 // Worker Assignment - Which worker handles which data
@@ -139,6 +140,7 @@ export const WORKER_ASSIGNMENT: Record<DataKey, 'public' | 'auth'> = {
   nachosVaultDashboard: 'public',
   nachosConfig: 'public',
   nachosNavHistory: 'public',
+  nachosVaultAnalytics: 'public',
 }
 
 // ============================================================================
@@ -227,6 +229,7 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
   nachosVaultDashboard: 60_000,   // 1min - revalidate frequently; cache still shown immediately
   nachosConfig: 3_600_000,         // 1h - Admin-set, rarely changes
   nachosNavHistory: 60_000,        // 1min - keep chart fresh against new snapshots
+  nachosVaultAnalytics: 60_000,    // 1min - same cadence as the dashboard
 }
 
 // Background tab multiplier (3x slower)
@@ -286,6 +289,7 @@ export type WorkerRequestType =
   | 'SET_USER_PRINCIPAL' // Send user principal to public worker for getVoteDashboard
   | 'SET_ROUTE' // Update current route for admin data gating
   | 'SET_DEBUG' // Toggle worker debug logging (per-fetch timing telemetry)
+  | 'PAGE_HIDDEN' // Tab closed, reloaded or went into the back-forward cache (shared worker drops its route)
 
 export interface WorkerRequest extends BaseMessage {
   type: WorkerRequestType
@@ -436,7 +440,7 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
   },
   '/vault': {
     critical: ['nachosVaultDashboard', 'nachosConfig'],  // Nachos-specific data first
-    high: ['nachosNavHistory', 'cryptoPrices'],          // NAV chart + price data
+    high: ['nachosNavHistory', 'cryptoPrices', 'nachosVaultAnalytics'], // NAV chart, prices, analytics panel
     preloadRoutes: ['/wallet', '/buy', '/performance'],
   },
   '/buy': {
@@ -488,6 +492,10 @@ export interface CachedData<T = unknown> {
   data: T
   lastUpdated: number
   version: number
+  // Network the entry was fetched on. Missing on entries written before tagging.
+  network?: string
+  // Principal (text) a user-specific entry belongs to. Never set on public data.
+  owner?: string
 }
 
 export const CACHE_VERSION = 1

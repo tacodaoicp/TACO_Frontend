@@ -4,7 +4,7 @@
  * for the NACHOS index token vault (staging only)
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { Actor } from '@dfinity/agent'
 import { Principal } from '@dfinity/principal'
@@ -14,6 +14,8 @@ import { getCanisterId } from '../constants/canisterIds'
 import { workerBridge } from './worker-bridge'
 import { withTimeout } from '../exchange/utils/withTimeout'
 import { deserializeFromTransfer } from '../workers/shared/transfer'
+import { readUserCache, writeUserCache } from '../utils/userScopedCache'
+import type { DataKey } from '../workers/types'
 // Vault IDL factory now managed by taco.store's lazy loader + actor cache
 import type {
   MintResult, BurnResult, NachosError, CachedNAV, ActiveDeposit,
@@ -41,6 +43,8 @@ const POLL_SWITCH_AFTER_MS = 60_000
 
 // localStorage key prefix
 const DEPOSIT_CACHE_PREFIX = 'nachos_ops_'
+// Name of the signed-in user's activity in the per-user cache
+const ACTIVITY_CACHE = 'nachos_activity'
 
 // ============================================================================
 // Interfaces
@@ -73,9 +77,19 @@ export const useNachosStore = defineStore('nachos', () => {
   // ============================================================================
 
   const dashboardData = ref<any | null>(null)
+  // When the dashboard on screen was fetched (ms). Old after a reload of a
+  // long idle tab, until the background refresh lands.
+  const dashboardUpdatedAt = ref<number | null>(null)
   const userActivity = ref<any | null>(null)
+  // Set when the signed-in user's activity could not be loaded and none is cached
+  const userActivityError = ref<string | null>(null)
   const navHistory = ref<NavSnapshot[]>([])
   const navHistoryUSD = ref<Array<{ navPerTokenUSD: number; timestamp: bigint; reason: any }>>([])
+  // Set by the first history delivery, even an empty one (or a failure with nothing cached)
+  const navHistoryLoaded = ref(false)
+  const vaultAnalytics = ref<any | null>(null)
+  // Set when nothing is cached yet and the first analytics fetch failed (the worker keeps retrying)
+  const analyticsError = ref<string | null>(null)
   const isLoading = ref(false)
   const lastError = ref<string | null>(null)
   const activeOperationStatus = ref<string | null>(null)
@@ -95,12 +109,30 @@ export const useNachosStore = defineStore('nachos', () => {
   // Track worker unsubscribers for cleanup
   const workerUnsubscribers: (() => void)[] = []
 
-  // Subscribe to nachos worker data - updates store refs automatically
+  // Subscribe to nachos worker data - updates store refs automatically.
+  // The worker serves its IndexedDB copy first and then the refreshed data,
+  // each delivered once (cache replays of a payload the tab holds are skipped).
   workerUnsubscribers.push(
-    workerBridge.subscribe('nachosVaultDashboard', (data: unknown) => {
+    workerBridge.subscribe('nachosVaultDashboard', (data: unknown, state) => {
       if (data) {
         dashboardData.value = deserializeFromTransfer(data)
+        dashboardUpdatedAt.value = state?.lastUpdated ?? Date.now()
         lastError.value = null
+      } else if (state?.error) {
+        // Nothing cached and the fetch failed (the worker keeps retrying): mint
+        // and burn say they are unavailable instead of loading for good
+        lastError.value = state.error
+      }
+    })
+  )
+
+  workerUnsubscribers.push(
+    workerBridge.subscribe('nachosVaultAnalytics', (data: unknown, state) => {
+      if (data) {
+        vaultAnalytics.value = deserializeFromTransfer(data)
+        analyticsError.value = null
+      } else if (state?.error) {
+        analyticsError.value = state.error
       }
     })
   )
@@ -114,8 +146,13 @@ export const useNachosStore = defineStore('nachos', () => {
   )
 
   workerUnsubscribers.push(
-    workerBridge.subscribe('nachosNavHistory', (data: unknown) => {
-      if (!data) return
+    workerBridge.subscribe('nachosNavHistory', (data: unknown, state) => {
+      if (!data) {
+        // Failed with nothing cached: the chart hides (as before) instead of loading for good
+        if (state?.error) navHistoryLoaded.value = true
+        return
+      }
+      navHistoryLoaded.value = true
       const decoded = deserializeFromTransfer(data) as any
       if (decoded && Array.isArray(decoded.icp) && Array.isArray(decoded.usd)) {
         // New shape (worker v7+): { icp, usd }
@@ -432,17 +469,34 @@ export const useNachosStore = defineStore('nachos', () => {
   // localStorage Cache — Deposit Tracking
   // ============================================================================
 
-  const getCacheKey = (): string => DEPOSIT_CACHE_PREFIX + userPrincipal.value
+  // Scoped by network and principal. Unlike the activity cache these records
+  // outlive a sign out: they are how a failed deposit gets retried later.
+  const getCacheKey = (): string => `${DEPOSIT_CACHE_PREFIX}${getEffectiveNetwork()}_${userPrincipal.value}`
 
   const saveOpsToCache = () => {
+    if (!userPrincipal.value) return
     try {
       localStorage.setItem(getCacheKey(), JSON.stringify(cachedOperations.value))
     } catch (e) { console.error('Failed to save nachos ops cache:', e) }
   }
 
   const loadOpsFromCache = () => {
+    if (!userPrincipal.value) {
+      cachedOperations.value = []
+      return
+    }
     try {
-      const raw = localStorage.getItem(getCacheKey())
+      const key = getCacheKey()
+      let raw = localStorage.getItem(key)
+      if (raw === null) {
+        // Saved before the key carried the network: move it under this network
+        const legacyKey = DEPOSIT_CACHE_PREFIX + userPrincipal.value
+        raw = localStorage.getItem(legacyKey)
+        if (raw !== null) {
+          localStorage.setItem(key, raw)
+          localStorage.removeItem(legacyKey)
+        }
+      }
       if (raw) {
         cachedOperations.value = JSON.parse(raw)
       } else {
@@ -481,52 +535,77 @@ export const useNachosStore = defineStore('nachos', () => {
   // Query Actions (anonymous, read-only)
   // ============================================================================
 
-  const loadDashboard = async (mintEstimateE8s?: bigint, burnEstimateE8s?: bigint) => {
+  // Refreshes of the public vault data go through the data worker: it fetches
+  // with the same anonymous agent, hands the result to the subscriptions above
+  // and stores it in IndexedDB, which is what the next visit shows first.
+  // Resolves when the fresh data has arrived, or rejects after `timeoutMs`.
+  const refreshFromWorker = (key: DataKey, timeoutMs = 12_000) =>
+    workerBridge.fetchAndWait(key, true, timeoutMs)
+
+  const loadDashboard = async () => {
     try {
-      const actor = await createVaultActor(false)
-      const result = await withTimeout<any>((actor as any).getVaultDashboard(
-        mintEstimateE8s !== undefined ? [mintEstimateE8s] : [],
-        burnEstimateE8s !== undefined ? [burnEstimateE8s] : []
-      ), 10_000, 'getVaultDashboard')
-      // Guard against null/undefined wiping a good cache — mirrors the worker
-      // subscription guard at line 100.
-      if (result) {
-        dashboardData.value = result
-        lastError.value = null
-      }
+      await refreshFromWorker('nachosVaultDashboard')
+      lastError.value = null
     } catch (e: any) {
       console.error('Failed to load vault dashboard:', e)
       lastError.value = 'Failed to load vault dashboard'
     }
   }
 
-  const loadUserActivity = async (mintLimit = 10n, mintOffset = 0n, burnLimit = 10n, burnOffset = 0n) => {
-    if (!userLoggedIn.value) return
+  // Shared by the page, its sign in watcher and the 30 s refresh, which can
+  // all ask at once. Only for the same account: after a sign out and sign in a
+  // load still running for the old one is not the new account's. A `fresh`
+  // load (after a mint, burn, retry or cancel) must include what just changed,
+  // so it never takes a load that started earlier: it runs once that one ends.
+  let userActivityLoad: { principal: string; promise: Promise<void> } | null = null
+
+  const loadUserActivity = ({ fresh = false } = {}, mintLimit = 10n, mintOffset = 0n, burnLimit = 10n, burnOffset = 0n): Promise<void> => {
+    if (!userLoggedIn.value) return Promise.resolve()
+    const principal = userPrincipal.value
+    const running = userActivityLoad?.principal === principal ? userActivityLoad.promise : null
+    if (running && !fresh) return running
+    const load = async () => {
+      if (principal === userPrincipal.value) await fetchUserActivity(mintLimit, mintOffset, burnLimit, burnOffset)
+    }
+    const promise: Promise<void> = (running ? running.then(load) : load())
+      .finally(() => { if (userActivityLoad?.promise === promise) userActivityLoad = null })
+    userActivityLoad = { principal, promise }
+    return promise
+  }
+
+  const fetchUserActivity = async (mintLimit: bigint, mintOffset: bigint, burnLimit: bigint, burnOffset: bigint) => {
+    const principal = userPrincipal.value
     try {
       const actor = await createVaultActor(true)
       const result = await withTimeout<any>((actor as any).getUserActivity(
-        Principal.fromText(userPrincipal.value),
+        Principal.fromText(principal),
         mintLimit, mintOffset, burnLimit, burnOffset
       ), 10_000, 'getUserActivity')
       if (isDevEnvironment()) {
         console.log('[NACHOS loadUserActivity]', {
-          principal: userPrincipal.value,
+          principal,
           recentTransactions: result.recentTransactions?.length ?? 0,
           totalMints: result.totalMints?.toString(),
           totalBurns: result.totalBurns?.toString(),
         })
       }
+      // Signed out or switched account while this was in flight: not theirs
+      if (principal !== userPrincipal.value) return
       userActivity.value = result
+      userActivityError.value = null
+      writeUserCache(principal, ACTIVITY_CACHE, result)
     } catch (e: any) {
       console.error('Failed to load user activity:', e)
+      if (principal === userPrincipal.value && !userActivity.value) {
+        userActivityError.value = 'Could not load your vault activity'
+      }
     }
   }
 
   const loadNAVHistory = async () => {
     try {
-      const actor = await createVaultActor(false)
-      const result = await withTimeout<any>((actor as any).getNAVHistoryAdaptive(), 10_000, 'getNAVHistoryAdaptive')
-      if (result) navHistory.value = result
+      // ICP and USD history come as one key, so they stay paired
+      await refreshFromWorker('nachosNavHistory')
     } catch (e: any) {
       console.error('Failed to load NAV history:', e)
     }
@@ -534,11 +613,17 @@ export const useNachosStore = defineStore('nachos', () => {
 
   const loadConfig = async () => {
     try {
-      const actor = await createVaultActor(false)
-      const result = await withTimeout<any>((actor as any).getConfig(), 10_000, 'getConfig')
-      if (result) vaultConfig.value = result
+      await refreshFromWorker('nachosConfig')
     } catch (e: any) {
       console.error('Failed to load vault config:', e)
+    }
+  }
+
+  const loadAnalytics = async () => {
+    try {
+      await refreshFromWorker('nachosVaultAnalytics')
+    } catch (e: any) {
+      console.error('Failed to load vault analytics:', e)
     }
   }
 
@@ -719,11 +804,14 @@ export const useNachosStore = defineStore('nachos', () => {
   }
 
   const getTokenBalance = async (tokenPrincipal: string): Promise<bigint> => {
-    const actor = await createBalanceActor(tokenPrincipal)
-    return await (actor as any).icrc1_balance_of({
-      owner: Principal.fromText(userPrincipal.value),
-      subaccount: [],
-    }) as bigint
+    const owner = Principal.fromText(userPrincipal.value)
+    const query = async () => {
+      const actor = await createBalanceActor(tokenPrincipal)
+      return await (actor as any).icrc1_balance_of({ owner, subaccount: [] }) as bigint
+    }
+    // Bounded: this agent has no transport abort, and a request hung after the
+    // phone wakes up used to leave the balance poll stuck until a reload
+    return await withTimeout<bigint>(query(), 10_000, 'icrc1_balance_of')
   }
 
   // ============================================================================
@@ -1181,6 +1269,15 @@ export const useNachosStore = defineStore('nachos', () => {
   // Initialization
   // ============================================================================
 
+  // The signed-in account changed (sign in, sign out, another account): the
+  // previous account's activity and operations are dropped at once, and the
+  // new account's last known activity shows while initialize() refreshes it.
+  watch(userPrincipal, (principal) => {
+    userActivity.value = readUserCache<any>(principal, ACTIVITY_CACHE)?.value ?? null
+    userActivityError.value = null
+    loadOpsFromCache()
+  }, { immediate: true })
+
   const initialize = async () => {
     loadOpsFromCache()
     pruneOldOps()
@@ -1200,7 +1297,8 @@ export const useNachosStore = defineStore('nachos', () => {
 
   return {
     // State
-    dashboardData, userActivity, navHistory, navHistoryUSD, isLoading, lastError,
+    dashboardData, dashboardUpdatedAt, userActivity, userActivityError, navHistory, navHistoryUSD, navHistoryLoaded,
+    vaultAnalytics, analyticsError, isLoading, lastError,
     activeOperationStatus, activeOperationType, cachedOperations, slippageBP, vaultConfig,
     // Computed
     userPrincipal, userLoggedIn, icpPriceUsd,
@@ -1215,7 +1313,7 @@ export const useNachosStore = defineStore('nachos', () => {
     userRateLimits, globalMintIn4h, globalBurnIn4h, maxMintPer4h, maxBurnPer4h, effectiveBurnLimit, liquidPortfolioICP,
     remainingMintICP, remainingMintOps, remainingBurnNachos, remainingBurnOps,
     // Query actions
-    loadDashboard, loadUserActivity, loadNAVHistory, loadConfig,
+    loadDashboard, loadUserActivity, loadNAVHistory, loadConfig, loadAnalytics,
     // Estimate actions
     estimateMintICP, estimateMintWithToken, getRequiredPortfolioShares, estimateBurn,
     // Mint actions

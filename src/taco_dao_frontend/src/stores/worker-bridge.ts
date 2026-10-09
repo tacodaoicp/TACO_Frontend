@@ -29,7 +29,7 @@ import MainDedicatedWorkerUrl from '../workers/authenticated.dedicated.worker.ts
 // Debug Mode (use tacoConfig.debug() in console to enable/disable)
 // ============================================================================
 
-import { isDebugEnabled } from '../config/network-config'
+import { isDebugEnabled, getEffectiveNetwork as getConfiguredNetwork } from '../config/network-config'
 
 // Runtime debug check - respects tacoConfig.debug() setting
 const WORKER_DEBUG = () => isDebugEnabled()
@@ -79,7 +79,9 @@ const workersConnected = ref(false)
 // ============================================================================
 
 // Increment to force browser to load fresh SharedWorker code
-const WORKER_VERSION = 'v7' // v7: nachosNavHistory wire format changed to { icp, usd }
+// v7: nachosNavHistory wire format changed to { icp, usd }
+// v8: nachosVaultAnalytics key, FETCH_STARTED without payload, cache tagged by network and owner
+const WORKER_VERSION = 'v8'
 
 function getMainWorker(): WorkerAdapter {
   if (!mainWorker) {
@@ -126,16 +128,12 @@ function getEffectiveNetwork(): 'ic' | 'staging' | 'local' {
       try { localStorage.removeItem('taco_network_override') } catch { /* ignore */ }
     }
   }
-  // @ts-ignore - Vite/dfx injects this at build time
-  const envNetwork = process.env.DFX_NETWORK
-  if (envNetwork === 'ic' || envNetwork === 'staging') {
-    return envNetwork
-  }
-  // Last resort: infer from the hostname rather than defaulting to 'local'
-  // (a build shipped without DFX_NETWORK on prod must still reach mainnet).
-  const hostname = typeof location !== 'undefined' ? location.hostname : ''
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.')) return 'local'
-  return 'ic'
+  // Same answer initNetworkConfig() sends right after boot (and the one the
+  // main thread's canister ids use). Resolving it from the build env here
+  // started the staging site's worker on 'ic' and flipped it to 'staging' a
+  // moment later, and that switch wiped the worker's IndexedDB cache on every
+  // load. Prod hosts resolve to 'ic' either way.
+  return getConfiguredNetwork()
 }
 
 function setupWorkerAdapter(worker: WorkerAdapter, workerName: string): void {
@@ -181,6 +179,10 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
           const dataInfo = payload.state?.data ? (Array.isArray(payload.state.data) ? `array[${payload.state.data.length}]` : typeof payload.state.data) : 'null'
           console.log(`[WorkerBridge] ${type} received for ${payload.dataKey} from ${workerName}, data=${dataInfo}`)
         }
+        // A cache replay of the payload this tab already holds: subscribers
+        // have it, so skip their decode and re-render
+        const held = dataStore.get(payload.dataKey)
+        if (type === 'CACHE_HIT' && held?.data != null && held.lastUpdated === payload.state.lastUpdated) break
         updateDataStore(payload.dataKey, payload.state)
       } else if (WORKER_DEBUG()) {
         console.warn(`[WorkerBridge] ${type} received but missing dataKey or state`, payload)
@@ -188,10 +190,12 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
       break
 
     case 'FETCH_STARTED':
+      // Bookkeeping only. The data did not change, so subscribers are not
+      // called (each call decodes and re-renders the whole payload again).
       if (payload.dataKey) {
         const current = dataStore.get(payload.dataKey)
         if (current) {
-          updateDataStore(payload.dataKey, { ...current, loading: true })
+          dataStore.set(payload.dataKey, { ...current, loading: true })
         }
       }
       break
@@ -201,11 +205,14 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
         const current = dataStore.get(payload.dataKey) || {
           data: null, lastUpdated: null, loading: false, error: null, stale: true
         }
-        updateDataStore(payload.dataKey, {
-          ...current,
-          loading: false,
-          error: payload.error || 'Unknown error',
-        })
+        const failed = { ...current, loading: false, error: payload.error || 'Unknown error' }
+        // Subscribers that have data keep showing it while the worker retries.
+        // Only a key with nothing to show is passed on, so its loading state can end.
+        if (current.data == null) {
+          updateDataStore(payload.dataKey, failed)
+        } else {
+          dataStore.set(payload.dataKey, failed)
+        }
       }
       // Only log unexpected errors (not access denied or backend version mismatch)
       const isSuppressedError = payload.error && (
@@ -381,6 +388,21 @@ export function initWorkerBridge(route?: string): void {
   }
   if (typeof window !== 'undefined') {
     window.addEventListener('pageshow', resumeKick)
+    // Closing, reloading or leaving into the back-forward cache: the shared
+    // worker stops counting this tab's route for background refreshes. After a
+    // restore the pageshow kick above (never debounced then) sends it again.
+    window.addEventListener('pagehide', () => {
+      lastResumeKick = 0
+      if (mainWorker?.type !== 'shared') return
+      try {
+        sendToWorker(mainWorker, {
+          id: generateMessageId(),
+          timestamp: Date.now(),
+          type: 'PAGE_HIDDEN',
+          payload: {},
+        })
+      } catch { /* worker gone; nothing to tell */ }
+    })
   }
 
   // Safety fallback timeout in case worker messages are lost
@@ -449,8 +471,16 @@ export function subscribe(
     if (WORKER_DEBUG()) {
       console.log(`[WorkerBridge] subscribe: found cached data for ${dataKey}, calling callback`)
     }
-    // Use setTimeout to ensure callback runs after subscription is fully set up
-    setTimeout(() => callback(cachedState.data, cachedState), 0)
+    // Use setTimeout to ensure callback runs after subscription is fully set up.
+    // Skipped when newer data reached the callback in between (replaying the
+    // older payload afterwards would roll it back), when the payload was
+    // dropped (another user signed in), or when the callback unsubscribed.
+    setTimeout(() => {
+      const latest = dataStore.get(dataKey)
+      if (!latest?.data || latest.lastUpdated !== cachedState.lastUpdated) return
+      if (!subscriptions.get(dataKey)?.has(callback)) return
+      callback(latest.data, latest)
+    }, 0)
   }
 
   // Subscribe to worker for updates
@@ -570,8 +600,11 @@ export function invalidate(dataKeys?: DataKey[]): void {
  */
 export function setCurrentRoute(route: string): void {
   currentRoute.value = route
-  // Tell workers the current route (used to gate admin data fetching)
-  broadcastToAllWorkers({
+  // Tell workers the current route (used to gate admin data fetching). The
+  // landing route is set before anything else created the worker, so create it
+  // here: skipped, this SET_ROUTE and the priority updates below were dropped
+  // (the fetches below create the worker anyway).
+  sendToWorker(getMainWorker(), {
     id: generateMessageId(),
     timestamp: Date.now(),
     type: 'SET_ROUTE',
@@ -620,10 +653,21 @@ export function setIdentity(serializedIdentity: {
   }
 }
 
+// Keys that hold one user's data (the workers' USER_KEYS). The tab keeps the
+// last payload of every key to replay to new subscribers, so these are
+// dropped when the user signs out or another principal signs in.
+const USER_DATA_KEYS: DataKey[] = ['userAllocation', 'userPerformance', 'swapDashboard']
+let knownUserPrincipal = ''
+
+function dropUserData(): void {
+  for (const key of USER_DATA_KEYS) dataStore.delete(key)
+}
+
 /**
  * Clear identity from authenticated worker (logout)
  */
 export function clearIdentity(): void {
+  dropUserData()
   if (mainWorker) {
     sendToWorker(mainWorker, {
       id: generateMessageId(),
@@ -639,6 +683,10 @@ export function clearIdentity(): void {
  * Pass the principal text when user logs in so the composite returns userAllocation.
  */
 export function setUserPrincipal(principalText: string): void {
+  if (principalText !== knownUserPrincipal) {
+    if (knownUserPrincipal) dropUserData()
+    knownUserPrincipal = principalText
+  }
   if (mainWorker) {
     sendToWorker(mainWorker, {
       id: generateMessageId(),

@@ -18,6 +18,32 @@ interface TacoDBSchema {
 
 let dbInstance: IDBPDatabase<TacoDBSchema> | null = null
 
+// Network the worker currently serves (set from SET_NETWORK). Stamped on every
+// entry so a cold start on another network never replays this one's data.
+let cacheNetwork: string | null = null
+
+export function setCacheNetwork(network: string | null): void {
+  cacheNetwork = network
+}
+
+/** A restored entry plus the tags it was written with */
+export interface CachedEntry<T = unknown> extends DataState<T> {
+  network?: string
+  owner?: string
+}
+
+function toEntry(cached: CachedData): CachedEntry {
+  return {
+    data: cached.data,
+    lastUpdated: cached.lastUpdated,
+    loading: false,
+    error: null,
+    stale: false, // Will be recalculated by caller
+    network: cached.network,
+    owner: cached.owner,
+  }
+}
+
 /**
  * Initialize or get the IndexedDB instance
  */
@@ -79,9 +105,10 @@ export async function getCached<T>(dataKey: DataKey): Promise<DataState<T> | nul
 }
 
 /**
- * Store data in cache
+ * Store data in cache. `owner` is the principal (text) of user-specific data;
+ * such an entry is only ever restored for that same principal.
  */
-export async function setCached<T>(dataKey: DataKey, data: T): Promise<void> {
+export async function setCached<T>(dataKey: DataKey, data: T, owner?: string): Promise<void> {
   try {
     const db = await getDB()
     const cached: CachedData<T> = {
@@ -89,11 +116,38 @@ export async function setCached<T>(dataKey: DataKey, data: T): Promise<void> {
       data,
       lastUpdated: Date.now(),
       version: 1,
+      ...(cacheNetwork ? { network: cacheNetwork } : {}),
+      ...(owner ? { owner } : {}),
     }
     await db.put(STORE_NAME, cached)
   } catch (error) {
     console.error(`[IndexedDB] Error caching data for ${dataKey}:`, error)
   }
+}
+
+/**
+ * Get cached entries for the given keys in one read transaction. Reading only
+ * what is needed keeps the big payloads (trade history) out of the first pass.
+ */
+export async function getCachedMany(dataKeys: DataKey[]): Promise<Map<DataKey, CachedEntry>> {
+  const result = new Map<DataKey, CachedEntry>()
+  if (dataKeys.length === 0) return result
+
+  try {
+    const db = await getDB()
+    const tx = db.transaction(STORE_NAME, 'readonly')
+    const [rows] = await Promise.all([
+      Promise.all(dataKeys.map((key) => tx.store.get(key))),
+      tx.done,
+    ])
+    for (const cached of rows) {
+      if (cached && cached.version === 1) result.set(cached.dataKey, toEntry(cached))
+    }
+  } catch (error) {
+    console.error('[IndexedDB] Error getting cached data:', error)
+  }
+
+  return result
 }
 
 /**

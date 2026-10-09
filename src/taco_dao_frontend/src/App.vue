@@ -275,6 +275,10 @@
     // This ensures /admin gets admin data prioritized, not homepage data
     await router.isReady()
 
+    // A redirect can resolve to the start path '/', which the route watcher
+    // does not see as a change; make sure the worker has the resolved route
+    syncWorkerRoute(route.path)
+
     // Worker bridge, network config, subscriptions, identity, and crypto prices
     // run synchronously after router.isReady() — deferring them races against
     // login restoration (sendIdentityToWorker / setUserPrincipal silently no-op
@@ -349,10 +353,20 @@
   // watch for route changes to update worker priorities. Immediate so the
   // landing route also produces a SET_ROUTE — the dedicated-worker fallback
   // relies on it as redundancy for its initial load.
+  // The immediate run happens before the first navigation resolves, while
+  // route.path is still the router's start location '/'. That used to start
+  // the worker on the home page's data even on a reload of /vault, so until
+  // the router is ready the path comes from the address bar instead.
+  let workerRoute = null
+  const syncWorkerRoute = (path) => {
+    if (path === workerRoute) return
+    workerRoute = path
+    setCurrentRoute(path)
+  }
   watch(
     () => route.path,
     (newPath) => {
-      setCurrentRoute(newPath)
+      syncWorkerRoute(routerReady.value ? newPath : window.location.pathname)
     },
     { immediate: true }
   )

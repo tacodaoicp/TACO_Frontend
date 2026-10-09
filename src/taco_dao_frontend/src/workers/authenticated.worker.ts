@@ -21,7 +21,7 @@ import { DelegationChain, DelegationIdentity, Ed25519KeyIdentity } from '@dfinit
 import { createAgent } from '@dfinity/utils'
 import { PriorityQueue } from './shared/priority-queue'
 import { BackoffTracker } from './shared/backoff'
-import { getCached, setCached, getAllCached } from './shared/indexed-db'
+import { setCached, getCachedMany, setCacheNetwork, type CachedEntry } from './shared/indexed-db'
 import { getHost, shouldFetchRootKey, setWorkerNetworkOverride } from './shared/canister-ids'
 import {
   // Public data fetch functions
@@ -77,6 +77,7 @@ import {
   fetchNachosVaultDashboard,
   fetchNachosConfig,
   fetchNachosNavHistory,
+  fetchNachosVaultAnalytics,
   // Utilities
   serializeForTransfer,
 } from './shared/fetch-functions'
@@ -85,6 +86,7 @@ import type {
   DataState,
   WorkerRequest,
   WorkerResponse,
+  WorkerResponseType,
   Priority,
   SerializedIdentity,
 } from './types'
@@ -128,6 +130,7 @@ const HANDLED_KEYS: DataKey[] = [
   'nachosVaultDashboard',
   'nachosConfig',
   'nachosNavHistory',
+  'nachosVaultAnalytics',
   // ========== USER KEYS ==========
   'userAllocation',
   'systemLogs',
@@ -199,7 +202,12 @@ const PUBLIC_KEYS: DataKey[] = [
   'nachosVaultDashboard',
   'nachosConfig',
   'nachosNavHistory',
+  'nachosVaultAnalytics',
 ]
+
+// The two treasury payloads (~650 KB each, 2000 trades) are restored from
+// IndexedDB in a second pass, so small route data never waits behind them.
+const HEAVY_CACHE_KEYS: DataKey[] = ['timerStatus', 'tradingStatus']
 
 // Keys that can be read publicly (anonymous agent works)
 const PUBLIC_ADMIN_KEYS: DataKey[] = [
@@ -248,6 +256,23 @@ let isInitialized = false
 let currentNetwork: 'ic' | 'staging' | 'local' | null = null // Track current network to detect changes
 let debugEnabled = false // Debug mode - disabled by default in production
 let currentRoute = '/' // Current route for admin data gating
+let currentPrincipal: string | null = null // Text of currentIdentity's principal
+let creatingAnonymousAgent = false
+
+// Principal each in-memory USER_KEYS entry belongs to. User data is only ever
+// served to that same principal (see setIdentity / clearIdentity).
+const userKeyOwner = new Map<DataKey, string>()
+// Network each entry restored from IndexedDB was written on ('ic' for entries
+// from before tagging); entries from another network are dropped.
+const restoredNetwork = new Map<DataKey, string>()
+// Bumped on a network change so a fetch still in flight on the old network is
+// dropped instead of being shown and cached as the new network's data.
+let networkEpoch = 0
+// lastUpdated of the payload each tab already holds, per key (see sendResponse)
+const deliveredTo = new WeakMap<MessagePort, Map<DataKey, number>>()
+// Route each tab is on. Background refreshes of data that only some routes
+// show serve every open tab, not only the tab that reported its route last.
+const portRoutes = new Map<MessagePort, string>()
 
 // Initial load state - track which keys are priority for current route
 let initialLoadKeys: Set<DataKey> = new Set()
@@ -278,29 +303,29 @@ async function init(): Promise<void> {
   // The network override must be set before we know which host to connect to
   // Agent creation will be triggered by handleSetNetwork
 
-  // Load cached data from IndexedDB (runs in parallel with agent creation).
-  // Raced against a timer: a hung openDB (multi-tab upgrade, broken private
-  // window IDB) must never stand between the user and live fetches.
-  try {
-    const cached = await Promise.race([
-      getAllCached(),
-      new Promise<Map<DataKey, DataState>>((resolve) => setTimeout(() => {
-        console.warn('[AuthWorker] IndexedDB restore timed out after 3s, starting with empty cache')
-        resolve(new Map())
-      }, 3_000)),
-    ])
-    for (const [key, state] of cached) {
-      if (HANDLED_KEYS.includes(key)) {
-        dataStates.set(key, {
-          ...state,
-          stale: isStale(key, state.lastUpdated),
-        })
-        if (debugEnabled) if (debugEnabled) console.log(`[AuthWorker] Loaded cached ${key}`)
-      }
-    }
-  } catch (error) {
-    console.error('[AuthWorker] Error loading cache:', error)
+  // Load cached data from IndexedDB (runs in parallel with agent creation), in
+  // two passes: the small keys (vault, prices, token details) first, then the
+  // two big treasury payloads, so route data is served without waiting on
+  // ~1.3 MB of trade history. The first pass is raced against a timer, because
+  // a hung openDB (multi-tab upgrade, broken private window IDB) must never
+  // stand between the user and live fetches; a pass that lands after the timer
+  // is merged in when it arrives instead of being thrown away. User data is
+  // not restored here: setIdentity loads it for the principal that owns it.
+  const restoreDeadline = sleep(3_000)
+  const firstPass = getCachedMany(
+    HANDLED_KEYS.filter(k => !HEAVY_CACHE_KEYS.includes(k) && !USER_KEYS.includes(k))
+  )
+  const restored = await Promise.race([firstPass, restoreDeadline.then(() => null)])
+  if (restored) {
+    applyRestoredCache(restored, false)
+  } else {
+    console.warn('[AuthWorker] IndexedDB restore is slow, starting with an empty cache and merging it when it lands')
+    firstPass.then((late) => applyRestoredCache(late, true))
   }
+  const heavyPass = firstPass
+    .then(() => getCachedMany(HEAVY_CACHE_KEYS))
+    .then((heavy) => applyRestoredCache(heavy, true))
+  Promise.race([heavyPass, restoreDeadline]).then(openHeavyFetches, openHeavyFetches)
 
   // Mark as initialized IMMEDIATELY after cache load (before agent is ready)
   // This allows cached data to be delivered without waiting for agent
@@ -355,6 +380,93 @@ async function init(): Promise<void> {
   processQueue()
 
   debugLog(`Init complete: anonymousAgent=${!!anonymousAgent}, authenticatedAgent=${!!authenticatedAgent}, queueSize=${queue.size}`)
+}
+
+// Set once the heavy keys' IndexedDB copy has been read, or the restore gave
+// up. Until then processQueue holds their fetches: started earlier, they
+// downloaded ~1.3 MB again on every load even when the stored copy was fresh.
+let heavyCacheRead = false
+
+// True while a key of the current route is in flight or due to start, unless
+// the route needs `heavyKey` itself. processQueue holds the heavy keys until
+// then: decoding a ~180 KB treasury reply blocks this thread for a while, and
+// in the first wave it held up the route's own small replies.
+function routeKeysLoading(heavyKey: DataKey): boolean {
+  const routeKeys = getInitialLoadKeys(currentRoute)
+  if (routeKeys.includes(heavyKey)) return false
+  return routeKeys.some((k) => queue.has(k) && (queue.isProcessing(k) || backoff.canRetry(k)))
+}
+
+function openHeavyFetches(): void {
+  if (heavyCacheRead) return
+  heavyCacheRead = true
+  // A fetch queued while the copy loaded is only needed if it is missing or
+  // stale (or, for timerStatus, if it was stored without its trading status)
+  for (const key of HEAVY_CACHE_KEYS) {
+    const state = dataStates.get(key)
+    const partial = key === 'timerStatus' && (state?.data as any)?.tradingStatus == null
+    if (state?.data && !partial && !isStale(key, state.lastUpdated) && !queue.isProcessing(key)) {
+      queue.remove(key)
+    }
+  }
+}
+
+// Keys the routes of all open tabs show (see portRoutes). currentRoute is the
+// route a tab reported last, possibly one that has closed since, so it only
+// counts while no open tab has reported a route.
+function openRouteKeys(): Set<DataKey> {
+  const keys = new Set<DataKey>()
+  for (const route of portRoutes.size ? portRoutes.values() : [currentRoute]) {
+    for (const key of getInitialLoadKeys(route)) keys.add(key)
+  }
+  return keys
+}
+
+// Vault analytics load in the background only while an open tab is on the
+// vault page, the one page that shows them. Its vault store stays subscribed
+// after the user moves on, so a subscription says nothing.
+function analyticsWanted(routeKeys: Set<DataKey>): boolean {
+  return routeKeys.has('nachosVaultAnalytics')
+}
+
+/**
+ * Put restored IndexedDB entries into memory. With `announce`, also push them
+ * to subscribed tabs: used for passes that land after init has already served
+ * its pending subscriptions (the heavy pass, or a first pass that beat the
+ * timer only late).
+ */
+function applyRestoredCache(cached: Map<DataKey, CachedEntry>, announce: boolean): void {
+  for (const [key, entry] of cached) {
+    if (!HANDLED_KEYS.includes(key) || USER_KEYS.includes(key)) continue
+    // Written on another network (cold start after a network switch). Entries
+    // from before tagging count as mainnet: on the staging site the old worker
+    // could write either network's data untagged, so there they are dropped.
+    const network = entry.network ?? 'ic'
+    if (currentNetwork && network !== currentNetwork) continue
+    // A live fetch already landed; never replace newer data with the cache
+    const current = dataStates.get(key)
+    if (current?.data && (current.lastUpdated ?? 0) >= (entry.lastUpdated ?? 0)) continue
+
+    const state: DataState = {
+      data: entry.data,
+      lastUpdated: entry.lastUpdated,
+      loading: false,
+      error: null,
+      stale: isStale(key, entry.lastUpdated),
+    }
+    dataStates.set(key, state)
+    restoredNetwork.set(key, network)
+    if (debugEnabled) console.log(`[AuthWorker] Loaded cached ${key}`)
+
+    if (announce) {
+      broadcastToSubscribers(key, {
+        id: generateMessageId(),
+        timestamp: Date.now(),
+        type: 'CACHE_HIT',
+        payload: { dataKey: key, data: state.data, state, fromCache: true },
+      })
+    }
+  }
 }
 
 // Per-request hard abort for the anonymous agent's transport (see usage below).
@@ -412,6 +524,8 @@ function deserializeIdentity(serialized: SerializedIdentity): DelegationIdentity
 async function setIdentity(serialized: SerializedIdentity): Promise<void> {
   try {
     currentIdentity = deserializeIdentity(serialized)
+    const principal = currentIdentity.getPrincipal().toText()
+    currentPrincipal = principal
     isAuthenticated = true
 
     authenticatedAgent = await createAgent({
@@ -422,11 +536,12 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
 
     if (debugEnabled) console.log('[AuthWorker] Identity set, agent created')
 
-    // Immediately deliver any cached user data to all subscribed ports
-    // This ensures components get cached data without waiting for a new fetch
+    // Immediately deliver cached user data, but only this principal's: data
+    // held in memory for another principal is dropped, and the IndexedDB copy
+    // is used only when it was written for this same principal.
     for (const key of USER_KEYS) {
       const state = dataStates.get(key)
-      if (state?.data) {
+      if (state?.data && userKeyOwner.get(key) === principal) {
         if (debugEnabled) console.log(`[AuthWorker] Delivering cached ${key} after authentication`)
         broadcastToSubscribers(key, {
           id: generateMessageId(),
@@ -439,7 +554,12 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
             fromCache: true,
           },
         })
+        continue
       }
+      dataStates.set(key, createInitialState())
+      userKeyOwner.delete(key)
+      forgetDelivered([key])
+      void restoreOwnedUserKey(key, principal)
     }
 
     // Queue user data fetch for background refresh
@@ -455,17 +575,57 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
     console.error('[AuthWorker] Error setting identity:', error)
     isAuthenticated = false
     currentIdentity = null
+    currentPrincipal = null
     authenticatedAgent = null
   }
 }
 
+/**
+ * Load a user key's IndexedDB copy for `principal` and push it to subscribers,
+ * if the entry was written for that principal on the current network.
+ */
+async function restoreOwnedUserKey(key: DataKey, principal: string): Promise<void> {
+  const entry = (await getCachedMany([key])).get(key)
+  if (!entry || entry.owner !== principal) return
+  if (entry.network && entry.network !== currentNetwork) return
+  if (currentPrincipal !== principal) return // signed out or switched meanwhile
+  const current = dataStates.get(key)
+  if (current?.data && (current.lastUpdated ?? 0) >= (entry.lastUpdated ?? 0)) return
+
+  const state: DataState = {
+    data: entry.data,
+    lastUpdated: entry.lastUpdated,
+    loading: false,
+    error: null,
+    stale: isStale(key, entry.lastUpdated),
+  }
+  dataStates.set(key, state)
+  userKeyOwner.set(key, principal)
+  broadcastToSubscribers(key, {
+    id: generateMessageId(),
+    timestamp: Date.now(),
+    type: 'CACHE_HIT',
+    payload: { dataKey: key, data: state.data, state, fromCache: true },
+  })
+}
+
 function clearIdentity(): void {
   currentIdentity = null
+  currentPrincipal = null
   authenticatedAgent = null
   isAuthenticated = false
   isAdmin = false
 
-  // Clear user-specific data from state (but keep in cache for quick restore)
+  // Signed-out tabs must not keep receiving the last user's data: drop it from
+  // memory. The IndexedDB copy stays, tagged with its owner, for that user's
+  // next sign-in.
+  for (const key of USER_KEYS) {
+    dataStates.set(key, createInitialState())
+    userKeyOwner.delete(key)
+  }
+  forgetDelivered(USER_KEYS)
+
+  // Mark the rest stale so it refreshes
   for (const key of HANDLED_KEYS) {
     const state = dataStates.get(key)
     if (state) {
@@ -500,6 +660,12 @@ self.onconnect = (event: MessageEvent) => {
     disconnectPort(port)
   }
 
+  // A closed or reloaded tab's route is dropped on PAGE_HIDDEN (posting to its
+  // port fails silently, so nothing else notices). Where the browser fires the
+  // MessagePort close event (Chromium 147 does not), a tab that ended without
+  // pagehide (crash, discard) is dropped as well.
+  port.addEventListener('close', () => disconnectPort(port))
+
   port.start()
 
   // Send connected message only - don't send all cached data automatically
@@ -522,6 +688,7 @@ self.onconnect = (event: MessageEvent) => {
 
 function disconnectPort(port: MessagePort): void {
   connectedPorts.delete(port)
+  portRoutes.delete(port)
   for (const subscribers of subscriptions.values()) {
     subscribers.delete(port)
   }
@@ -555,6 +722,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
       // resume kick when the tab becomes visible again, and this body is
       // idempotent (cache replay + stale-only enqueue with backoff reset).
       currentRoute = newRoute
+      portRoutes.set(port, newRoute)
       {
         // Proactively serve cache + prioritize fetches for the route
         const routeKeys = getInitialLoadKeys(newRoute)
@@ -633,6 +801,12 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
       console.log(`[AuthWorker] Debug ${debugEnabled ? 'enabled' : 'disabled'}`)
       break
 
+    case 'PAGE_HIDDEN':
+      // The tab closed, reloaded or went into the back-forward cache: its route
+      // no longer counts. After a restore the bridge sends SET_ROUTE again.
+      portRoutes.delete(port)
+      break
+
     case 'PING':
       sendResponse(port, {
         id: message.id,
@@ -685,6 +859,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
 function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   const route = message.payload.route || '/'
   currentRoute = route
+  portRoutes.set(port, route)
   debugLog(`handleInitialLoad called for route: ${route}, isInitialized=${isInitialized}`)
 
   // If not initialized yet, queue this for processing after init completes
@@ -694,10 +869,10 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
     return
   }
 
-  // Reset state for fresh page load
+  // Reset state for fresh page load. Only the backoff: fetches already in
+  // flight stay marked as processing and counted, otherwise the queue starts the
+  // same keys a second time (every vault query ran twice on a cold load).
   backoff.resetAll()
-  queue.clearProcessing()
-  activeFetchCount = 0
   deferredLoadTriggered = false
   pendingPriorityKeys.clear()
 
@@ -796,8 +971,10 @@ function triggerDeferredLoad(): void {
   if (debugEnabled) console.log('[AuthWorker] All priority keys loaded - starting deferred load for non-priority keys')
 
   // Send cached data and queue fetches for remaining keys
+  const routeKeys = openRouteKeys()
   for (const key of HANDLED_KEYS) {
     if (initialLoadKeys.has(key)) continue // Already handled
+    if (key === 'nachosVaultAnalytics' && !analyticsWanted(routeKeys)) continue
 
     const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
     if (requiresAuth && !isAuthenticated) continue
@@ -901,7 +1078,9 @@ function handleFetch(port: MessagePort, message: WorkerRequest): void {
   // The queue processor will wait for agent initialization before processing
   if (force || !currentState?.data || isStale(dataKey, currentState.lastUpdated)) {
     if (debugEnabled) console.log(`[AuthWorker] Queuing ${dataKey} for fetch (force=${force}, hasData=${!!currentState?.data}, queueSize=${queue.size})`)
-    queue.enqueue(dataKey, priority)
+    // force: a fetch of this key already running may predate the request (a
+    // refresh after a mint), so the queue runs it once more when it ends
+    queue.enqueue(dataKey, priority, force)
   }
 }
 
@@ -1017,6 +1196,11 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   const { network } = message.payload
   const newNetwork = network || 'ic' // Default to 'ic' if not specified
 
+  // Every tab sends SET_NETWORK when it connects and again from
+  // initNetworkConfig. Same network with an agent ready (or being built):
+  // nothing to redo, and rebuilding it mid-boot only threw away a warm agent.
+  if (newNetwork === currentNetwork && (anonymousAgent || creatingAnonymousAgent)) return
+
   // Check if this is the first SET_NETWORK or if network actually changed
   const isFirstSetup = currentNetwork === null
   const networkChanged = currentNetwork !== null && currentNetwork !== newNetwork
@@ -1026,13 +1210,26 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   // Update tracked network
   currentNetwork = newNetwork
   setWorkerNetworkOverride(network || null)
+  setCacheNetwork(newNetwork)
+  if (networkChanged) networkEpoch++
+
+  // Restored entries written on another network are not this network's data
+  for (const [key, net] of restoredNetwork) {
+    if (net && net !== newNetwork) {
+      dataStates.set(key, createInitialState())
+      restoredNetwork.delete(key)
+    }
+  }
 
   // Create/recreate anonymous agent with correct network settings
+  creatingAnonymousAgent = true
   try {
     await createAnonymousAgent()
     debugLog(`Agent ready after SET_NETWORK: anonymousAgent=${!!anonymousAgent}`)
   } catch (err) {
     debugLog(`Failed to create agent after SET_NETWORK: ${err}`)
+  } finally {
+    creatingAnonymousAgent = false
   }
 
   // If authenticated, recreate authenticated agent with new network settings
@@ -1055,6 +1252,8 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
     }
 
     // Clear in-memory state and queue for refetch
+    userKeyOwner.clear()
+    restoredNetwork.clear()
     for (const key of HANDLED_KEYS) {
       dataStates.set(key, createInitialState())
       // Queue ADMIN_KEYS only when on admin route
@@ -1101,6 +1300,7 @@ async function processQueue(): Promise<void> {
     // processing flag, so dequeue() would return it again and busy-spin). Blocked
     // keys are released after the pass so the next pass re-evaluates them.
     const blockedThisPass: DataKey[] = []
+    const heldThisPass: DataKey[] = []
     while (activeFetchCount < MAX_CONCURRENT_FETCHES) {
       // Get next highest-priority item (queue.dequeue handles deduplication internally)
       const item = queue.dequeue()
@@ -1117,6 +1317,13 @@ async function processQueue(): Promise<void> {
       if (requiresAuth && (!isAuthenticated || !authenticatedAgent)) {
         if (debugEnabled) console.log(`[AuthWorker] Skipping ${item.dataKey} - requires auth but not authenticated`)
         queue.complete(item.dataKey)
+        continue
+      }
+
+      // Heavy keys wait for their IndexedDB copy and for the route's own keys
+      // (see openHeavyFetches and routeKeysLoading)
+      if (HEAVY_CACHE_KEYS.includes(item.dataKey) && (!heavyCacheRead || routeKeysLoading(item.dataKey))) {
+        heldThisPass.push(item.dataKey)
         continue
       }
 
@@ -1146,6 +1353,7 @@ async function processQueue(): Promise<void> {
     // Release backoff-blocked items so the next pass re-checks them once their
     // delay elapses (retry() clears the processing flag + re-sorts the queue).
     for (const key of blockedThisPass) queue.retry(key)
+    for (const key of heldThisPass) queue.release(key)
 
     // Adaptive sleep: longer when idle (no active fetches and empty queue), shorter
     // when processing. When the only thing left is backoff-blocked keys (nothing in
@@ -1223,8 +1431,11 @@ async function processSingleFetch(item: { dataKey: DataKey; retryCount: number }
 
     // Most keys give up after 5 retries; user-facing vault data keeps retrying
     // forever (paced by `backoff.canRetry`) so a transient canister outage can't
-    // leave /vault permanently stuck on "Loading dashboard data…".
-    if (item.retryCount < 5 || KEEP_TRYING.includes(item.dataKey)) {
+    // leave /vault permanently stuck on "Loading dashboard data…". Analytics
+    // only while a tab shows them; the vault route restarts them on arrival.
+    const keepTrying = KEEP_TRYING.includes(item.dataKey) &&
+      (item.dataKey !== 'nachosVaultAnalytics' || analyticsWanted(openRouteKeys()))
+    if (item.retryCount < 5 || keepTrying) {
       queue.retry(item.dataKey)
     } else {
       queue.complete(item.dataKey)
@@ -1238,6 +1449,7 @@ const KEEP_TRYING: DataKey[] = [
   'nachosVaultDashboard',
   'nachosConfig',
   'nachosNavHistory',
+  'nachosVaultAnalytics',
   'cryptoPrices',
 ]
 
@@ -1388,8 +1600,12 @@ async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey
     await setCached('tokenDetails', td)
   }
 
-  // timerStatus is in HANDLED_KEYS, so update it
-  if (excludeKey !== 'timerStatus') {
+  // timerStatus is in HANDLED_KEYS, so update it. Only on routes that show it:
+  // it embeds the ~650 KB trading status, and elsewhere every vote dashboard
+  // refresh pushed it to the page for nothing (a route that shows it fetches
+  // it on arrival when stale). Not before the stored trading status is read
+  // either: built without it, it would replace the good stored copy.
+  if (excludeKey !== 'timerStatus' && heavyCacheRead && openRouteKeys().has('timerStatus')) {
     const cachedTS = dataStates.get('tradingStatus')?.data
     const ts = serializeForTransfer({
       snapshotInfo: dashboard.snapshotInfo,
@@ -1466,6 +1682,10 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 
   debugLog(`Starting network fetch for ${dataKey}`)
   updateState(dataKey, { loading: true, error: null })
+
+  // Who and where this fetch is for; checked again when the answer lands
+  const epoch = networkEpoch
+  const owner = USER_KEYS.includes(dataKey) ? currentPrincipal : null
 
   let data: unknown
 
@@ -1606,6 +1826,10 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       data = serializeForTransfer(await fetchNachosNavHistory(anonymousAgent!))
       break
 
+    case 'nachosVaultAnalytics':
+      data = serializeForTransfer(await fetchNachosVaultAnalytics(anonymousAgent!))
+      break
+
     // ========== USER/AUTH DATA CASES (existing) ==========
     case 'userAllocation':
       // userAllocation requires authenticated agent (user-specific data)
@@ -1735,6 +1959,15 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       throw new Error(`Unknown dataKey: ${dataKey}`)
   }
 
+  // The network or the signed-in user changed while this was in flight: the
+  // answer belongs to the old one, so it is neither shown nor cached.
+  if (epoch !== networkEpoch || (owner !== null && owner !== currentPrincipal)) {
+    debugLog(`Dropping ${dataKey}: network or user changed during the fetch`)
+    updateState(dataKey, { loading: false })
+    onPriorityKeyLoaded(dataKey)
+    return
+  }
+
   debugLog(`Fetch completed for ${dataKey}, updating state`)
   updateState(dataKey, {
     data,
@@ -1743,8 +1976,9 @@ async function fetchData(dataKey: DataKey): Promise<void> {
     error: null,
     stale: false,
   })
+  if (owner) userKeyOwner.set(dataKey, owner)
 
-  await setCached(dataKey, data)
+  await setCached(dataKey, data, owner ?? undefined)
   if (debugEnabled) console.log(`[AuthWorker] Cached ${dataKey} to IndexedDB`)
 
   // Notify that this priority key has loaded (triggers deferred load when all done)
@@ -1760,15 +1994,24 @@ function updateState(dataKey: DataKey, partial: Partial<DataState>): void {
   const updated = { ...current, ...partial }
   dataStates.set(dataKey, updated)
 
+  // Only new data carries the payload. Loading and error updates used to
+  // re-send the whole cached payload as well, so every fetch start and every
+  // failed retry made each tab decode and re-render data it already had.
+  const hasNewData = 'data' in partial
+  const type: WorkerResponseType | null = hasNewData
+    ? 'DATA_UPDATE'
+    : partial.error ? 'FETCH_ERROR' : partial.loading ? 'FETCH_STARTED' : null
+  if (!type) return
+
   const response: WorkerResponse = {
     id: generateMessageId(),
     timestamp: Date.now(),
-    type: partial.error ? 'FETCH_ERROR' : 'DATA_UPDATE',
+    type,
     payload: {
       dataKey,
-      data: updated.data,
+      data: hasNewData ? updated.data : undefined,
       error: partial.error || undefined,
-      state: updated,
+      state: hasNewData ? updated : { ...updated, data: null },
       fromCache: false,
     },
   }
@@ -1789,7 +2032,34 @@ function broadcastToSubscribers(dataKey: DataKey, response: WorkerResponse): voi
   }
 }
 
+// Tabs drop their copy of user data when the user signs out or switches (see
+// the bridge), so a later replay of the same payload must not be skipped as
+// "already held"
+function forgetDelivered(keys: DataKey[]): void {
+  for (const port of connectedPorts) {
+    const held = deliveredTo.get(port)
+    if (held) for (const key of keys) held.delete(key)
+  }
+}
+
 function sendResponse(port: MessagePort, response: WorkerResponse): void {
+  // Subscribe, INITIAL_LOAD, route changes and resume kicks all replay the
+  // cache, which delivered every key to the same tab three or more times per
+  // load (each one a structured clone plus a decode on the page). Remember
+  // what each tab holds and skip a CACHE_HIT that would resend it.
+  const { dataKey, state } = response.payload
+  const at = state?.lastUpdated
+  if (dataKey && at && state?.data != null &&
+      (response.type === 'CACHE_HIT' || response.type === 'DATA_UPDATE')) {
+    let held = deliveredTo.get(port)
+    if (!held) {
+      held = new Map()
+      deliveredTo.set(port, held)
+    }
+    if (response.type === 'CACHE_HIT' && held.get(dataKey) === at) return
+    held.set(dataKey, at)
+  }
+
   try {
     port.postMessage(response)
   } catch {
@@ -1879,7 +2149,13 @@ async function autoRefreshLoop(): Promise<void> {
 
     // PUBLIC KEYS: refresh every 5 seconds (counter % 1 == 0)
     if (publicRefreshCounter >= 1) {
+      const routeKeys = openRouteKeys()
       for (const dataKey of PUBLIC_KEYS) {
+        // The two treasury payloads refresh only on routes that show them (the
+        // route change refreshes them on arrival). Elsewhere every 30 s refresh
+        // sent ~1.3 MB to the page that nothing on it used.
+        if (HEAVY_CACHE_KEYS.includes(dataKey) && !routeKeys.has(dataKey)) continue
+        if (dataKey === 'nachosVaultAnalytics' && !analyticsWanted(routeKeys)) continue
         const state = dataStates.get(dataKey)
         if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
           queue.enqueue(dataKey, 'medium')

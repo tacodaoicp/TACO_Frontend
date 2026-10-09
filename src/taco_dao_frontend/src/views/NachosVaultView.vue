@@ -49,6 +49,13 @@
                     <VaultMint @operation-complete="onOperationComplete" />
                     <VaultBurn @operation-complete="onOperationComplete" />
                   </template>
+                  <!-- sign in check still running and this device had a session:
+                       placeholders, not a log in prompt that the signed in user
+                       would see first (without a session the prompt shows at once) -->
+                  <template v-else-if="!tacoStore.loginChecked && tacoStore.sessionLikely">
+                    <div class="nachos-vault-view__action-skeleton taco-container taco-container--l1" aria-label="Loading"></div>
+                    <div class="nachos-vault-view__action-skeleton nachos-vault-view__action-skeleton--short taco-container taco-container--l1"></div>
+                  </template>
                   <div v-else-if="!tacoStore.tourBypassAuth" class="nachos-vault-view__login-prompt">
                     <i class="fa-solid fa-lock"></i>
                     <span>Mint & burn NACHO</span>
@@ -79,7 +86,7 @@
 
               <!-- analytics (public) -->
               <div class="nachos-vault-view__public-content">
-                <VaultAnalytics ref="analyticsRef" />
+                <VaultAnalytics />
               </div>
             </div>
 
@@ -153,6 +160,25 @@
     gap: 1.5rem;
   }
 
+  // placeholders in the action column while the sign in check runs: empty
+  // cards (taco-container--l1, so they read in both themes). The opacity pulse
+  // runs on the compositor; a moving gradient would repaint on the main thread
+  // every frame while the page is still booting.
+  &__action-skeleton {
+    height: 16rem;
+    animation: nachos-vault-view-pulse 1.4s ease-in-out infinite;
+
+    &--short { height: 10rem; }
+  }
+
+  // stands in for the NAV chart (an empty card) while its chunk
+  // (lightweight-charts) loads
+  &__chart-placeholder {
+    flex: 1;
+    min-height: 300px;
+    animation: nachos-vault-view-pulse 1.4s ease-in-out infinite;
+  }
+
   // login prompt for unauthenticated users in the action column
   &__login-prompt {
     display: flex;
@@ -192,6 +218,11 @@
 
 }
 
+@keyframes nachos-vault-view-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
 
 </style>
 
@@ -204,21 +235,27 @@
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import DfinityLogo from '../assets/images/dfinityLogo.vue'
 import nachoLogo from '../assets/tokens/nacho.png'
-import { ref, computed, defineAsyncComponent, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, h, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useTacoStore } from '../stores/taco.store'
 import { useNachosStore } from '../stores/nachos.store'
 
-// sub-components — eager (above the fold / primary CTA)
+// sub-components — eager. All of them render cached data as soon as the page
+// mounts; as separate chunks they each showed up a round trip later.
 import VaultStatusBanner from '../components/nachos/VaultStatusBanner.vue'
 import VaultDashboard from '../components/nachos/VaultDashboard.vue'
 import VaultMint from '../components/nachos/VaultMint.vue'
 import VaultBurn from '../components/nachos/VaultBurn.vue'
+import VaultPortfolioBreakdown from '../components/nachos/VaultPortfolioBreakdown.vue'
+import VaultOperations from '../components/nachos/VaultOperations.vue'
+import VaultAnalytics from '../components/nachos/VaultAnalytics.vue'
 
-// sub-components — lazy (below the fold; chart libs / extra canister calls)
-const NAVChart = defineAsyncComponent(() => import('../components/nachos/NAVChart.vue'))
-const VaultPortfolioBreakdown = defineAsyncComponent(() => import('../components/nachos/VaultPortfolioBreakdown.vue'))
-const VaultOperations = defineAsyncComponent(() => import('../components/nachos/VaultOperations.vue'))
-const VaultAnalytics = defineAsyncComponent(() => import('../components/nachos/VaultAnalytics.vue'))
+// lazy: the chart library (lightweight-charts) is the one heavy part. A pulsing
+// placeholder holds its column until the chunk is in.
+const NAVChart = defineAsyncComponent({
+  loader: () => import('../components/nachos/NAVChart.vue'),
+  loadingComponent: () => h('div', { class: 'nachos-vault-view__chart-placeholder taco-container taco-container--l1', 'aria-label': 'Loading NAV history' }),
+  delay: 0,
+})
 
 ////////////
 // stores //
@@ -228,23 +265,23 @@ const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 const showAsLoggedIn = computed(() => tacoStore.userLoggedIn || tacoStore.tourBypassAuth)
 
-// Template ref to VaultAnalytics so we can trigger its refresh explicitly
-// (it no longer auto-refetches on every dashboard tick).
-const analyticsRef = ref<{ refresh: () => Promise<void> } | null>(null)
-
 ///////////////////
 // local methods //
 ///////////////////
 
-// refresh after any mint/burn operation — fire all sources in parallel
+// Public data refreshes through the data worker (and its cache); the user's
+// own activity is queried directly. All in parallel.
+const refreshAll = () => Promise.all([
+  nachosStore.loadDashboard(),
+  nachosStore.loadUserActivity({ fresh: true }),
+  nachosStore.loadNAVHistory(),
+  nachosStore.loadConfig(),
+  nachosStore.loadAnalytics(),
+])
+
+// refresh after any mint/burn operation
 const onOperationComplete = async () => {
-  await Promise.all([
-    nachosStore.loadDashboard(),
-    nachosStore.loadUserActivity(),
-    nachosStore.loadNAVHistory(),
-    nachosStore.loadConfig(),
-    analyticsRef.value?.refresh() ?? Promise.resolve(),
-  ])
+  await refreshAll()
 }
 
 // ============ user-activity-only auto-refresh ============
@@ -273,16 +310,17 @@ const refreshing = ref(false)
 const handleRefresh = async () => {
   refreshing.value = true
   try {
-    await Promise.all([
-      nachosStore.loadDashboard(),
-      nachosStore.loadUserActivity(),
-      nachosStore.loadNAVHistory(),
-      nachosStore.loadConfig(),
-      analyticsRef.value?.refresh() ?? Promise.resolve(),
-    ])
+    await refreshAll()
   } finally {
     refreshing.value = false
   }
+}
+
+// the signed-in user's own data: last known activity first (seeded by the
+// store from its per-account cache), then a refresh every 30 s
+const startUserData = () => {
+  nachosStore.initialize()  // fire-and-forget; userActivity arrives reactively
+  startUserActivityRefresh()
 }
 
 /////////////////////
@@ -290,25 +328,20 @@ const handleRefresh = async () => {
 /////////////////////
 
 // on mounted — don't block the public render on the auth check.
-// Worker subscriptions already feed dashboard/config/navHistory reactively.
+// Worker subscriptions already feed dashboard/config/navHistory/analytics reactively.
 onMounted(() => {
-  tacoStore.checkIfLoggedIn()
-    .then(() => {
-      if (tacoStore.userLoggedIn) {
-        nachosStore.initialize()  // fire-and-forget; userActivity arrives reactively
-        startUserActivityRefresh()
-      }
-    })
-    .catch((error) => {
-      console.error('Error in vault onMounted:', error)
-    })
+  if (tacoStore.userLoggedIn) startUserData()
+  // App.vue runs the same check on load; while one is in flight it is shared.
+  // A sign in it finds is picked up by the watcher below.
+  tacoStore.checkIfLoggedIn().catch((error) => {
+    console.error('Error in vault onMounted:', error)
+  })
 })
 
 // re-load on login state change
-watch(() => tacoStore.userLoggedIn, async (loggedIn) => {
+watch(() => tacoStore.userLoggedIn, (loggedIn) => {
   if (loggedIn) {
-    await nachosStore.initialize()
-    startUserActivityRefresh()
+    startUserData()
   } else {
     stopUserActivityRefresh()
     nachosStore.stopPolling()

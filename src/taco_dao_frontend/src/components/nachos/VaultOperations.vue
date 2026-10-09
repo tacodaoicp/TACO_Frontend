@@ -6,7 +6,14 @@
 
     <div class="vault-ops__content taco-container taco-container--l1">
 
-      <div v-if="allOperations.length === 0" class="vault-ops__empty">
+      <!-- the account's activity has not arrived yet (nothing cached for it):
+           not "no operations", which read like an empty history -->
+      <div v-if="allOperations.length === 0 && !nachosStore.userActivity" class="vault-ops__empty">
+        <template v-if="nachosStore.userActivityError">Could not load your operations. Trying again...</template>
+        <template v-else><i class="fa-solid fa-spinner fa-spin"></i> Loading operations...</template>
+      </div>
+
+      <div v-else-if="allOperations.length === 0" class="vault-ops__empty">
         No operations yet.
       </div>
 
@@ -383,7 +390,7 @@ const handleRetry = async (op: UnifiedOperation) => {
         ? `Redeemed ${nachosStore.formatE8s(result.netValueICP)} ICP worth of tokens`
         : `Received ${nachosStore.formatNachos(result.nachosReceived)}`
     })
-    await nachosStore.loadUserActivity()
+    await nachosStore.loadUserActivity({ fresh: true })
   } catch (e: any) {
     tacoStore.addToast({
       id: Date.now(),
@@ -406,7 +413,7 @@ const handleCancel = async (op: UnifiedOperation) => {
       icon: 'fa-solid fa-check',
       message: result?.alreadyResolved ? 'This deposit was already processed. Removed from list.' : 'Refund is being processed.'
     })
-    await nachosStore.loadUserActivity()
+    await nachosStore.loadUserActivity({ fresh: true })
   } catch (e: any) {
     op.showCancelConfirm = false
     tacoStore.addToast({

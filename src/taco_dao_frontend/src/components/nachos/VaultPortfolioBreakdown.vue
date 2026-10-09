@@ -1,11 +1,25 @@
 <template>
 
-  <div v-if="nachosStore.portfolio.length > 0" class="portfolio-breakdown">
+  <div v-if="nachosStore.portfolio.length > 0 || !nachosStore.dashboardData" class="portfolio-breakdown">
 
     <!-- section title -->
     <h3 class="portfolio-breakdown__section-title">Portfolio Breakdown</h3>
 
-    <div class="portfolio-breakdown__layout taco-container taco-container--l1">
+    <!-- until the vault data arrives (first visit, nothing cached): placeholders
+         in the section's own footprint, so the page does not jump when it fills -->
+    <div v-if="!nachosStore.dashboardData"
+         class="portfolio-breakdown__layout taco-container taco-container--l1"
+         aria-label="Loading portfolio">
+      <div class="portfolio-breakdown__chart-wrap">
+        <div class="portfolio-breakdown__skeleton portfolio-breakdown__skeleton--ring"></div>
+      </div>
+      <ul class="portfolio-breakdown__legend">
+        <li v-for="n in 8" :key="n" class="portfolio-breakdown__skeleton portfolio-breakdown__skeleton--pill"></li>
+      </ul>
+      <div class="portfolio-breakdown__skeleton portfolio-breakdown__skeleton--bar"></div>
+    </div>
+
+    <div v-else class="portfolio-breakdown__layout taco-container taco-container--l1">
 
       <!-- donut chart -->
       <div class="portfolio-breakdown__chart-wrap">
@@ -383,6 +397,39 @@ const chartOptions = computed(() => ({
       border-bottom: 2px solid var(--dark-orange-to-brown);
     }
   }
+
+  // loading placeholders (ring, legend entries, holdings bar). Opacity pulse:
+  // runs on the compositor, no repaint per frame.
+  &__skeleton {
+    background: rgba(255, 255, 255, 0.1);
+    animation: portfolio-breakdown-pulse 1.4s ease-in-out infinite;
+
+    &--ring {
+      width: 76%;
+      aspect-ratio: 1;
+      margin: 12% auto;
+      border-radius: 50%;
+      // a donut: the middle stays clear
+      -webkit-mask: radial-gradient(circle, transparent 50%, #000 51%);
+      mask: radial-gradient(circle, transparent 50%, #000 51%);
+    }
+
+    &--pill {
+      width: 4.5rem;
+      height: 0.9rem;
+      border-radius: 999px;
+    }
+
+    &--bar {
+      height: 2.75rem;
+      border-radius: 0.5rem;
+    }
+  }
+}
+
+@keyframes portfolio-breakdown-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
 
 .text-danger { color: var(--red-to-light-red) !important; }

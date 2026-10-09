@@ -5,8 +5,13 @@
     <!-- section title -->
     <h3 class="vault-burn__title">Burn / Redeem NACHO</h3>
 
+    <!-- vault status not known yet (first visit, nothing cached): a placeholder,
+         not "unavailable", which read like an outage while it loaded. Once the
+         first fetch failed it is "unavailable" (below), as before. -->
+    <div v-if="!nachosStore.dashboardData && !nachosStore.lastError" class="vault-burn__skeleton taco-container taco-container--l1" aria-label="Loading vault status"></div>
+
     <!-- cannot burn banner -->
-    <div v-if="!nachosStore.canBurn" class="vault-burn__disabled">
+    <div v-else-if="!nachosStore.canBurn" class="vault-burn__disabled">
       Burning is currently unavailable.
     </div>
 
@@ -238,7 +243,9 @@ const nachosStore = useNachosStore()
 
 const NACHOS_PRINCIPAL = getCanisterId('nachos')
 const NACHOS_FEE = 10_000n
-const { balance: nachosBalance, refresh: loadNachosBalance } = useTokenBalance(NACHOS_PRINCIPAL)
+// nachosBalance may be the last known one from the cache; nachosBalanceFresh
+// says the ledger confirmed it in this session (required before a burn)
+const { balance: nachosBalance, balanceFresh: nachosBalanceFresh, refresh: loadNachosBalance } = useTokenBalance(NACHOS_PRINCIPAL)
 
 const nachosAmount = ref('')
 const burnEstimate = ref<any>(null)
@@ -294,7 +301,7 @@ const canConfirm = computed(() => {
   if (nachosAmountE8s.value <= 0n) return false
   // Hard cap on balance / rate limit — must come first, before the estimate
   // check, so the button stays disabled even before the canister responds.
-  if (nachosBalance.value === null) return false  // balance unknown — don't let user act
+  if (nachosBalance.value === null || !nachosBalanceFresh.value) return false  // balance unknown or not confirmed yet — don't let user act
   const maxE8s = BigInt(Math.floor(maxBurnable.value))
   if (nachosAmountE8s.value > maxE8s) return false
   if (!burnEstimate.value) return false
@@ -535,6 +542,13 @@ onBeforeUnmount(() => {
     text-align: center;
     opacity: 0.75;
     font-family: 'Space Mono', monospace;
+  }
+
+  // an empty card (taco-container--l1, so it reads in both themes) with an
+  // opacity pulse (compositor only, no repaint per frame)
+  &__skeleton {
+    height: 10rem;
+    animation: vault-burn-pulse 1.4s ease-in-out infinite;
   }
 
   &__content {
@@ -953,5 +967,10 @@ onBeforeUnmount(() => {
     outline: none;
     box-shadow: 0 0 0 2px rgba(var(--dark-orange), 0.25);
   }
+}
+
+@keyframes vault-burn-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
 </style>

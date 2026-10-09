@@ -56,13 +56,17 @@ import { useNachosStore } from '../../stores/nachos.store'
 
 const nachosStore = useNachosStore()
 
+// Only from real dashboard data: before it arrives every flag reads false and
+// an empty banner box flashed in, then out again, shifting the page
 const showBanner = computed(() =>
-  nachosStore.systemPaused ||
-  nachosStore.circuitBreakerActive ||
-  !nachosStore.genesisComplete ||
-  (nachosStore.genesisComplete && !nachosStore.mintingEnabled) ||
-  (nachosStore.genesisComplete && !nachosStore.burningEnabled) ||
-  nachosStore.hasPausedTokens
+  !!nachosStore.dashboardData && (
+    nachosStore.systemPaused ||
+    nachosStore.circuitBreakerActive ||
+    !nachosStore.genesisComplete ||
+    (nachosStore.genesisComplete && !nachosStore.mintingEnabled) ||
+    (nachosStore.genesisComplete && !nachosStore.burningEnabled) ||
+    nachosStore.hasPausedTokens
+  )
 )
 </script>
 

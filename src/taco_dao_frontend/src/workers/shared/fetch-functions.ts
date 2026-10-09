@@ -1216,6 +1216,22 @@ export async function fetchNachosNavHistory(agent: HttpAgent): Promise<{
   return { icp, usd }
 }
 
+/**
+ * Fetch nachos vault analytics (public query)
+ * Lifetime mint/burn counts and volumes, fees collected, mints by mode and the
+ * global 4h mint/burn usage shown in the Vault Analytics panel
+ */
+export async function fetchNachosVaultAnalytics(agent: HttpAgent): Promise<any> {
+  const canisterId = getNachosVaultCanisterId()
+
+  const actor = Actor.createActor(nachosVaultIDL, {
+    agent,
+    canisterId,
+  })
+
+  return await (actor as any).getVaultAnalytics()
+}
+
 // ============================================================================
 // Swap Dashboard
 // ============================================================================

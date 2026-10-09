@@ -14,6 +14,7 @@ import { deserializeFromTransfer } from '../workers/shared/transfer'
 import { getEffectiveNetwork, getICHost } from '../config/network-config'
 import { getCanisterId } from '../constants/canisterIds'
 import { getFrontendIdentity } from '../utils/frontend-identity'
+import { clearUserCache, clearAllUserCache } from '../utils/userScopedCache'
 
 // Only import Principal synchronously - it's small and used everywhere
 import { Principal } from '@dfinity/principal'
@@ -1437,6 +1438,33 @@ export const useTacoStore = defineStore('taco', () => {
 
     // user
     const userLoggedIn = ref(false)
+    // True once the first sign in check has finished. Until then a signed out
+    // state only means "not known yet", so pages can show placeholders instead
+    // of the log in prompt to a user who is in fact signed in.
+    const loginChecked = ref(false)
+    // Whether the last check on this device found a session that has not
+    // expired yet. Read at load, before the check (which waits for the auth
+    // modules and IndexedDB) can tell: pages use it to pick placeholders or the
+    // log in prompt for that wait. Holds no identity, only an expiry time.
+    const SESSION_HINT_KEY = 'taco_session_hint'
+    const sessionLikely = ref((() => {
+        try {
+            const until = Number(JSON.parse(localStorage.getItem(SESSION_HINT_KEY) || 'null')?.until)
+            return Number.isFinite(until) && until > Date.now()
+        } catch {
+            return false
+        }
+    })())
+    const rememberSession = (authClient: any) => {
+        try {
+            const expiration = authClient.getIdentity()?.getDelegation?.()?.delegations?.[0]?.delegation?.expiration
+            const until = typeof expiration === 'bigint' ? Number(expiration / 1_000_000n) : Date.now() + 86_400_000
+            localStorage.setItem(SESSION_HINT_KEY, JSON.stringify({ until }))
+        } catch { /* the hint is optional */ }
+    }
+    const forgetSession = () => {
+        try { localStorage.removeItem(SESSION_HINT_KEY) } catch { /* ignore */ }
+    }
     const userPrincipal = ref('')
     const truncatedPrincipal = computed(() => {
 
@@ -1880,6 +1908,28 @@ export const useTacoStore = defineStore('taco', () => {
                         // Also populate tradingLogs from executedTrades
                         const executedTrades = ts.executedTrades
                         if (executedTrades && executedTrades.length > 0) {
+                            // Look tokens up by principal text. Principal.toText is costly, and
+                            // searching the token list for each of ~2000 trades ran it twice per
+                            // token per trade: seconds of main thread on phones, on every load.
+                            // The decoder reuses one Principal object per id, so with this memo
+                            // each id is converted once.
+                            const principalText = new Map<Principal, string>()
+                            const textOf = (p: Principal): string => {
+                                let text = principalText.get(p)
+                                if (text === undefined) {
+                                    text = p.toText()
+                                    principalText.set(p, text)
+                                }
+                                return text
+                            }
+                            const tokenByText = new Map<string, any>()
+                            for (const t of fetchedTokenDetails.value) {
+                                try {
+                                    const text = textOf(t[0] as Principal)
+                                    if (!tokenByText.has(text)) tokenByText.set(text, t[1])
+                                } catch { /* skip a malformed entry */ }
+                            }
+
                             tradingLogs.value = executedTrades.map((trade: TradeRecord) => {
                                 if (trade.error && trade.error.length > 0) {
                                     return {
@@ -1889,30 +1939,19 @@ export const useTacoStore = defineStore('taco', () => {
                                 }
 
                                 // Find token details from our trusted tokens list
-                                const soldToken = fetchedTokenDetails.value.find(t => {
-                                    try {
-                                        const tradeTokenId = (trade.tokenSold as Principal).toText();
-                                        const listTokenId = (t[0] as Principal).toText();
-                                        return tradeTokenId === listTokenId;
-                                    } catch {
-                                        return false;
-                                    }
-                                })?.[1];
-
-                                const boughtToken = fetchedTokenDetails.value.find(t => {
-                                    try {
-                                        const tradeTokenId = (trade.tokenBought as Principal).toText();
-                                        const listTokenId = (t[0] as Principal).toText();
-                                        return tradeTokenId === listTokenId;
-                                    } catch {
-                                        return false;
-                                    }
-                                })?.[1];
+                                let soldText = ''
+                                let boughtText = ''
+                                try {
+                                    soldText = textOf(trade.tokenSold as Principal)
+                                    boughtText = textOf(trade.tokenBought as Principal)
+                                } catch { /* reported as unknown below */ }
+                                const soldToken = tokenByText.get(soldText);
+                                const boughtToken = tokenByText.get(boughtText);
 
                                 if (!soldToken || !boughtToken) {
                                     return {
                                         timestamp: trade.timestamp,
-                                        message: `Trade with unknown tokens: ${(trade.tokenSold as Principal).toText()} -> ${(trade.tokenBought as Principal).toText()}`
+                                        message: `Trade with unknown tokens: ${soldText} -> ${boughtText}`
                                     };
                                 }
 
@@ -2738,7 +2777,23 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // user
-    const checkIfLoggedIn = async () => {
+    // App.vue and the page being opened both run this on load. While a check is
+    // in flight they share it: each check creates an auth client, sends the
+    // identity to the data worker and starts the neuron preload.
+    let loginCheck: Promise<void> | null = null
+    const checkIfLoggedIn = (): Promise<void> => {
+        if (!loginCheck) {
+            loginCheck = runLoginCheck().finally(() => {
+                loginCheck = null
+                loginChecked.value = true
+            })
+            // A check that never settles (hung auth IndexedDB) must not hold the
+            // placeholders forever: after 8 s pages show the log in prompt
+            if (!loginChecked.value) setTimeout(() => { loginChecked.value = true }, 8_000)
+        }
+        return loginCheck
+    }
+    const runLoginCheck = async () => {
 
         // log
         // console.log('checking if user is logged in')
@@ -2760,6 +2815,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // set user logged in to true
             userLoggedIn.value = true
+            rememberSession(authClient)
 
             // Send identity to auth worker so it can deliver cached user data
             sendIdentityToWorker(authClient).catch(console.error)
@@ -2786,6 +2842,10 @@ export const useTacoStore = defineStore('taco', () => {
 
             // set user logged in to false
             userLoggedIn.value = false
+            forgetSession()
+            // No account is signed in on this device (the session may simply
+            // have expired), so no cached vault activity or balances can be read
+            clearAllUserCache()
 
             // clear user ledger account ID
             userLedgerAccountId.value = ''
@@ -2872,6 +2932,7 @@ export const useTacoStore = defineStore('taco', () => {
 
                 // set user logged in to true
                 userLoggedIn.value = true
+                rememberSession(authClient)
 
                 // calculate and set user ledger account ID
                 userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
@@ -2929,6 +2990,7 @@ export const useTacoStore = defineStore('taco', () => {
 
             // set user logged in to true
             userLoggedIn.value = true
+            rememberSession(authClient)
 
             // calculate and set user ledger account ID
             userLedgerAccountId.value = calculateAccountId(userPrincipal.value)
@@ -3002,6 +3064,10 @@ export const useTacoStore = defineStore('taco', () => {
 
             // Clear actor caches on logout
             clearActorCaches()
+
+            // Drop this account's cached vault activity and balances from the device
+            clearUserCache(userPrincipal.value)
+            forgetSession()
 
             // set user principal to empty string
             setUserPrincipal('')
@@ -9160,6 +9226,8 @@ export const useTacoStore = defineStore('taco', () => {
         exchangeTheme,
         appLoading,
         userLoggedIn,
+        loginChecked,
+        sessionLikely,
         userPrincipal,
         userLedgerAccountId,
         icpPriceUsd,

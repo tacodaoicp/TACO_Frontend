@@ -38,7 +38,8 @@
           <span v-if="loading" class="vault-dashboard__skeleton"></span>
           <template v-else>{{ nachosStore.formatE8s(nachosStore.portfolioValueICP) }} ICP</template>
         </span>
-        <span v-if="nachosStore.icpPriceUsd" class="vault-dashboard__metric-sub">
+        <!-- not while loading: the value is still 0 then and read as "~$0.00" -->
+        <span v-if="nachosStore.icpPriceUsd && !loading" class="vault-dashboard__metric-sub">
           ~${{ portfolioUSD }}
         </span>
       </div>
@@ -64,12 +65,19 @@
 
     </div>
 
+    <!-- age of the numbers while they are still the ones from an earlier visit -->
+    <div v-if="updatedAgo" class="vault-dashboard__age">
+      <i class="fa-solid fa-clock-rotate-left"></i>
+      {{ updatedAgo }}
+    </div>
+
   </div>
 
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useNow } from '@vueuse/core'
 import { useNachosStore } from '../../stores/nachos.store'
 
 const nachosStore = useNachosStore()
@@ -81,6 +89,23 @@ const nav = computed(() => nachosStore.nav)
 // message. Cached data (warm visits) clears this immediately; cold visits show
 // shimmering skeletons that fill in when the fetch lands.
 const loading = computed(() => !nachosStore.dashboardData)
+
+// Ticks so the age line stays right while the page is open
+const now = useNow({ interval: 30_000 })
+
+// "Updated 5 min ago" while the numbers come from an earlier visit (a reload of
+// a tab that sat idle) and the refresh has not landed yet, or keeps failing
+const updatedAgo = computed<string | null>(() => {
+  const at = nachosStore.dashboardUpdatedAt
+  if (!at) return null
+  const age = now.value.getTime() - at
+  if (age < 2 * 60_000) return null
+  const minutes = Math.floor(age / 60_000)
+  if (minutes < 60) return `Updated ${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `Updated ${hours} h ago`
+  return `Updated ${new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`
+})
 
 // 24h NAV change — computed from navHistory, skipping the first (genesis) snapshot
 const navChange24h = computed(() => {
@@ -229,23 +254,31 @@ const navChangeClassUSD = computed(() => {
     opacity: 0.6;
   }
 
+  &__age {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: -0.5rem;
+    font-size: 0.75rem;
+    font-family: 'Space Mono', monospace;
+    opacity: 0.65;
+  }
+
+  // Opacity pulse: runs on the compositor. The moving gradient it replaces
+  // repainted on the main thread every frame while the page was booting.
   &__skeleton {
     display: inline-block;
     min-width: 4.5rem;
     height: 1.05em;
     border-radius: 5px;
     vertical-align: middle;
-    background: linear-gradient(90deg,
-      rgba(255, 255, 255, 0.06) 25%,
-      rgba(255, 255, 255, 0.18) 37%,
-      rgba(255, 255, 255, 0.06) 63%);
-    background-size: 400% 100%;
-    animation: vault-dashboard-shimmer 1.4s ease infinite;
+    background: rgba(255, 255, 255, 0.16);
+    animation: vault-dashboard-pulse 1.4s ease-in-out infinite;
   }
 }
 
-@keyframes vault-dashboard-shimmer {
-  0% { background-position: 100% 50%; }
-  100% { background-position: 0 50%; }
+@keyframes vault-dashboard-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
 </style>

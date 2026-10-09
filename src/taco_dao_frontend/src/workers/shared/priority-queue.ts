@@ -18,11 +18,17 @@ export interface QueueItem {
 export class PriorityQueue {
   private items: QueueItem[] = []
   private processing = new Set<DataKey>()
+  // Keys forced while a fetch of them was already running: that fetch may have
+  // started before whatever the caller wants to see (a mint), so complete()
+  // queues them once more instead of dropping the request
+  private rerun = new Map<DataKey, Priority>()
 
   /**
    * Add item to queue or update its priority if already exists
    */
-  enqueue(dataKey: DataKey, priority: Priority): void {
+  enqueue(dataKey: DataKey, priority: Priority, force = false): void {
+    if (force && this.processing.has(dataKey)) this.rerun.set(dataKey, priority)
+
     // Remove existing entry for this dataKey (to update priority)
     const existingIndex = this.items.findIndex((item) => item.dataKey === dataKey)
     let retryCount = 0
@@ -69,6 +75,20 @@ export class PriorityQueue {
   complete(dataKey: DataKey): void {
     this.processing.delete(dataKey)
     this.items = this.items.filter((item) => item.dataKey !== dataKey)
+    const rerunPriority = this.rerun.get(dataKey)
+    if (rerunPriority) {
+      this.rerun.delete(dataKey)
+      this.enqueue(dataKey, rerunPriority)
+    }
+  }
+
+  /**
+   * Put back an item that was dequeued but not started, without counting it
+   * as a failed attempt (retry() does)
+   */
+  release(dataKey: DataKey): void {
+    this.processing.delete(dataKey)
+    this.rerun.delete(dataKey)
   }
 
   /**
@@ -76,6 +96,7 @@ export class PriorityQueue {
    */
   retry(dataKey: DataKey): void {
     this.processing.delete(dataKey)
+    this.rerun.delete(dataKey) // still queued: the retry is the new fetch
     const item = this.items.find((i) => i.dataKey === dataKey)
     if (item) {
       item.retryCount++
@@ -114,6 +135,7 @@ export class PriorityQueue {
    */
   remove(dataKey: DataKey): void {
     this.processing.delete(dataKey)
+    this.rerun.delete(dataKey)
     this.items = this.items.filter((item) => item.dataKey !== dataKey)
   }
 
@@ -151,6 +173,7 @@ export class PriorityQueue {
   clear(): void {
     this.items = []
     this.processing.clear()
+    this.rerun.clear()
   }
 
   /**
@@ -159,6 +182,7 @@ export class PriorityQueue {
    */
   clearProcessing(): void {
     this.processing.clear()
+    this.rerun.clear()
   }
 
   /**

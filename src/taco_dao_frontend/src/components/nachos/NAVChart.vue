@@ -1,6 +1,9 @@
 <template>
 
-  <div v-if="hasData" class="nav-chart">
+  <!-- The frame renders while the history loads, so the column is never
+       blank; a skeleton covers the chart until the first data. A history that
+       arrives empty (or fails with nothing cached) hides the panel, as before. -->
+  <div v-if="hasData || !nachosStore.navHistoryLoaded" class="nav-chart">
 
     <!-- section title + currency toggle -->
     <div class="nav-chart__head">
@@ -18,7 +21,10 @@
 
     <!-- chart -->
     <div class="nav-chart__wrap taco-container taco-container--l1">
-      <div ref="chartContainer" class="nav-chart__inner"></div>
+      <div class="nav-chart__plot">
+        <div ref="chartContainer" class="nav-chart__inner"></div>
+        <div v-if="!hasData" class="nav-chart__skeleton" aria-label="Loading NAV history"></div>
+      </div>
     </div>
 
   </div>
@@ -74,8 +80,20 @@ let resizeObserver: ResizeObserver | null = null
 const toUnixSec = (nsTimestamp: bigint): UTCTimestamp =>
   Number(nsTimestamp / 1_000_000_000n) as UTCTimestamp
 
+// What the series shows now. The worker refreshes the history every minute;
+// a refresh that brings the same snapshots changes nothing (and keeps the
+// user's zoom). New snapshots, such as the fresh history replacing the cached
+// one, are drawn and fitted to the view as before.
+let shownKey = ''
+
 function applyData() {
   if (!series) return
+  const list = snapshots.value
+  const last = list[list.length - 1]
+  const key = `${shownUnit.value}:${list.length}:${last ? String(last.timestamp) : ''}`
+  if (key === shownKey) return
+  shownKey = key
+
   const usd = shownUnit.value === 'usd'
   const color = usd ? COLORS.usd : COLORS.icp
   series.applyOptions({
@@ -86,7 +104,7 @@ function applyData() {
       ? { type: 'price', precision: 2, minMove: 0.01 }
       : { type: 'price', precision: 4, minMove: 0.0001 },
   })
-  series.setData(snapshots.value.map(s => ({
+  series.setData(list.map(s => ({
     time: toUnixSec(s.timestamp),
     value: usd ? s.navPerTokenUSD : Number(s.navPerTokenE8s) / 1e8,
   })))
@@ -141,12 +159,14 @@ function setupChart() {
   resizeObserver.observe(chartContainer.value)
 }
 
+// The frame renders at once, but the chart itself is only created when there
+// is history to draw: creating it costs a few hundred ms of main thread on a
+// phone, and on a first visit that landed right where the vault numbers were
+// waiting to render.
 onMounted(() => {
-  // Wait one tick — the v-if="hasData" gate may need to flip true before container exists.
-  nextTick(() => setupChart())
+  if (hasData.value) nextTick(() => setupChart())
 })
 
-// If data arrives after mount (worker delivery), set up the chart on first arrival.
 watch(hasData, (now) => {
   if (now) nextTick(() => setupChart())
 })
@@ -202,6 +222,14 @@ onBeforeUnmount(() => {
     flex-direction: column;
   }
 
+  &__plot {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
   &__inner {
     flex: 1;
     min-height: 0;
@@ -209,5 +237,20 @@ onBeforeUnmount(() => {
     border-radius: 0.375rem;
     overflow: hidden;
   }
+
+  // pulse over the empty chart until the first history arrives (opacity runs
+  // on the compositor, no repaint per frame)
+  &__skeleton {
+    position: absolute;
+    inset: 0;
+    border-radius: 0.375rem;
+    background: rgba(255, 255, 255, 0.08);
+    animation: nav-chart-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes nav-chart-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
 </style>

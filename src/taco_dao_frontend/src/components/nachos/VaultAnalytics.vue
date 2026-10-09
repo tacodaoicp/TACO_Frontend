@@ -5,7 +5,12 @@
     <h3 class="vault-analytics__title">Vault Analytics</h3>
 
     <div v-if="!analytics" class="vault-analytics__loading">
-      <i class="fa-solid fa-spinner fa-spin"></i> Loading analytics...
+      <template v-if="nachosStore.analyticsError">
+        <i class="fa-solid fa-circle-exclamation"></i> Could not load analytics. Trying again...
+      </template>
+      <template v-else>
+        <i class="fa-solid fa-spinner fa-spin"></i> Loading analytics...
+      </template>
     </div>
 
     <div v-else class="vault-analytics__content taco-container taco-container--l1">
@@ -122,12 +127,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useNachosStore } from '../../stores/nachos.store'
-import { withTimeout } from '../../exchange/utils/withTimeout'
 
 const nachosStore = useNachosStore()
-const analytics = ref<any>(null)
+// From the data worker (key nachosVaultAnalytics): its IndexedDB copy shows
+// at once on a reload, then the background refresh updates it in place
+const analytics = computed<any>(() => nachosStore.vaultAnalytics)
 
 const usedModeCount = computed(() => {
   if (!analytics.value) return 0
@@ -142,35 +148,6 @@ const ICP_PRINCIPAL = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
 const hasNonICPTokens = computed(() =>
   nachosStore.acceptedTokens.some(([p, c]: [any, any]) => c.enabled && p.toText() !== ICP_PRINCIPAL)
 )
-
-const loadAnalytics = async () => {
-  try {
-    const actor = await createAnalyticsActor()
-    // Timeout so a wedged connection can't leave this section pending forever.
-    analytics.value = await withTimeout(actor.getVaultAnalytics(), 10_000, 'getVaultAnalytics')
-  } catch (e) {
-    console.error('Failed to load vault analytics:', e)
-  }
-}
-
-onMounted(loadAnalytics)
-
-defineExpose({ refresh: loadAnalytics })
-
-// Create anonymous actor for analytics query
-const createAnalyticsActor = async () => {
-  const { Actor } = await import('@dfinity/agent')
-  const { useTacoStore } = await import('../../stores/taco.store')
-  const { idlFactory } = await import('../../../../declarations/nachos_vault/nachos_vault.did.js')
-  const { getCanisterId } = await import('../../constants/canisterIds')
-
-  const tacoStore = useTacoStore()
-  const agent = await tacoStore.getAnonymousAgentPublic()
-
-  const canisterId = getCanisterId('nachos_vault')
-
-  return Actor.createActor(idlFactory, { agent, canisterId })
-}
 
 // 24h NAV change — from navHistory, skipping genesis snapshot
 const navChange24h = computed(() => {

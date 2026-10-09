@@ -5,8 +5,13 @@
     <!-- section title -->
     <h3 class="vault-mint__title">Mint NACHO</h3>
 
+    <!-- vault status not known yet (first visit, nothing cached): a placeholder,
+         not "unavailable", which read like an outage while it loaded. Once the
+         first fetch failed it is "unavailable" (below), as before. -->
+    <div v-if="!nachosStore.dashboardData && !nachosStore.lastError" class="vault-mint__skeleton taco-container taco-container--l1" aria-label="Loading vault status"></div>
+
     <!-- cannot mint banner -->
-    <div v-if="!nachosStore.canMint" class="vault-mint__disabled">
+    <div v-else-if="!nachosStore.canMint" class="vault-mint__disabled">
       Minting is currently unavailable.
     </div>
 
@@ -331,7 +336,9 @@ const tacoStore = useTacoStore()
 const nachosStore = useNachosStore()
 
 const ICP_FEE = 10_000n
-const { balance: icpBalance, refresh: loadICPBalance } = useTokenBalance('ryjl3-tyaaa-aaaaa-aaaba-cai')
+// icpBalance may be the last known one from the cache; icpBalanceFresh says the
+// ledger confirmed it in this session (required before a mint is allowed)
+const { balance: icpBalance, balanceFresh: icpBalanceFresh, refresh: loadICPBalance } = useTokenBalance('ryjl3-tyaaa-aaaaa-aaaba-cai')
 
 // mode state — only show 'Single Token' if there are non-ICP tokens in portfolio
 const ICP_PRINCIPAL = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
@@ -417,7 +424,7 @@ const canConfirmICP = computed(() => {
   if (icpAmountE8s.value <= 0n) return false
   // Hard cap on balance / rate limit — before the estimate so the button stays
   // disabled even before the canister responds.
-  if (icpBalance.value === null) return false
+  if (icpBalance.value === null || !icpBalanceFresh.value) return false
   const maxE8s = BigInt(Math.floor(maxMintableICP.value))
   if (icpAmountE8s.value > maxE8s) return false
   if (!icpEstimate.value) return false
@@ -1018,6 +1025,13 @@ onBeforeUnmount(() => {
     font-family: 'Space Mono', monospace;
   }
 
+  // an empty card (taco-container--l1, so it reads in both themes) with an
+  // opacity pulse (compositor only, no repaint per frame)
+  &__skeleton {
+    height: 16rem;
+    animation: vault-mint-pulse 1.4s ease-in-out infinite;
+  }
+
   &__content {
     display: flex;
     flex-direction: column;
@@ -1402,5 +1416,10 @@ onBeforeUnmount(() => {
     outline: none;
     box-shadow: 0 0 0 2px rgba(var(--dark-orange), 0.25);
   }
+}
+
+@keyframes vault-mint-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
 </style>
