@@ -142,16 +142,20 @@
                 <!-- tile container inner -->
                 <div class="home-view__tile__inner">
 
-                  <!-- video iframe - lazy loaded, using nocookie for faster load -->
+                  <!-- video: a bundled thumbnail until tapped, then the player (nocookie embed) -->
                   <iframe v-if="shouldLoadYouTube"
                     ref="youtubeIframeRef"
-                    loading="lazy"
-                    src="https://www.youtube-nocookie.com/embed/ikNBuHYMkNs?enablejsapi=1"
+                    :src="`https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}?enablejsapi=1&autoplay=1`"
                     title="YouTube video player"
                     frameborder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen
                     ></iframe>
+                  <button v-else type="button" class="home-view__video-thumb"
+                          aria-label="Play the Getting Started video" @click="playYouTube">
+                    <img :src="youtubeThumb" alt="" decoding="async" />
+                    <span class="home-view__video-play" aria-hidden="true"></span>
+                  </button>
 
                 </div>
 
@@ -952,6 +956,57 @@
       border-radius: 0.5rem;
     }
 
+  }
+
+  // video thumbnail, same box as the player it turns into
+  &__video-thumb {
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    padding: 0;
+    border: 0;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #000;
+    cursor: pointer;
+
+    img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    &:hover .home-view__video-play,
+    &:focus-visible .home-view__video-play {
+      opacity: 1;
+    }
+  }
+
+  // YouTube style play button
+  &__video-play {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 68px;
+    height: 48px;
+    transform: translate(-50%, -50%);
+    background: #f00;
+    border-radius: 14px / 12px;
+    opacity: 0.85;
+    transition: opacity 0.15s;
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-35%, -50%);
+      border-style: solid;
+      border-width: 11px 0 11px 19px;
+      border-color: transparent transparent transparent #fff;
+    }
   }
 
   &__tagline {
@@ -2248,6 +2303,7 @@
   import solumLogo from "../assets/tokens/solum.png"
   import simwinLogo from "../assets/tokens/simwin.webp"
   import neutriniteLogo from "../assets/tokens/snspng/neutrinite.png"
+import youtubeThumb from '../assets/images/getting-started-video.webp'
   import TaggrSocialImg from '../assets/images/social/taggr.vue'
   import CatalyzeSocialImg from '../assets/images/social/catalyze.vue'
   import GithubSocialImg from '../assets/images/social/github.vue'
@@ -2313,6 +2369,21 @@
   const shouldLoadDex = ref(false)
   const shouldLoadYouTube = ref(false)
   const youtubeIframeRef = ref<HTMLIFrameElement | null>(null)
+  // the player only loads on a tap. A tiny image probe at idle tells whether the embed host can be reached
+  // (blocked DNS, a VPN or no network); if not, the tap opens the video on youtube.com instead of an error page
+  const YOUTUBE_VIDEO_ID = 'ikNBuHYMkNs'
+  let youtubeReachable = true
+  const probeYouTube = () => {
+    const img = new Image()
+    img.onload = () => { youtubeReachable = true }
+    img.onerror = () => { youtubeReachable = false }
+    img.src = `https://www.youtube-nocookie.com/favicon.ico?t=${Date.now()}`
+  }
+  const playYouTube = () => {
+    if (youtubeReachable) { shouldLoadYouTube.value = true; return }
+    window.open(`https://www.youtube.com/watch?v=${YOUTUBE_VIDEO_ID}`, '_blank', 'noopener')
+    probeYouTube() // so a later tap embeds again once the network is back
+  }
   const dexIframeRef = ref<HTMLIFrameElement | null>(null)
 
   // TACO/* price chart — replaces dextools iframe with the in-house
@@ -2653,7 +2724,7 @@
       : (cb) => setTimeout(cb, 200)
     idleIframes(() => {
       shouldLoadDex.value = true
-      shouldLoadYouTube.value = true
+      probeYouTube()
     })
 
   })
