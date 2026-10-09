@@ -291,11 +291,11 @@
                         <!-- key -->
                         <span class="home-view__taco-assets__kvp__key">
                             <i class="fa-solid fa-chart-pie  home-view__taco-assets__fa-icon"></i>
-                            Portfolio (DAO share)
+                            Portfolio
                         </span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">{{ nachoOwnershipFraction > 0 ? '$' + formatNumber(daoVaultShareUsd) : '…' }}</span>
+                        <span class="home-view__taco-assets__kvp__value">{{ totalPortfolioValueInUsd > 0 ? '$' + formatNumber(totalPortfolioValueInUsd) : '…' }}</span>
 
                     </div>
 
@@ -308,7 +308,7 @@
                         <span class="home-view__taco-assets__kvp__key">Total</span>
 
                         <!-- value -->
-                        <span class="home-view__taco-assets__kvp__value">{{ nachoOwnershipFraction > 0 ? '$' + formatNumber(daoAssetsDisplayUsd) : '…' }}</span>
+                        <span class="home-view__taco-assets__kvp__value">{{ totalPortfolioValueInUsd > 0 ? '$' + formatNumber(assetsTotalUsd) : '…' }}</span>
 
                     </div>
 
@@ -2344,7 +2344,10 @@ import youtubeThumb from '../assets/images/getting-started-video.webp'
   const { userLoggedIn } = storeToRefs(tacoStore)
 
   // dao
-  const { daoAssetsDisplayUsd, daoVaultShareUsd, nachoOwnershipFraction, treasuryValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+  const { totalPortfolioValueInUsd, treasuryValueExTacoInUsd, totalTreasuryValueInUsd, snsTreasuryIcpValueInUsd, snsTreasuryDkpValueInUsd, snsTreasurySolumValueInUsd, snsTreasurySimwinValueInUsd, snsTreasuryNtnValueInUsd } = storeToRefs(tacoStore)
+  // same as the header value card: treasury without TACO plus the whole vault portfolio with its TACO,
+  // summed from parts rounded to thousands so the rows add up on screen
+  const assetsTotalUsd = computed(() => Math.round(treasuryValueExTacoInUsd.value / 1000) * 1000 + Math.round(totalPortfolioValueInUsd.value / 1000) * 1000)
 
   /////////////////////
   // Local Variables //
