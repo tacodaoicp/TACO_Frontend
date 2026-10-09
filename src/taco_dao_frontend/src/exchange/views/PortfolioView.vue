@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, onMounted, onUnmounted, onActivated, watch } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, onActivated, onDeactivated, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import WalletTab from '../components/portfolio/WalletTab.vue'
 import OpenOrdersTab from '../components/portfolio/OpenOrdersTab.vue'
@@ -301,31 +301,39 @@ function ensureUserData() {
   }
 }
 
-onMounted(() => {
-  ensureUserData()
-  // Periodic trend refresh while the view is mounted — visibility-gated so
-  // we don't burn a 28-sample query while the tab is hidden. A forced read:
-  // the timer equals the query's freshness window, so ensure() found it
-  // fresh and never fetched.
+// Periodic trend refresh while the view is shown — visibility-gated so we
+// don't burn a 28-sample query while the tab is hidden, and stopped while the
+// kept-alive view sits in the background. A forced read: the timer equals the
+// query's freshness window, so ensure() found it fresh and never fetched.
+function startTrendsTimer() {
+  if (trendsTimer !== null) return
   trendsTimer = window.setInterval(() => {
     if (!isDocumentVisible.value) return
     void trendsQuery.value?.refresh()
   }, TREND_REFRESH_MS)
-})
-
-// The view is kept alive: coming back to it re-checks orders, LP and trends
-// (each only fetches when older than its window).
-onActivated(() => {
-  ensureUserData()
-  void trendsQuery.value?.ensure()
-})
-
-onUnmounted(() => {
+}
+function stopTrendsTimer() {
   if (trendsTimer !== null) {
     clearInterval(trendsTimer)
     trendsTimer = null
   }
+}
+
+onMounted(() => {
+  ensureUserData()
+  startTrendsTimer()
 })
+
+// The view is kept alive: coming back to it re-checks orders, LP and trends
+// (each only fetches when older than its window) and restarts the timer.
+onActivated(() => {
+  ensureUserData()
+  void trendsQuery.value?.ensure()
+  startTrendsTimer()
+})
+onDeactivated(stopTrendsTimer)
+
+onUnmounted(stopTrendsTimer)
 </script>
 
 <style scoped lang="scss">

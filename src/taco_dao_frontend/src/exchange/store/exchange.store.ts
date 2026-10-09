@@ -388,6 +388,8 @@ export const useExchangeStore = defineStore('exchange', () => {
     const list = v && v.length > 0 ? v[0] ?? [] : []
     // Never blank the list (the getAcceptedTokens fallback may have filled it).
     if (list.length > 0 && list !== tokens.value) tokens.value = list
+    // A list landing later (the poll got through) ends the init "no tokens" errors.
+    if (list.length > 0 && /^(Cannot reach|No tokens)/.test(initError.value)) initError.value = ''
   }
 
   // Signature of the pool data ON SCREEN. The poll compares fresh data with
@@ -608,7 +610,7 @@ export const useExchangeStore = defineStore('exchange', () => {
         // "Can't reach canister" needs only the critical batch — deferred can
         // fail independently without indicating a connectivity problem.
         const allFailed = criticalResults.every(r => r.status === 'rejected')
-        if (allFailed) {
+        if (allFailed && !unknown) {
           initError.value = `Cannot reach exchange canister (${getExchangeCanisterId()}). Check canister ID and deployment.`
         } else if (!unknown) {
           initError.value = 'No tokens configured on the exchange. An admin must add tokens via the Admin panel.'
@@ -625,7 +627,8 @@ export const useExchangeStore = defineStore('exchange', () => {
   /** Re-fetch everything the boot loaded that can change: tokens (new listings),
    *  for WalletTab after an admin adds a token. Applies via onSuccess. */
   async function refreshTokens(): Promise<void> {
-    await acceptedTokensQuery.refresh()
+    // refetch, not refresh: a read already in flight may predate the listing.
+    await acceptedTokensQuery.refetch()
   }
 
   // ── External crypto price fetch (CoinGecko → Binance) ──
@@ -831,10 +834,12 @@ export const useExchangeStore = defineStore('exchange', () => {
           entries.push([addr, price])
           if (addr === ICP) {
             // A recent DAO price replaces a pool estimate (or nothing); an
-            // external price stays. An old DAO price only fills an empty anchor.
+            // external price stays. An old DAO price only fills an empty anchor,
+            // tagged like a pool estimate so a better source can still replace it
+            // and it never becomes the sanity bound for pool estimates.
             const syncedMs = Number(BigInt(details?.lastTimeSynced ?? 0n) / 1_000_000n)
             const recent = syncedMs > 0 && isWithinAge(syncedMs, 6 * 60 * 60_000)
-            if (icpPriceUSD.value <= 0 || (recent && icpSrc.value !== 'ext')) setIcpAnchor(price, 'dao')
+            if (icpPriceUSD.value <= 0 || (recent && icpSrc.value !== 'ext')) setIcpAnchor(price, recent ? 'dao' : 'pool')
           }
         }
       }

@@ -74,7 +74,9 @@ const walletInitials = computed(() => {
 
 async function deriveAccountId() {
   const p = principalText.value
-  if (!p) { accountIdHex.value = ''; return }
+  // Clear first: the previous account's ID must not show while this one derives.
+  accountIdHex.value = ''
+  if (!p) return
   try {
     const { Principal } = await import('@dfinity/principal')
     const { AccountIdentifier } = await import('@dfinity/ledger-icp')
