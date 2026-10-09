@@ -1029,8 +1029,20 @@ async function submitFullRange() {
     })
     .catch(() => { /* probe falls back to 'unknown' */ })
 
-  try {
+  // Ask the exchange once, before the first deposit: a freeze, a stopped or
+  // unreachable exchange, or an old fee or treasury refuses here, before
+  // either token moves. (A check between the two deposits could strand the
+  // first one, so the deposits below skip their own.)
+  phase.value = 'deposit0'
+  try { await store.assertCanTrade() }
+  catch (err: any) {
+    error.value = err.message || 'Failed to add liquidity'
+    phase.value = 'idle'
+    toast.error('Add Liquidity Failed', error.value)
+    return
+  }
 
+  try {
     if (v2) {
       phase.value = 'deposit0'
       try { await approveExchangeDeposit(token0.value, a0Raw, fee0) }
@@ -1053,14 +1065,14 @@ async function submitFullRange() {
       phase.value = 'deposit0'
       block0 = await depositTokenForLiquidity(
         token0.value, info0.value!.asset_type as any,
-        a0Raw, store.treasuryAccountId, store.treasuryPrincipal,
+        a0Raw, store.treasuryAccountId, store.treasuryPrincipal, true,
       )
       savePendingDeposit(token0.value, block0, symbol0.value)
 
       phase.value = 'deposit1'
       block1 = await depositTokenForLiquidity(
         token1.value, info1.value!.asset_type as any,
-        a1Raw, store.treasuryAccountId, store.treasuryPrincipal,
+        a1Raw, store.treasuryAccountId, store.treasuryPrincipal, true,
       )
       savePendingDeposit(token1.value, block1, symbol1.value)
     }
@@ -1233,8 +1245,21 @@ async function submitConcentrated() {
   const preDone = store.userLpQuery.refresh()
     .then(async (v) => { prePositionCount = (v ?? await store.getUserLiquidityDetailed()).length })
     .catch(() => { /* fall back to 'unknown' */ })
-  try {
 
+  // Ask the exchange once, before the first deposit: a freeze, a stopped or
+  // unreachable exchange, or an old fee or treasury refuses here, before
+  // either token moves. (A check between the two deposits could strand the
+  // first one, so the deposits below skip their own.)
+  phase.value = 'deposit0'
+  try { await store.assertCanTrade() }
+  catch (err: any) {
+    error.value = err.message || 'Failed to add liquidity'
+    phase.value = 'idle'
+    toast.error('Add Liquidity Failed', error.value)
+    return
+  }
+
+  try {
     if (v2) {
       phase.value = 'deposit0'
       try { await approveExchangeDeposit(token0.value, a0Raw, fee0) }
@@ -1258,14 +1283,14 @@ async function submitConcentrated() {
         phase.value = 'deposit0'
         block0 = await depositTokenForLiquidity(
           token0.value, info0.value!.asset_type as any,
-          a0Raw, store.treasuryAccountId, store.treasuryPrincipal,
+          a0Raw, store.treasuryAccountId, store.treasuryPrincipal, true,
         )
       }
       if (a1Raw > 0n) {
         phase.value = 'deposit1'
         block1 = await depositTokenForLiquidity(
           token1.value, info1.value!.asset_type as any,
-          a1Raw, store.treasuryAccountId, store.treasuryPrincipal,
+          a1Raw, store.treasuryAccountId, store.treasuryPrincipal, true,
         )
       }
     }

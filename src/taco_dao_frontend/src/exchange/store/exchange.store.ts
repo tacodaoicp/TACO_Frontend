@@ -273,15 +273,46 @@ export const useExchangeStore = defineStore('exchange', () => {
     return callsRemaining.value > 0
   }
 
-  /** Called before a deposit moves funds (V1 flows transfer first and call the
-   *  exchange after). Refuses when the exchange is known to be frozen or the
-   *  update budget is spent, so funds never leave the wallet for an exchange
-   *  call that would be refused, and a freeze gets its own message instead of
-   *  "Rate limit reached". The backend still rejects trades itself on a freeze
-   *  this tab has not seen yet. */
-  function assertCanTrade(): void {
-    if (isFrozen.value) throw new Error('Exchange is currently frozen. No funds were moved.')
+  /**
+   * Called right before funds move (V1 flows transfer first and call the
+   * exchange after). Asks the canister itself, so a frozen, stopped or
+   * unreachable exchange refuses here instead of after the transfer, and
+   * makes sure the trading fee and treasury used for the deposit come from a
+   * recent read, never an old saved copy. Throws a message for the user;
+   * nothing has moved when it throws.
+   */
+  async function assertCanTrade(): Promise<void> {
     if (callsRemaining.value <= 0) throw new Error('Rate limit reached. Wait before making more trades.')
+    const unreachable = "Can't reach the exchange right now. No funds were moved."
+    const FEE_WINDOW = 60 * 60_000
+    const TREASURY_WINDOW = 24 * 60 * 60_000
+    const recent = <T>(q: CachedQuery<T>, windowMs: number, label: string) =>
+      q.isFresh(windowMs) ? Promise.resolve(q.data.value) : withTimeout(q.refresh(), 5_000, label)
+    const [frozenR] = await Promise.allSettled([
+      getQueryActor().then(actor => withTimeout(actor.isExchangeFrozen(), 5_000, 'isExchangeFrozen')),
+      recent(tradingFeeQuery, FEE_WINDOW, 'hmFee'),
+      recent(treasuryAcctQuery, TREASURY_WINDOW, 'p2acannister'),
+      recent(treasuryPrincQuery, TREASURY_WINDOW, 'returncontractprincipal'),
+    ])
+    let frozen = false
+    if (frozenR.status === 'fulfilled') frozen = Boolean(frozenR.value)
+    else if (!isMissingMethodError(frozenR.reason)) throw new Error(unreachable)
+    isFrozen.value = frozen
+    frozenUnknown.value = false
+    if (frozen) {
+      startFrozenPolling()
+      throw new Error('Exchange is currently frozen. No funds were moved.')
+    }
+    const fee = tradingFeeQuery.data.value
+    const acct = treasuryAcctQuery.data.value
+    const princ = treasuryPrincQuery.data.value
+    if (fee === null || !acct || !princ
+        || !tradingFeeQuery.isFresh(FEE_WINDOW) || !treasuryAcctQuery.isFresh(TREASURY_WINDOW) || !treasuryPrincQuery.isFresh(TREASURY_WINDOW)) {
+      throw new Error(unreachable)
+    }
+    tradingFeeBps.value = fee
+    treasuryAccountId.value = acct
+    treasuryPrincipal.value = princ
   }
 
   // ── Frozen state detection ──

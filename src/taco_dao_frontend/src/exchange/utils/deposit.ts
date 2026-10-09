@@ -362,8 +362,16 @@ export async function depositTokenForLiquidity(
   amount: bigint,
   treasuryAccountIdHex: string,
   treasuryPrincipalText: string,
+  /** The caller already ran store.assertCanTrade() for this whole action (LP
+   *  adds check once before the first of their two deposits, so a failed
+   *  check can never strand the first one). */
+  tradeChecked = false,
 ): Promise<bigint> {
-  useExchangeStore().assertCanTrade()
+  const store = useExchangeStore()
+  if (!tradeChecked) await store.assertCanTrade()
+  // The treasury as read by the check above (never an old saved copy).
+  treasuryAccountIdHex = store.treasuryAccountId || treasuryAccountIdHex
+  treasuryPrincipalText = store.treasuryPrincipal || treasuryPrincipalText
   const agent = await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
 
@@ -422,7 +430,17 @@ export async function depositToken(
   treasuryAccountIdHex: string,
   treasuryPrincipalText: string,
 ): Promise<bigint> {
-  useExchangeStore().assertCanTrade()
+  const store = useExchangeStore()
+  // Asks the canister before any funds move, and refreshes the fee and the
+  // treasury if the saved ones are old.
+  await store.assertCanTrade()
+  // The amount was worked out with the fee the user saw. If the fresh fee
+  // differs, stop here rather than charge something else.
+  if (store.tradingFeeBps !== tradingFeeBps) {
+    throw new Error('The trading fee changed. Check the amounts and try again. No funds were moved.')
+  }
+  treasuryAccountIdHex = store.treasuryAccountId || treasuryAccountIdHex
+  treasuryPrincipalText = store.treasuryPrincipal || treasuryPrincipalText
   let block: bigint
   const typeStr = 'ICP' in assetType ? 'ICP' : 'ICRC3' in assetType ? 'ICRC3' : 'ICRC12'
 
