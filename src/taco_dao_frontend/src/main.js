@@ -113,7 +113,12 @@ async function bootDAO() {
   // shared selectors like .btn / .taco-nav-btn, so index.scss MUST come last.
   // (See the matching comment in App.vue: "loads before taco.scss for correct
   // cascade".) FA Pro brands is deferred post-mount below.
-  const bootCss = Promise.all([
+  //
+  // The order guarantee above holds for production builds, where each <link>
+  // is added at the import() call. The dev server has no links: a CSS import
+  // adds its <style> when the module runs, so there the sheets start only
+  // after App has loaded, which keeps App's styles first as before.
+  const startBootCss = () => Promise.all([
     import('bootstrap/dist/css/bootstrap.css'),
     import('@fortawesome/fontawesome-pro/css/fontawesome.css'),
     import('@fortawesome/fontawesome-pro/css/light.css'),
@@ -127,6 +132,7 @@ async function bootDAO() {
     import('@fortawesome/fontawesome-pro/css/v4-shims.css'),
     import('./index.scss'),
   ])
+  const bootCss = import.meta.env.DEV ? appModules.then(startBootCss) : startBootCss()
 
   const [[
     { createRouter, createWebHistory },
