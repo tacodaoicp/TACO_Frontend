@@ -11,7 +11,7 @@ import { serializeForTransfer, deserializeFromTransfer } from './shared/transfer
 import { getNetworkHost } from '../shared/auth-cache'
 import { getEffectiveNetwork } from '../config/network-config'
 import { getCanisterId } from '../constants/canisterIds'
-import { noteCallOk, noteCallError } from '../exchange/utils/connectivity'
+import { noteCallOk, noteCallError, noteCallStart, noteCallEnd } from '../exchange/utils/connectivity'
 
 interface NetCfg { host: string; canisterId: string; fetchRootKey: boolean }
 export interface SerializedIdentity { delegationChainJson: string; sessionKeyJson: string }
@@ -20,7 +20,7 @@ let worker: Worker | null = null
 let netSent: NetCfg | null = null
 let identitySent: SerializedIdentity | null = null
 let nextId = 1
-const pending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void; timer: ReturnType<typeof setTimeout> }>()
+const pending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void; timer: ReturnType<typeof setTimeout>; callId: number }>()
 
 function resolveNet(): NetCfg {
   return {
@@ -39,6 +39,7 @@ function ensureWorker(): Worker {
     if (!p) return
     pending.delete(id)
     clearTimeout(p.timer)
+    noteCallEnd(p.callId)
     if (ok) {
       noteCallOk()
       p.resolve(deserializeFromTransfer(result))
@@ -49,7 +50,7 @@ function ensureWorker(): Worker {
     }
   }
   worker.onerror = (e) => {
-    for (const [, p] of pending) { clearTimeout(p.timer); p.reject(new Error(e.message || 'exchange worker crashed')) }
+    for (const [, p] of pending) { clearTimeout(p.timer); noteCallEnd(p.callId); p.reject(new Error(e.message || 'exchange worker crashed')) }
     pending.clear()
     // Drop the dead worker so the next call respawns it.
     try { worker?.terminate() } catch { /* ignore */ }
@@ -100,13 +101,15 @@ export function callExchangeQuery<T = unknown>(method: string, args: unknown[] =
   const id = nextId++
   const timeoutMs = opts.timeoutMs ?? 20_000
   return new Promise<T>((resolve, reject) => {
+    const callId = noteCallStart()
     const timer = setTimeout(() => {
       pending.delete(id)
+      noteCallEnd(callId)
       const err = new Error(`exchange worker call '${method}' timed out`)
       noteCallError(err)
       reject(err)
     }, timeoutMs)
-    pending.set(id, { resolve, reject, timer })
+    pending.set(id, { resolve, reject, timer, callId })
     w.postMessage({ type: 'CALL', id, method, args: args.map(serializeForTransfer), auth: !!opts.auth })
   })
 }

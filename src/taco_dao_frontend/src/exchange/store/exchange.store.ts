@@ -40,7 +40,7 @@ import { getEffectiveNetwork } from '../../config/network-config'
 import { readCache, writeCache, isWithinAge, sweepCache, purgeUserCache } from '../utils/persistCache'
 import { createCachedQuery, createKeyedQueryFactory, type CachedQuery } from '../utils/cachedQuery'
 import { isVisible as isDocumentVisible } from '../composables/useVisibilityAware'
-import { callsFailingSince, connectivityTick, lastCallOkAt, noteCallOk, noteCallError } from '../utils/connectivity'
+import { callsFailingSince, connectivityTick, lastCallOkAt, stalledSince, noteCallOk, noteCallError, noteCallStart, noteCallEnd } from '../utils/connectivity'
 
 // Refresh windows for the saved boot values. A saved value paints first and
 // is replaced on screen when the refresh lands. Tokens rarely change, but a
@@ -184,6 +184,7 @@ export const useExchangeStore = defineStore('exchange', () => {
         const v = Reflect.get(target, prop, receiver)
         if (typeof v !== 'function') return v
         return async (...args: unknown[]) => {
+          const callId = noteCallStart()
           try {
             const r = await (v as (...a: unknown[]) => Promise<unknown>).apply(target, args)
             noteCallOk()
@@ -191,6 +192,8 @@ export const useExchangeStore = defineStore('exchange', () => {
           } catch (err) {
             noteCallError(err)
             throw err
+          } finally {
+            noteCallEnd(callId)
           }
         }
       },
@@ -2459,12 +2462,12 @@ export const useExchangeStore = defineStore('exchange', () => {
 
   // One small note under the nav when the data on screen may be behind:
   //  - the boot frozen check got no answer (network): the app runs on saved data;
-  //  - an exchange call failed and nothing succeeded for about 10 s.
+  //  - an exchange call failed or hangs and nothing succeeded for about 10 s.
   // Cleared by the next answer / success.
   const dataNote = computed<string>(() => {
     if (frozenUnknown.value) return "Can't reach the exchange right now. Showing saved data."
     void connectivityTick.value
-    if (!callsFailingSince.value) return ''
+    if (!callsFailingSince.value && !stalledSince()) return ''
     const lastOk = lastCallOkAt()
     if (Date.now() - (lastOk || PAGE_STARTED_AT) < LIVE_DATA_PAUSED_AFTER_MS) return ''
     const shownAt = lastOk || exchangeInfoQuery.lastFetchedAt.value
