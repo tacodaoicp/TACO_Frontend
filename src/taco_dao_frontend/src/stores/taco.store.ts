@@ -1519,8 +1519,10 @@ export const useTacoStore = defineStore('taco', () => {
     // simwin: fixed off-chain reserve, $30,000 initial + $90,000 added
     const SIMWIN_VALUE_USD = 30_000 + 90_000
 
-    // off-chain ICP held outside the SNS treasury (locked-neuron + reserve)
-    const EXTRA_ICP_HOLDINGS = 7832
+    // ICP outside the SNS treasury: the DAO's 8 year locked NNS neuron 493330108113619734 (Neuron Pool vector 101 on
+    // 6jvpj-sqaaa-aaaaj-azwnq-cai), stake 7,777.78 + maturity 0.82, checked 2026-10-09. Its maturity is paid out to the
+    // SNS treasury, where it is counted live, so update this only when the stake changes.
+    const EXTRA_ICP_HOLDINGS = 7778.6
 
     // NTN held by a DAO-controlled canister; value derived from fetchedTokenDetails price feed
     const NTN_DEFAULT_HOLDINGS = 3423
