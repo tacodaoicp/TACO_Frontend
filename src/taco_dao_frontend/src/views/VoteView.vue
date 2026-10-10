@@ -118,7 +118,7 @@
                       >
 
                         <!-- no tokens curtain -->
-                        <div v-if="allocationCount === 0" class="vote-allocations__no-tokens-curtain">
+                        <div v-if="showNoHoldings" class="vote-allocations__no-tokens-curtain">
 
                           <p class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> {{ canShowAllocations ? 'No Allocations Yet' : 'No Holdings Yet' }}</p>                          
                           
@@ -143,7 +143,7 @@
                         <div class="d-flex w-100">
 
                           <!-- no tokens curtain -->
-                          <div v-if="allocationCount === 0" class="vote-allocations__no-tokens-curtain">
+                          <div v-if="showNoHoldings" class="vote-allocations__no-tokens-curtain">
 
                             <p class="taco-text-white text-center mb-0"><i class="fa-solid fa-triangle-exclamation taco-text-orange"></i> {{ canShowAllocations ? 'No Tokens Allocated' : 'No Holdings' }}</p>
                             
@@ -2232,8 +2232,6 @@
   import DfinityLogo from "../assets/images/dfinityLogo.vue"
   import { Principal } from "@dfinity/principal"
   import astronautLoader from "../assets/images/astonautLoader.webp"
-  import { isDevEnvironment } from '../config/network-config'
-  import { useAdminCheck } from '../composables/useAdminCheck'
 
   ////////////////
   // interfaces //
@@ -2303,9 +2301,9 @@
   // dao backend
   const { ensureTokenDetails } = tacoStore
 
-  // allocations visibility: only on local or for admins
-  const { isAdmin } = useAdminCheck()
-  const canShowAllocations = computed(() => isDevEnvironment() || isAdmin.value)
+  // aggregate allocations are no longer shown here: the panel always shows the DAO's current holdings
+  // ponytail: kept as a constant flag so the allocation code paths stay as they are
+  const canShowAllocations = computed(() => false)
 
   /////////////////////
   // local variables //
@@ -3163,6 +3161,8 @@
       ? fetchedAggregateAllocation.value.length
       : (fetchedTokenDetails.value || []).filter((e: any) => BigInt(e?.[1]?.balance ?? 0) > 0n).length
   })
+  // the "no holdings" covers only show once the holdings have loaded and are really empty, never while loading
+  const showNoHoldings = computed(() => (fetchedTokenDetails.value || []).length > 0 && allocationCount.value === 0)
 
   /////////////
   // utility //  
