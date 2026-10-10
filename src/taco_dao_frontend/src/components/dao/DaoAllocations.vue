@@ -616,8 +616,6 @@ LOCAL METHODS
     import astronautLoader from '../../assets/images/astonautLoader.webp'
     import placeholder52x52 from '../../assets/images/placeholder-52x52.png'
     import { Tooltip } from 'bootstrap'
-    import { isDevEnvironment } from '../../config/network-config'
-    import { useAdminCheck } from '../../composables/useAdminCheck'
 
     ///////////
     // Store //
@@ -781,9 +779,8 @@ LOCAL METHODS
     })
 
     // navigation
-    // allocations visibility: only on staging/local or for admins
-    const { isAdmin } = useAdminCheck()
-    const canShowAllocations = computed(() => isDevEnvironment() || isAdmin.value)
+    // aggregate allocations are no longer shown, not even on staging or for admins
+    const canShowAllocations = computed(() => false)
 
     const showCurrentHoldings = ref(!canShowAllocations.value) // user is viewing current holdings
     const showCurrentAllocations = ref(canShowAllocations.value) // user is viewing current allocations
