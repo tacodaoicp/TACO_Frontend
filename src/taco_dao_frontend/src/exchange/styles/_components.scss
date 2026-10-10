@@ -553,10 +553,13 @@
     cursor: pointer;
     transition: all 150ms ease;
 
-    &:hover {
-      color: var(--tx-ink);
-      background: var(--tx-orange-dim);
-      border-color: var(--tx-orange-line);
+    // only on devices that really hover: on touch screens :hover sticks to the last tapped button
+    @media (hover: hover) {
+      &:hover {
+        color: var(--tx-ink);
+        background: var(--tx-orange-dim);
+        border-color: var(--tx-orange-line);
+      }
     }
     &--active {
       color: var(--tx-orange);

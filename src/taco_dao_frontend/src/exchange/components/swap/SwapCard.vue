@@ -172,8 +172,8 @@
           <span class="num">{{ feeDisplay }} <span v-if="feeUSD > 0" class="swap-card__usd-subtle">&asymp; {{ formatUSD(feeUSD) }}</span></span>
         </div>
 
-        <!-- Partial fill warning -->
-        <div v-if="!swap.quote.value.canFulfillFully" class="ex-warning-box">
+        <!-- Partial fill warning (not when nothing can be routed: the button then says the amount is too small) -->
+        <div v-if="!swap.quote.value.canFulfillFully && swap.quote.value.expectedBuyAmount > 0n" class="ex-warning-box">
           Only part of this swap can be filled immediately. The remainder will be placed as a limit order.
         </div>
 
