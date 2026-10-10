@@ -3157,8 +3157,11 @@
   }  
 
   // return allocation count
+  // the aggregate target is admin-only, so in holdings mode count held tokens instead
   const allocationCount = computed(() => {
-    return fetchedAggregateAllocation.value.length
+    return canShowAllocations.value
+      ? fetchedAggregateAllocation.value.length
+      : (fetchedTokenDetails.value || []).filter((e: any) => BigInt(e?.[1]?.balance ?? 0) > 0n).length
   })
 
   /////////////
