@@ -341,6 +341,22 @@
   // Wathcers //
   //////////////
 
+  // canonical URL per page on tacodao.com (set here, not in index.html: one fixed tag made search engines treat
+  // every page as a copy of the home page). The exchange router sets its own canonical.
+  watch(
+    () => route.path,
+    (path) => {
+      let link = document.querySelector('link[rel="canonical"]')
+      if (!link) {
+        link = document.createElement('link')
+        link.setAttribute('rel', 'canonical')
+        document.head.appendChild(link)
+      }
+      link.setAttribute('href', `https://tacodao.com${path}`)
+    },
+    { immediate: true }
+  )
+
   // watch for changes to the route
   watch(
     () => route.meta.robots,
