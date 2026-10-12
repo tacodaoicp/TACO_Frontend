@@ -259,8 +259,9 @@ const tabs = computed(() => [
   { key: 'docs',     label: 'Docs',          badge: null as number | null },
 ])
 
+// Trade on a wallet row: CrossDEX, selling that token (CrossDexCard picks ICP, or TACO when selling ICP, to buy)
 function goToTrade(tokenAddress: string) {
-  router.push({ path: '/', query: { token: tokenAddress } })
+  router.push({ path: '/crossdex', query: { sell: tokenAddress } })
 }
 
 function onTotalUsd(total: number) {

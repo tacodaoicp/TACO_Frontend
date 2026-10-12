@@ -225,6 +225,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ICP_LEDGER_ID } from '../../constants/tokens'
 import { useCrossDexSwap } from '../../composables/useCrossDexSwap'
 import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
@@ -396,6 +398,23 @@ function scheduleQuote() {
 }
 watch(() => cx.amountIn.value, scheduleQuote)
 watch([() => cx.tokenFrom.value, () => cx.tokenTo.value], () => { if (cx.amountIn.value) scheduleQuote() })
+
+// ?sell=<token> (from the portfolio Trade button): sell that token for ICP, or for TACO when it is ICP.
+// Applied once the token list has loaded, then dropped from the URL so later choices are not overwritten.
+const route = useRoute()
+const router = useRouter()
+watch([() => route.query.sell, () => store.tokens.length], ([sell]) => {
+  if (typeof sell !== 'string' || !store.tokens.length) return
+  const from = store.getTokenByAddress(sell)
+  if (!from) return
+  const to = sell === ICP_LEDGER_ID
+    ? store.tokens.find(t => t.symbol === 'TACO')
+    : store.getTokenByAddress(ICP_LEDGER_ID)
+  cx.tokenFrom.value = from
+  if (to) cx.tokenTo.value = to
+  const { sell: _drop, ...rest } = route.query
+  router.replace({ query: rest })
+}, { immediate: true })
 
 onMounted(() => {
   if (!cx.tokenFrom.value) {
