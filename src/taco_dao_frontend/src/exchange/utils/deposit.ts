@@ -12,7 +12,6 @@ import { Principal } from '@dfinity/principal'
 import { getCachedAgent, getCachedIdentity } from '../../shared/auth-cache'
 import { icrcIDL } from '../../shared/icrc-idl'
 import { getCanisterId } from '../../constants/canisterIds'
-import { requestApproval, ApprovalDeclined } from './approvalPrompt'
 import { useExchangeStore } from '../store/exchange.store'
 import { setItemWithCacheEviction } from './persistCache'
 import { withTimeout } from './withTimeout'
@@ -39,17 +38,19 @@ export function calculateRequiredDeposit(
  *
  * Allowance strategy (ensure-style, same as the bridge's ensureAllowance):
  * reuse a standing allowance when it already covers this trade — no ledger
- * fee, no extra call, no dialog. Otherwise ask the user via ApprovalDialog:
- * prefilled with 10x this trade's needs and a 2-month validity, both
- * editable (amount never below what the trade needs). The spender is the
- * exchange itself and every pull consumes allowance, so the standing
- * amount only ever shrinks.
+ * fee, no extra call. Otherwise approve exactly what this trade pulls, with
+ * no prompt, like the ICPSwap leg does. The approval expires after
+ * APPROVAL_TTL_MS, so one left over by a trade that failed before its pull
+ * lapses on its own. The spender is the exchange itself and every pull
+ * consumes allowance, so the standing amount only ever shrinks.
  *
  * - The pull draws from the caller's DEFAULT subaccount only.
  * - No journal entry: a V2 failure either moved nothing, or is tracked
  *   on-chain as a pending pull (see getMyPendingPulls / the Recover page).
  * - Works for ICP too (the ICP ledger supports icrc2_approve).
  */
+const APPROVAL_TTL_MS = 30 * 60_000
+
 export async function approveExchangeDeposit(
   tokenCanisterId: string,
   gross: bigint,
@@ -100,26 +101,16 @@ export async function approveExchangeDeposit(
     }
     store.userAllowanceQuery(tokenCanisterId).set(liveVal)
     if (sufficient(liveVal)) return
-  } catch { /* live check unavailable — proceed to the prompt */ }
+  } catch { /* live check unavailable — approve below */ }
 
-  // New approval needed: the user confirms and can edit amount and validity.
-  const decision = await requestApproval({
-    tokenAddress: tokenCanisterId,
-    needed,
-    transferFee,
-    proposed: needed * 10n,
-  })
-  if (decision == null) throw new ApprovalDeclined()
-  // Belt-and-braces for a money path: the dialog enforces this, but a short
-  // allowance is exactly what traps the deviant sGLDT/EXE ledgers into an
-  // ambiguous pending pull, so never let one through.
-  if (decision.amount < needed) throw new Error('Approved amount is below what this trade needs.')
-
+  // New approval needed: approve exactly what this trade pulls (never less: a short allowance
+  // is what traps the deviant sGLDT/EXE ledgers into an ambiguous pending pull).
+  const expiresAtNs = BigInt(Date.now() + APPROVAL_TTL_MS) * 1_000_000n
   const result = await ledger.icrc2_approve({
     fee: [], memo: [], from_subaccount: [], created_at_time: [],
     expected_allowance: [],
-    expires_at: [decision.expiresAtNs],
-    amount: decision.amount,
+    expires_at: [expiresAtNs],
+    amount: needed,
     spender,
   })
   if ('Err' in (result as any)) {
@@ -131,8 +122,8 @@ export async function approveExchangeDeposit(
   // here could capture pre-approve state from a lagging replica and poison the
   // cache; set() is authoritative and supersedes any in-flight read.
   store.userAllowanceQuery(tokenCanisterId).set({
-    allowance: decision.amount,
-    expiresAt: decision.expiresAtNs,
+    allowance: needed,
+    expiresAt: expiresAtNs,
   })
 }
 
