@@ -63,6 +63,10 @@
               <span class="token-selector__item-symbol">{{ token.symbol }}</span>
               <span class="token-selector__item-name">{{ token.name }}</span>
             </div>
+            <div v-if="holding(token)" class="token-selector__item-balance">
+              <span class="token-selector__item-amount num">{{ holding(token)!.amount }}</span>
+              <span class="token-selector__item-usd num">{{ holding(token)!.usd }}</span>
+            </div>
             <div v-if="isSelected(token)" class="token-selector__item-badge">
               Selected
             </div>
@@ -80,6 +84,8 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { getTokenIcon, prefetchLedgerLogos, iconCacheVersion } from '../../utils/token-icons'
+import { formatTokenAmount, formatUSD } from '../../utils/format'
+import { ICP_LEDGER_ID } from '../../constants/tokens'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
 type TokenInfoWithPaused = TokenInfo & { _paused?: boolean }
@@ -122,10 +128,48 @@ const popularTokens = computed(() => {
   return allTokens.value.slice(0, 5)
 })
 
+// The user's balances, from the same per token cache the Portfolio page reads. Opening the
+// picker loads them all once; they then stay live like the Portfolio's.
+watch(() => [props.visible, store.isAuthenticated] as const, ([open, authed]) => {
+  if (open && authed) for (const t of store.tokens) void store.userBalanceQuery(t.address).ensure(30_000)
+}, { immediate: true })
+
+function usdValue(token: TokenInfo): number {
+  if (!store.isAuthenticated) return 0
+  const bal = store.userBalanceQuery(token.address).data.value ?? 0n
+  if (bal === 0n) return 0
+  return Number(bal) / 10 ** Number(token.decimals) * store.getTokenPriceUSD(token.address)
+}
+
+// Balance shown on the right, only when logged in and worth more than $0.10
+function holding(token: TokenInfo): { amount: string; usd: string } | null {
+  const usd = usdValue(token)
+  if (usd <= 0.1) return null
+  const bal = store.userBalanceQuery(token.address).data.value ?? 0n
+  return { amount: formatTokenAmount(bal, Number(token.decimals)), usd: formatUSD(usd) }
+}
+
+// TACO, ICP and ckUSDC always first, then what the user holds (by dollar value), then the rest
+function pinRank(t: TokenInfo): number {
+  if (t.symbol === 'TACO') return 0
+  if (t.address === ICP_LEDGER_ID) return 1
+  if (t.symbol === 'ckUSDC') return 2
+  return 3
+}
+const orderedTokens = computed(() => {
+  const value = new Map(allTokens.value.map(t => [t.address, usdValue(t) > 0.1 ? usdValue(t) : 0]))
+  return allTokens.value
+    .map((t, i) => ({ t, i }))
+    .sort((a, b) => pinRank(a.t) - pinRank(b.t)
+      || value.get(b.t.address)! - value.get(a.t.address)!
+      || a.i - b.i)
+    .map(x => x.t)
+})
+
 const filteredTokens = computed(() => {
   const q = search.value.toLowerCase()
-  if (!q) return allTokens.value
-  return allTokens.value.filter(t =>
+  if (!q) return orderedTokens.value
+  return orderedTokens.value.filter(t =>
     t.symbol.toLowerCase().includes(q) ||
     t.name.toLowerCase().includes(q) ||
     t.address.toLowerCase().includes(q)
@@ -322,8 +366,28 @@ function selectToken(token: TokenInfo) {
 
   &__item-info {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
+  }
+
+  &__item-balance {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  &__item-amount {
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+  }
+
+  &__item-usd {
+    font-size: var(--text-xs);
+    color: var(--text-tertiary);
   }
 
   &__item-symbol {
