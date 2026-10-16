@@ -8,18 +8,21 @@
         qualifier="stuck funds"
         subtitle="We scan failed and interrupted transactions for balances the exchange still holds for your principal, and refund them here."
       />
-      <!-- Warning banner — only use recovery when an on-chain TX didn't settle -->
+      <!-- Warning banner: only use recovery when an on-chain TX didn't settle -->
       <div class="recover-view__warn">
         <div class="recover-view__warn-icon">⚠</div>
         <div>
           <strong class="tx-warning">Only use this if a deposit, withdraw, or swap completed on-chain but never appeared in your balance.</strong>
-          <div class="tx-ink-3" style="margin-top:4px;font-size:13px">Normal pending transactions settle within 2 minutes — don't recover those.</div>
+          <div class="tx-ink-3" style="margin-top:4px;font-size:13px">Normal pending transactions settle within 2 minutes. Don't recover those.</div>
         </div>
       </div>
 
       <!-- Recover All: one button, hunts every recoverable location -->
       <section class="recover-view__section">
         <h2 class="recover-view__subtitle">Recover All</h2>
+        <div v-if="interrupted" class="recover-view__interrupted">
+          A sale of {{ interruptedTokens === 1 ? '1 token' : `${interruptedTokens} tokens` }} was interrupted {{ interruptedAgo }} ago. Recover All checks every place funds can be left.
+        </div>
         <p class="recover-view__desc">
           One click checks every place funds can get stuck for your wallet: saved deposits on the exchange,
           interrupted CrossDEX swaps, every ICPSwap pool, the Neutrinite pylon, and pending exchange deposits.
@@ -336,6 +339,7 @@ import { useExchangeStore } from '../store/exchange.store'
 import { getDepositHistory, removeDepositFromCache } from '../utils/deposit'
 import { runJournal } from '../utils/runJournalStore'
 import { withFundsLock, isSaleRunning, BUSY, SALE_RUNNING_RECOVERY_TEXT } from '../utils/saleLock'
+import { useInterruptedSale } from '../composables/useInterruptedSale'
 import { mergeDepositRows, isOtherWallet as isOtherWalletRow, batchItemRecovered, batchRefused, type DepositRow, type MaySentRow } from '../utils/recoverRows'
 import { useExchangeToast } from '../composables/useExchangeToast'
 import { getCachedIdentity } from '../../shared/auth-cache'
@@ -345,6 +349,7 @@ import * as neutrinite from '../services/neutrinite'
 
 const store = useExchangeStore()
 const toast = useExchangeToast()
+const { interrupted, interruptedAgo, interruptedTokens, check: checkInterrupted, dismissInterrupted } = useInterruptedSale()
 
 // ── Funds lock: every recovery action takes it shared, so none runs while a
 // Sell many sale (exclusive) is moving funds in any tab. The 2 s poll only
@@ -1130,6 +1135,7 @@ async function recoverAllInner(scope: RaScope) {
       : `Done in ${secs}s. Nothing recoverable found anywhere${icp.scanned > 0 ? ` (${icp.scanned} pools scanned)` : ''}.`)
       + (icp.stuck > 0 ? ` ${icp.stuck} withdraw${icp.stuck > 1 ? 's are' : ' is'} stuck inside ICPSwap itself and needs their support, see the rows above.` : '')
     if (total > 0) void store.refreshAfterMutation('swap')
+    if (scope === 'all') dismissInterrupted()
   } catch (e: any) {
     toast.error('Recover All failed', e?.message || String(e))
   } finally {
@@ -1148,6 +1154,7 @@ onMounted(() => {
   loadPendingNeu()
   loadPendingSwaps()
   void loadPendingPulls()
+  void checkInterrupted()
   // If a run from an evicted instance is still going, reflect it and clear
   // the button once it finishes.
   if (raActive) {
@@ -1161,6 +1168,7 @@ onUnmounted(() => { if (salePoll) clearInterval(salePoll) })
 // Markers can be written while this tab is hidden (a failed leg in another
 // tab, a zombie leg finishing late). Refresh every list on return.
 onVisible(() => {
+  void checkInterrupted()
   loadCachedDeposits()
   loadPendingNeu()
   loadPendingSwaps()
@@ -1290,6 +1298,11 @@ onVisible(() => {
   &__subtitle--minor { font-size: var(--text-sm); margin-top: var(--space-2); }
 
   &__token-id { font-size: var(--text-xs); color: var(--text-tertiary); margin-left: 4px; }
+
+  &__interrupted {
+    font-size: var(--text-sm); line-height: 1.45; color: var(--text-primary);
+    background: var(--tx-warning-dim); border-radius: 8px; padding: 8px 10px;
+  }
 
   &__ra-detail {
     font-size: var(--text-xs);
