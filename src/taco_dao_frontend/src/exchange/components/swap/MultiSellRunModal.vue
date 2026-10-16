@@ -29,19 +29,30 @@
 
         <div class="ms-ar-list">
           <div v-for="(a, ai) in run.assets" :key="a.address" class="ms-ar" :class="{ 'is-open': isOpen(ai) }">
-            <TokenCoin :token="tokenOf(a.address)" :size="26" />
-            <button class="ms-ar__id" @click="toggle(ai)" :aria-expanded="isOpen(ai)">
-              <span class="ms-ar__sym">{{ a.symbol }}</span>
-              <span class="ms-ar__amt num">{{ fmtTok(a.address, a.amountIn) }}</span>
-            </button>
-            <span class="ms-ar__state" :class="`is-${cell(a).cls}`">
-              <span v-if="cell(a).spin" class="ms-spin"></span>
-              <span v-if="cell(a).glyph">{{ cell(a).glyph }}</span>
-              {{ cell(a).text }}
-              <b v-if="cell(a).out != null" class="num">{{ fmtIcp(cell(a).out!) }}</b>
-            </span>
+            <!-- the whole line opens the routes; a stopped sale sent nothing, so there is nothing to open -->
+            <component
+              :is="canToggle ? 'button' : 'div'"
+              class="ms-ar__head"
+              :type="canToggle ? 'button' : undefined"
+              :aria-expanded="canToggle ? isOpen(ai) : undefined"
+              @click="canToggle && toggle(ai)"
+            >
+              <TokenCoin :token="tokenOf(a.address)" :size="26" />
+              <span class="ms-ar__id">
+                <span class="ms-ar__sym">{{ a.symbol }}</span>
+                <span class="ms-ar__amt num">{{ fmtTok(a.address, a.amountIn) }}</span>
+              </span>
+              <span class="ms-ar__state" :class="`is-${cell(a).cls}`">
+                <span v-if="cell(a).spin" class="ms-spin"></span>
+                <span v-if="cell(a).glyph">{{ cell(a).glyph }}</span>
+                {{ cell(a).text }}
+                <b v-if="cell(a).out != null" class="num">{{ fmtIcp(cell(a).out!) }}</b>
+              </span>
+              <span v-if="canToggle" class="ms-ar__chev" aria-hidden="true">{{ isOpen(ai) ? '▴' : '▾' }}</span>
+            </component>
             <div class="ms-ar__chips">
               <DexLegChip v-for="(l, li) in a.legs" :key="li" :dex="l.venue" :state="run.phase === 'stopped' ? 'notSent' : l.state" />
+              <span v-if="cell(a).tag" class="ms-ar__tag">{{ cell(a).tag }}</span>
             </div>
             <div v-if="isOpen(ai)" class="ms-ar__detail">
               <template v-for="(l, li) in a.legs" :key="li">
@@ -54,12 +65,23 @@
         </div>
 
         <template v-if="final && refunds.length">
-          <div class="ms-md__sec">{{ refunds.some(r => r.bad) ? 'Refunds and recovery' : 'Refunds' }}</div>
+          <div class="ms-md__sec">{{ recoverRows.length ? (returnRows.length ? 'Refunds and recovery' : 'Recovery') : 'Refunds' }}</div>
           <div class="ms-rf">
-            <div v-for="(r, i) in refunds" :key="i" class="ms-rf__row">
+            <div v-for="(r, i) in recoverRows" :key="'r' + i" class="ms-rf__row">
               <span>{{ r.what }}</span>
-              <span class="ms-rf__where" :class="{ 'is-bad': r.bad }">{{ r.where }}</span>
+              <span class="ms-rf__where is-bad">{{ r.where }}</span>
             </div>
+            <div v-if="foldReturns" class="ms-rf__row">
+              <span>{{ plural(returnRows.length, 'part', 'parts') }} sent back to your wallet</span>
+              <button type="button" class="ms-rf__more" :aria-expanded="false" @click="showAllReturns = true">Show all</button>
+            </div>
+            <template v-else>
+              <div v-for="(r, i) in returnRows" :key="'b' + i" class="ms-rf__row">
+                <span>{{ r.what }}</span>
+                <span class="ms-rf__where">{{ r.where }}</span>
+              </div>
+              <button v-if="returnRows.length > FOLD_AFTER" type="button" class="ms-rf__more ms-rf__more--less" :aria-expanded="true" @click="showAllReturns = false">Show less</button>
+            </template>
           </div>
         </template>
 
@@ -207,7 +229,7 @@ const stopMessage = computed(() => {
 })
 
 // state cell per token (plan 6.4)
-function cell(a: MultiSellRun['assets'][number]): { text: string; cls: string; spin?: boolean; glyph?: string; out?: bigint } {
+function cell(a: MultiSellRun['assets'][number]): { text: string; cls: string; spin?: boolean; glyph?: string; out?: bigint; tag?: string } {
   if (props.run?.phase === 'stopped') return { text: 'Not sent', cls: 'skip' }
   const ls = a.legs
   const sold = ls.filter(l => SOLD.includes(l.state))
@@ -223,28 +245,40 @@ function cell(a: MultiSellRun['assets'][number]): { text: string; cls: string; s
     return { text: allWait ? 'Waiting' : 'Running', cls: 'run', spin: !allWait }
   }
   const bad = ls.some(l => ['needsRecovery', 'tracked'].includes(l.state))
+  // a part sold below the minimum price counts as sold, and says so
+  const tag = ls.some(l => l.state === 'belowMin') ? 'below minimum' : undefined
   if (sold.length === ls.length) {
-    if (sold.every(l => l.state === 'doneUnknown')) return { text: 'Sold', cls: 'ok', glyph: '✓' }
-    return { text: '', cls: 'ok', glyph: '✓', out }
+    if (sold.every(l => l.state === 'doneUnknown')) return { text: 'Sold', cls: 'ok', glyph: '✓', tag }
+    return { text: '', cls: 'ok', glyph: '✓', out, tag }
   }
-  if (sold.length > 0) return { text: 'Partly sold', cls: 'part', out }
+  if (sold.length > 0) return { text: 'Partly sold', cls: 'part', out, tag }
   if (bad) return { text: 'Needs recovery', cls: 'fail' }
   if (ls.some(l => l.state === 'refunded')) return { text: 'Refunded', cls: 'ref', glyph: '↩' }
   return { text: 'Not sent', cls: 'skip' }
 }
 
-// row detail: open on tap; rows with a problem open by themselves on the result
+// row detail: open on tap; on the result, rows that need the user open by themselves (needs
+// recovery, tracked, sold below the minimum). Refunded rows stay closed: the list below has them.
 const opened = ref<Set<number>>(new Set())
-const isOpen = (ai: number) => opened.value.has(ai)
+const canToggle = computed(() => props.run?.phase !== 'stopped')
+const isOpen = (ai: number) => canToggle.value && opened.value.has(ai)
 function toggle(ai: number) {
   const s = new Set(opened.value)
   s.has(ai) ? s.delete(ai) : s.add(ai)
   opened.value = s
 }
-// immediate: the sheet can also open on a sale that already finished (back from another page)
-watch([() => props.run?.id, final], ([id, f], [oldId]) => {
-  const s = id === oldId ? new Set(opened.value) : new Set<number>()
-  if (f && props.run) props.run.assets.forEach((a, ai) => { if (a.legs.some(l => !SOLD.includes(l.state))) s.add(ai) })
+const ATTENTION = ['needsRecovery', 'tracked', 'belowMin']
+const attentionRows = computed(() => (final.value && props.run
+  ? props.run.assets.map((a: MultiSellRun['assets'][number], ai: number) => (a.legs.some((l: LegRun) => ATTENTION.includes(l.state)) ? ai : -1)).filter((ai: number) => ai >= 0)
+  : []))
+let autoOpened = new Set<number>()
+// immediate: the sheet can also open on a sale that already finished (back from another page);
+// a slow route that settles later opens its row once, a row the user closed stays closed
+watch([() => props.run?.id, () => attentionRows.value.join(',')], ([id], [oldId]) => {
+  const fresh = id !== oldId
+  if (fresh) autoOpened = new Set()
+  const s = fresh ? new Set<number>() : new Set(opened.value)
+  for (const ai of attentionRows.value) if (!autoOpened.has(ai)) { autoOpened.add(ai); s.add(ai) }
   opened.value = s
 }, { immediate: true })
 
@@ -281,7 +315,9 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 const showRawError = (l: LegRun) => ['needsRecovery', 'tracked'].includes(l.state) && !!l.error
   && !['maySent', 'tacoPaused', 'rateLimited'].includes(l.reason ?? '') && !/may have been sent|TACO takes only/i.test(l.error)
 
-// Refunds and recovery: each recovery line says what to do for its reason
+// Refunds and recovery: what needs the user first (each with what to do for its reason), then what
+// came back by itself; more than FOLD_AFTER of those fold into one line.
+const FOLD_AFTER = 4
 const refunds = computed(() => {
   const out: Array<{ what: string; where: string; bad: boolean }> = []
   for (const a of props.run?.assets ?? []) for (const l of a.legs) {
@@ -295,6 +331,11 @@ const refunds = computed(() => {
   }
   return out
 })
+const recoverRows = computed(() => refunds.value.filter(r => r.bad))
+const returnRows = computed(() => refunds.value.filter(r => !r.bad))
+const showAllReturns = ref(false)
+watch(() => props.run?.id, () => { showAllReturns.value = false })
+const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !showAllReturns.value)
 </script>
 
 <style scoped lang="scss">
@@ -328,10 +369,22 @@ const refunds = computed(() => {
 .ms-box-err { font-size: 12.5px; color: var(--tx-sell); background: var(--tx-sell-dim); padding: 8px 10px; border-radius: 6px; line-height: 1.45; }
 .ms-ar-list { background: var(--tx-surface-1); border: 1px solid var(--tx-line); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
 .ms-ar {
-  display: grid; grid-template-columns: 26px 1fr auto; column-gap: 10px; row-gap: 6px; padding: 10px 12px;
+  display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 10px; row-gap: 6px; padding: 4px 12px 10px;
   border-bottom: 1px solid var(--tx-line); align-items: center;
   &:last-child { border-bottom: 0; }
-  &__id { min-width: 0; display: flex; align-items: baseline; gap: 8px; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; text-align: left; }
+  // the whole first line is the toggle (a 44 px target on touch screens), the chevron shows it
+  &__head {
+    grid-column: 1 / -1; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto 14px; column-gap: 10px; align-items: center;
+    min-height: 38px; width: 100%; margin: 0; padding: 0; background: none; border: 0; border-radius: 8px;
+    color: inherit; font: inherit; text-align: left;
+    @media (pointer: coarse) { min-height: 44px; }
+  }
+  button.ms-ar__head {
+    cursor: pointer;
+    &:hover .ms-ar__chev, &:hover .ms-ar__sym { color: var(--tx-ink); }
+    &:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--tx-orange-line); }
+  }
+  &__id { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
   &__sym { font-weight: 600; font-size: 14px; }
   &__amt { font-size: 12px; color: var(--tx-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   &__state {
@@ -342,9 +395,14 @@ const refunds = computed(() => {
     &.is-fail { color: var(--tx-sell); }
     &.is-skip { color: var(--tx-ink-3); }
   }
-  &__chips { grid-column: 2 / 4; display: flex; gap: 6px; flex-wrap: wrap; }
+  &__tag {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.02em; color: var(--tx-warning);
+    border: 1px solid color-mix(in srgb, var(--tx-warning) 55%, transparent); border-radius: 4px; padding: 0 4px; line-height: 15px;
+  }
+  &__chev { justify-self: end; color: var(--tx-ink-3); font-size: 11px; line-height: 1; }
+  &__chips { grid-column: 2 / -1; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
   &__detail {
-    grid-column: 2 / 4; font-size: 12px; color: var(--tx-ink-2); line-height: 1.45; background: var(--tx-surface-2);
+    grid-column: 2 / -1; font-size: 12px; color: var(--tx-ink-2); line-height: 1.45; background: var(--tx-surface-2);
     border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px;
   }
   &__err { color: var(--tx-sell); font-size: 11.5px; word-break: break-word; }
@@ -359,6 +417,13 @@ const refunds = computed(() => {
   display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; font-size: 12.5px; color: var(--tx-ink-2); line-height: 1.4;
 }
 .ms-rf__where { text-align: right; color: var(--tx-ink-3); font-size: 12px; &.is-bad { color: var(--tx-sell); } }
+.ms-rf__more {
+  // a 28 px tall target around a text link (the negative margin keeps the line height)
+  background: none; border: 0; padding: 7px 4px; margin: -7px -4px; color: var(--tx-ink-2); font-size: 12px; font-weight: 600; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px; white-space: nowrap;
+  &:hover { color: var(--tx-ink); }
+  &--less { align-self: flex-start; }
+}
 .ms-note-warn { color: var(--tx-warning); }
 .ms-note-bad { color: var(--tx-sell); }
 </style>
