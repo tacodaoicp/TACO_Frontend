@@ -2491,6 +2491,21 @@ export const useExchangeStore = defineStore('exchange', () => {
     return (await userBalanceQuery(tokenAddress).ensure()) ?? 0n
   }
 
+  // Live ledger transfer fees (anonymous icrc1_fee query), kept for a minute.
+  // Amount fills use max(live, listed) so a raised fee never overdraws.
+  const ledgerFeeCache = new Map<string, { fee: bigint; at: number }>()
+  async function fetchLedgerFee(tokenAddress: string, maxAgeMs = 60_000): Promise<bigint> {
+    const hit = ledgerFeeCache.get(tokenAddress)
+    if (hit && Date.now() - hit.at < maxAgeMs) return hit.fee
+    const { HttpAgent } = await import('@dfinity/agent')
+    const agent = new HttpAgent({ host: getNetworkHost(), verifyQuerySignatures: false })
+    if (getEffectiveNetwork() === 'local') await agent.fetchRootKey()
+    const actor = Actor.createActor(_icrc1MetadataIdl, { agent, canisterId: tokenAddress })
+    const fee = BigInt(await withTimeout(actor.icrc1_fee() as Promise<bigint>, 10_000, 'icrc1_fee'))
+    ledgerFeeCache.set(tokenAddress, { fee, at: Date.now() })
+    return fee
+  }
+
   // One small note under the nav when the data on screen may be behind:
   //  - the boot frozen check got no answer (network): the app runs on saved data;
   //  - an exchange call failed or hangs and nothing succeeded for about 10 s.
@@ -2592,6 +2607,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     getLogging,
     getCycles,
     getUserBalance,
+    fetchLedgerFee,
 
     // Update methods
     addPosition,

@@ -21,3 +21,10 @@ export const BASE_TOKEN_IDS = new Set<string>([
 export function isBaseToken(addr: string): boolean {
   return BASE_TOKEN_IDS.has(addr)
 }
+
+// sGLDT and EXE ledgers trap ("Natural subtraction underflow") on spec exact
+// balances and allowances, so every amount fill keeps one more transfer fee of
+// room for them, and CrossDEX Sell many keeps them on the TACO V1 path.
+export const SGLDT_LEDGER_ID = 'i2s4q-syaaa-aaaan-qz4sq-cai'
+export const EXE_LEDGER_ID = 'rh2pm-ryaaa-aaaan-qeniq-cai'
+export const FEE_HEADROOM_LEDGERS = new Set<string>([SGLDT_LEDGER_ID, EXE_LEDGER_ID])

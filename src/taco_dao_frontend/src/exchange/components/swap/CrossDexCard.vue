@@ -226,7 +226,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ICP_LEDGER_ID } from '../../constants/tokens'
+import { ICP_LEDGER_ID, FEE_HEADROOM_LEDGERS } from '../../constants/tokens'
+import { crossDexMax } from '../../utils/crossDexCosts'
 import { useCrossDexSwap } from '../../composables/useCrossDexSwap'
 import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
@@ -361,19 +362,22 @@ function flip() {
 }
 
 async function setPercentage(pct: number) {
-  if (!cx.tokenFrom.value || cx.fromBalance.value <= 0n) return
-  // Fresh ledger read so Max never computes from a stale cached balance.
-  try { await store.userBalanceQuery(cx.tokenFrom.value.address).refresh() } catch { /* cached value stands */ }
-  if (cx.fromBalance.value <= 0n) return
-  const fee = cx.tokenFrom.value.transfer_fee
-  const tradingFee = (cx.fromBalance.value * store.tradingFeeBps) / 10000n
-  // Worst case 3-venue split: TACO leg needs 2 fees (deposit model), ICPSwap 1, Neutrinite 1.
-  // On the V2 approve+pull path the TACO leg needs 3 (the approval is its own ledger tx).
-  const reserve = fee * (store.useV2Deposit(cx.tokenFrom.value.address) ? 5n : 4n) + tradingFee
-  const max = cx.fromBalance.value > reserve ? cx.fromBalance.value - reserve : 0n
+  const token = cx.tokenFrom.value
+  if (!token || cx.fromBalance.value <= 0n) return
+  // Fresh ledger reads so Max never computes from a stale balance or an old fee.
+  const [, liveFee] = await Promise.all([
+    store.userBalanceQuery(token.address).refresh().catch(() => { /* cached value stands */ }),
+    store.fetchLedgerFee(token.address).catch(() => null),
+  ])
+  if (cx.tokenFrom.value?.address !== token.address || cx.fromBalance.value <= 0n) return
+  const fee = liveFee != null && liveFee > token.transfer_fee ? liveFee : token.transfer_fee
+  // Worst three venue split: ICPSwap 2 fees, TACO 2 (3 on the V2 approve and
+  // pull path), Neutrinite 1, plus the trading fee and the sGLDT/EXE headroom.
+  const max = crossDexMax(cx.fromBalance.value, fee, store.tradingFeeBps,
+    store.useV2Deposit(token.address), FEE_HEADROOM_LEDGERS.has(token.address))
   const useAmount = pct === 100 ? max : (max * BigInt(pct)) / 100n
   if (useAmount <= 0n) { cx.amountIn.value = ''; return }
-  const dec = Number(cx.tokenFrom.value.decimals)
+  const dec = Number(token.decimals)
   const divisor = 10n ** BigInt(dec)
   const whole = useAmount / divisor
   const frac = (useAmount % divisor).toString().padStart(dec, '0').replace(/0+$/, '')
