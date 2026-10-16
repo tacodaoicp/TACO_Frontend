@@ -185,9 +185,23 @@ export interface LegCtx {
   onStep: (s: string) => void
   /** How many swap records the landed probe reads (10 single, 50 batch). */
   probeLimit: bigint
-  /** Sell many sorts TACO V1 answers (5.9); the single swap keeps one recovery after any failure. */
+  /** Sell many sorts TACO V1 answers (5.9), hands rate limited deposits to the
+   *  deferred refund pass and reads what a sweep brought back (ICP back means
+   *  the swap had sold); the single swap keeps one recovery after any failure. */
   sortV1Errors: boolean
+  /** Second in line TACO leg: waits for its owners' TACO legs, then an exact recheck. */
+  turn?: LegTurn
+  turnWaitText?: string
   log?: (...a: unknown[]) => void
+}
+
+export interface LegTurn {
+  /** Resolves when every owner TACO leg is final ('go'), or at the cap ('late'). */
+  wait(): Promise<'go' | 'late'>
+  /** One simulateSplitRoutes on the planned splits: the fresh gross total, or null. */
+  recheck(): Promise<bigint | null>
+  plannedOut: bigint
+  plannedMin: bigint
 }
 
 /** What a TACO split leg looks like when handed to the exchange. */
@@ -355,12 +369,22 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
     // it). Only a sweep that actually moved funds clears the marker;
     // otherwise the Recover page row stays visible.
     let recovered = false
+    const report: SweepReport = { found: [], moved: [] }
     try {
-      recovered = await deps.icpswap.sweepWithRetry({ token0Principal: sell, token1Principal: buy })
+      recovered = await deps.icpswap.sweepWithRetry({ token0Principal: sell, token1Principal: buy }, 3, 4000, { report })
       if (recovered) deps.icpswap.removePendingSwap(sell, buy)
     } catch { /* marker stays so the Recover page can sweep later */ }
-    ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
     const error = errText(err, 'ICPSwap swap failed')
+    if (ctx.sortV1Errors && recovered) {
+      // What came back decides: the bought token means the swap had sold (its
+      // withdraw failed), only the sold token means a refund.
+      const gotOut = report.moved.filter(m => m.token === buy).reduce((a, m) => a + m.amount, 0n)
+      if (gotOut > 0n) {
+        ctx.onStep('Done')
+        return { dex: 'icpswap', success: true, amountOut: gotOut, state: 'done', reason: 'afterSwap' }
+      }
+    }
+    ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
     return recovered
       ? { dex: 'icpswap', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true }
       : { dex: 'icpswap', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
@@ -408,16 +432,18 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // that amount came back, and never one an earlier failed swap on this
     // pair left (its funds are still there); otherwise the Recover page keeps it.
     let recovered = false
+    const report: SweepReport = { found: [], moved: [] }
     for (let i = 0; i < 3 && !recovered; i++) {
       if (i > 0) await deps.clock.sleep(5000)
-      try { recovered = await deps.neutrinite.sweep(sell, buy, track.before) }
+      try { recovered = await deps.neutrinite.sweep(sell, buy, track.before, { report }) }
       catch (e) { ctx.log?.(`[CrossDEX] Neutrinite sweep attempt ${i + 1} failed:`, e) }
     }
     if (recovered && !track.hadMarker) deps.neutrinite.removePendingSwap(sell, buy)
-    if (recovered && track.swappedOut != null) {
+    const gotOut = report.moved.filter(m => m.token === buy).reduce((a, m) => a + m.amount, 0n)
+    if (recovered && (track.swappedOut != null || (ctx.sortV1Errors && gotOut > 0n))) {
       // The swap filled and the retry delivered its output.
       ctx.onStep('Done')
-      return { dex: 'neutrinite', success: true, amountOut: track.swappedOut, state: 'done' }
+      return { dex: 'neutrinite', success: true, amountOut: ctx.sortV1Errors && gotOut > 0n ? gotOut : track.swappedOut!, state: 'done', reason: 'afterSwap' }
     }
     ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
     return recovered
@@ -427,12 +453,42 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
   }
 }
 
-// TACO: gate, deposit (V1) or nothing (V2, approved before the sale), swap call.
-async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: bigint): Promise<LegOutcome> {
+// TACO: gate, turn (second in line), deposit (V1) or nothing (V2, approved before
+// the sale), swap call.
+async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOutIn: bigint): Promise<LegOutcome> {
   const sell = ctx.sell
+  let minOut = minOutIn
   if (ctx.gate && !(await ctx.gate.wait(() => ctx.onStep(ctx.gateWaitText ?? NEU_WAIT_STEP)))) {
     ctx.onStep(NOT_STARTED)
     return { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', reason: 'gateLate', error: NOT_STARTED, notStarted: true }
+  }
+  if (ctx.turn) {
+    // Second in line: its pools are shared with tokens whose TACO parts go first.
+    // Nothing moves until they are final and an exact requote is close to the plan.
+    ctx.onStep(ctx.turnWaitText ?? 'Waiting for its turn on TACO…')
+    const t = await ctx.turn.wait()
+    if (t === 'late') {
+      ctx.onStep('Not sent, the shared pools took too long')
+      return { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', reason: 'secondLate', notStarted: true,
+        error: 'TACO: not sent because the other tokens took too long on the same pools.' }
+    }
+    let fresh: bigint | null = null
+    try { fresh = await ctx.turn.recheck() } catch { fresh = null }
+    if (fresh == null) {
+      ctx.onStep('Not sent, the price could not be checked')
+      return { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', reason: 'secondCheck', notStarted: true,
+        error: 'TACO: this part could not be checked before its turn.' }
+    }
+    // send when fresh >= planned × (1 − s/2)
+    const SCALE = 1_000_000n
+    const s = BigInt(Math.round(ctx.slip * 1_000_000))
+    if (fresh * 2n * SCALE < ctx.turn.plannedOut * (2n * SCALE - s)) {
+      ctx.onStep('Not sent, the price moved')
+      return { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', reason: 'secondMoved', notStarted: true,
+        error: 'TACO: the price moved before its turn.' }
+    }
+    const floorFresh = (fresh * (SCALE - s)) / SCALE
+    minOut = ctx.turn.plannedMin > floorFresh ? ctx.turn.plannedMin : floorFresh
   }
   const outCtx = { outDecimals: Number(ctx.buy.decimals), outSymbol: ctx.buy.symbol }
   let block: bigint | undefined
@@ -443,6 +499,11 @@ async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: big
     if (block == null) return
     deps.taco.removeDepositFromCache(block.toString(), sell.address)
     ctx.journal.deposit(status)
+  }
+  const settled = () => {
+    if (block == null) return
+    deps.taco.setDepositStatus(block.toString(), 'settled', sell.address)
+    ctx.journal.deposit('settled')
   }
   try {
     // Gross = exactly what the V1 path transfers.
@@ -499,8 +560,15 @@ async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: big
       const classified = classifyExchangeError(raw.Err, { ...outCtx, v2Settled: true })
       const e = raw.Err as any
       if ('SlippageExceeded' in e) {
-        // Settled on chain: the below-minimum output was already delivered.
+        // Settled on chain: the below-minimum output was delivered, or the net refunded.
         deps.taco.refreshAfterMutation('swap')
+        if (ctx.sortV1Errors) {
+          const landed = await probeLanded(deps, ctx, leg.amountIn, submittedAt)
+          if (landed === 'succeeded') {
+            ctx.onStep('Done, below your minimum price')
+            return { dex: 'taco', success: true, amountOut: BigInt(e.SlippageExceeded.got ?? 0n), state: 'belowMin', reason: 'slippage', error: classified.message }
+          }
+        }
         ctx.onStep('Failed, output delivered below minimum')
         return { dex: 'taco', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'exchange', reason: 'slippage',
           error: classified.message, recovered: false, notStarted: false }
@@ -517,12 +585,14 @@ async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: big
         || ('InsufficientFunds' in e && String(e.InsufficientFunds).startsWith('V2 pull declined'))
       if (prePull) {
         ctx.onStep('Failed, no funds moved')
-        return { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', error: classified.message, recovered: false, notStarted: true }
+        return { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', reason: 'NotAuthorized' in e ? 'rateLimited' : undefined,
+          error: classified.message, recovered: false, notStarted: true }
       }
       deps.taco.refreshAfterMutation('swap')
       ctx.onStep('Failed, check your wallet and the Recover page')
       return { dex: 'taco', success: false, amountOut: 0n, state: 'needsRecovery', error: classified.message, recovered: false, notStarted: false }
     }
+    if (ctx.sortV1Errors) return await sortedV1Answer(raw.Err, leg, ctx, deps, block!, submittedAt, pointer, settled)
     throw new Error(classifyExchangeError(raw.Err, outCtx).message)
   } catch (err: any) {
     ctx.log?.('[CrossDEX] TACO leg failed:', err?.message || err)
@@ -539,8 +609,10 @@ async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: big
       return { dex: 'taco', success: false, amountOut: 0n, state: 'needsRecovery', reason: 'maySent',
         error: 'The deposit may have been sent, but its answer did not come back. It is listed on the Recover page.', recovered: false }
     }
+    // Was the swap call sent at all? Errors the store throws before sending carry beforeSend.
+    const sent = submitted && !err?.beforeSend
     // Transport hiccup: the swap may actually have landed. Verify before refunding.
-    if (isTransportError(err) && submitted) {
+    if (sent && (isTransportError(err) || ctx.sortV1Errors)) {
       const status = await probeLanded(deps, ctx, leg.amountIn, submittedAt)
       if (status === 'succeeded') {
         // The pointer stays: a probe match is not proof the deposit was used.
@@ -551,26 +623,106 @@ async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: big
     if (ctx.v2) {
       // No block to recover. Before submit nothing left the wallet; after an
       // ambiguous submit the user must check history before retrying.
-      ctx.onStep(submitted ? 'Failed, check your history and the Recover page' : 'Failed, no funds moved')
-      return submitted
+      ctx.onStep(sent ? 'Failed, check your history and the Recover page' : 'Failed, no funds moved')
+      return sent
         ? { dex: 'taco', success: false, amountOut: 0n, state: 'tracked', error: errText(err, 'TACO swap failed'), recovered: false, notStarted: false }
         : { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', error: errText(err, 'TACO swap failed'), recovered: false, notStarted: true }
     }
-    // Recover the unspent deposit so funds are never stuck in the treasury.
-    ctx.onStep('Recovering funds…')
-    let recovered = false
-    if (block != null) {
-      try { recovered = !!(await deps.taco.recoverWronglysent(sell.address, block, sell.asset_type as AssetType)) }
-      catch { /* best-effort; the deposit stays listed on the Recover page */ }
-      if (recovered) pointer('recovered')
+    if (ctx.sortV1Errors && block != null && !sent) {
+      // The swap call never left this tab (the client limiter or actor creation):
+      // the deposit is untouched. A rate limit waits for the window, a dead
+      // session cannot recover now, anything else tries once.
+      const msg = errText(err, '')
+      if (/Rate limit/i.test(msg)) {
+        ctx.onStep('Waiting for the exchange call limit to refund it')
+        return deferredOutcome(sell, block, 'TACO takes only a few trades per wallet every 90 seconds. The refund starts after the window.')
+      }
+      if (/Session expired|Not authenticated/i.test(msg)) {
+        ctx.onStep('Failed, your session expired')
+        return { dex: 'taco', success: false, amountOut: 0n, state: 'needsRecovery', reason: 'session', error: msg, recovered: false, block }
+      }
     }
-    ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed')
-    const error = errText(err, 'TACO swap failed')
-    if (recovered) return { dex: 'taco', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true, block }
-    // Not confirmed: the deposit (if any) stays listed on the Recover page.
-    return { dex: 'taco', success: false, amountOut: 0n, state: 'needsRecovery',
-      reason: block != null ? 'unconfirmed' : undefined, error, recovered: false, block }
+    // Recover the unspent deposit so funds are never stuck in the treasury.
+    return await recoverOnce(leg, ctx, deps, block, errText(err, 'TACO swap failed'), pointer)
   }
+}
+
+function deferredOutcome(sell: TokenInfo, block: bigint, error: string): LegOutcome {
+  return { dex: 'taco', success: false, amountOut: 0n, state: 'deferred', reason: 'rateLimited', error, recovered: false, block,
+    deferred: { token: sell.address, block, assetType: sell.asset_type as AssetType } }
+}
+
+/** One recoverWronglysent (the single swap after any V1 failure, Sell many where 5.9 says so).
+ *  A client limiter refusal hands the deposit to the deferred pass (Sell many). */
+async function recoverOnce(
+  leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, block: bigint | undefined, error: string,
+  pointer: (s: 'used' | 'recovered') => void,
+): Promise<LegOutcome> {
+  const sell = ctx.sell
+  ctx.onStep('Recovering funds…')
+  let recovered = false
+  if (block != null) {
+    try { recovered = !!(await deps.taco.recoverWronglysent(sell.address, block, sell.asset_type as AssetType)) }
+    catch (e: any) {
+      if (ctx.sortV1Errors && e?.beforeSend && /Rate limit/i.test(errText(e, ''))) {
+        ctx.onStep('Waiting for the exchange call limit to refund it')
+        return deferredOutcome(sell, block, 'TACO takes only a few trades per wallet every 90 seconds. The refund starts after the window.')
+      }
+      /* best-effort; the deposit stays listed on the Recover page */
+    }
+    if (recovered) pointer('recovered')
+  }
+  ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed')
+  if (recovered) return { dex: 'taco', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true, block }
+  // Not confirmed: the deposit (if any) stays listed on the Recover page.
+  return { dex: 'taco', success: false, amountOut: 0n, state: 'needsRecovery',
+    reason: block != null ? 'unconfirmed' : undefined, error, recovered: false, block }
+}
+
+/** 5.9: TACO V1 answers in Sell many, under the one pointer rule. */
+async function sortedV1Answer(
+  e: any, leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, block: bigint, submittedAt: number,
+  pointer: (s: 'used' | 'recovered') => void, settled: () => void,
+): Promise<LegOutcome> {
+  const outCtx = { outDecimals: Number(ctx.buy.decimals), outSymbol: ctx.buy.symbol }
+  const message = classifyExchangeError(e, outCtx).message
+  const sys = typeof e?.SystemError === 'string' ? e.SystemError as string : null
+  const refundedByExchange = (why: string): LegOutcome => {
+    settled()
+    deps.taco.refreshAfterMutation('swap')
+    ctx.onStep('Refunded by TACO')
+    return { dex: 'taco', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'exchange', reason: why, error: message, recovered: true, block }
+  }
+  if ('NotAuthorized' in e) {
+    // Refused before the block was read (the exchange's call limit): the deposit
+    // is untouched and is refunded in one batch after the window.
+    ctx.onStep('Waiting for the exchange call limit to refund it')
+    return deferredOutcome(ctx.sell, block, 'TACO takes only a few trades per wallet every 90 seconds. The refund starts after the window.')
+  }
+  if ('SlippageExceeded' in e) {
+    // Settled: refunded by the pre check, or the below minimum output was delivered.
+    const landed = await probeLanded(deps, ctx, leg.amountIn, submittedAt)
+    settled()
+    deps.taco.refreshAfterMutation('swap')
+    if (landed === 'succeeded') {
+      ctx.onStep('Done, below your minimum price')
+      return { dex: 'taco', success: true, amountOut: BigInt(e.SlippageExceeded.got ?? 0n), state: 'belowMin', reason: 'slippage', error: message, block }
+    }
+    ctx.onStep('Refunded by TACO')
+    return { dex: 'taco', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'exchange', reason: 'slippage', error: message, recovered: true, block }
+  }
+  if ('RouteFailed' in e) return refundedByExchange('route')
+  if (sys != null) {
+    if (/reverted/i.test(sys) && /refunded/i.test(sys)) return refundedByExchange('reverted')
+    if (/already refunded/i.test(sys)) return refundedByExchange('admin refunded')
+    if (/outcome unknown/i.test(sys)) {
+      ctx.onStep('Needs an admin')
+      return { dex: 'taco', success: false, amountOut: 0n, state: 'needsRecovery', reason: 'admin', error: message, recovered: false, block }
+    }
+    // "Failed to get block data" (untouched) and any other system error: one recovery now.
+  }
+  // Funds not received, InvalidInput, Failed to get block data, anything else: one recovery now.
+  return recoverOnce(leg, ctx, deps, block, message, pointer)
 }
 
 // ── The single swap: every leg at once, with the gate for Neutrinite first splits ──
