@@ -333,10 +333,10 @@ import { onVisible } from '../composables/useVisibilityAware'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
-import { getDepositHistory, removeDepositFromCache, type DepositHistoryEntry } from '../utils/deposit'
+import { getDepositHistory, removeDepositFromCache } from '../utils/deposit'
 import { runJournal } from '../utils/runJournalStore'
 import { withFundsLock, isSaleRunning, BUSY, SALE_RUNNING_RECOVERY_TEXT } from '../utils/saleLock'
-import { legUnresolved } from '../utils/crossDexJournal'
+import { mergeDepositRows, isOtherWallet as isOtherWalletRow, batchItemRecovered, batchRefused, type DepositRow, type MaySentRow } from '../utils/recoverRows'
 import { useExchangeToast } from '../composables/useExchangeToast'
 import { getCachedIdentity } from '../../shared/auth-cache'
 import { mapWithConcurrency, withRetries } from '../utils/concurrency'
@@ -368,64 +368,16 @@ async function guarded<T>(fn: () => Promise<T>): Promise<T | undefined> {
 // already recovered or refunded) or the user dismissed it. A false or a failed
 // call never deletes it: a bare false can also mean the exchange refused the
 // call, and a thrown call changed nothing.
-/** A saved deposit: the deposit history entry, merged with the run journal legs that point at it. */
-interface CachedDeposit extends DepositHistoryEntry {
-  refs: Array<{ runId: string; ai: number; li: number }>
-  /** The exchange settled it by itself (kept so the user can check). */
-  settled: boolean
-}
-/** A V1 deposit whose transfer answer was lost: it may have been sent, with no block known. */
-interface MaySentRow { key: string; runId: string; ai: number; li: number; token: string; amount: string; at: number }
+type CachedDeposit = DepositRow
 
 const cachedDeposits = ref<CachedDeposit[]>([])
 const maySentRows = ref<MaySentRow[]>([])
 const depositNote = ref('')
 
-const depKey = (token: string, block: string) => `${token}:${block}`
-
 function loadCachedDeposits() {
-  const me = store.principalText
-  const hidden = new Set<string>()
-  const settledKeys = new Set<string>()
-  const refsOf = new Map<string, CachedDeposit['refs']>()
-  const journalOnly = new Map<string, CachedDeposit>()
-  const may: MaySentRow[] = []
-  for (const r of runJournal.list()) {
-    // Journal rows show for the wallet that saved them only.
-    if (!me || r.principal !== me) continue
-    r.assets.forEach((a, ai) => a.legs.forEach((l, li) => {
-      if (l.dex !== 'taco') return
-      if (l.block != null) {
-        const key = depKey(a.token, l.block)
-        if (l.deposit === 'used' || l.deposit === 'recovered' || l.deposit === 'dismissed') { hidden.add(key); return }
-        if (l.deposit === 'settled') settledKeys.add(key)
-        refsOf.set(key, [...(refsOf.get(key) ?? []), { runId: r.id, ai, li }])
-        if (!journalOnly.has(key)) {
-          journalOnly.set(key, {
-            token: a.token, block: l.block, amount: l.amountIn, type: a.type ?? 'ICRC12',
-            timestamp: l.intent?.at ?? r.startedAt, principal: r.principal, status: 'open', runId: r.id,
-            refs: [], settled: false,
-          })
-        }
-      } else if (l.intent && legUnresolved(l)) {
-        may.push({ key: `${r.id}:${ai}:${li}`, runId: r.id, ai, li, token: a.token, amount: l.intent.amount, at: l.intent.at })
-      }
-    }))
-  }
-  const rows: CachedDeposit[] = []
-  const seen = new Set<string>()
-  for (const e of getDepositHistory()) {
-    const key = depKey(e.token, e.block)
-    if (hidden.has(key) || seen.has(key)) continue
-    seen.add(key)
-    rows.push({ ...e, refs: refsOf.get(key) ?? [], settled: e.status === 'settled' || settledKeys.has(key) })
-  }
-  for (const [key, row] of journalOnly) {
-    if (seen.has(key)) continue
-    rows.push({ ...row, refs: refsOf.get(key) ?? [], settled: settledKeys.has(key) })
-  }
-  cachedDeposits.value = rows.sort((a, b) => b.timestamp - a.timestamp)
-  maySentRows.value = may.sort((a, b) => b.at - a.at)
+  const merged = mergeDepositRows(getDepositHistory(), runJournal.list(), store.principalText)
+  cachedDeposits.value = merged.rows
+  maySentRows.value = merged.maySent
 }
 
 const openDeposits = computed(() => cachedDeposits.value.filter(d => !d.settled))
@@ -442,7 +394,7 @@ function formatClock(ms: number): string {
 
 /** Saved by a different wallet than the one connected now (entries without a principal predate the field). */
 function isOtherWallet(dep: CachedDeposit): boolean {
-  return !!dep.principal && !!store.principalText && dep.principal !== store.principalText
+  return isOtherWalletRow(dep, store.principalText)
 }
 const recoverableDeposits = computed(() => openDeposits.value.filter(d => !isOtherWallet(d)))
 
@@ -463,10 +415,6 @@ function dismissMaySent(m: MaySentRow) {
   maySentRows.value = maySentRows.value.filter(x => x.key !== m.key)
 }
 
-/** A recoverBatch item that confirms the refund. */
-function batchItemRecovered(r: { success: boolean; error: string }): boolean {
-  return r.success || /already recovered|already refunded/i.test(r.error ?? '')
-}
 
 /** Text for a recovery call that threw (nothing changed on the exchange). */
 function recoveryThrowText(err: any): string {
@@ -570,7 +518,7 @@ async function recoverAllCachedInner() {
     const results = await store.recoverBatch(batch)
 
     // A limited caller gets one "Not allowed" row and nothing was looked at.
-    if (results.length === 1 && /not allowed/i.test(results[0].error ?? '') && !results[0].success) {
+    if (batchRefused(results)) {
       depositNote.value = recoveryThrowText(new Error('Rate limit'))
       toast.warning('Recovery Notice', depositNote.value)
       return
@@ -933,8 +881,7 @@ async function raTreasury(): Promise<number> {
     }
     // The exchange itself refused (one "Not allowed" row, nothing looked at).
     // Never call again inside the same window: a second refusal in a day bans the wallet.
-    const limited = (results ?? []).length === 1 && !results![0].success && /not allowed/i.test(results![0].error ?? '')
-    if (limited) {
+    if (batchRefused(results ?? [])) {
       raSet(id, 'Saved deposits', 'failed', 'TACO takes only a few calls per wallet every 90 seconds. Run Recover All again in a few minutes. Every deposit stays listed above.')
       return recovered
     }

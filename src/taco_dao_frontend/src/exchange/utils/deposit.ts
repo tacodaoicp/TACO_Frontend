@@ -13,7 +13,8 @@ import { getCachedAgent, getCachedIdentity } from '../../shared/auth-cache'
 import { icrcIDL } from '../../shared/icrc-idl'
 import { getCanisterId } from '../../constants/canisterIds'
 import { useExchangeStore } from '../store/exchange.store'
-import { setItemWithCacheEviction } from './persistCache'
+import { createDepositHistory, type DepositHistoryEntry } from './depositHistory'
+import { journalStorage } from './runJournalStore'
 import { withTimeout } from './withTimeout'
 import { requiredDeposit } from './crossDexCosts'
 import { sendDeposit, DepositError, type DepositIntent, type LedgerSendResult } from './depositSend'
@@ -322,86 +323,22 @@ export async function depositICRC(
 }
 
 // ── Deposit history (the Recover page's pointer to every V1 deposit) ──
-// One entry per V1 deposit, written right after the ledger returns the block.
-// An entry leaves only when its trade went through, a recovery confirmed the
-// refund, or the user dismissed it. Entries carry the principal that sent the
-// deposit (older entries have none) and a status: 'open' (may still need a
-// recovery) or 'settled' (the exchange settled it by itself).
-export interface DepositHistoryEntry {
-  token: string
-  block: string
-  amount: string
-  type: string
-  timestamp: number
-  principal?: string
-  status?: 'open' | 'settled'
-  runId?: string
-}
+// Rules in utils/depositHistory.ts; here bound to localStorage, written with
+// cache eviction on a full storage (a recovery record beats cached data).
+export type { DepositHistoryEntry } from './depositHistory'
+const history = createDepositHistory(journalStorage, () => Date.now())
 
-const HISTORY_KEY = 'taco_deposit_history'
-const HISTORY_CAP = 200
-const HISTORY_MAX_AGE_MS = 21 * 86_400_000 // 21 days (block validity window)
-
-function readHistory(): DepositHistoryEntry[] {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY)
-    const v = raw ? JSON.parse(raw) : []
-    return Array.isArray(v) ? v : []
-  } catch { return [] }
-}
-
-/** Age out entries older than 21 days, then, above the cap, the oldest settled
- *  ones. An open entry younger than 21 days is never evicted. */
-function pruneHistory(list: DepositHistoryEntry[], now = Date.now()): DepositHistoryEntry[] {
-  let out = list.filter(e => now - e.timestamp < HISTORY_MAX_AGE_MS)
-  if (out.length <= HISTORY_CAP) return out
-  const settled = out.filter(e => e.status === 'settled').sort((a, b) => a.timestamp - b.timestamp)
-  const drop = new Set<DepositHistoryEntry>()
-  for (const e of settled) {
-    if (out.length - drop.size <= HISTORY_CAP) break
-    drop.add(e)
-  }
-  out = out.filter(e => !drop.has(e))
-  return out
-}
-
-function writeHistory(list: DepositHistoryEntry[]): boolean {
-  try {
-    // Recovery record: on a full storage, free exchange cache space and retry.
-    setItemWithCacheEviction(HISTORY_KEY, JSON.stringify(pruneHistory(list)))
-    return true
-  } catch { return false }
-}
-
-const sameEntry = (e: DepositHistoryEntry, block: string, token?: string) =>
-  e.block === block && (token == null || e.token === token)
-
-/**
- * Save a deposit for recovery. Returns whether it was written.
- */
+/** Save a deposit for recovery. Returns whether it was written. */
 export function saveDepositToCache(
   tokenCanisterId: string, block: bigint, amount: bigint, assetType: string,
   meta: { principal?: string; runId?: string } = {},
 ): boolean {
-  const list = readHistory().filter(e => !sameEntry(e, block.toString(), tokenCanisterId))
-  list.unshift({
-    token: tokenCanisterId,
-    block: block.toString(),
-    amount: amount.toString(),
-    type: assetType,
-    timestamp: Date.now(),
-    principal: meta.principal,
-    status: 'open',
-    runId: meta.runId,
-  })
-  return writeHistory(list)
+  return history.save(tokenCanisterId, block, amount, assetType, meta)
 }
 
-/**
- * Get cached deposit history for the Recover page.
- */
+/** Get cached deposit history for the Recover page. */
 export function getDepositHistory(): DepositHistoryEntry[] {
-  return readHistory()
+  return history.list()
 }
 
 /**
@@ -410,17 +347,12 @@ export function getDepositHistory(): DepositHistoryEntry[] {
  * (block numbers are per ledger, so two tokens can share one).
  */
 export function removeDepositFromCache(block: string, token?: string) {
-  const list = readHistory()
-  const next = list.filter(e => !sameEntry(e, block, token))
-  if (next.length !== list.length) writeHistory(next)
+  history.remove(block, token)
 }
 
 /** Mark a deposit settled by the exchange (kept for the user to check) or open again. */
 export function setDepositStatus(block: string, status: 'open' | 'settled', token?: string) {
-  const list = readHistory()
-  let changed = false
-  for (const e of list) if (sameEntry(e, block, token) && e.status !== status) { e.status = status; changed = true }
-  if (changed) writeHistory(list)
+  history.setStatus(block, status, token)
 }
 
 /** The principal of the current session, read once before funds move. */
