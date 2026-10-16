@@ -181,7 +181,9 @@
             <div class="crossdex-card__exec-leg-amt num">
               {{ formatFrom(lv.amountIn) }}
               <span class="crossdex-card__exec-arrow">→</span>
-              <template v-if="lv.outcome && lv.outcome.success">{{ formatTo(lv.outcome.amountOut) }}</template>
+              <!-- sold, but the answer with the amount was lost: the wallet shows it -->
+              <template v-if="lv.outcome && lv.outcome.success && lv.outcome.state === 'doneUnknown'">sold, see your wallet</template>
+              <template v-else-if="lv.outcome && lv.outcome.success">{{ formatTo(lv.outcome.amountOut) }}</template>
               <template v-else>≈ {{ formatTo(lv.expectedOut) }}</template>
             </div>
             <div v-if="lv.status === 'running'" class="crossdex-card__exec-leg-step">
@@ -338,7 +340,9 @@ const execStatusLabel = computed(() => {
 
 const summaryLine = computed(() => {
   const total = cx.outcomes.value.reduce((s, o) => s + o.amountOut, 0n)
-  const totalStr = formatTo(total)
+  // a route that sold without its amount (the answer was lost) is in the wallet, not in this total
+  const unknown = cx.outcomes.value.some(o => o.success && o.state === 'doneUnknown')
+  const totalStr = formatTo(total) + (unknown ? ', plus a route whose amount shows in your wallet' : '')
   if (cx.phase.value === 'success') return `Received ${totalStr}`
   if (cx.phase.value === 'partial') return `Partial: received ${totalStr}. Check each route's status above; anything not recovered automatically is on the Recover page.`
   if (cx.phase.value === 'error') return `All routes failed. Check each route's status above; anything not recovered automatically is on the Recover page.`

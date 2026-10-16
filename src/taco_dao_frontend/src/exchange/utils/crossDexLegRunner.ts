@@ -468,11 +468,20 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // that amount came back, and never one an earlier failed swap on this
     // pair left (its funds are still there); otherwise the Recover page keeps it.
     let recovered = false
+    let sweepThrew = false
     const report: SweepReport = { found: [], moved: [] }
     for (let i = 0; i < 3 && !recovered; i++) {
       if (i > 0) await deps.clock.sleep(5000)
       try { recovered = await deps.neutrinite.sweep(sell, buy, track.before, { report }) }
-      catch (e) { ctx.log?.(`[CrossDEX] Neutrinite sweep attempt ${i + 1} failed:`, e) }
+      catch (e) { sweepThrew = true; ctx.log?.(`[CrossDEX] Neutrinite sweep attempt ${i + 1} failed:`, e) }
+    }
+    if (!recovered && !sweepThrew && track.swappedOut != null && report.found.length === 0) {
+      // The swap filled and every look at the pylon came back empty (a sweep throws when the
+      // pylon read or a withdraw fails, so a plain false is a real empty look): the withdraw went
+      // through and only its answer was lost. Sold, for an amount the wallet shows.
+      if (!track.hadMarker) deps.neutrinite.removePendingSwap(sell, buy)
+      ctx.onStep('Done')
+      return { dex: 'neutrinite', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
     }
     if (recovered && !track.hadMarker) deps.neutrinite.removePendingSwap(sell, buy)
     const gotOut = report.moved.filter(m => m.token === buy).reduce((a, m) => a + m.amount, 0n)
