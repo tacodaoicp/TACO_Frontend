@@ -563,6 +563,13 @@ const bpOf = (p: AssetPlan, dex: CrossDexVenue) => p.legs.filter(l => l.dex === 
 /** Check the structural rules (4.9); returns the problems (any one is a bug). */
 export function checkPlan(plan: BatchPlan, inputs: AssetInput[], allowed: number): string[] {
   const out: string[] = []
+  // One row per token: two sales of one token would share its approvals, pools and deposits
+  // (the basket never holds a token twice; this keeps the runner safe on its own).
+  const tokenRows = new Set<string>()
+  for (const a of plan.assets) {
+    if (tokenRows.has(a.address)) out.push(`${a.symbol}: in the sale twice`)
+    tokenRows.add(a.address)
+  }
   plan.assets.forEach((a, i) => {
     if (a.issue) return
     const sum = a.legs.reduce((s, l) => s + l.amountIn, 0n)
