@@ -242,6 +242,8 @@ export function useMultiSell() {
       const iss = rowIssue(b)
       return iss == null || iss === 'quoteFailed' || iss === 'noRoute' || iss === 'zeroOut' || iss === 'tacoBusy'
     }).filter(b => amountOf(b) > 0n)
+    // rows left out of this round (fix the amount first) show no skeleton
+    for (const b of basket.value) if (!items.includes(b)) b.quoting = false
     if (items.length === 0) { plan.value = null; quoting.value = false; return }
     quoting.value = true
     refining.value = false
