@@ -65,11 +65,17 @@
         </div>
 
         <template v-if="final && refunds.length">
-          <div class="ms-md__sec">{{ recoverRows.length ? (returnRows.length ? 'Refunds and recovery' : 'Recovery') : 'Refunds' }}</div>
+          <div class="ms-md__sec">{{ recoverRows.length ? (returnRows.length || otherRows.length ? 'Refunds and recovery' : 'Recovery') : 'Refunds' }}</div>
           <div class="ms-rf">
             <div v-for="(r, i) in recoverRows" :key="'r' + i" class="ms-rf__row">
               <span>{{ r.what }}</span>
               <span class="ms-rf__where is-bad">{{ r.where }}</span>
+            </div>
+            <!-- a route that came back as another token never folds: the wallet now holds a token
+                 that was not sold -->
+            <div v-for="(r, i) in otherRows" :key="'o' + i" class="ms-rf__row">
+              <span>{{ r.what }}</span>
+              <span class="ms-rf__where">{{ r.where }}</span>
             </div>
             <div v-if="foldReturns" class="ms-rf__row">
               <span>{{ plural(returnRows.length, 'part', 'parts') }} sent back to your wallet</span>
@@ -258,7 +264,8 @@ function cell(a: MultiSellRun['assets'][number]): { text: string; cls: string; s
 }
 
 // row detail: open on tap; on the result, rows that need the user open by themselves (needs
-// recovery, tracked, sold below the minimum). Refunded rows stay closed: the list below has them.
+// recovery, tracked, sold below the minimum, a route that came back as another token). Other
+// refunded rows stay closed: the list below has them.
 const opened = ref<Set<number>>(new Set())
 const canToggle = computed(() => props.run?.phase !== 'stopped')
 const isOpen = (ai: number) => canToggle.value && opened.value.has(ai)
@@ -268,8 +275,9 @@ function toggle(ai: number) {
   opened.value = s
 }
 const ATTENTION = ['needsRecovery', 'tracked', 'belowMin']
+const needsLook = (l: LegRun) => ATTENTION.includes(l.state) || (l.state === 'refunded' && routeHopToken(l) != null)
 const attentionRows = computed(() => (final.value && props.run
-  ? props.run.assets.map((a: MultiSellRun['assets'][number], ai: number) => (a.legs.some((l: LegRun) => ATTENTION.includes(l.state)) ? ai : -1)).filter((ai: number) => ai >= 0)
+  ? props.run.assets.map((a: MultiSellRun['assets'][number], ai: number) => (a.legs.some(needsLook) ? ai : -1)).filter((ai: number) => ai >= 0)
   : []))
 let autoOpened = new Set<number>()
 // immediate: the sheet can also open on a sale that already finished (back from another page);
@@ -316,14 +324,15 @@ const showRawError = (l: LegRun) => ['needsRecovery', 'tracked'].includes(l.stat
   && !['maySent', 'tacoPaused', 'rateLimited'].includes(l.reason ?? '') && !/may have been sent|TACO takes only/i.test(l.error)
 
 // Refunds and recovery: what needs the user first (each with what to do for its reason), then what
-// came back by itself; more than FOLD_AFTER of those fold into one line.
+// came back as another token, then what came back by itself; more than FOLD_AFTER of those fold
+// into one line.
 const FOLD_AFTER = 4
 const refunds = computed(() => {
-  const out: Array<{ what: string; where: string; bad: boolean }> = []
+  const out: Array<{ what: string; where: string; bad: boolean; other?: boolean }> = []
   for (const a of props.run?.assets ?? []) for (const l of a.legs) {
     const amt = `≈ ${fmtTok(a.address, l.amountIn)} ${a.symbol}`
     const mid = l.state === 'refunded' ? routeHopToken(l) : null
-    if (mid != null) out.push({ what: `${a.symbol} route on the TACO exchange`, where: mid && tokenOf(mid) ? `Came back as ${tokenOf(mid)!.symbol}.` : 'Came back as another token.', bad: false })
+    if (mid != null) out.push({ what: `${a.symbol} route on the TACO exchange`, where: mid && tokenOf(mid) ? `Came back as ${tokenOf(mid)!.symbol}.` : 'Came back as another token.', bad: false, other: true })
     else if (l.state === 'refunded') out.push({ what: `${amt} from ${venueIn(l.venue)}`, where: 'Sent back to your wallet.', bad: false })
     else if (l.state === 'tracked' || (l.state === 'needsRecovery' && l.reason === 'maySent')) out.push({ what: `${a.symbol} deposit on the TACO exchange`, where: recoverWhere(l), bad: true })
     else if (l.state === 'needsRecovery' && l.failedAfterSwap) out.push({ what: `ICP from your ${a.symbol} sale on ${venueIn(l.venue)}`, where: recoverWhere(l), bad: true })
@@ -332,7 +341,8 @@ const refunds = computed(() => {
   return out
 })
 const recoverRows = computed(() => refunds.value.filter(r => r.bad))
-const returnRows = computed(() => refunds.value.filter(r => !r.bad))
+const otherRows = computed(() => refunds.value.filter(r => !r.bad && r.other))
+const returnRows = computed(() => refunds.value.filter(r => !r.bad && !r.other))
 const showAllReturns = ref(false)
 watch(() => props.run?.id, () => { showAllReturns.value = false })
 const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !showAllReturns.value)
