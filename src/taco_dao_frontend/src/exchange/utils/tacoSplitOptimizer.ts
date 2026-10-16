@@ -12,6 +12,9 @@
  *
  * The pool-edge conflict rejection (two legs that touch the same physical pool
  * would interfere on execution) is preserved exactly.
+ *
+ * Plans have at most `maxLegs` routes (default 3): the exchange accepts 1 to 3
+ * splits in swapSplitRoutes and swapSplitRoutesV2 and refuses anything longer.
  */
 
 import type { HopDetailDisplay, SplitLeg } from '../composables/useSwapFlow'
@@ -76,7 +79,9 @@ export function buildTacoSplitPlan(
   fromAddr: string,
   toAddr: string,
   targetBp: number,
+  opts?: { maxLegs?: number },
 ): TacoSplitResult {
+  const maxLegs = Math.max(1, Math.min(5, opts?.maxLegs ?? 3))
   // Canonical unordered pool-edge key so legs touching the same physical pool —
   // even via different overall paths — are detected as conflicts.
   const edgeKey = (a: string, b: string): string => (a < b ? `${a}|${b}` : `${b}|${a}`)
@@ -146,7 +151,7 @@ export function buildTacoSplitPlan(
   }
 
   // 2-way splits
-  for (let i = 0; i < allQuotes.length; i++) {
+  if (maxLegs >= 2) for (let i = 0; i < allQuotes.length; i++) {
     const rem = targetBp - allQuotes[i].bp
     const others = byBpMap.get(rem)
     if (!others) continue
@@ -157,7 +162,7 @@ export function buildTacoSplitPlan(
   }
 
   // 3-way splits
-  for (let i = 0; i < allQuotes.length; i++) {
+  if (maxLegs >= 3) for (let i = 0; i < allQuotes.length; i++) {
     for (let j = i; j < allQuotes.length; j++) {
       const rem = targetBp - allQuotes[i].bp - allQuotes[j].bp
       if (rem <= 0 || rem >= targetBp) continue
@@ -170,8 +175,8 @@ export function buildTacoSplitPlan(
     }
   }
 
-  // 4-way splits
-  for (let i = 0; i < allQuotes.length; i++) {
+  // 4-way splits (only when a caller asks for more than the exchange accepts)
+  if (maxLegs >= 4) for (let i = 0; i < allQuotes.length; i++) {
     for (let j = i; j < allQuotes.length; j++) {
       for (let k = j; k < allQuotes.length; k++) {
         const rem = targetBp - allQuotes[i].bp - allQuotes[j].bp - allQuotes[k].bp
@@ -187,7 +192,7 @@ export function buildTacoSplitPlan(
   }
 
   // 5-way splits
-  for (let i = 0; i < allQuotes.length; i++) {
+  if (maxLegs >= 5) for (let i = 0; i < allQuotes.length; i++) {
     for (let j = i; j < allQuotes.length; j++) {
       for (let k = j; k < allQuotes.length; k++) {
         for (let l = k; l < allQuotes.length; l++) {
