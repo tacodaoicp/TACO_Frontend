@@ -680,7 +680,7 @@ export function useMultiSell() {
       if ('back' in prepared) {
         // prices moved or the fee changed: fresh numbers, back to Confirm
         backNote.value = prepared.back === 'feeChanged'
-          ? 'The TACO trading fee changed. Check the new amounts and try again.'
+          ? 'The trading fee on the TACO exchange changed. Check the new amounts and try again.'
           : 'Prices moved while you confirmed. Check the new amounts and try again.'
         run.value = null
         await requote(true)
@@ -725,23 +725,29 @@ export function useMultiSell() {
     })
   }
 
+  /** What a complete sale received: the known total, plus the parts whose amount only the wallet shows. */
+  function receivedText(res: SaleResult, inTotal = ''): string {
+    const t = icp.value
+    const got = t ? formatTokenAmount(res.received, Number(t.decimals), t.symbol) : res.received.toString()
+    const k = res.unknownParts
+    if (k === 0) return `${got} received${inTotal}`
+    if (res.received <= 0n) return 'Sold. The ICP shows in your wallet'
+    return `${got} received${inTotal}, plus ${k === 1 ? '1 part' : `${k} parts`} whose amount shows in your wallet`
+  }
+
   function announceLate(res: SaleResult) {
     const anyRecover = res.assets.some(a => a.legs.some(l => ['needsRecovery', 'tracked'].includes(l.state)))
     const anyRefund = res.assets.some(a => a.legs.some(l => l.state === 'refunded'))
-    const t = icp.value
-    const got = t ? formatTokenAmount(res.received, Number(t.decimals), t.symbol) : ''
     if (anyRecover) toast.error('Your last sale has finished', 'Some funds need the Recover page. The result is on the CrossDEX page.')
-    else if (res.phase === 'complete') toast.success('Your last sale has finished', got ? `${got} received in total.` : undefined)
+    else if (res.phase === 'complete') toast.success('Your last sale has finished', icp.value ? `${receivedText(res, ' in total')}.` : undefined)
     else toast.info('Your last sale has finished', anyRefund ? 'Some parts were refunded. The result is on the CrossDEX page.' : 'The result is on the CrossDEX page.')
   }
 
   function announce(res: SaleResult) {
-    const t = icp.value
-    const fmt = (v: bigint) => t ? formatTokenAmount(v, Number(t.decimals), t.symbol) : v.toString()
     const tokensFully = res.assets.filter(a => a.legs.every(l => ['done', 'doneUnknown', 'belowMin'].includes(l.state))).length
     const anyRecover = res.assets.some(a => a.legs.some(l => ['needsRecovery', 'tracked'].includes(l.state)))
     const anyRefund = res.assets.some(a => a.legs.some(l => l.state === 'refunded'))
-    if (res.phase === 'complete') toast.success('Sale complete', `${fmt(res.received)} received`)
+    if (res.phase === 'complete') toast.success('Sale complete', receivedText(res))
     else if (res.phase === 'partial') toast.warning('Partly done', `${tokensFully} of ${res.assets.length} tokens fully sold. Details are in the summary.`)
     else if (anyRecover) toast.error('Sale failed', 'Some funds need the Recover page.')
     else toast.info('Nothing was sold', anyRefund ? 'Refunds are on their way to your wallet, minus network fees.' : 'Your tokens stayed in your wallet.')

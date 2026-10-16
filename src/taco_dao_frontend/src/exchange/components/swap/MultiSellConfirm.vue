@@ -24,7 +24,7 @@
         <p class="ms-md__note">{{ batchNote }}</p>
         <p v-if="gateNote" class="ms-md__note">{{ gateNote }}</p>
         <p v-if="queueNote" class="ms-md__note">{{ queueNote }}</p>
-        <p v-if="anyMax" class="ms-md__note">For tokens at Max, whatever is not needed for fees is sold too, so nothing is left over.</p>
+        <p v-if="anyMax" class="ms-md__note">For tokens at Max, whatever is not needed for fees is sold too.</p>
         <p v-if="poolNote" class="ms-md__note">{{ poolNote }}</p>
         <div class="ms-md__wallet num">Prices updated {{ ageText }} · wallet {{ shortP }}</div>
         <div class="ms-md__acts">
@@ -63,9 +63,11 @@ const store = useExchangeStore()
 const tokenOf = (a: string) => store.getTokenByAddress(a) ?? null
 const assets = computed(() => (props.plan?.assets ?? []).filter(a => !a.issue))
 // the tokens go out in one batch; the Neutrinite gate and the queued TACO exchange parts say what waits
-const batchNote = computed(() => (assets.value.length === 1
-  ? 'Anything that cannot finish goes back to your wallet, minus network fees.'
-  : `All ${assets.value.length} tokens sell in one batch. Anything that cannot finish goes back to your wallet, minus network fees.`))
+const batchNote = computed(() => {
+  const back = 'Anything that cannot finish goes back to your wallet, minus network fees.'
+  const n = assets.value.length
+  return n === 1 ? back : n === 2 ? `Both tokens sell in one batch. ${back}` : `All ${n} tokens sell in one batch. ${back}`
+})
 const queueNote = computed(() => (props.plan ? queueNoteText(props.plan) : ''))
 const fmtIcp = (v: bigint) => props.icp ? formatTokenAmount(v, Number(props.icp.decimals), props.icp.symbol) : v.toString()
 const fmtTok = (addr: string, v: bigint) => { const t = tokenOf(addr); return t ? formatTokenAmount(v, Number(t.decimals)) : v.toString() }
