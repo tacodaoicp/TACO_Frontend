@@ -35,6 +35,8 @@ export const SALE_MIN_SESSION_MS = 15 * 60_000
 export const SECOND_CAP_MS = 30_000
 export const DEFERRED_DELAY_MS = 95_000
 export const LOCK_CAP_MS = 10 * 60_000
+/** Preflight waits this long for the V2 approvals: a hung approval must not use up the funds lock. */
+export const APPROVAL_WAIT_MS = 120_000
 const READ_TIMEOUT_MS = 10_000
 export const FEE_HEADROOM = new Set(['i2s4q-syaaa-aaaan-qz4sq-cai', 'rh2pm-ryaaa-aaaan-qeniq-cai'])
 
@@ -80,8 +82,8 @@ export interface RunHooks {
   onLeg(asset: number, leg: number, patch: Partial<LegRun>): void
   onPhase(p: RunPhase, info?: { stop?: StopReason; back?: BackReason; stopAsset?: string; approvalSpent?: boolean; waitMs?: number; deferredUntil?: number; deferredCount?: number }): void
   onAssetSettled(asset: number): void
-  /** Preflight sent its TACO V2 approvals and waits for their answers (they have no time cap:
-   *  one that never answers ends with the IC call, about 5 minutes later). */
+  /** Preflight sent its TACO V2 approvals and waits for their answers (at most APPROVAL_WAIT_MS:
+   *  then the sale stops, and an approval that never answered may still land). */
   onApprovals?(count: number): void
   log?: (...a: unknown[]) => void
 }
@@ -319,19 +321,31 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
   if (!rule.ok) return rule.reason === 'failed' ? stop('readFailed') : back('moved')
   ruleLegs.forEach((r, j) => { prepAssets[r.k].minOut[r.li] = rule.minOut[j] })
 
-  // 9. V2 approvals, in parallel, before anything moves
+  // 9. V2 approvals, in parallel, before anything moves. The wait is capped (APPROVAL_WAIT_MS) so a
+  //    hung approval cannot use up the funds lock while the legs still need it. An approval without
+  //    an answer at the cap may still land: the sale stops as an approval (spent), never as not sent.
   const bound = deps.bind(run)
   let approvalSpent = false
   const v2Jobs = prepAssets.map((pa, k) => ({ pa, k })).filter(({ pa }) => tokens.get(pa.plan.address)!.v2 && pa.legs.some(l => l.dex === 'taco'))
   if (v2Jobs.length > 0) try { hooks.onApprovals?.(v2Jobs.length) } catch { /* display only */ }
-  const approvals = await Promise.all(v2Jobs.map(async ({ pa }) => {
-    const t = tokens.get(pa.plan.address)!
-    const tacoLeg = pa.legs.find(l => l.dex === 'taco')!
-    const gross = requiredDeposit(tacoLeg.amountIn, tradingFeeBps, t.fee)
-    pa.v2Gross = gross
-    try { const r = await bound.approve(pa.plan.address, gross, t.fee); if (r.approved) approvalSpent = true; return null }
-    catch { approvalSpent = true; return pa.plan.address }
-  }))
+  const pendingApproval = new Set(v2Jobs.map(j => j.pa.plan.address))
+  let approvals: Array<string | null> = []
+  if (v2Jobs.length > 0) {
+    try {
+      approvals = await clockTimeout(deps.clock, Promise.all(v2Jobs.map(async ({ pa }) => {
+        const t = tokens.get(pa.plan.address)!
+        const tacoLeg = pa.legs.find(l => l.dex === 'taco')!
+        const gross = requiredDeposit(tacoLeg.amountIn, tradingFeeBps, t.fee)
+        pa.v2Gross = gross
+        try { const r = await bound.approve(pa.plan.address, gross, t.fee); if (r.approved) approvalSpent = true; return null }
+        catch { approvalSpent = true; return pa.plan.address }
+        finally { pendingApproval.delete(pa.plan.address) }
+      })), APPROVAL_WAIT_MS, 'approvals')
+    } catch {
+      hooks.log?.('[Sell many] no answer from these approvals in time, the sale stops:', [...pendingApproval])
+      return stop('approval', { stopAsset: [...pendingApproval][0] ?? v2Jobs[0].pa.plan.address, approvalSpent: true })
+    }
+  }
   const failedApproval = approvals.find(x => x != null)
   if (failedApproval) return stop('approval', { stopAsset: failedApproval, approvalSpent })
 
