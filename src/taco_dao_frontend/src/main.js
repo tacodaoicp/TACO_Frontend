@@ -15,8 +15,25 @@ function recoverFromChunkError(err) {
   if (!isChunkLoadError(err)) return false
   try {
     if (sessionStorage.getItem('taco_chunk_reloaded') === '1') return false
-    sessionStorage.setItem('taco_chunk_reloaded', '1')
-  } catch { /* private mode — best effort, skip the loop guard */ }
+  } catch { /* private mode: best effort, skip the loop guard */ }
+  // A CrossDEX swap or sale holds the funds lock in this tab: a reload now
+  // would stop its later steps. Say an update is ready and reload once the
+  // lock is free.
+  if (window.__tacoFundsBusy) {
+    if (!window.__tacoReloadPending) {
+      window.__tacoReloadPending = true
+      try { window.dispatchEvent(new CustomEvent('taco:update-ready')) } catch { /* ignore */ }
+      const reloadWhenFree = () => {
+        if (window.__tacoFundsBusy) return
+        window.removeEventListener('taco:funds-free', reloadWhenFree)
+        try { sessionStorage.setItem('taco_chunk_reloaded', '1') } catch { /* ignore */ }
+        location.reload()
+      }
+      window.addEventListener('taco:funds-free', reloadWhenFree)
+    }
+    return true
+  }
+  try { sessionStorage.setItem('taco_chunk_reloaded', '1') } catch { /* ignore */ }
   location.reload()
   return true
 }

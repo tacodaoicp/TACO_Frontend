@@ -34,9 +34,17 @@ import MobileNav from './exchange/components/layout/MobileNav.vue'
 import ExchangeToastContainer from './exchange/components/shared/ExchangeToastContainer.vue'
 import HelpModal from './exchange/components/common/HelpModal.vue'
 import * as neutrinite from './exchange/services/neutrinite'
+import { useExchangeToast } from './exchange/composables/useExchangeToast'
 
 const exchangeStore = useExchangeStore()
 const tacoStore = useTacoStore()
+const toast = useExchangeToast()
+
+// A new app version could not load its files while a CrossDEX sale holds the
+// funds lock: main.js reloads once the sale is done.
+function onUpdateReady() {
+  toast.info('Update ready', 'An update is ready. It loads after your sale finishes.')
+}
 const router = useRouter()
 const route = useRoute()
 const helpOpen = ref(false)
@@ -79,6 +87,7 @@ onMounted(() => {
   void neutrinite.prefetchFollowSettings()
 
   window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('taco:update-ready', onUpdateReady)
   mobileMql.addEventListener('change', syncTradeRouteToViewport)
 })
 
@@ -95,6 +104,7 @@ watch(() => exchangeStore.isAuthenticated, (authed) => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('taco:update-ready', onUpdateReady)
   mobileMql.removeEventListener('change', syncTradeRouteToViewport)
   delete document.documentElement.dataset.txTheme
 })

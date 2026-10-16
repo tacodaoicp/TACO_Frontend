@@ -26,17 +26,18 @@
           Anything found is returned to your wallet. A full run can take a few minutes; you can watch it work below.
         </p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="ex-btn ex-btn--primary" :disabled="!store.isAuthenticated || raRunning" @click="recoverAll()">
+          <button class="ex-btn ex-btn--primary" :disabled="!store.isAuthenticated || raRunning || saleRunning" @click="recoverAll()">
             {{ raRunning && raScope === 'all' ? `Running... ${raElapsed}s` : 'Recover All' }}
           </button>
-          <button class="ex-btn ex-btn--outline" :disabled="!store.isAuthenticated || raRunning" @click="recoverAll('icpswap')">
+          <button class="ex-btn ex-btn--outline" :disabled="!store.isAuthenticated || raRunning || saleRunning" @click="recoverAll('icpswap')">
             {{ raRunning && raScope === 'icpswap' ? `Running... ${raElapsed}s` : 'ICPSwap Only' }}
           </button>
-          <button class="ex-btn ex-btn--outline" :disabled="!store.isAuthenticated || raRunning" @click="recoverAll('neutrinite')">
+          <button class="ex-btn ex-btn--outline" :disabled="!store.isAuthenticated || raRunning || saleRunning" @click="recoverAll('neutrinite')">
             {{ raRunning && raScope === 'neutrinite' ? `Running... ${raElapsed}s` : 'Neutrinite Only' }}
           </button>
         </div>
         <p class="recover-view__desc" style="margin:0">The two smaller buttons run just that exchange's checks, same scan, same recovery.</p>
+        <div v-if="saleRunning || lockNote" class="ex-error-box">{{ SALE_RUNNING_RECOVERY_TEXT }}</div>
         <div v-if="!store.isAuthenticated" class="recover-view__desc">Connect your wallet to run this.</div>
         <div v-if="raRows.length > 0" class="recover-view__stuck-list">
           <div v-for="row in raRows" :key="row.id" class="recover-view__stuck-item">
@@ -92,7 +93,7 @@
           click "Recover" to get your tokens back.
         </p>
 
-        <button v-if="recoverableDeposits.length > 1" class="ex-btn ex-btn--primary" @click="recoverAllCached" :disabled="recovering || raRunning" style="margin-bottom:var(--space-3)">
+        <button v-if="recoverableDeposits.length > 1" class="ex-btn ex-btn--primary" @click="recoverAllCached" :disabled="recovering || raRunning || saleRunning" style="margin-bottom:var(--space-3)">
           {{ recovering ? 'Recovering...' : `Recover All (${recoverableDeposits.length} deposits)` }}
         </button>
         <div v-if="depositNote" class="ex-error-box" style="margin-bottom:var(--space-3)">{{ depositNote }}</div>
@@ -134,7 +135,7 @@
                       v-else
                       class="ex-btn ex-btn--sm ex-btn--primary"
                       @click="recoverCachedDeposit(dep)"
-                      :disabled="recovering || raRunning"
+                      :disabled="recovering || raRunning || saleRunning"
                     >{{ recovering ? '...' : 'Recover' }}</button>
                     <button
                       class="ex-btn ex-btn--sm ex-btn--outline"
@@ -217,7 +218,7 @@
               <button
                 class="ex-btn ex-btn--sm ex-btn--primary"
                 @click="sweepPending(p)"
-                :disabled="sweeping === p.sell + p.buy || raRunning"
+                :disabled="sweeping === p.sell + p.buy || raRunning || saleRunning"
               >{{ sweeping === (p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
               <button
                 class="ex-btn ex-btn--sm ex-btn--outline"
@@ -261,7 +262,7 @@
               <button
                 class="ex-btn ex-btn--sm ex-btn--primary"
                 @click="sweepNeuPending(p)"
-                :disabled="sweeping === ('neu:' + p.sell + p.buy) || raRunning"
+                :disabled="sweeping === ('neu:' + p.sell + p.buy) || raRunning || saleRunning"
               >{{ sweeping === ('neu:' + p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
               <button
                 class="ex-btn ex-btn--sm ex-btn--outline"
@@ -326,7 +327,7 @@ let raActive = false
 </script>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { Principal } from '@dfinity/principal'
 import { onVisible } from '../composables/useVisibilityAware'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
@@ -334,6 +335,7 @@ import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { getDepositHistory, removeDepositFromCache, type DepositHistoryEntry } from '../utils/deposit'
 import { runJournal } from '../utils/runJournalStore'
+import { withFundsLock, isSaleRunning, BUSY, SALE_RUNNING_RECOVERY_TEXT } from '../utils/saleLock'
 import { legUnresolved } from '../utils/crossDexJournal'
 import { useExchangeToast } from '../composables/useExchangeToast'
 import { getCachedIdentity } from '../../shared/auth-cache'
@@ -343,6 +345,22 @@ import * as neutrinite from '../services/neutrinite'
 
 const store = useExchangeStore()
 const toast = useExchangeToast()
+
+// ── Funds lock: every recovery action takes it shared, so none runs while a
+// Sell many sale (exclusive) is moving funds in any tab. The 2 s poll only
+// drives the disabled look; the lock itself decides.
+const saleRunning = ref(false)
+const lockNote = ref(false)
+async function guarded<T>(fn: () => Promise<T>): Promise<T | undefined> {
+  const r = await withFundsLock('shared', fn)
+  if (r === BUSY) {
+    lockNote.value = true
+    toast.warning('Sale in progress', SALE_RUNNING_RECOVERY_TEXT)
+    return undefined
+  }
+  lockNote.value = false
+  return r as T
+}
 
 // ── Cached Deposits ──
 // Pointer rules: a saved deposit leaves this list only when a recovery
@@ -480,7 +498,10 @@ const depositTokenType: Record<string, any> = {
   ICRC3: { ICRC3: null },
 }
 
-async function recoverCachedDeposit(dep: CachedDeposit) {
+function recoverCachedDeposit(dep: CachedDeposit) {
+  return guarded(() => recoverCachedDepositInner(dep))
+}
+async function recoverCachedDepositInner(dep: CachedDeposit) {
   console.log(`[Recover] Attempting recovery: token=${dep.token.slice(0, 10)} block=${dep.block} type=${dep.type}`)
   if (isOtherWallet(dep)) return
   recovering.value = true
@@ -523,7 +544,10 @@ async function recoverCachedDeposit(dep: CachedDeposit) {
   }
 }
 
-async function recoverAllCached() {
+function recoverAllCached() {
+  return guarded(() => recoverAllCachedInner())
+}
+async function recoverAllCachedInner() {
   if (!store.isAuthenticated) {
     recoverError.value = 'Connect your wallet first'
     return
@@ -641,7 +665,10 @@ const canRecover = computed(() => {
   return store.isAuthenticated && recoverTokenId.value && recoverBlock.value && !recovering.value && !raRunning.value
 })
 
-async function recoverTokens() {
+function recoverTokens() {
+  return guarded(() => recoverTokensInner())
+}
+async function recoverTokensInner() {
   recoverError.value = ''
   recoverSuccess.value = false
   recovering.value = true
@@ -699,7 +726,10 @@ const canSweepManual = computed(() =>
   store.isAuthenticated && !!sweepTokenA.value.trim() && !!sweepTokenB.value.trim() && !sweeping.value && !raRunning.value,
 )
 
-async function sweepPending(p: icpswap.PendingIcpSwap) {
+function sweepPending(p: icpswap.PendingIcpSwap) {
+  return guarded(() => sweepPendingInner(p))
+}
+async function sweepPendingInner(p: icpswap.PendingIcpSwap) {
   if (!store.isAuthenticated) { sweepError.value = 'Connect your wallet first'; return }
   sweeping.value = p.sell + p.buy
   sweepError.value = ''
@@ -728,7 +758,10 @@ function dismissPendingSwap(p: icpswap.PendingIcpSwap) {
   pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
 }
 
-async function sweepManual() {
+function sweepManual() {
+  return guarded(() => sweepManualInner())
+}
+async function sweepManualInner() {
   if (!canSweepManual.value) return
   sweeping.value = 'manual'
   sweepError.value = ''
@@ -761,7 +794,10 @@ function dismissPendingNeu(p: neutrinite.PendingNeutrinite) {
   pendingNeu.value = pendingNeu.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
 }
 
-async function sweepNeuPending(p: neutrinite.PendingNeutrinite) {
+function sweepNeuPending(p: neutrinite.PendingNeutrinite) {
+  return guarded(() => sweepNeuPendingInner(p))
+}
+async function sweepNeuPendingInner(p: neutrinite.PendingNeutrinite) {
   if (!store.isAuthenticated) { sweepError.value = 'Connect your wallet first'; return }
   sweeping.value = 'neu:' + p.sell + p.buy
   sweepError.value = ''
@@ -786,7 +822,10 @@ async function sweepNeuPending(p: neutrinite.PendingNeutrinite) {
   }
 }
 
-async function sweepNeuManual() {
+function sweepNeuManual() {
+  return guarded(() => sweepNeuManualInner())
+}
+async function sweepNeuManualInner() {
   if (!canSweepManual.value) return
   sweeping.value = 'neu-manual'
   sweepError.value = ''
@@ -1101,7 +1140,11 @@ async function raPulls(): Promise<void> {
 type RaScope = 'all' | 'icpswap' | 'neutrinite'
 const raScope = ref<RaScope>('all')
 
-async function recoverAll(scope: RaScope = 'all') {
+function recoverAll(scope: RaScope = 'all') {
+  if (raActive || !store.isAuthenticated) return
+  return guarded(() => recoverAllInner(scope))
+}
+async function recoverAllInner(scope: RaScope) {
   if (raActive || !store.isAuthenticated) return
   raActive = true
   raRunning.value = true
@@ -1149,7 +1192,11 @@ async function recoverAll(scope: RaScope = 'all') {
   }
 }
 
+let salePoll: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
+  const pollSale = async () => { if (!document.hidden) saleRunning.value = await isSaleRunning() }
+  void pollSale()
+  salePoll = setInterval(pollSale, 2000)
   loadCachedDeposits()
   loadPendingNeu()
   loadPendingSwaps()
@@ -1161,6 +1208,8 @@ onMounted(() => {
     const t = setInterval(() => { if (!raActive) { raRunning.value = false; clearInterval(t) } }, 2000)
   }
 })
+
+onUnmounted(() => { if (salePoll) clearInterval(salePoll) })
 
 // Markers can be written while this tab is hidden (a failed leg in another
 // tab, a zombie leg finishing late). Refresh every list on return.

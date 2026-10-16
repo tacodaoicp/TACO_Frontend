@@ -32,6 +32,7 @@ import { depositToken, removeDepositFromCache, setDepositStatus, approveExchange
 import { isApprovalDeclined } from '../utils/approvalPrompt'
 import { formatTokenAmount } from '../utils/format'
 import { createRunAgent, type RunAgent } from '../utils/runAgent'
+import { withFundsLock, BUSY } from '../utils/saleLock'
 import { dedupLedgers } from '../utils/ledgerDedup'
 import { runJournal } from '../utils/runJournalStore'
 import { newRunId, type RunRecord } from '../utils/crossDexJournal'
@@ -338,7 +339,26 @@ export function useCrossDexSwap() {
     phase.value = 'ready'
   }
 
+  /**
+   * Run the swap inside the CrossDEX funds lock (shared: a Sell many sale in
+   * any tab refuses it). The lock is held until every leg promise has settled,
+   * while the result shows at the 180 s backstop.
+   */
   async function execute() {
+    if (!tokenFrom.value || !tokenTo.value || !plan.value) return
+    let uiReady!: () => void
+    const ui = new Promise<'ui'>(r => { uiReady = () => r('ui') })
+    const locked = withFundsLock('shared', async () => {
+      try { await executeLocked(uiReady) } finally { uiReady() }
+    })
+    const first = await Promise.race([locked.then(v => (v === BUSY ? 'busy' : 'done')), ui])
+    if (first === 'busy') {
+      phase.value = 'ready'
+      toast.warning('Sale in progress', 'A Sell many sale is running. Try again when it finishes.')
+    }
+  }
+
+  async function executeLocked(uiReady: () => void) {
     if (!tokenFrom.value || !tokenTo.value || !plan.value) return
     seq++ // a refine still in flight must not replace the plan these legs run
     const legs = plan.value.legs
@@ -444,14 +464,20 @@ export function useCrossDexSwap() {
       sortV1Errors: false,
       log: (...a) => console.error(...a),
     }), buildLegDeps(store, runAgent), { log: (m) => console.info(m) })
-    void run.all.finally(() => {
+    const settledAll = run.all.finally(() => {
       window.removeEventListener('beforeunload', blockUnload)
       runJournal.close(runId)
     })
 
     const results = await run.ui
     outcomes.value = results
+    void reportResult(results, buyToken).catch(e => console.error('[CrossDEX] result:', e))
+    uiReady()
+    // Keep the funds lock until every leg promise has settled.
+    await settledAll
+  }
 
+  async function reportResult(results: LegOutcome[], buyToken: TokenInfo) {
     // Balances/trades may have moved on any leg — always refresh.
     void store.refreshAfterMutation('swap')
 
