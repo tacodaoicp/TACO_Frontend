@@ -2,8 +2,8 @@
   <div class="crossdex-card">
     <!-- Header -->
     <div class="crossdex-card__header">
-      <div>
-        <h2 class="crossdex-card__title">CrossDEX</h2>
+      <div class="crossdex-card__titlebox">
+        <slot name="title"><h2 class="crossdex-card__title">CrossDEX</h2></slot>
         <p class="crossdex-card__subtitle">Best mix across ICPSwap + TACO + Neutrinite</p>
       </div>
       <button
@@ -441,7 +441,8 @@ onMounted(() => {
   gap: 12px;
   box-shadow: var(--tx-shadow-1);
 
-  &__header { display: flex; justify-content: space-between; align-items: flex-start; }
+  &__header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  &__titlebox { display: flex; flex-direction: column; gap: 4px; min-width: 0; @media (max-width: 600px) { flex: 1; } }
   &__title { font-size: var(--text-xl); font-weight: var(--weight-semibold); color: var(--text-primary); margin: 0; }
   &__subtitle { font-size: var(--text-xs); color: var(--text-tertiary); margin: 2px 0 0; }
   &__settings-btn {

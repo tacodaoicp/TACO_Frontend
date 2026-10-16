@@ -63,6 +63,8 @@ export interface MultiSellRun {
   sessionExpired?: boolean
   /** Every leg promise settled (the lock is free again). */
   settled: boolean
+  /** The result was closed while slow legs still run (the card shows a banner). */
+  dismissed?: boolean
 }
 
 const QUOTE_FRESH_MS = 30_000
@@ -72,6 +74,7 @@ const REQUOTE_QUIET_MS = 600
 const basket = ref<BasketItem[]>([])
 const plan = ref<BatchPlan | null>(null)
 const planInputs = ref<AssetInput[]>([])
+const planFeeBps = ref(0n)
 const planQuotes = ref<AssetQuotes[]>([])
 const quoting = ref(false)
 const refining = ref(false)
@@ -153,7 +156,7 @@ export function useMultiSell() {
     const t = tokenOf(addr)
     if (!t) return null
     const [bal, live] = await Promise.all([
-      store.userBalanceQuery(addr).refresh().catch(() => null),
+      store.userBalanceQuery(addr).refetch().catch(() => null),
       store.fetchLedgerFee(addr).catch(() => null),
     ])
     const balance = bal ?? store.userBalanceQuery(addr).data.value
@@ -281,11 +284,12 @@ export function useMultiSell() {
     }))
     const quotes = ok.map(f => f.quotes!)
     const principal = store.principalText
+    const feeBps = store.tradingFeeBps
     let p: BatchPlan
     try {
       p = await planMultiSell(inputs, quotes, {
         target,
-        tradingFeeBps: store.tradingFeeBps,
+        tradingFeeBps: feeBps,
         slip: slippage.value / 100,
         pausedTokens: new Set(store.pausedTokens),
         callsUsed: principal ? store.callsUsed(principal) : 0,
@@ -303,6 +307,7 @@ export function useMultiSell() {
     console.info('[Sell many] plan', { decisions: p.decisions, fallback: p.fallbackUsed, budget: p.budget })
     planInputs.value = inputs
     planQuotes.value = quotes
+    planFeeBps.value = feeBps
     plan.value = p
     quoting.value = false
     if (p.fallbackUsed) {
@@ -496,7 +501,8 @@ export function useMultiSell() {
       createRunAgent: (o) => createRunAgent(o),
       currentPrincipal: () => store.principalText,
       balance: async (t) => {
-        const v = await store.userBalanceQuery(t).refresh()
+        // a read that starts now (never one already in flight)
+        const v = await store.userBalanceQuery(t).refetch()
         if (v == null) throw new Error('balance unreadable')
         return v
       },
@@ -572,7 +578,7 @@ export function useMultiSell() {
     const inputs = p.assets.map((a) => planInputs.value.find(i => i.token.address === a.address)!)
     const h = startSale({
       runId: id, target, slip: slippage.value / 100, confirmPrincipal: store.principalText,
-      inputs, plan: p, planFeeBps: store.tradingFeeBps,
+      inputs, plan: p, planFeeBps: planFeeBps.value,
     }, saleDeps(), hooks)
     const prepared = await h.prepared
     if (!prepared.ok) {
@@ -610,6 +616,7 @@ export function useMultiSell() {
       inTabRun = false
       if (unloadGuard) { window.removeEventListener('beforeunload', unloadGuard); unloadGuard = null }
       void store.refreshAfterMutation('swap')
+      if (r.dismissed && run.value === r) run.value = null
     })
   }
 
@@ -630,7 +637,9 @@ export function useMultiSell() {
     const r = run.value
     if (r && !r.settled && ['preparing', 'selling', 'settling'].includes(r.phase)) return
     const stopped = r?.phase === 'stopped'
-    run.value = r && !r.settled ? r : null
+    // slow legs keep running (and keep the lock): the card shows a banner until they settle
+    if (r && !r.settled) r.dismissed = true
+    else run.value = null
     quoteCache.clear()
     plan.value = null
     if (stopped) { schedule(0); return }
@@ -645,11 +654,17 @@ export function useMultiSell() {
   }
 
   function clearRun() { if (run.value?.settled) run.value = null }
+  /** Routes of a closed result that are still finishing. */
+  const finishingRoutes = computed(() => {
+    const r = run.value
+    if (!r || r.settled) return 0
+    return r.assets.reduce((n, a) => n + a.legs.filter(l => !['done', 'doneUnknown', 'belowMin', 'refunded', 'notSent', 'needsRecovery', 'tracked'].includes(l.state)).length, 0)
+  })
 
   return {
     // state
     basket, plan, quoting, refining, quoteError, run, confirmOpen, slippage, backNote, sellAnyway,
-    rows, ready, quoteAgeMs, extreme, impactAcknowledged, waitSec, isRunning, isBusy, icp,
+    rows, ready, quoteAgeMs, extreme, impactAcknowledged, waitSec, isRunning, isBusy, icp, finishingRoutes,
     // actions
     addTokens, setBasket, removeToken, setAmount, setMax, requote, openConfirm, cancelConfirm, confirm, done, clearRun,
     acknowledgeImpact, schedule,

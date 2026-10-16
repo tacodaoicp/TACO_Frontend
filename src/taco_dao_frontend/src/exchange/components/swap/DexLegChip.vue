@@ -1,0 +1,85 @@
+<template>
+  <span class="dex-chip" :class="`dex-chip--${look}`" :aria-label="`${name} ${meaning}`">
+    <span class="dex-chip__dot" :class="`dex-chip__dot--${dex}`"></span>
+    {{ name }}
+    <span v-if="look === 'run'" class="dex-chip__spin" aria-hidden="true"></span>
+    <span v-else class="dex-chip__g" aria-hidden="true">{{ glyph }}</span>
+  </span>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import type { CrossDexVenue } from '../../utils/crossDexOptimizer'
+import type { LegState } from '../../utils/crossDexLegRunner'
+
+const props = defineProps<{ dex: CrossDexVenue; state: LegState }>()
+
+const name = computed(() => (props.dex === 'icpswap' ? 'ICPSwap' : props.dex === 'neutrinite' ? 'Neutrinite' : 'TACO'))
+const look = computed(() => {
+  switch (props.state) {
+    case 'running': case 'recovering': case 'slow': return 'run'
+    case 'done': case 'doneUnknown': return 'done'
+    case 'belowMin': return 'low'
+    case 'refunded': return 'ref'
+    case 'deferred': return 'defer'
+    case 'notSent': return 'skip'
+    case 'needsRecovery': case 'tracked': return 'fail'
+    default: return 'wait'
+  }
+})
+const glyph = computed(() => ({ done: '✓', low: '✓', ref: '↩', defer: '···', skip: '○', fail: props.state === 'tracked' ? '!' : '✕', wait: '···', run: '' } as Record<string, string>)[look.value])
+const meaning = computed(() => {
+  switch (props.state) {
+    case 'running': case 'recovering': return 'running'
+    case 'slow': return 'taking longer than usual'
+    case 'done': return 'sold'
+    case 'doneUnknown': return 'sold, the amount shows in your wallet'
+    case 'belowMin': return 'sold below your minimum price'
+    case 'refunded': return 'refunded to your wallet'
+    case 'deferred': return 'refund waiting for the exchange call limit'
+    case 'notSent': return 'not sent, stayed in your wallet'
+    case 'needsRecovery': return 'not refunded, use the Recover page'
+    case 'tracked': return 'tracked on chain, see the Recover page'
+    default: return 'waiting to start'
+  }
+})
+</script>
+
+<style scoped lang="scss">
+.dex-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px 0 7px;
+  border-radius: 999px;
+  background: var(--tx-surface-2);
+  border: 1px solid var(--tx-line);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tx-ink-2);
+  white-space: nowrap;
+
+  &__dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    &--icpswap { background: var(--tx-dex-icpswap); }
+    &--taco { background: var(--tx-dex-taco); }
+    &--neutrinite { background: var(--tx-dex-neutrinite); }
+  }
+  &__g { font-size: 11px; line-height: 1; }
+  &__spin {
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 1.5px solid var(--tx-line-2); border-top-color: var(--tx-orange);
+    animation: dex-chip-spin 0.7s linear infinite;
+  }
+
+  &--done { border-color: color-mix(in srgb, var(--tx-buy) 35%, transparent); .dex-chip__g { color: var(--tx-buy); } }
+  &--low { border-color: color-mix(in srgb, var(--tx-warning) 45%, transparent); .dex-chip__g { color: var(--tx-warning); } }
+  &--ref { border-color: color-mix(in srgb, var(--tx-warning) 45%, transparent); .dex-chip__g { color: var(--tx-warning); } }
+  &--defer { .dex-chip__g { color: var(--tx-warning); } }
+  &--fail { border-color: color-mix(in srgb, var(--tx-sell) 45%, transparent); .dex-chip__g { color: var(--tx-sell); } }
+  &--skip { color: var(--tx-ink-3); .dex-chip__g { color: var(--tx-ink-4); } }
+  &--wait .dex-chip__g { color: var(--tx-ink-3); }
+}
+@keyframes dex-chip-spin { to { transform: rotate(360deg); } }
+</style>

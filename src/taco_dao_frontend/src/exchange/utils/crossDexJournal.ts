@@ -251,3 +251,28 @@ export class RunJournal {
     }
   }
 }
+
+/** Older than this without Web Locks, a 'running' sale with no live run in this tab counts as interrupted. */
+export const INTERRUPTED_NO_LOCKS_MS = 6 * 60_000
+
+/**
+ * The newest Sell many run of `principal` that was left 'running' (the tab closed
+ * or crashed mid sale): no lock holder anywhere (or, without Web Locks, older
+ * than 6 minutes) and not this tab's live run. Already checked runs are skipped.
+ */
+export function findInterrupted(
+  runs: RunRecord[], principal: string,
+  o: { anyLockHeld: boolean; hasWebLocks: boolean; liveRunId?: string | null; now: number },
+): RunRecord | null {
+  if (!principal) return null
+  for (const r of runs) { // newest first
+    if (r.kind !== 'many' || r.principal !== principal || r.checked) continue
+    if (r.phase !== 'running' && r.phase !== 'interrupted') continue
+    if (o.liveRunId && r.id === o.liveRunId) continue
+    if (r.phase === 'running') {
+      if (o.hasWebLocks ? o.anyLockHeld : o.now - r.updatedAt < INTERRUPTED_NO_LOCKS_MS) continue
+    }
+    return r
+  }
+  return null
+}
