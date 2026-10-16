@@ -222,13 +222,12 @@ function toggle(ai: number) {
   s.has(ai) ? s.delete(ai) : s.add(ai)
   opened.value = s
 }
-watch(final, (f) => {
-  if (!f || !props.run) return
-  const s = new Set(opened.value)
-  props.run.assets.forEach((a, ai) => { if (a.legs.some(l => !SOLD.includes(l.state))) s.add(ai) })
+// immediate: the sheet can also open on a sale that already finished (back from another page)
+watch([() => props.run?.id, final], ([id, f], [oldId]) => {
+  const s = id === oldId ? new Set(opened.value) : new Set<number>()
+  if (f && props.run) props.run.assets.forEach((a, ai) => { if (a.legs.some(l => !SOLD.includes(l.state))) s.add(ai) })
   opened.value = s
-})
-watch(() => props.run?.id, () => { opened.value = new Set() })
+}, { immediate: true })
 
 function detail(a: MultiSellRun['assets'][number], l: LegRun): string {
   const owners = (l.waitsFor ?? []).map(x => props.run?.assets.find(y => y.address === x)?.symbol ?? '').filter(Boolean).join(' and ')
