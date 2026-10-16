@@ -269,11 +269,22 @@ export interface NeutriniteSwapParams {
   onStep?: (step: string) => void
   /** Checked right before the deposit; false sends nothing. */
   canDeposit?: () => boolean
+  /** Synchronous, right before the deposit transfer (after canDeposit): the
+   *  caller writes its recovery note; false sends nothing. */
+  beforeTransfer?: () => boolean
+  /** Stop before the transfer when the pair marker could not be written. */
+  requireMarker?: boolean
   /** Called once the deposit is credited; false refuses the swap. */
   onCredited?: () => boolean
   /** Filled in for the caller's recovery: pylon balances before our deposit, the swap output,
    *  and whether an earlier swap on this pair had already left a marker. */
   track?: { before?: { sell: bigint; buy: bigint }; swappedOut?: bigint; hadMarker?: boolean }
+}
+
+/** The swap stopped before its deposit transfer: nothing left the wallet. */
+export class NeutriniteNotStarted extends Error {
+  readonly notStarted = true
+  constructor(message: string, readonly journal = false) { super(message); this.name = 'NeutriniteNotStarted' }
 }
 
 /**
@@ -302,10 +313,14 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
 
   // 2. Fund the swap: plain icrc1_transfer of the input token into the pylon account.
   // No await from this check to the transfer call, so a late start sends nothing.
-  if (params.canDeposit?.() === false) throw new Error('Neutrinite was too slow to start, so its share was not sent')
+  if (params.canDeposit?.() === false) throw new NeutriniteNotStarted('Neutrinite was too slow to start, so its share was not sent')
+  if (params.beforeTransfer?.() === false) throw new NeutriniteNotStarted('Neutrinite: the recovery note could not be saved, so its share was not sent', true)
   // Persist the pair NOW (funds are about to move) so a tab close is recoverable via the Recover page.
   const hadMarker = getPendingSwaps().some(e => e.sell === params.sell && e.buy === params.buy)
-  savePendingSwap(params.sell, params.buy)
+  const markerWritten = savePendingSwap(params.sell, params.buy)
+  if (!markerWritten && params.requireMarker) {
+    throw new NeutriniteNotStarted('Neutrinite: the recovery note could not be saved, so its share was not sent', true)
+  }
   if (params.track) {
     params.track.before = { sell: balanceBefore, buy: findEndpoint(accounts, params.buy)?.balance ?? 0n }
     params.track.hadMarker = hadMarker

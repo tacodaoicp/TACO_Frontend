@@ -15,6 +15,7 @@ import { getCanisterId } from '../../constants/canisterIds'
 import { useExchangeStore } from '../store/exchange.store'
 import { setItemWithCacheEviction } from './persistCache'
 import { withTimeout } from './withTimeout'
+import { requiredDeposit } from './crossDexCosts'
 
 /** JSON replacer that converts BigInt to string (prevents "Do not know how to serialize a BigInt") */
 const jsonSafe = (_: string, v: any) => typeof v === 'bigint' ? v.toString() : v
@@ -27,8 +28,7 @@ export function calculateRequiredDeposit(
   tradingFeeBps: bigint,
   transferFee: bigint,
 ): bigint {
-  const feeAmount = (tradeAmount * tradingFeeBps) / 10000n
-  return tradeAmount + feeAmount + transferFee
+  return requiredDeposit(tradeAmount, tradingFeeBps, transferFee)
 }
 
 /**

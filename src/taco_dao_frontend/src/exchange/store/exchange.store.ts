@@ -1836,7 +1836,13 @@ export const useExchangeStore = defineStore('exchange', () => {
     return callExchangeQuery<Awaited<ReturnType<_SERVICE['getUserTradeHistory']>>>('getUserTradeHistory', [limit], { auth: true })
   }
 
-  async function getUserSwapHistory(limit: bigint) {
+  /** The caller's swap records. With a pinned run agent the query is signed by
+   *  that agent (a CrossDEX run never reads another principal's history). */
+  async function getUserSwapHistory(limit: bigint, agent?: unknown) {
+    if (agent) {
+      const actor = Actor.createActor<_SERVICE>(idlFactory, { agent: agent as any, canisterId: getExchangeCanisterId() })
+      return actor.getUserSwapHistory(limit)
+    }
     await ensureExchangeWorkerIdentity()
     return callExchangeQuery<Awaited<ReturnType<_SERVICE['getUserSwapHistory']>>>('getUserSwapHistory', [limit], { auth: true })
   }

@@ -67,13 +67,15 @@ export interface IcpSwapParams {
   /** Awaited after the approve and before any funds move; a throw, or false,
    *  stops the swap with nothing moved but the approve fee and leaves no marker. */
   beforeDeposit?: () => Promise<void | boolean>
+  /** Stop before the deposit when the pair marker could not be written. */
+  requireMarker?: boolean
   track?: IcpSwapTrack
 }
 
 /** Error for a swap that stopped before any funds moved (only the approve fee was spent). */
 export class IcpSwapNotStarted extends Error {
   readonly notStarted = true
-  constructor(message = 'Not started, your funds stayed in your wallet') { super(message); this.name = 'IcpSwapNotStarted' }
+  constructor(message = 'Not started, your funds stayed in your wallet', readonly journal = false) { super(message); this.name = 'IcpSwapNotStarted' }
 }
 /** depositFrom refused: the pool did not take the funds (the caller still checks with one sweep). */
 export class IcpSwapDepositRefused extends Error {
@@ -500,6 +502,9 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   // pair left behind stays until its funds come back.
   track.hadMarker = hasPendingSwap(params.sellTokenPrincipal, params.buyTokenPrincipal)
   track.markerWritten = savePendingSwap(params.sellTokenPrincipal, params.buyTokenPrincipal)
+  if (!track.markerWritten && params.requireMarker) {
+    throw new IcpSwapNotStarted('ICPSwap: the recovery note could not be saved, so this part was not sent', true)
+  }
   params.onStep?.('Depositing tokens...')
   track.step = 'deposit'
   const depositResult = (await poolActor.depositFrom({

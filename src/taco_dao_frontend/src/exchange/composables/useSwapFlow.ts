@@ -22,6 +22,11 @@ import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
  * Probe whether a swap we submitted actually landed. Looks for a SwapRecord
  * in the user's history matching the tokenIn/tokenOut pair, a near-match on
  * amountIn, and a recent timestamp. Used only after a transport-level throw.
+ *
+ * Without options (easy mode) any match stamped up to 60 s before
+ * `submittedAtMs` counts. With `notBeforeMs` only records stamped at or after
+ * it count (CrossDEX passes its submission time minus a margin), and `limit`
+ * reads more records when several swaps of one sale land together.
  */
 export async function probeSwapLanded(
   store: ReturnType<typeof useExchangeStore>,
@@ -29,15 +34,17 @@ export async function probeSwapLanded(
   tokenOut: string,
   amountIn: bigint,
   submittedAtMs: number,
+  opts: { limit?: bigint; notBeforeMs?: number; agent?: unknown } = {},
 ): Promise<VerifyStatus> {
   try {
-    const records: any[] = await store.getUserSwapHistory(10n) as any[]
+    const records: any[] = await store.getUserSwapHistory(opts.limit ?? 10n, opts.agent) as any[]
     const nowNs = BigInt(submittedAtMs) * 1_000_000n
     const windowNs = 60n * 1_000_000_000n // 60 s
+    const notBeforeNs = opts.notBeforeMs != null ? BigInt(Math.floor(opts.notBeforeMs)) * 1_000_000n : null
     const tolerance = amountIn / 20n       // 5 %
     for (const r of records) {
       const ts = BigInt(r.timestamp)
-      if (ts + windowNs < nowNs) continue
+      if (notBeforeNs != null ? ts < notBeforeNs : ts + windowNs < nowNs) continue
       if (r.tokenIn !== tokenIn || r.tokenOut !== tokenOut) continue
       const rAmt = BigInt(r.amountIn)
       const diff = rAmt > amountIn ? rAmt - amountIn : amountIn - rAmt

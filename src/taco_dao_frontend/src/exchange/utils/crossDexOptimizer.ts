@@ -16,6 +16,13 @@ import type { SplitLeg } from '../composables/useSwapFlow'
 
 export type CrossDexVenue = 'icpswap' | 'taco' | 'neutrinite'
 
+/** The 10% grid every venue is quoted on (shared by the single swap and Sell many). */
+export const CROSSDEX_GRID_BPS = [1000n, 2000n, 3000n, 4000n, 5000n, 6000n, 7000n, 8000n, 9000n, 10000n]
+/** Routes per fraction asked from getExpectedReceiveAmountBatchMulti (10 x 5 never came back empty). */
+export const CROSSDEX_MAX_ROUTES = 5n
+/** A Neutrinite deposit credits on the pylon's indexer tick; only a cadence this fast may join a split. */
+export const NEU_SPLIT_MAX_FOLLOW_SEC = 10
+
 export interface TacoGridEntry {
   /** Best within-TACO output at this fraction (single or internal split). */
   expectedOut: bigint

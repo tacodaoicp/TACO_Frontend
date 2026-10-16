@@ -17,6 +17,11 @@ export function tradingFeeOf(amount: bigint, tradingFeeBps: bigint): bigint {
   return (amount * tradingFeeBps) / 10000n
 }
 
+/** What a TACO V1 deposit transfers (and the V2 gross): amount + trading fee + one transfer fee. */
+export function requiredDeposit(tradeAmount: bigint, tradingFeeBps: bigint, transferFee: bigint): bigint {
+  return tradeAmount + tradingFeeOf(tradeAmount, tradingFeeBps) + transferFee
+}
+
 /** Wallet debit of one leg. */
 export function legDebit(dex: CrossDexVenue, amountIn: bigint, fee: bigint, tradingFeeBps: bigint, v2: boolean): bigint {
   if (amountIn <= 0n) return 0n
