@@ -32,16 +32,17 @@
       </span>
     </div>
 
-    <!-- result line -->
-    <div v-if="showResult" class="ms-row__l3">
+    <!-- result line: the whole line opens the routes (the chevron is the keyboard control) -->
+    <div v-if="showResult" class="ms-row__l3" :class="{ 'is-toggle': canToggle }" @click="canToggle && $emit('toggle')">
       <template v-if="item.quoting">
         <span class="ex-skeleton ms-row__skbar"></span>
         <span class="ex-skeleton" style="width:84px;height:14px"></span>
       </template>
       <template v-else-if="plan && !plan.issue">
         <DexSplitBar :legs="plan.legs" />
+        <span v-if="impactHint" class="ms-row__imp num">{{ impactHint }}</span>
         <span class="ms-row__out num" :class="impactClass">→ {{ fmtIcp(plan.receiveOut) }}</span>
-        <button class="ms-row__chev" :aria-expanded="open" :aria-label="open ? 'Hide the routes' : 'Show the routes'" @click="$emit('toggle')">{{ open ? '▴' : '▾' }}</button>
+        <button class="ms-row__chev" :aria-expanded="open" :aria-label="open ? 'Hide the routes' : 'Show the routes'" @click.stop="$emit('toggle')">{{ open ? '▴' : '▾' }}</button>
       </template>
     </div>
 
@@ -125,6 +126,9 @@ const impact = computed<number | null>(() => {
   return Math.max(0, (1 - Number(a.expectedOut) / Number(a.noImpactOut)) * 100)
 })
 const impactClass = computed(() => (impact.value == null ? '' : impact.value > 25 ? 'is-err' : impact.value > 5 ? 'is-warn' : ''))
+/** Between 5% and 15% the amount turns orange: say why (above 15% the message line does). */
+const impactHint = computed(() => (impact.value != null && impact.value > 5 && impact.value <= 15 ? `${impact.value.toFixed(1)}% impact` : ''))
+const canToggle = computed(() => !props.item.quoting && !!props.plan && !props.plan.issue)
 
 const showResult = computed(() => props.item.quoting || (!!props.plan && !props.plan.issue && props.issue == null))
 const inputError = computed(() => ['overMax', 'tooSmall', 'balanceChanged'].includes(props.issue ?? ''))
@@ -203,18 +207,27 @@ function via(l: CrossDexLeg): string {
   }
   &__bal { display: inline-flex; align-items: center; gap: 6px; }
   &__max {
-    appearance: none; height: 18px; padding: 0 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
+    appearance: none; height: 24px; min-width: 40px; padding: 0 8px; font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
     border-radius: 4px; border: 1px solid var(--tx-line); background: var(--tx-surface-2); color: var(--tx-ink-3); cursor: pointer;
     &.is-on { color: var(--tx-orange); background: var(--tx-orange-dim); border-color: var(--tx-orange-line); }
   }
-  &__l3 { grid-column: 2 / 5; display: flex; align-items: center; gap: 10px; padding-right: 4px; margin-top: 2px; }
+  &__l3 {
+    grid-column: 2 / 5; display: flex; align-items: center; gap: 10px; padding-right: 4px; margin-top: 2px;
+    &.is-toggle { cursor: pointer; }
+  }
+  &__imp { font-size: 11px; color: var(--tx-warning); white-space: nowrap; }
   &__skbar { flex: 1; height: 4px; }
   &__out {
     font-size: 13px; font-weight: 500; color: var(--tx-ink); white-space: nowrap;
     &.is-warn { color: var(--tx-warning); }
     &.is-err { color: var(--tx-sell); }
   }
-  &__chev { background: none; border: 0; color: var(--tx-ink-3); font-size: 11px; width: 16px; cursor: pointer; padding: 0; }
+  // a 32 px target drawn at the size of the glyph
+  &__chev {
+    background: none; border: 0; color: var(--tx-ink-3); font-size: 11px; cursor: pointer; padding: 0;
+    width: 32px; height: 32px; margin: -8px -8px -8px -8px; border-radius: 6px;
+    &:hover { color: var(--tx-ink); }
+  }
   &__msg {
     grid-column: 2 / 5; font-size: 12px; line-height: 1.4;
     &.is-err { color: var(--tx-sell); }
@@ -236,7 +249,8 @@ function via(l: CrossDexLeg): string {
 
   @media (max-width: 600px) {
     &__amt { width: 132px; font-size: min(14px, calc(110px / (var(--len, 1) * 0.6))); }
-    &__x { width: 44px; height: 44px; margin: -8px -8px -8px 0; }
+    // a 44 px tall target that grows to the left, into the column gap, never past the row's edge
+    &__x { width: 38px; height: 44px; margin: -8px 0; justify-self: end; }
   }
 }
 .ms-dex {

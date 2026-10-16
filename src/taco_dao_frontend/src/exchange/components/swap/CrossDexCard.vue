@@ -442,7 +442,8 @@ onMounted(() => {
   box-shadow: var(--tx-shadow-1);
 
   &__header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  &__titlebox { display: flex; flex-direction: column; gap: 4px; min-width: 0; @media (max-width: 600px) { flex: 1; } }
+  // the mode switch keeps its own width on desktop (the same as in Sell many), and fills the row on phones
+  &__titlebox { display: flex; flex-direction: column; gap: 4px; min-width: 0; align-items: flex-start; @media (max-width: 600px) { flex: 1; align-items: stretch; } }
   &__title { font-size: var(--text-xl); font-weight: var(--weight-semibold); color: var(--text-primary); margin: 0; }
   &__subtitle { font-size: var(--text-xs); color: var(--text-tertiary); margin: 2px 0 0; }
   &__settings-btn {

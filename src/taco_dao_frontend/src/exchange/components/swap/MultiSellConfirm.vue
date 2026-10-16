@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible && plan" class="ms-modal-overlay" data-theme="exchange" @click.self="$emit('cancel')" @keydown.escape="$emit('cancel')">
+    <div v-if="visible && plan" class="ms-modal-overlay" data-theme="exchange" @click.self="$emit('cancel')">
       <div class="ms-md" role="dialog" aria-modal="true" aria-label="Confirm sale">
         <h3>Confirm sale</h3>
         <div v-if="backNote" class="ms-md__back">{{ backNote }}</div>
@@ -27,7 +27,7 @@
         <p v-if="poolNote" class="ms-md__note">{{ poolNote }}</p>
         <div class="ms-md__wallet num">Prices updated {{ ageText }} · wallet {{ shortP }}</div>
         <div class="ms-md__acts">
-          <button class="ex-btn ex-btn--ghost" @click="$emit('cancel')">Cancel</button>
+          <button ref="cancelBtn" class="ex-btn ex-btn--ghost" @click="$emit('cancel')">Cancel</button>
           <button class="ex-btn ex-btn--primary" :disabled="cooling || refreshing" @click="onConfirm">
             {{ refreshing ? 'Updating prices…' : assets.length === 1 ? `Sell ${assets[0].symbol}` : `Sell ${assets.length} tokens` }}
           </button>
@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { formatTokenAmount } from '../../utils/format'
 import { joinNames, type BatchPlan } from '../../utils/multiSellPlanner'
@@ -100,6 +100,25 @@ watch(() => props.plan?.totalReceiveOut, () => {
   coolTimer = setTimeout(() => { cooling.value = false }, 1000)
 })
 function onConfirm() { if (!cooling.value && !props.refreshing) emit('confirm') }
+
+// Keyboard: focus moves into the sheet (Cancel, so Enter never sells by accident), Escape
+// cancels wherever focus is, and focus goes back to what opened the sheet when it closes.
+const cancelBtn = ref<HTMLButtonElement | null>(null)
+let opener: HTMLElement | null = null
+function onKey(e: KeyboardEvent) { if (e.key === 'Escape') { e.preventDefault(); emit('cancel') } }
+watch(() => props.visible && !!props.plan, async (open, was) => {
+  if (open && !was) {
+    opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    document.addEventListener('keydown', onKey)
+    await nextTick()
+    cancelBtn.value?.focus()
+  } else if (!open && was) {
+    document.removeEventListener('keydown', onKey)
+    if (opener?.isConnected) opener.focus()
+    opener = null
+  }
+}, { immediate: true })
+onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 </script>
 
 <style scoped lang="scss">

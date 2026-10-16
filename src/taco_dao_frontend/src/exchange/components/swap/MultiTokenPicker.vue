@@ -96,7 +96,7 @@
         <div class="ms-pick__f">
           <small>
             <template v-if="loading">Loading your balances…</template>
-            <template v-else>{{ picked.length }} selected, {{ pickedUsd }}<br />Up to {{ MAX }} tokens per sale</template>
+            <template v-else>{{ picked.length }} selected{{ pickedUsd ? `, ${pickedUsd}` : '' }}<br />Up to {{ MAX }} tokens per sale</template>
           </small>
           <button class="ex-btn ex-btn--primary" :disabled="picked.length === 0" @click="apply">
             {{ picked.length === 0 ? 'Pick at least one token' : editing ? 'Done' : picked.length === 1 ? 'Add 1 token' : `Add ${picked.length} tokens` }}
@@ -139,7 +139,10 @@ watch(() => props.visible, async (v) => {
   holdings.ensureBalances(store.tokens)
   markets.ensure(store.tokens.filter(t => t.address !== ICP_LEDGER_ID).map(t => t.address))
   await nextTick()
-  searchEl.value?.focus()
+  // on a touch screen the keyboard would cover the list the user came to tap: no autofocus there
+  let touch = false
+  try { touch = window.matchMedia('(pointer: coarse)').matches } catch { /* no matchMedia */ }
+  if (!touch) searchEl.value?.focus()
 }, { immediate: true })
 
 interface Entry { token: TokenInfo; usd: number; amountText: string; usdText: string; tooSmall: boolean; noMarket: boolean; small: boolean }
@@ -211,7 +214,11 @@ function apply() {
     h3 { margin: 0; font-size: 16px; font-weight: 600; }
     p { margin: 3px 0 0; font-size: 12px; color: var(--tx-ink-3); }
   }
-  &__close { background: none; border: 0; color: var(--tx-ink-3); padding: 2px; cursor: pointer; &:hover { color: var(--tx-ink); } }
+  &__close {
+    background: none; border: 0; color: var(--tx-ink-3); cursor: pointer; border-radius: 8px;
+    min-width: 36px; min-height: 36px; margin: -8px -8px 0 0; display: inline-flex; align-items: center; justify-content: center;
+    &:hover { color: var(--tx-ink); }
+  }
   &__search { padding: 12px 16px 8px; input { width: 100%; } }
   &__list { overflow-y: auto; flex: 1; min-height: 120px; }
   &__empty { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--tx-ink-3); line-height: 1.45; }

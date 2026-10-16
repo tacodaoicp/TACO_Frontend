@@ -27,7 +27,7 @@
         <TokenCoin v-for="t in topHoldings" :key="t.address" :token="t" :size="28" />
       </div>
       <div class="ms-empty__t">Pick the tokens you want to sell</div>
-      <div class="ms-empty__b">They all sell for ICP at the same time, each on the DEXes that pay the most.</div>
+      <div class="ms-empty__b">Up to {{ MAX }} tokens, all sold for ICP in one go.</div>
     </button>
 
     <template v-else>
@@ -66,16 +66,17 @@
       <div class="ms-recv">
         <div class="ms-recv__h">
           <span>You receive</span>
-          <span v-if="ms.refining.value" class="ms-refine"><span class="ms-spin"></span> finding precise split…</span>
+          <span v-if="updating" class="ms-refine"><span class="ms-spin"></span> updating…</span>
+          <span v-else-if="ms.refining.value" class="ms-refine"><span class="ms-spin"></span> finding precise split…</span>
         </div>
         <div class="ms-recv__row">
           <span class="ms-recv__pill"><TokenCoin :token="ms.icp.value" :size="20" /> ICP</span>
-          <span class="ms-recv__total num">
+          <span class="ms-recv__total num" :class="{ 'is-stale': updating }">
             <span v-if="ms.quoting.value && !plan" class="ex-skeleton" style="width:120px;height:24px;display:inline-block"></span>
             <template v-else>{{ plan ? fmtIcp(plan.totalReceiveOut) : '0.00' }}</template>
           </span>
         </div>
-        <div v-if="receiveUsd" class="ms-recv__usd num">{{ receiveUsd }}</div>
+        <div v-if="receiveUsd" class="ms-recv__usd num" :class="{ 'is-stale': updating }">{{ receiveUsd }}</div>
       </div>
 
       <div v-if="plan && !ms.quoting.value && ms.ready.value" class="ms-details">
@@ -109,9 +110,9 @@
     </template>
 
     <div class="ms-card__bar">
-      <div v-if="plan && ms.ready.value" class="ms-card__bar-total">
-        <span>You receive</span>
-        <b class="num">{{ fmtIcp(plan.totalReceiveOut) }}</b>
+      <div v-if="plan && (ms.ready.value || updating)" class="ms-card__bar-total">
+        <span>{{ updating ? 'Updating…' : 'You receive' }}</span>
+        <b class="num" :class="{ 'is-stale': updating }">{{ fmtIcp(plan.totalReceiveOut) }}</b>
       </div>
       <button
         class="ex-btn ex-btn--primary ex-btn--lg ex-btn--block"
@@ -154,7 +155,7 @@ import { useHoldings } from '../../composables/useHoldings'
 import { ICP_LEDGER_ID } from '../../constants/tokens'
 import { formatTokenAmount, formatUSD } from '../../utils/format'
 import { MAX_TOKENS_PER_SALE, joinNames } from '../../utils/multiSellPlanner'
-import { poolNoteText, aboutIcp, plural } from './multiSellCopy'
+import { poolNoteText, aboutIcp, plural, someNames } from './multiSellCopy'
 import MultiSellRow from './MultiSellRow.vue'
 import MultiTokenPicker from './MultiTokenPicker.vue'
 import MultiSellConfirm from './MultiSellConfirm.vue'
@@ -171,6 +172,8 @@ const pickerOpen = ref(false)
 const openRow = ref('')
 
 const plan = computed(() => ms.plan.value)
+/** A plan is shown while a changed basket or amount is being quoted again: it is dimmed until the new one lands. */
+const updating = computed(() => !!plan.value && ms.quoting.value)
 
 // the holdings (empty state coins, the picker) read the Portfolio's balance cache
 onMounted(() => { if (store.isAuthenticated) holdings.ensureBalances(store.tokens) })
@@ -225,9 +228,9 @@ const budgetInfo = computed(() => {
 })
 const waitHelper = computed(() => {
   if (!costlySkip.value || !ms.icp.value) return ''
-  return `Waiting ${ms.waitSec.value} s gets about ${aboutIcp(plan.value!.budget.gainIfWait, ms.icp.value)} ICP more.`
+  return `TACO takes only a few trades per wallet every 90 seconds. Waiting ${ms.waitSec.value} s lets ${someNames(skippedSyms.value)} use TACO too, for about ${aboutIcp(plan.value!.budget.gainIfWait, ms.icp.value)} ICP more.`
 })
-const sellNowText = computed(() => skippedSyms.value.length === 1 ? `Sell now without TACO for ${skippedSyms.value[0]}` : `Sell now without TACO for ${skippedSyms.value.length} tokens`)
+const sellNowText = computed(() => 'Sell now without waiting')
 watch(() => plan.value, () => { ms.sellAnyway.value = false })
 
 const extremeTitle = computed(() => {
@@ -328,9 +331,10 @@ function onPicked(addrs: string[]) {
     display: flex; align-items: center; gap: 6px; background: var(--tx-surface-2); border: 1px solid var(--tx-line-2);
     border-radius: 20px; padding: 4px 12px 4px 6px; font-weight: 600;
   }
-  &__total { flex: 1; text-align: right; font-size: 22px; font-weight: 500; letter-spacing: -0.01em; }
-  &__usd { text-align: right; font-size: 12px; color: var(--tx-ink-3); margin-top: 2px; }
+  &__total { flex: 1; text-align: right; font-size: 22px; font-weight: 500; letter-spacing: -0.01em; transition: opacity 0.2s; }
+  &__usd { text-align: right; font-size: 12px; color: var(--tx-ink-3); margin-top: 2px; transition: opacity 0.2s; }
 }
+.is-stale { opacity: 0.45; transition: opacity 0.2s; }
 .ms-refine { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--tx-ink-3); }
 .ms-spin {
   width: 10px; height: 10px; border: 2px solid var(--tx-line-2); border-top-color: var(--tx-orange); border-radius: 50%;

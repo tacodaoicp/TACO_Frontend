@@ -12,7 +12,7 @@
           label="CrossDEX"
           qualifier="best mix"
           :subtitle="mode === 'many'
-            ? 'All your tokens sell at the same time, each on the DEXes that pay the most ICP for it.'
+            ? 'The tokens you pick sell at once, each on the DEXes that pay the most ICP.'
             : 'Splits one swap across ICPSwap + TACO + Neutrinite for the best total output.'"
         />
 

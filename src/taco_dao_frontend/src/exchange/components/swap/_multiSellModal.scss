@@ -10,6 +10,7 @@
   padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--tx-shadow-2);
   color: var(--tx-ink);
 
+  &:focus { outline: none; } // focused on open so keys reach it; the sheet is not a control
   &--wide { max-width: 500px; }
   h3 { margin: 0; font-size: 17px; font-weight: 600; }
   &__head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }

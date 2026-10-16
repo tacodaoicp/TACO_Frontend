@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div v-if="run" class="ms-modal-overlay" data-theme="exchange">
-      <div class="ms-md ms-md--wide ms-run" role="dialog" aria-modal="true" :aria-label="title">
+      <div ref="sheet" class="ms-md ms-md--wide ms-run" role="dialog" aria-modal="true" :aria-label="title" tabindex="-1">
         <div class="ms-md__head">
           <h3>{{ title }}</h3>
           <span class="ms-pill" :class="`ms-pill--${pill.cls}`">{{ pill.text }}</span>
@@ -17,7 +17,7 @@
           </div>
         </div>
 
-        <div v-if="final" class="ms-res-total">
+        <div v-if="final && (receivedSoFar > 0n || unknownParts > 0)" class="ms-res-total">
           <div><small>You received</small><b class="num">{{ fmtIcp(receivedSoFar) }}</b></div>
           <span v-if="usdText" class="num ms-res-total__usd">{{ usdText }}</span>
         </div>
@@ -52,7 +52,7 @@
         </div>
 
         <template v-if="final && refunds.length">
-          <div class="ms-md__sec">Refunds</div>
+          <div class="ms-md__sec">{{ refunds.some(r => r.bad) ? 'Refunds and recovery' : 'Refunds' }}</div>
           <div class="ms-rf">
             <div v-for="(r, i) in refunds" :key="i" class="ms-rf__row">
               <span>{{ r.what }}</span>
@@ -61,8 +61,7 @@
           </div>
         </template>
 
-        <p v-if="run.phase === 'settling' && deferSec > 0" class="ms-md__note">Refunding {{ plural(run.deferredCount ?? 0, 'route', 'routes') }} after TACO's 90 second limit, in {{ deferSec }} s</p>
-        <p v-if="final && slowCount > 0" class="ms-md__note ms-note-warn">{{ plural(slowCount, 'route is', 'routes are') }} still finishing. Keep this page open until they do.</p>
+        <p v-if="final && slowCount > 0" class="ms-md__note ms-note-warn">{{ slowCount === 1 ? '1 route is still finishing. Keep this page open until it does.' : `${slowCount} routes are still finishing. Keep this page open until they do.` }}</p>
         <p v-if="final && run.sessionExpired" class="ms-md__note ms-note-warn">Your session expired during the sale. Reconnect, then open the Recover page for anything that was not refunded.</p>
         <p v-if="final && !anyRecover && anyRefund" class="ms-md__note">Refunds are on their way to your wallet, minus network fees.</p>
         <p v-if="final && anyRecover" class="ms-md__note ms-note-bad">Some funds were not refunded automatically. Open the Recover page to get them back.</p>
@@ -91,18 +90,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { formatTokenAmount, formatUSD } from '../../utils/format'
 import type { MultiSellRun } from '../../composables/useMultiSell'
 import type { LegRun } from '../../utils/multiSellRunner'
-import { dexName, plural, legDetail, stopText } from './multiSellCopy'
+import { dexName, plural, legDetail, stopText, routeHopToken } from './multiSellCopy'
+import { joinNames } from '../../utils/multiSellPlanner'
 import TokenCoin from './TokenCoin.vue'
 import DexLegChip from './DexLegChip.vue'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
 const props = defineProps<{ run: MultiSellRun | null; icp: TokenInfo | null }>()
-defineEmits<{ done: []; recover: []; back: []; portfolio: []; connect: [] }>()
+const emit = defineEmits<{ done: []; recover: []; back: []; portfolio: []; connect: [] }>()
 
 const store = useExchangeStore()
 const tokenOf = (a: string) => store.getTokenByAddress(a) ?? null
@@ -125,7 +125,8 @@ const receivedSoFar = computed(() => legs.value.reduce((s, l) => s + (SOLD.inclu
   ? l.amountOut - (l.venue === 'taco' ? 0n : 10_000n) : 0n), 0n))
 const usdText = computed(() => {
   const p = props.icp ? store.getTokenPriceUSD(props.icp.address) : 0
-  return p ? `≈ ${formatUSD(Number(receivedSoFar.value) / 1e8 * p)}` : ''
+  const usd = p && receivedSoFar.value > 0n ? formatUSD(Number(receivedSoFar.value) / 1e8 * p) : ''
+  return usd ? `≈ ${usd}` : ''
 })
 
 const n = computed(() => props.run?.assets.length ?? 0)
@@ -172,7 +173,7 @@ const progressText = computed(() => {
   const r = props.run
   if (!r) return ''
   if (r.phase === 'preparing') return 'Getting ready. Nothing has moved yet.'
-  if (r.phase === 'stopped') return 'Stopped before any funds moved.'
+  if (r.phase === 'stopped') return r.approvalSpent ? 'Stopped before anything was sold.' : 'Stopped before any funds moved.'
   if (r.phase === 'settling') {
     const k = legs.value.filter(l => l.state === 'deferred').length
     if (k) return deferSec.value > 0 ? `Refunding ${plural(k, 'route', 'routes')} after TACO's 90 second limit, in ${deferSec.value} s` : `Refunding ${plural(k, 'route', 'routes')}…`
@@ -200,6 +201,11 @@ function cell(a: MultiSellRun['assets'][number]): { text: string; cls: string; s
   const out = sold.reduce((s, l) => s + (l.amountOut != null && l.state !== 'doneUnknown' ? l.amountOut - (l.venue === 'taco' ? 0n : 10_000n) : 0n), 0n)
   const unfinished = ls.filter(l => !isFinal(l))
   if (unfinished.length) {
+    // a part handed to the refund after TACO's call window is waiting to be refunded, not to sell
+    if (unfinished.every(l => l.state === 'deferred')) {
+      const sec = Math.max(0, Math.ceil(((unfinished[0].deferUntil ?? props.run?.deferredUntil ?? 0) - now.value) / 1000))
+      return { text: sec > 0 ? `Refund in ${sec} s` : 'Refunding', cls: 'run', spin: sec === 0 }
+    }
     const allWait = unfinished.every(l => l.state === 'waiting' || l.state === 'deferred')
     return { text: allWait ? 'Waiting' : 'Running', cls: 'run', spin: !allWait }
   }
@@ -230,21 +236,46 @@ watch([() => props.run?.id, final], ([id, f], [oldId]) => {
 }, { immediate: true })
 
 function detail(a: MultiSellRun['assets'][number], l: LegRun): string {
-  const owners = (l.waitsFor ?? []).map(x => props.run?.assets.find(y => y.address === x)?.symbol ?? '').filter(Boolean).join(' and ')
+  const owners = joinNames((l.waitsFor ?? []).map(x => props.run?.assets.find(y => y.address === x)?.symbol ?? '').filter(Boolean))
   const out = l.amountOut != null ? fmtIcp(l.amountOut - (l.venue === 'taco' ? 0n : 10_000n)) : ''
-  return legDetail(l, a.symbol, fmtTok(a.address, l.amountIn), out, owners)
+  return legDetail(l, a.symbol, fmtTok(a.address, l.amountIn), out, owners, (x) => tokenOf(x)?.symbol ?? '')
 }
+// Keyboard: focus moves into the sheet when it opens and back to what was focused when it
+// closes; Escape closes a finished or stopped sale (never one that is still running).
+const sheet = ref<HTMLElement | null>(null)
+let opener: HTMLElement | null = null
+function onKey(e: KeyboardEvent) {
+  if (e.key !== 'Escape' || !props.run) return
+  if (props.run.phase === 'stopped') { e.preventDefault(); emit('back') }
+  else if (final.value) { e.preventDefault(); emit('done') }
+}
+watch(() => !!props.run, async (open, was) => {
+  if (open && !was) {
+    opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    document.addEventListener('keydown', onKey)
+    await nextTick()
+    sheet.value?.focus()
+  } else if (!open && was) {
+    document.removeEventListener('keydown', onKey)
+    if (opener?.isConnected) opener.focus()
+    opener = null
+  }
+}, { immediate: true })
+onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
+
 const showRawError = (l: LegRun) => ['needsRecovery', 'tracked'].includes(l.state) && !!l.error && !/may have been sent|TACO takes only/i.test(l.error)
 
 const refunds = computed(() => {
   const out: Array<{ what: string; where: string; bad: boolean }> = []
   for (const a of props.run?.assets ?? []) for (const l of a.legs) {
     const amt = `≈ ${fmtTok(a.address, l.amountIn)} ${a.symbol}`
-    if (l.state === 'refunded') out.push({ what: `${amt} from ${dexName(l.venue)}`, where: 'Sent back to your wallet', bad: false })
-    else if (l.state === 'tracked') out.push({ what: `${a.symbol} deposit on TACO`, where: 'Listed on the Recover page.', bad: true })
-    else if (l.state === 'needsRecovery' && l.reason === 'maySent') out.push({ what: `${a.symbol} deposit on TACO`, where: 'Listed on the Recover page.', bad: true })
-    else if (l.state === 'needsRecovery' && l.failedAfterSwap) out.push({ what: `ICP from ${a.symbol} on ${dexName(l.venue)}`, where: 'Not sent yet. Use Recover.', bad: true })
-    else if (l.state === 'needsRecovery') out.push({ what: `${amt} on ${dexName(l.venue)}`, where: 'Not refunded yet. Use Recover.', bad: true })
+    const mid = l.state === 'refunded' ? routeHopToken(l) : null
+    if (mid != null) out.push({ what: `${a.symbol} route on TACO`, where: mid && tokenOf(mid) ? `Came back as ${tokenOf(mid)!.symbol}.` : 'Came back as another token.', bad: false })
+    else if (l.state === 'refunded') out.push({ what: `${amt} from ${dexName(l.venue)}`, where: 'Sent back to your wallet.', bad: false })
+    else if (l.state === 'tracked') out.push({ what: `${a.symbol} deposit on TACO`, where: 'Use the Recover page.', bad: true })
+    else if (l.state === 'needsRecovery' && l.reason === 'maySent') out.push({ what: `${a.symbol} deposit on TACO`, where: 'Use the Recover page.', bad: true })
+    else if (l.state === 'needsRecovery' && l.failedAfterSwap) out.push({ what: `ICP from ${a.symbol} on ${dexName(l.venue)}`, where: 'Not sent yet. Use the Recover page.', bad: true })
+    else if (l.state === 'needsRecovery') out.push({ what: `${amt} on ${dexName(l.venue)}`, where: 'Not refunded yet. Use the Recover page.', bad: true })
   }
   return out
 })
