@@ -75,8 +75,11 @@ const gateNote = computed(() => {
   const waitingAssets = [...new Set(g.legs.map(l => l.asset))]
   const allLegs = assets.value.reduce((n, a) => n + a.legs.filter(l => l.dex !== 'neutrinite' || a.address !== g.token).length, 0)
   if (g.legs.length >= allLegs) return `${sym} starts first on Neutrinite. Everything else starts when Neutrinite confirms that deposit, usually within 10 seconds.`
-  const names = waitingAssets.map(a => assets.value.find(x => x.address === a)?.symbol ?? '').filter(Boolean)
-  return `${sym} starts first on Neutrinite. ${joinNames(names)} ${names.length === 1 ? 'starts' : 'start'} when Neutrinite confirms that deposit, usually within 10 seconds. The rest start at once.`
+  const own = waitingAssets.includes(g.token)
+  const names = waitingAssets.filter(a => a !== g.token).map(a => assets.value.find(x => x.address === a)?.symbol ?? '').filter(Boolean)
+  const others = `the ${joinNames(names)} ${names.length === 1 ? 'route' : 'routes'} that use the same markets`
+  const who = own && names.length ? `Its other routes and ${others}` : own ? 'Its other routes' : others.charAt(0).toUpperCase() + others.slice(1)
+  return `${sym} starts first on Neutrinite. ${who} wait until Neutrinite confirms that deposit, usually within 10 seconds. Everything else starts at once.`
 })
 const poolNote = computed(() => (props.plan?.note && props.icp ? poolNoteText(props.plan.note, props.icp) : ''))
 
