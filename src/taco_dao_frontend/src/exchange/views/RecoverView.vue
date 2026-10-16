@@ -451,8 +451,12 @@ const depositTokenType: Record<string, any> = {
   ICRC3: { ICRC3: null },
 }
 
+// Each action sets its busy flag in the tap's own task, before the funds lock is
+// requested (granted a task later), so a second tap meanwhile sends nothing twice.
 function recoverCachedDeposit(dep: CachedDeposit) {
-  return guarded(() => recoverCachedDepositInner(dep))
+  if (recovering.value) return
+  recovering.value = true
+  return guarded(() => recoverCachedDepositInner(dep)).finally(() => { recovering.value = false })
 }
 async function recoverCachedDepositInner(dep: CachedDeposit) {
   console.log(`[Recover] Attempting recovery: token=${dep.token.slice(0, 10)} block=${dep.block} type=${dep.type}`)
@@ -498,7 +502,9 @@ async function recoverCachedDepositInner(dep: CachedDeposit) {
 }
 
 function recoverAllCached() {
-  return guarded(() => recoverAllCachedInner())
+  if (recovering.value) return
+  recovering.value = true
+  return guarded(() => recoverAllCachedInner()).finally(() => { recovering.value = false })
 }
 async function recoverAllCachedInner() {
   if (!store.isAuthenticated) {
@@ -619,7 +625,9 @@ const canRecover = computed(() => {
 })
 
 function recoverTokens() {
-  return guarded(() => recoverTokensInner())
+  if (recovering.value) return
+  recovering.value = true
+  return guarded(() => recoverTokensInner()).finally(() => { recovering.value = false })
 }
 async function recoverTokensInner() {
   recoverError.value = ''
@@ -680,7 +688,9 @@ const canSweepManual = computed(() =>
 )
 
 function sweepPending(p: icpswap.PendingIcpSwap) {
-  return guarded(() => sweepPendingInner(p))
+  if (sweeping.value) return
+  sweeping.value = p.sell + p.buy
+  return guarded(() => sweepPendingInner(p)).finally(() => { sweeping.value = '' })
 }
 async function sweepPendingInner(p: icpswap.PendingIcpSwap) {
   if (!store.isAuthenticated) { sweepError.value = 'Connect your wallet first'; return }
@@ -712,10 +722,11 @@ function dismissPendingSwap(p: icpswap.PendingIcpSwap) {
 }
 
 function sweepManual() {
-  return guarded(() => sweepManualInner())
+  if (!canSweepManual.value) return
+  sweeping.value = 'manual'
+  return guarded(() => sweepManualInner()).finally(() => { sweeping.value = '' })
 }
 async function sweepManualInner() {
-  if (!canSweepManual.value) return
   sweeping.value = 'manual'
   sweepError.value = ''
   sweepSuccess.value = false
@@ -748,7 +759,9 @@ function dismissPendingNeu(p: neutrinite.PendingNeutrinite) {
 }
 
 function sweepNeuPending(p: neutrinite.PendingNeutrinite) {
-  return guarded(() => sweepNeuPendingInner(p))
+  if (sweeping.value) return
+  sweeping.value = 'neu:' + p.sell + p.buy
+  return guarded(() => sweepNeuPendingInner(p)).finally(() => { sweeping.value = '' })
 }
 async function sweepNeuPendingInner(p: neutrinite.PendingNeutrinite) {
   if (!store.isAuthenticated) { sweepError.value = 'Connect your wallet first'; return }
@@ -776,10 +789,11 @@ async function sweepNeuPendingInner(p: neutrinite.PendingNeutrinite) {
 }
 
 function sweepNeuManual() {
-  return guarded(() => sweepNeuManualInner())
+  if (!canSweepManual.value) return
+  sweeping.value = 'neu-manual'
+  return guarded(() => sweepNeuManualInner()).finally(() => { sweeping.value = '' })
 }
 async function sweepNeuManualInner() {
-  if (!canSweepManual.value) return
   sweeping.value = 'neu-manual'
   sweepError.value = ''
   sweepSuccess.value = false

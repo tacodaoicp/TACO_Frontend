@@ -34,6 +34,7 @@ import { formatTokenAmount } from '../utils/format'
 import { createRunAgent, type RunAgent } from '../utils/runAgent'
 import { withFundsLock, BUSY } from '../utils/saleLock'
 import { dedupLedgers } from '../utils/ledgerDedup'
+import { withTimeout } from '../utils/withTimeout'
 import { runJournal } from '../utils/runJournalStore'
 import { newRunId, type RunRecord } from '../utils/crossDexJournal'
 import {
@@ -339,27 +340,41 @@ export function useCrossDexSwap() {
     phase.value = 'ready'
   }
 
+  /** Set from the Confirm tap until its result shows: a second tap runs nothing. */
+  let executing = false
+
   /**
    * Run the swap inside the CrossDEX funds lock (shared: a Sell many sale in
    * any tab refuses it). The lock is held until every leg promise has settled,
-   * while the result shows at the 180 s backstop.
+   * while the result shows at the 180 s backstop. The phase leaves 'confirming'
+   * in the tap's own task: the lock is granted a task later, and a second tap
+   * in between must not start a second run of the same plan.
    */
   async function execute() {
-    if (!tokenFrom.value || !tokenTo.value || !plan.value) return
-    let uiReady!: () => void
-    const ui = new Promise<'ui'>(r => { uiReady = () => r('ui') })
-    const locked = withFundsLock('shared', async () => {
-      try { await executeLocked(uiReady) } finally { uiReady() }
-    })
-    const first = await Promise.race([locked.then(v => (v === BUSY ? 'busy' : 'done')), ui])
-    if (first === 'busy') {
-      phase.value = 'ready'
-      toast.warning('Sale in progress', 'A Sell many sale is running. Try again when it finishes.')
+    if (executing || phase.value !== 'confirming' || !tokenFrom.value || !tokenTo.value || !plan.value) return
+    executing = true
+    phase.value = 'executing'
+    refining.value = false
+    outcomes.value = []
+    legSteps.value = { icpswap: '', taco: '', neutrinite: '' }
+    try {
+      let uiReady!: () => void
+      const ui = new Promise<'ui'>(r => { uiReady = () => r('ui') })
+      const locked = withFundsLock('shared', async () => {
+        try { await executeLocked(uiReady) } finally { uiReady() }
+      })
+      const first = await Promise.race([locked.then(v => (v === BUSY ? 'busy' : 'done')), ui])
+      if (first === 'busy') {
+        phase.value = 'ready'
+        toast.warning('Sale in progress', 'A Sell many sale is running. Try again when it finishes.')
+      }
+    } finally {
+      executing = false
     }
   }
 
   async function executeLocked(uiReady: () => void) {
-    if (!tokenFrom.value || !tokenTo.value || !plan.value) return
+    if (!tokenFrom.value || !tokenTo.value || !plan.value) { phase.value = 'ready'; return }
     seq++ // a refine still in flight must not replace the plan these legs run
     const legs = plan.value.legs
     const fromAddr = tokenFrom.value.address
@@ -379,7 +394,10 @@ export function useCrossDexSwap() {
     // and a memo (resent unchanged when its answer is lost), which needs the
     // run agent's clock synced with the replica.
     const v1Taco = legs.some(l => l.dex === 'taco') && !store.useV2Deposit(fromAddr)
-    const dedup = v1Taco ? (await dedupLedgers()).has(fromAddr) : false
+    // the list is prefetched when CrossDEX opens; a cold or slow read waits 3 s at most (then no resend)
+    const dedup = v1Taco
+      ? (await withTimeout(dedupLedgers(), 3_000, 'dedupLedgers').catch(() => new Set<string>())).has(fromAddr)
+      : false
     let runAgent: RunAgent
     try {
       // the replica clock also dates the ICPSwap approval's expiry

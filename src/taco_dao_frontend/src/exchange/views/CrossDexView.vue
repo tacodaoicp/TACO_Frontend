@@ -83,6 +83,7 @@ import { useMultiSell } from '../composables/useMultiSell'
 import { useExchangeAuth } from '../composables/useExchangeAuth'
 import { useExchangeStore } from '../store/exchange.store'
 import { useInterruptedSale } from '../composables/useInterruptedSale'
+import { dedupLedgers } from '../utils/ledgerDedup'
 
 const route = useRoute()
 const router = useRouter()
@@ -116,7 +117,11 @@ const switchLocked = computed(() => ms.isBusy.value)
 const viewActive = ref(true)
 onActivated(() => { viewActive.value = true; void checkInterrupted() })
 onDeactivated(() => { viewActive.value = false })
-onMounted(() => { void checkInterrupted() })
+onMounted(() => {
+  void checkInterrupted()
+  // warm the deduplicating ledger list (two anonymous queries, cached 24 h) before any Confirm
+  void dedupLedgers()
+})
 watch(() => store.principalText, () => { void checkInterrupted() })
 
 // Browser back while a sale runs: it keeps going; ask before leaving.
