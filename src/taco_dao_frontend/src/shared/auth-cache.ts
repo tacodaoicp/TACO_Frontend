@@ -168,6 +168,21 @@ export async function getCachedAgent(): Promise<HttpAgent> {
 }
 
 /**
+ * A fresh agent for one identity object, never cached: same host and root key
+ * rules as getCachedAgent. A CrossDEX run builds its own agent this way and
+ * takes the principal from the same identity object, so a login or logout in
+ * another tab can never pair one principal with another principal's agent.
+ */
+export async function createAgentFor(identity: Identity): Promise<HttpAgent> {
+  const { createAgent } = await getUtilsModule()
+  return createAgent({
+    identity,
+    host: getNetworkHost(),
+    fetchRootKey: shouldFetchRootKey(),
+  })
+}
+
+/**
  * Create an HttpAgent using @dfinity/agent's HttpAgent class directly.
  * Useful when createAgent from utils isn't appropriate.
  */

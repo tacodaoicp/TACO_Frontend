@@ -81,6 +81,9 @@ export interface TokenTrend7d {
   changePct7d: number
 }
 
+/** A CrossDEX run's own agent and principal, from one identity object. */
+export interface ExchangePin { agent: unknown; principal: string }
+
 export const useExchangeStore = defineStore('exchange', () => {
   // ═══════════════════════════════════════════
   // State
@@ -228,6 +231,55 @@ export const useExchangeStore = defineStore('exchange', () => {
     _identityHash = currentHash
 
     return _updateActor
+  }
+
+  // ── Pinned actors (CrossDEX run agents) ──
+  // A run passes its own agent and principal (one identity object). Its actor
+  // is cached per agent; a session error resets this tab's auth only when the
+  // pinned principal is still the current one (never a newer session's).
+  const pinnedActors = new WeakMap<object, _SERVICE>()
+  function getPinnedUpdateActor(pin: ExchangePin): _SERVICE {
+    let a = pinnedActors.get(pin.agent as object)
+    if (!a) {
+      const raw = Actor.createActor<_SERVICE>(idlFactory, { agent: pin.agent as any, canisterId: getExchangeCanisterId() })
+      a = new Proxy(raw, {
+        get(target, prop, receiver) {
+          const v = Reflect.get(target, prop, receiver)
+          if (typeof v !== 'function') return v
+          return async (...args: unknown[]) => {
+            try { return await (v as (...x: unknown[]) => Promise<unknown>).apply(target, args) }
+            catch (err) {
+              if (isSessionAuthError(err)) {
+                if (principalText.value === pin.principal) {
+                  clearAuthCache()
+                  clearActorCache()
+                  isAuthenticated.value = false
+                  principalText.value = ''
+                  try { localStorage.removeItem('taco_exchange_auth') } catch { /* ignore */ }
+                  try { new BroadcastChannel('taco-exchange-auth').postMessage({ type: 'logout' }) } catch { /* ignore */ }
+                }
+                throw new Error('Session expired. Please reconnect your wallet.')
+              }
+              throw err
+            }
+          }
+        },
+      }) as _SERVICE
+      pinnedActors.set(pin.agent as object, a)
+    }
+    return a
+  }
+
+  /** An error thrown before the call was sent (the exchange saw nothing). */
+  function notSentError(message: string): Error {
+    return Object.assign(new Error(message), { beforeSend: true })
+  }
+
+  /** The update actor for one call: the run's pinned actor, or the cached session's. */
+  async function updateActorFor(pin?: ExchangePin): Promise<_SERVICE> {
+    if (pin) return getPinnedUpdateActor(pin)
+    try { return await getUpdateActor() }
+    catch (e: any) { throw Object.assign(e instanceof Error ? e : new Error(String(e)), { beforeSend: true }) }
   }
 
   /** Funnel every update call through one choke point: a dead session (expired
@@ -1905,10 +1957,12 @@ export const useExchangeStore = defineStore('exchange', () => {
     route: SwapHop[],
     minAmountOut: bigint,
     blockNumber: bigint,
+    pin?: ExchangePin,
   ) {
-    if (!canMakeUpdateCall()) throw new Error('Rate limit reached. Wait before making more trades.')
-    trackUpdateCall()
-    const actor = await getUpdateActor()
+    const principal = pin?.principal ?? principalText.value
+    if (!canMakeUpdateCall(principal)) throw notSentError('Rate limit reached. Wait before making more trades.')
+    trackUpdateCall(principal)
+    const actor = await updateActorFor(pin)
     return actor.swapMultiHop(tokenIn, tokenOut, amountIn, route, minAmountOut, blockNumber)
   }
 
@@ -1918,10 +1972,12 @@ export const useExchangeStore = defineStore('exchange', () => {
     splits: SplitLeg[],
     minAmountOut: bigint,
     blockNumber: bigint,
+    pin?: ExchangePin,
   ) {
-    if (!canMakeUpdateCall()) throw new Error('Rate limit reached. Wait before making more trades.')
-    trackUpdateCall()
-    const actor = await getUpdateActor()
+    const principal = pin?.principal ?? principalText.value
+    if (!canMakeUpdateCall(principal)) throw notSentError('Rate limit reached. Wait before making more trades.')
+    trackUpdateCall(principal)
+    const actor = await updateActorFor(pin)
     return actor.swapSplitRoutes(tokenIn, tokenOut, splits, minAmountOut, blockNumber)
   }
 
@@ -2041,20 +2097,31 @@ export const useExchangeStore = defineStore('exchange', () => {
     tokenCanisterId: string,
     blockNumber: bigint,
     tokenType: { ICP: null } | { ICRC3: null } | { ICRC12: null },
+    pin?: ExchangePin,
   ): Promise<boolean> {
-    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
-    trackUpdateCall()
-    const actor = await getUpdateActor()
+    const principal = pin?.principal ?? principalText.value
+    if (!canMakeUpdateCall(principal)) throw notSentError('Rate limit reached.')
+    trackUpdateCall(principal)
+    const actor = await updateActorFor(pin)
     return actor.recoverWronglysent(tokenCanisterId, blockNumber, tokenType)
   }
 
   async function recoverBatch(
     recoveries: Array<{ identifier: string; block: bigint; tType: { ICP: null } | { ICRC3: null } | { ICRC12: null } }>,
+    pin?: ExchangePin,
   ) {
-    if (!canMakeUpdateCall()) throw new Error('Rate limit reached.')
-    trackUpdateCall()
-    const actor = await getUpdateActor()
+    const principal = pin?.principal ?? principalText.value
+    if (!canMakeUpdateCall(principal)) throw notSentError('Rate limit reached.')
+    trackUpdateCall(principal)
+    const actor = await updateActorFor(pin)
     return actor.recoverBatch(recoveries)
+  }
+
+  /** Exact TACO simulation of 1 to 3 split legs, run in order with the pool
+   *  state carried from leg to leg (query, anonymous, free). */
+  async function simulateSplitRoutes(splits: Array<{ amountIn: bigint; route: SwapHop[] }>) {
+    const actor = await getQueryActor()
+    return actor.simulateSplitRoutes(splits)
   }
 
   async function fixStuckTX(accesscode: string) {
@@ -2097,10 +2164,12 @@ export const useExchangeStore = defineStore('exchange', () => {
     amountInGross: bigint,
     route: SwapHop[],
     minAmountOut: bigint,
+    pin?: ExchangePin,
   ) {
-    if (!canMakeUpdateCall()) throw new Error('Rate limit reached. Wait before making more trades.')
-    trackUpdateCall()
-    const actor = await getUpdateActor()
+    const principal = pin?.principal ?? principalText.value
+    if (!canMakeUpdateCall(principal)) throw notSentError('Rate limit reached. Wait before making more trades.')
+    trackUpdateCall(principal)
+    const actor = await updateActorFor(pin)
     const res = await actor.swapMultiHopV2(tokenIn, tokenOut, amountInGross, route, minAmountOut)
     noteV2GateError(res)
     return res
@@ -2111,10 +2180,12 @@ export const useExchangeStore = defineStore('exchange', () => {
     tokenOut: string,
     splits: SplitLeg[],
     minAmountOut: bigint,
+    pin?: ExchangePin,
   ) {
-    if (!canMakeUpdateCall()) throw new Error('Rate limit reached. Wait before making more trades.')
-    trackUpdateCall()
-    const actor = await getUpdateActor()
+    const principal = pin?.principal ?? principalText.value
+    if (!canMakeUpdateCall(principal)) throw notSentError('Rate limit reached. Wait before making more trades.')
+    trackUpdateCall(principal)
+    const actor = await updateActorFor(pin)
     const res = await actor.swapSplitRoutesV2(tokenIn, tokenOut, splits, minAmountOut)
     noteV2GateError(res)
     return res
@@ -2634,6 +2705,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     claimConcentratedFees,
     recoverWronglysent,
     recoverBatch,
+    simulateSplitRoutes,
     fixStuckTX,
 
     // Exchange V2 (approve+pull)

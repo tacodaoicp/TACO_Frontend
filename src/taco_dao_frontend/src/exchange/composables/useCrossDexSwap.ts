@@ -31,6 +31,7 @@ import {
 import { depositToken, removeDepositFromCache, setDepositStatus, approveExchangeDeposit, calculateRequiredDeposit } from '../utils/deposit'
 import { isApprovalDeclined } from '../utils/approvalPrompt'
 import { formatTokenAmount } from '../utils/format'
+import { createRunAgent, type RunAgent } from '../utils/runAgent'
 import {
   runCrossDexSwap, realClock, nullJournal, isNeuFirst,
   type LegDeps, type LegOutcome as RunnerLegOutcome,
@@ -49,32 +50,38 @@ export type LegOutcome = RunnerLegOutcome
 const GRID_BPS = CROSSDEX_GRID_BPS
 const MAX_ROUTES_PER_FRACTION = CROSSDEX_MAX_ROUTES
 
-/** The real services, bound for the leg runner. */
-export function buildLegDeps(store: ReturnType<typeof useExchangeStore>): LegDeps {
+/**
+ * The real services, bound for the leg runner. With a run agent every fund
+ * moving and recovery call is signed by that agent for its principal.
+ */
+export function buildLegDeps(store: ReturnType<typeof useExchangeStore>, run?: RunAgent): LegDeps {
+  const pin = run ? { agent: run.agent, principal: run.principalText } : undefined
+  const auth = run ? { agent: run.agent, owner: run.principal } : {}
   return {
     icpswap: {
-      icrc2Swap: (p) => icpswap.icrc2Swap(p),
-      sweep: (p, o) => icpswap.sweep(p, o),
-      sweepWithRetry: (p, a, d, o) => icpswap.sweepWithRetry(p, a, d, o),
+      icrc2Swap: (p) => icpswap.icrc2Swap({ ...p, ...auth }),
+      sweep: (p, o) => icpswap.sweep(p, { ...o, ...auth }),
+      sweepWithRetry: (p, a, d, o) => icpswap.sweepWithRetry(p, a, d, { ...o, ...auth }),
       removePendingSwap: icpswap.removePendingSwap,
     },
     neutrinite: {
-      executeSwap: (p) => neutrinite.executeSwap(p),
-      sweep: (sell, buy, before) => neutrinite.sweep(sell, buy, before),
+      executeSwap: (p) => neutrinite.executeSwap({ ...p, ...auth }),
+      sweep: (sell, buy, before, o) => neutrinite.sweep(sell, buy, before, { ...o, ...auth }),
       removePendingSwap: neutrinite.removePendingSwap,
     },
     taco: {
       treasury: () => ({ accountId: store.treasuryAccountId, principal: store.treasuryPrincipal }),
-      depositToken: (token, assetType, amount, feeBps, fee, acct, princ) =>
-        depositToken(token, assetType, amount, feeBps, fee, acct, princ),
+      depositToken: (token, assetType, amount, feeBps, fee, acct, princ, o) =>
+        depositToken(token, assetType, amount, feeBps, fee, acct, princ, { ...auth, runId: o.runId }),
       removeDepositFromCache: (block, token) => removeDepositFromCache(block, token),
       setDepositStatus: (block, status, token) => setDepositStatus(block, status, token),
-      swapMultiHop: (i, o, a, r, m, b) => store.swapMultiHop(i, o, a, r, m, b),
-      swapSplitRoutes: (i, o, s, m, b) => store.swapSplitRoutes(i, o, s, m, b),
-      swapMultiHopV2: (i, o, g, r, m) => store.swapMultiHopV2(i, o, g, r, m),
-      swapSplitRoutesV2: (i, o, s, m) => store.swapSplitRoutesV2(i, o, s, m),
-      recoverWronglysent: (t, b, a) => store.recoverWronglysent(t, b, a),
-      probeSwapLanded: (i, o, a, at, limit) => probeSwapLanded(store, i, o, a, at, { limit, notBeforeMs: at - 20_000 }),
+      swapMultiHop: (i, o, a, r, m, b) => store.swapMultiHop(i, o, a, r, m, b, pin),
+      swapSplitRoutes: (i, o, sp, m, b) => store.swapSplitRoutes(i, o, sp, m, b, pin),
+      swapMultiHopV2: (i, o, g, r, m) => store.swapMultiHopV2(i, o, g, r, m, pin),
+      swapSplitRoutesV2: (i, o, sp, m) => store.swapSplitRoutesV2(i, o, sp, m, pin),
+      recoverWronglysent: (t, b, a) => store.recoverWronglysent(t, b, a, pin),
+      probeSwapLanded: (i, o, a, at, limit) =>
+        probeSwapLanded(store, i, o, a, at, { limit, notBeforeMs: at - 20_000, agent: run?.agent }),
       refreshAfterMutation: (k) => { void store.refreshAfterMutation(k) },
     },
     clock: realClock,
@@ -340,6 +347,19 @@ export function useCrossDexSwap() {
     outcomes.value = []
     legSteps.value = { icpswap: '', taco: '', neutrinite: '' }
 
+    // The swap's own agent, built from one identity object: every fund moving
+    // and recovery call below is signed by it for this principal, whatever
+    // happens to the session in other tabs meanwhile.
+    let runAgent: RunAgent
+    try {
+      runAgent = await createRunAgent({ expectPrincipal: store.principalText || undefined })
+    } catch (err: any) {
+      phase.value = 'ready'
+      errorMsg.value = err?.message || 'Could not start the swap'
+      toast.error('Swap Failed', errorMsg.value)
+      return
+    }
+
     // Pinned once for the whole swap (store contract: decide once per user
     // action, never re-read mid-flow): the V2 path, the trading fee and the fee.
     const v2 = store.useV2Deposit(fromAddr)
@@ -354,7 +374,7 @@ export function useCrossDexSwap() {
       try {
         v2Gross = calculateRequiredDeposit(tacoLeg.amountIn, tradingFeeBps, fee)
         setLegStep('taco', 'Approving…')
-        await approveExchangeDeposit(fromAddr, v2Gross, fee)
+        await approveExchangeDeposit(fromAddr, v2Gross, fee, { agent: runAgent.agent, owner: runAgent.principal })
         setLegStep('taco', '')
       } catch (err: any) {
         // Approval failed before anything moved: abort the whole swap cleanly.
@@ -395,7 +415,7 @@ export function useCrossDexSwap() {
       probeLimit: 10n,
       sortV1Errors: false,
       log: (...a) => console.error(...a),
-    }), buildLegDeps(store), { log: (m) => console.info(m) })
+    }), buildLegDeps(store, runAgent), { log: (m) => console.info(m) })
     void run.all.finally(() => window.removeEventListener('beforeunload', blockUnload))
 
     const results = await run.ui

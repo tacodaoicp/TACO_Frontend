@@ -70,6 +70,9 @@ export interface IcpSwapParams {
   /** Stop before the deposit when the pair marker could not be written. */
   requireMarker?: boolean
   track?: IcpSwapTrack
+  /** A run's own agent and principal (one identity object); default: the cached session. */
+  agent?: HttpAgent
+  owner?: Principal
 }
 
 /** Error for a swap that stopped before any funds moved (only the approve fee was spent). */
@@ -458,12 +461,21 @@ export async function quoteGrid(
  * the first move of funds. Returns the gross amount out (before the output
  * ledger's transfer fee).
  */
-export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: bigint }> {
+async function resolveAuth(agent?: HttpAgent, owner?: Principal): Promise<{ agent: HttpAgent; owner: Principal }> {
+  if (agent && owner) {
+    if (owner.isAnonymous()) throw new Error('Not authenticated')
+    return { agent, owner }
+  }
   const authedAgent = await getCachedAgent()
   if (!authedAgent) throw new Error('Not authenticated')
   const identity = await getCachedIdentity()
   const ownerPrincipal = identity.getPrincipal()
   if (ownerPrincipal.isAnonymous()) throw new Error('Not authenticated')
+  return { agent: authedAgent, owner: ownerPrincipal }
+}
+
+export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: bigint }> {
+  const { agent: authedAgent } = await resolveAuth(params.agent, params.owner)
   const track = params.track ?? {}
 
   params.onStep?.('Finding pool...')
@@ -567,6 +579,9 @@ export interface SweepReport {
 }
 export interface SweepOptions {
   report?: SweepReport
+  /** A run's own agent and principal; default: the cached session. */
+  agent?: HttpAgent
+  owner?: Principal
 }
 
 /**
@@ -585,11 +600,7 @@ export interface SweepOptions {
  */
 export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promise<boolean> {
   const report = opts.report
-  const authedAgent = await getCachedAgent()
-  if (!authedAgent) throw new Error('Not authenticated')
-  const identity = await getCachedIdentity()
-  const ownerPrincipal = identity.getPrincipal()
-  if (ownerPrincipal.isAnonymous()) throw new Error('Not authenticated')
+  const { agent: authedAgent, owner: ownerPrincipal } = await resolveAuth(opts.agent, opts.owner)
 
   const poolId = params.poolId ?? (await getPoolCanister(params.token0Principal, params.token1Principal))
   const poolActor = Actor.createActor(poolIDL, { agent: authedAgent, canisterId: poolId })

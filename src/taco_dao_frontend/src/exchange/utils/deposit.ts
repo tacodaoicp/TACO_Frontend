@@ -7,7 +7,7 @@
  * exchange canister.
  */
 
-import { Actor } from '@dfinity/agent'
+import { Actor, type HttpAgent } from '@dfinity/agent'
 import { Principal } from '@dfinity/principal'
 import { getCachedAgent, getCachedIdentity } from '../../shared/auth-cache'
 import { icrcIDL } from '../../shared/icrc-idl'
@@ -55,15 +55,31 @@ export async function approveExchangeDeposit(
   tokenCanisterId: string,
   gross: bigint,
   transferFee: bigint,
-): Promise<void> {
-  const agent = await getCachedAgent()
-  if (!agent) throw new Error('Not authenticated')
-  const identity = await getCachedIdentity()
-  if (!identity || identity.getPrincipal().isAnonymous()) throw new Error('Not authenticated')
+  /** A CrossDEX run's own agent and principal: the allowance is read live
+   *  with that agent (never from the store cache, which follows the tab's
+   *  current session) and the approval is signed by it. */
+  pin?: { agent: HttpAgent; owner: Principal },
+): Promise<{ approved: boolean }> {
+  let agent: HttpAgent
+  let owner: Principal
+  if (pin) {
+    agent = pin.agent
+    owner = pin.owner
+    if (owner.isAnonymous()) throw new Error('Not authenticated')
+  } else {
+    const a = await getCachedAgent()
+    if (!a) throw new Error('Not authenticated')
+    const identity = await getCachedIdentity()
+    if (!identity || identity.getPrincipal().isAnonymous()) throw new Error('Not authenticated')
+    agent = a
+    owner = identity.getPrincipal()
+  }
 
   const ledger = Actor.createActor(icrcIDL, { agent, canisterId: tokenCanisterId })
   const spender = { owner: Principal.fromText(getCanisterId('exchange')), subaccount: [] as [] }
   const needed = gross + transferFee
+  // The store's allowance cache belongs to the tab's current principal.
+  const cacheIsOurs = () => !pin || useExchangeStore().principalText === owner.toText()
 
   // Reuse a standing allowance when it covers this trade. Reads the store's
   // allowance cache (warmed on token switch / page mount, refreshed after
@@ -76,10 +92,12 @@ export async function approveExchangeDeposit(
     const marginNs = BigInt(Date.now() + 60_000) * 1_000_000n
     return v.allowance >= needed && (v.expiresAt == null || v.expiresAt > marginNs)
   }
-  try {
-    const cur = await store.userAllowanceQuery(tokenCanisterId).ensure(30_000)
-    if (sufficient(cur)) return
-  } catch { /* allowance unknown — verify live below */ }
+  if (!pin) {
+    try {
+      const cur = await store.userAllowanceQuery(tokenCanisterId).ensure(30_000)
+      if (sufficient(cur)) return { approved: false }
+    } catch { /* allowance unknown — verify live below */ }
+  }
 
   // The cache said no or did not know. Take one LIVE look at the ledger via
   // the authed agent before opening a dialog: a fresh signed query heals every
@@ -89,7 +107,7 @@ export async function approveExchangeDeposit(
   try {
     const live: any = await withTimeout(
       (ledger as any).icrc2_allowance({
-        account: { owner: identity.getPrincipal(), subaccount: [] },
+        account: { owner, subaccount: [] },
         spender,
       }),
       8_000,
@@ -99,8 +117,8 @@ export async function approveExchangeDeposit(
       allowance: BigInt(live.allowance),
       expiresAt: Array.isArray(live.expires_at) && live.expires_at.length > 0 ? BigInt(live.expires_at[0]) : null,
     }
-    store.userAllowanceQuery(tokenCanisterId).set(liveVal)
-    if (sufficient(liveVal)) return
+    if (cacheIsOurs()) store.userAllowanceQuery(tokenCanisterId).set(liveVal)
+    if (sufficient(liveVal)) return { approved: false }
   } catch { /* live check unavailable — approve below */ }
 
   // New approval needed: approve exactly what this trade pulls (never less: a short allowance
@@ -121,10 +139,13 @@ export async function approveExchangeDeposit(
   // Seed the cache with the value the approval just wrote on chain. A refetch
   // here could capture pre-approve state from a lagging replica and poison the
   // cache; set() is authoritative and supersedes any in-flight read.
-  store.userAllowanceQuery(tokenCanisterId).set({
-    allowance: needed,
-    expiresAt: expiresAtNs,
-  })
+  if (cacheIsOurs()) {
+    store.userAllowanceQuery(tokenCanisterId).set({
+      allowance: needed,
+      expiresAt: expiresAtNs,
+    })
+  }
+  return { approved: true }
 }
 
 // Minimal IDL for ICP ledger transfer
@@ -211,10 +232,11 @@ export async function depositICP(
   tradeAmount: bigint,
   tradingFeeBps: bigint,
   treasuryAccountIdHex: string,
+  pinnedAgent?: HttpAgent,
 ): Promise<bigint> {
   const required = calculateRequiredDeposit(tradeAmount, tradingFeeBps, ICP_TRANSFER_FEE)
 
-  const agent = await getCachedAgent()
+  const agent = pinnedAgent ?? await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
 
   const ledger = Actor.createActor(icpLedgerIdl, {
@@ -254,10 +276,11 @@ export async function depositICRC(
   tradingFeeBps: bigint,
   transferFee: bigint,
   treasuryPrincipalText: string,
+  pinnedAgent?: HttpAgent,
 ): Promise<bigint> {
   const required = calculateRequiredDeposit(tradeAmount, tradingFeeBps, transferFee)
 
-  const agent = await getCachedAgent()
+  const agent = pinnedAgent ?? await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
 
   const tokenActor = Actor.createActor(icrc1TransferIdl, {
@@ -470,6 +493,14 @@ export async function depositTokenForLiquidity(
  * based on the token's asset type.
  * Every successful deposit is automatically saved to localStorage for recovery.
  */
+export interface DepositOptions {
+  /** A CrossDEX run's own agent and principal (one identity object). */
+  agent?: HttpAgent
+  owner?: Principal
+  /** The run this deposit belongs to (written to the deposit history). */
+  runId?: string
+}
+
 export async function depositToken(
   tokenCanisterId: string,
   assetType: { ICP: null } | { ICRC12: null } | { ICRC3: null },
@@ -478,6 +509,7 @@ export async function depositToken(
   transferFee: bigint,
   treasuryAccountIdHex: string,
   treasuryPrincipalText: string,
+  opts: DepositOptions = {},
 ): Promise<bigint> {
   const store = useExchangeStore()
   // Asks the canister before any funds move, and refreshes the fee and the
@@ -490,18 +522,18 @@ export async function depositToken(
   }
   treasuryAccountIdHex = store.treasuryAccountId || treasuryAccountIdHex
   treasuryPrincipalText = store.treasuryPrincipal || treasuryPrincipalText
-  const principal = await currentPrincipalText()
+  const principal = opts.owner ? opts.owner.toText() : await currentPrincipalText()
   let block: bigint
   const typeStr = 'ICP' in assetType ? 'ICP' : 'ICRC3' in assetType ? 'ICRC3' : 'ICRC12'
 
   if ('ICP' in assetType) {
-    block = await depositICP(tradeAmount, tradingFeeBps, treasuryAccountIdHex)
+    block = await depositICP(tradeAmount, tradingFeeBps, treasuryAccountIdHex, opts.agent)
   } else {
-    block = await depositICRC(tokenCanisterId, tradeAmount, tradingFeeBps, transferFee, treasuryPrincipalText)
+    block = await depositICRC(tokenCanisterId, tradeAmount, tradingFeeBps, transferFee, treasuryPrincipalText, opts.agent)
   }
 
   // Always save to cache — the next step (addPosition/addLiquidity/etc.) might fail
-  saveDepositToCache(tokenCanisterId, block, tradeAmount, typeStr, { principal })
+  saveDepositToCache(tokenCanisterId, block, tradeAmount, typeStr, { principal, runId: opts.runId })
 
   return block
 }

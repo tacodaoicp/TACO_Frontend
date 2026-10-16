@@ -111,10 +111,24 @@ async function anonActor(): Promise<any> {
   }
   return Actor.createActor(pylonIDL, { agent: _anonAgent, canisterId: NEUTRINITE_PYLON })
 }
-async function authedPylon(): Promise<any> {
-  const agent = await getCachedAgent()
+async function authedPylon(pinned?: HttpAgent): Promise<any> {
+  const agent = pinned ?? await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
   return Actor.createActor(pylonIDL, { agent, canisterId: NEUTRINITE_PYLON })
+}
+
+/** A run's own agent and principal when given (one identity object), else the cached session. */
+async function resolveAuth(agent?: HttpAgent, owner?: Principal): Promise<{ agent: HttpAgent; owner: Principal }> {
+  if (agent && owner) {
+    if (owner.isAnonymous()) throw new Error('Not authenticated')
+    return { agent, owner }
+  }
+  const identity = await getCachedIdentity()
+  const p = identity.getPrincipal()
+  if (p.isAnonymous()) throw new Error('Not authenticated')
+  const a = await getCachedAgent()
+  if (!a) throw new Error('Not authenticated')
+  return { agent: a, owner: p }
 }
 
 const ledgerVar = (p: string) => ({ ic: Principal.fromText(p) })
@@ -279,6 +293,9 @@ export interface NeutriniteSwapParams {
   /** Filled in for the caller's recovery: pylon balances before our deposit, the swap output,
    *  and whether an earlier swap on this pair had already left a marker. */
   track?: { before?: { sell: bigint; buy: bigint }; swappedOut?: bigint; hadMarker?: boolean }
+  /** A run's own agent and principal; default: the cached session. */
+  agent?: HttpAgent
+  owner?: Principal
 }
 
 /** The swap stopped before its deposit transfer: nothing left the wallet. */
@@ -294,11 +311,9 @@ export class NeutriniteNotStarted extends Error {
  * `track.before` are set only once funds are about to move.
  */
 export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amountOut: bigint }> {
-  const identity = await getCachedIdentity()
-  const owner = identity.getPrincipal()
-  if (owner.isAnonymous()) throw new Error('Not authenticated')
+  const { agent, owner } = await resolveAuth(params.agent, params.owner)
   const userAccount = { owner, subaccount: [] as [] }
-  const pylon = await authedPylon()
+  const pylon = await authedPylon(agent)
 
   // 1. Register (idempotent) so the pylon indexes this account, then resolve the
   // pylon-owned deposit account for the sell ledger (+ current virtual balance).
@@ -309,7 +324,7 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   if (!sellEp) throw new Error('Neutrinite: no deposit endpoint for this token')
   const balanceBefore = sellEp.balance
   const depositAccount = sellEp.account // { owner: pylon, subaccount: [bytes] }
-  const tokenActor = Actor.createActor(icrcIDL, { agent: await getCachedAgent(), canisterId: params.sell })
+  const tokenActor = Actor.createActor(icrcIDL, { agent, canisterId: params.sell })
 
   // 2. Fund the swap: plain icrc1_transfer of the input token into the pylon account.
   // No await from this check to the transfer call, so a late start sends nothing.
@@ -418,13 +433,18 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
  * withdraw succeeded, so a deposit that hasn't credited YET (sweep finds 0) keeps
  * its marker and stays visible on the Recover page once it does credit.
  */
-export async function sweep(sell: string, buy: string, before?: { sell: bigint; buy: bigint }): Promise<boolean> {
-  const identity = await getCachedIdentity()
-  const owner = identity.getPrincipal()
-  if (owner.isAnonymous()) throw new Error('Not authenticated')
+export interface NeutriniteSweepOptions {
+  /** A run's own agent and principal; default: the cached session. */
+  agent?: HttpAgent
+  owner?: Principal
+  /** Filled with what was found and withdrawn, per token. */
+  report?: { found: Array<{ token: string; amount: bigint }>; moved: Array<{ token: string; amount: bigint }> }
+}
+
+export async function sweep(sell: string, buy: string, before?: { sell: bigint; buy: bigint }, opts: NeutriniteSweepOptions = {}): Promise<boolean> {
+  const { agent, owner } = await resolveAuth(opts.agent, opts.owner)
   const userAccount = { owner, subaccount: [] as [] }
-  const pylon = await authedPylon()
-  const agent = await getCachedAgent()
+  const pylon = await authedPylon(agent)
   const accounts = (await pylon.icrc55_accounts({ owner, subaccount: [] })) as any[]
   let foundAny = false
   let allOk = true
@@ -436,6 +456,7 @@ export async function sweep(sell: string, buy: string, before?: { sell: bigint; 
       if (amount <= (typeof f === 'bigint' ? f : BigInt(f))) continue
     } catch { /* fee unknown, attempt the withdraw anyway */ }
     foundAny = true
+    opts.report?.found.push({ token: tok, amount })
     try {
       const res = (await pylon.icrc55_command({
         commands: [{
@@ -454,6 +475,8 @@ export async function sweep(sell: string, buy: string, before?: { sell: bigint; 
       if (!(inner && 'ok' in inner)) {
         allOk = false
         console.warn('[neutrinite.sweep] withdraw not delivered for', tok, safeStringify(res))
+      } else {
+        opts.report?.moved.push({ token: tok, amount })
       }
     } catch (e) {
       allOk = false
