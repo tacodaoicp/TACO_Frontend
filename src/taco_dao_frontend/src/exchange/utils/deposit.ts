@@ -7,7 +7,7 @@
  * exchange canister.
  */
 
-import { Actor, type HttpAgent } from '@dfinity/agent'
+import { Actor, RejectError, CertifiedRejectErrorCode, type HttpAgent } from '@dfinity/agent'
 import { Principal } from '@dfinity/principal'
 import { getCachedAgent, getCachedIdentity } from '../../shared/auth-cache'
 import { icrcIDL } from '../../shared/icrc-idl'
@@ -16,6 +16,7 @@ import { useExchangeStore } from '../store/exchange.store'
 import { setItemWithCacheEviction } from './persistCache'
 import { withTimeout } from './withTimeout'
 import { requiredDeposit } from './crossDexCosts'
+import { sendDeposit, DepositError, type DepositIntent, type LedgerSendResult } from './depositSend'
 
 /** JSON replacer that converts BigInt to string (prevents "Do not know how to serialize a BigInt") */
 const jsonSafe = (_: string, v: any) => typeof v === 'bigint' ? v.toString() : v
@@ -221,6 +222,60 @@ function hexToBytes(hex: string): number[] {
 const ICP_LEDGER_CANISTER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
 const ICP_TRANSFER_FEE = 10_000n
 
+/** A certified reject proves the update made no state change. */
+function isCertifiedReject(e: unknown): boolean {
+  try { return e instanceof RejectError && (e as any).code instanceof CertifiedRejectErrorCode } catch { return false }
+}
+
+/** The 8 memo bytes as the ICP ledger's nat64 memo (big endian). */
+function memoNat64(b: Uint8Array): bigint {
+  let v = 0n
+  for (const x of b) v = (v << 8n) | BigInt(x)
+  return v
+}
+
+/** One ICP ledger transfer to the treasury account, mapped to a send result. */
+async function sendIcpTransfer(
+  agent: HttpAgent, treasuryAccountIdHex: string, required: bigint, createdAtNs?: bigint, memo?: Uint8Array,
+): Promise<LedgerSendResult> {
+  const ledger = Actor.createActor(icpLedgerIdl, { agent, canisterId: ICP_LEDGER_CANISTER_ID })
+  const result = await ledger.transfer({
+    to: hexToBytes(treasuryAccountIdHex),
+    amount: { e8s: required },
+    fee: { e8s: ICP_TRANSFER_FEE },
+    memo: memo ? memoNat64(memo) : 0n,
+    from_subaccount: [],
+    created_at_time: createdAtNs != null ? [{ timestamp_nanos: createdAtNs }] : [],
+  }) as any
+  if ('Ok' in result) return { Ok: BigInt(result.Ok) }
+  const err = result.Err
+  if ('TxDuplicate' in err) return { Duplicate: BigInt(err.TxDuplicate.duplicate_of) }
+  if ('InsufficientFunds' in err) {
+    return { Err: `Insufficient ICP balance. Available: ${Number(err.InsufficientFunds.balance.e8s) / 1e8} ICP`, insufficient: true }
+  }
+  return { Err: `ICP transfer failed: ${JSON.stringify(err, jsonSafe)}` }
+}
+
+/** One ICRC-1 transfer to the treasury principal, mapped to a send result. */
+async function sendIcrcTransfer(
+  agent: HttpAgent, tokenCanisterId: string, treasuryPrincipalText: string, required: bigint, createdAtNs?: bigint, memo?: Uint8Array,
+): Promise<LedgerSendResult> {
+  const tokenActor = Actor.createActor(icrc1TransferIdl, { agent, canisterId: tokenCanisterId })
+  const result = await tokenActor.icrc1_transfer({
+    from_subaccount: [],
+    to: { owner: Principal.fromText(treasuryPrincipalText), subaccount: [] },
+    amount: required,
+    fee: [],
+    memo: memo ? [Array.from(memo)] : [],
+    created_at_time: createdAtNs != null ? [createdAtNs] : [],
+  }) as any
+  if ('Ok' in result) return { Ok: BigInt(result.Ok) }
+  const err = result.Err
+  if ('Duplicate' in err) return { Duplicate: BigInt(err.Duplicate.duplicate_of) }
+  if ('InsufficientFunds' in err) return { Err: 'Insufficient token balance.', insufficient: true }
+  return { Err: `Token transfer failed: ${JSON.stringify(err, jsonSafe)}` }
+}
+
 /**
  * Deposit ICP to the exchange treasury.
  * Returns the block height of the transfer.
@@ -235,33 +290,12 @@ export async function depositICP(
   pinnedAgent?: HttpAgent,
 ): Promise<bigint> {
   const required = calculateRequiredDeposit(tradeAmount, tradingFeeBps, ICP_TRANSFER_FEE)
-
   const agent = pinnedAgent ?? await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
-
-  const ledger = Actor.createActor(icpLedgerIdl, {
-    agent,
-    canisterId: ICP_LEDGER_CANISTER_ID,
-  })
-
-  const result = await ledger.transfer({
-    to: hexToBytes(treasuryAccountIdHex),
-    amount: { e8s: required },
-    fee: { e8s: ICP_TRANSFER_FEE },
-    memo: 0n,
-    from_subaccount: [],
-    created_at_time: [],
-  })
-
-  if ('Err' in (result as any)) {
-    const err = (result as any).Err
-    if ('InsufficientFunds' in err) {
-      throw new Error(`Insufficient ICP balance. Available: ${Number(err.InsufficientFunds.balance.e8s) / 1e8} ICP`)
-    }
-    throw new Error(`ICP transfer failed: ${JSON.stringify(err, jsonSafe)}`)
-  }
-
-  return (result as any).Ok
+  const r = await sendIcpTransfer(agent, treasuryAccountIdHex, required)
+  if ('Ok' in r) return r.Ok
+  if ('Duplicate' in r) return r.Duplicate
+  throw new Error(r.Err)
 }
 
 /**
@@ -279,36 +313,12 @@ export async function depositICRC(
   pinnedAgent?: HttpAgent,
 ): Promise<bigint> {
   const required = calculateRequiredDeposit(tradeAmount, tradingFeeBps, transferFee)
-
   const agent = pinnedAgent ?? await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
-
-  const tokenActor = Actor.createActor(icrc1TransferIdl, {
-    agent,
-    canisterId: tokenCanisterId,
-  })
-
-  const result = await tokenActor.icrc1_transfer({
-    from_subaccount: [],
-    to: {
-      owner: Principal.fromText(treasuryPrincipalText),
-      subaccount: [],
-    },
-    amount: required,
-    fee: [],
-    memo: [],
-    created_at_time: [],
-  })
-
-  if ('Err' in (result as any)) {
-    const err = (result as any).Err
-    if ('InsufficientFunds' in err) {
-      throw new Error(`Insufficient token balance.`)
-    }
-    throw new Error(`Token transfer failed: ${JSON.stringify(err, jsonSafe)}`)
-  }
-
-  return (result as any).Ok
+  const r = await sendIcrcTransfer(agent, tokenCanisterId, treasuryPrincipalText, required)
+  if ('Ok' in r) return r.Ok
+  if ('Duplicate' in r) return r.Duplicate
+  throw new Error(r.Err)
 }
 
 // ── Deposit history (the Recover page's pointer to every V1 deposit) ──
@@ -499,8 +509,22 @@ export interface DepositOptions {
   owner?: Principal
   /** The run this deposit belongs to (written to the deposit history). */
   runId?: string
+  /** The sell ledger deduplicates created_at_time + memo (see utils/ledgerDedup.ts). */
+  dedup?: boolean
+  /** The agent's clock was synced with the replica (needed for created_at_time). */
+  timeSynced?: boolean
+  /** Writes and reads back the deposit intent right before the transfer;
+   *  false stops with nothing sent. */
+  intent?: { beforeSend(i: DepositIntent): boolean }
 }
 
+/**
+ * Universal deposit: routes to the ICP or ICRC transfer, then saves the block to
+ * the deposit history. Every throw carries `deposit: 'notSent' | 'unknown'`
+ * (utils/depositSend.ts): only notSent means nothing left the wallet. With a run
+ * agent on a deduplicating ledger the transfer carries created_at_time and a
+ * random memo and is resent unchanged when its answer is lost.
+ */
 export async function depositToken(
   tokenCanisterId: string,
   assetType: { ICP: null } | { ICRC12: null } | { ICRC3: null },
@@ -514,23 +538,47 @@ export async function depositToken(
   const store = useExchangeStore()
   // Asks the canister before any funds move, and refreshes the fee and the
   // treasury if the saved ones are old.
-  await store.assertCanTrade()
+  try {
+    await store.assertCanTrade()
+  } catch (e: any) {
+    throw new DepositError(e?.message || "Can't reach the exchange right now. No funds were moved.", 'notSent', 'refused', e)
+  }
   // The amount was worked out with the fee the user saw. If the fresh fee
   // differs, stop here rather than charge something else.
   if (store.tradingFeeBps !== tradingFeeBps) {
-    throw new Error('The trading fee changed. Check the amounts and try again. No funds were moved.')
+    throw new DepositError('The trading fee changed. Check the amounts and try again. No funds were moved.', 'notSent', 'refused')
   }
   treasuryAccountIdHex = store.treasuryAccountId || treasuryAccountIdHex
   treasuryPrincipalText = store.treasuryPrincipal || treasuryPrincipalText
   const principal = opts.owner ? opts.owner.toText() : await currentPrincipalText()
-  let block: bigint
-  const typeStr = 'ICP' in assetType ? 'ICP' : 'ICRC3' in assetType ? 'ICRC3' : 'ICRC12'
-
-  if ('ICP' in assetType) {
-    block = await depositICP(tradeAmount, tradingFeeBps, treasuryAccountIdHex, opts.agent)
-  } else {
-    block = await depositICRC(tokenCanisterId, tradeAmount, tradingFeeBps, transferFee, treasuryPrincipalText, opts.agent)
+  const isIcp = 'ICP' in assetType
+  const typeStr = isIcp ? 'ICP' : 'ICRC3' in assetType ? 'ICRC3' : 'ICRC12'
+  let agent: HttpAgent
+  try {
+    const a = opts.agent ?? await getCachedAgent()
+    if (!a) throw new Error('Not authenticated')
+    agent = a
+  } catch (e: any) {
+    throw new DepositError(e?.message || 'Not authenticated', 'notSent', 'refused', e)
   }
+  const required = calculateRequiredDeposit(tradeAmount, tradingFeeBps, isIcp ? ICP_TRANSFER_FEE : transferFee)
+  const to = isIcp ? treasuryAccountIdHex : treasuryPrincipalText
+  const synced = !!opts.agent && !!opts.timeSynced
+
+  const block = await sendDeposit({
+    required,
+    to,
+    dedup: !!opts.dedup && synced,
+    nowNs: synced ? () => BigInt(Date.now() + agent.getTimeDiffMsecs()) * 1_000_000n : null,
+    randomMemo: () => crypto.getRandomValues(new Uint8Array(8)),
+    beforeSend: opts.intent?.beforeSend,
+    send: (createdAtNs, memo) => isIcp
+      ? sendIcpTransfer(agent, to, required, createdAtNs, memo)
+      : sendIcrcTransfer(agent, tokenCanisterId, to, required, createdAtNs, memo),
+    isCertifiedReject,
+    sleep: (ms) => new Promise(r => setTimeout(r, ms)),
+    refusedMessage: (err) => err,
+  })
 
   // Always save to cache — the next step (addPosition/addLiquidity/etc.) might fail
   saveDepositToCache(tokenCanisterId, block, tradeAmount, typeStr, { principal, runId: opts.runId })

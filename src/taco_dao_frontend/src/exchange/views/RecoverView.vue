@@ -84,8 +84,8 @@
         </div>
       </section>
 
-      <!-- Recent Deposits (auto-saved) -->
-      <section v-if="cachedDeposits.length > 0" class="recover-view__section">
+      <!-- Recent Deposits (auto-saved deposit history, merged with the CrossDEX run journal) -->
+      <section v-if="openDeposits.length > 0 || settledDeposits.length > 0 || maySentRows.length > 0" class="recover-view__section">
         <h2 class="recover-view__subtitle">Recent Deposits</h2>
         <p class="recover-view__desc">
           These deposits were automatically saved. If a trade or liquidity add failed after depositing,
@@ -97,7 +97,20 @@
         </button>
         <div v-if="depositNote" class="ex-error-box" style="margin-bottom:var(--space-3)">{{ depositNote }}</div>
 
-        <div class="ex-table-wrap">
+        <div v-if="maySentRows.length > 0" class="recover-view__stuck-list">
+          <div v-for="m in maySentRows" :key="m.key" class="recover-view__stuck-item">
+            <div class="recover-view__stuck-info">
+              <span>{{ getTokenSymbol(m.token) }} deposit on TACO</span>
+              <span class="recover-view__stuck-reason">
+                A TACO deposit of {{ formatMaySent(m) }} may have been sent at {{ formatClock(m.at) }}.
+                If it left your wallet, find its block number in your wallet history and enter it under Recover Tokens.
+              </span>
+            </div>
+            <button class="ex-btn ex-btn--sm ex-btn--outline" @click="dismissMaySent(m)">Dismiss</button>
+          </div>
+        </div>
+
+        <div v-if="openDeposits.length > 0" class="ex-table-wrap">
           <table class="ex-table recover-view__deposits-table">
             <thead>
               <tr>
@@ -109,7 +122,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="dep in cachedDeposits" :key="dep.token + ':' + dep.block">
+              <tr v-for="dep in openDeposits" :key="dep.token + ':' + dep.block">
                 <td>{{ getTokenSymbol(dep.token) }} <span class="recover-view__token-id">{{ dep.token.slice(0, 10) }}...</span></td>
                 <td class="num">{{ dep.block }}</td>
                 <td>{{ dep.type }}</td>
@@ -133,6 +146,21 @@
             </tbody>
           </table>
         </div>
+
+        <template v-if="settledDeposits.length > 0">
+          <h3 class="recover-view__subtitle recover-view__subtitle--minor">Settled by TACO ({{ settledDeposits.length }})</h3>
+          <div class="recover-view__stuck-list">
+            <div v-for="dep in settledDeposits" :key="'s:' + dep.token + ':' + dep.block" class="recover-view__stuck-item">
+              <div class="recover-view__stuck-info">
+                <span>{{ getTokenSymbol(dep.token) }} <span class="num">block {{ dep.block }}</span> · {{ formatDepositAge(dep.timestamp) }}</span>
+                <span class="recover-view__ra-detail">
+                  TACO already settled this deposit. Check your wallet history, and if the {{ getTokenSymbol(dep.token) }} did not come back, contact support with deposit {{ dep.block }}.
+                </span>
+              </div>
+              <button class="ex-btn ex-btn--sm ex-btn--outline" @click="dismissDeposit(dep)">Dismiss</button>
+            </div>
+          </div>
+        </template>
       </section>
 
       <!-- Exchange V2 pending pulls (unknown-outcome deposits, tracked on chain) -->
@@ -305,6 +333,8 @@ import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { getDepositHistory, removeDepositFromCache, type DepositHistoryEntry } from '../utils/deposit'
+import { runJournal } from '../utils/runJournalStore'
+import { legUnresolved } from '../utils/crossDexJournal'
 import { useExchangeToast } from '../composables/useExchangeToast'
 import { getCachedIdentity } from '../../shared/auth-cache'
 import { mapWithConcurrency, withRetries } from '../utils/concurrency'
@@ -320,27 +350,99 @@ const toast = useExchangeToast()
 // already recovered or refunded) or the user dismissed it. A false or a failed
 // call never deletes it: a bare false can also mean the exchange refused the
 // call, and a thrown call changed nothing.
-type CachedDeposit = DepositHistoryEntry
+/** A saved deposit: the deposit history entry, merged with the run journal legs that point at it. */
+interface CachedDeposit extends DepositHistoryEntry {
+  refs: Array<{ runId: string; ai: number; li: number }>
+  /** The exchange settled it by itself (kept so the user can check). */
+  settled: boolean
+}
+/** A V1 deposit whose transfer answer was lost: it may have been sent, with no block known. */
+interface MaySentRow { key: string; runId: string; ai: number; li: number; token: string; amount: string; at: number }
+
 const cachedDeposits = ref<CachedDeposit[]>([])
+const maySentRows = ref<MaySentRow[]>([])
 const depositNote = ref('')
 
+const depKey = (token: string, block: string) => `${token}:${block}`
+
 function loadCachedDeposits() {
-  cachedDeposits.value = getDepositHistory()
+  const me = store.principalText
+  const hidden = new Set<string>()
+  const settledKeys = new Set<string>()
+  const refsOf = new Map<string, CachedDeposit['refs']>()
+  const journalOnly = new Map<string, CachedDeposit>()
+  const may: MaySentRow[] = []
+  for (const r of runJournal.list()) {
+    // Journal rows show for the wallet that saved them only.
+    if (!me || r.principal !== me) continue
+    r.assets.forEach((a, ai) => a.legs.forEach((l, li) => {
+      if (l.dex !== 'taco') return
+      if (l.block != null) {
+        const key = depKey(a.token, l.block)
+        if (l.deposit === 'used' || l.deposit === 'recovered' || l.deposit === 'dismissed') { hidden.add(key); return }
+        if (l.deposit === 'settled') settledKeys.add(key)
+        refsOf.set(key, [...(refsOf.get(key) ?? []), { runId: r.id, ai, li }])
+        if (!journalOnly.has(key)) {
+          journalOnly.set(key, {
+            token: a.token, block: l.block, amount: l.amountIn, type: a.type ?? 'ICRC12',
+            timestamp: l.intent?.at ?? r.startedAt, principal: r.principal, status: 'open', runId: r.id,
+            refs: [], settled: false,
+          })
+        }
+      } else if (l.intent && legUnresolved(l)) {
+        may.push({ key: `${r.id}:${ai}:${li}`, runId: r.id, ai, li, token: a.token, amount: l.intent.amount, at: l.intent.at })
+      }
+    }))
+  }
+  const rows: CachedDeposit[] = []
+  const seen = new Set<string>()
+  for (const e of getDepositHistory()) {
+    const key = depKey(e.token, e.block)
+    if (hidden.has(key) || seen.has(key)) continue
+    seen.add(key)
+    rows.push({ ...e, refs: refsOf.get(key) ?? [], settled: e.status === 'settled' || settledKeys.has(key) })
+  }
+  for (const [key, row] of journalOnly) {
+    if (seen.has(key)) continue
+    rows.push({ ...row, refs: refsOf.get(key) ?? [], settled: settledKeys.has(key) })
+  }
+  cachedDeposits.value = rows.sort((a, b) => b.timestamp - a.timestamp)
+  maySentRows.value = may.sort((a, b) => b.at - a.at)
+}
+
+const openDeposits = computed(() => cachedDeposits.value.filter(d => !d.settled))
+const settledDeposits = computed(() => cachedDeposits.value.filter(d => d.settled))
+
+function formatMaySent(m: MaySentRow): string {
+  try { return formatRa(BigInt(m.amount), m.token) } catch { return getTokenSymbol(m.token) }
+}
+
+function formatClock(ms: number): string {
+  try { return new Date(ms).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }
+  catch { return '' }
 }
 
 /** Saved by a different wallet than the one connected now (entries without a principal predate the field). */
 function isOtherWallet(dep: CachedDeposit): boolean {
   return !!dep.principal && !!store.principalText && dep.principal !== store.principalText
 }
-const recoverableDeposits = computed(() => cachedDeposits.value.filter(d => !isOtherWallet(d)))
+const recoverableDeposits = computed(() => openDeposits.value.filter(d => !isOtherWallet(d)))
 
 function shortPrincipal(p: string): string {
   return p.length > 12 ? `${p.slice(0, 5)}…${p.slice(-3)}` : p
 }
 
-function dropDeposit(token: string, block: string) {
+/** A deposit leaves the list: refunded (confirmed) or dismissed. Both pointers are updated. */
+function dropDeposit(token: string, block: string, why: 'recovered' | 'dismissed' = 'recovered') {
   removeDepositFromCache(block, token)
+  const row = cachedDeposits.value.find(d => d.block === block && d.token === token)
+  for (const ref of row?.refs ?? []) runJournal.markLeg(ref.runId, ref.ai, ref.li, { deposit: why })
   cachedDeposits.value = cachedDeposits.value.filter(d => !(d.block === block && d.token === token))
+}
+
+function dismissMaySent(m: MaySentRow) {
+  runJournal.markLeg(m.runId, m.ai, m.li, { deposit: 'dismissed' })
+  maySentRows.value = maySentRows.value.filter(x => x.key !== m.key)
 }
 
 /** A recoverBatch item that confirms the refund. */
@@ -479,7 +581,7 @@ async function recoverAllCached() {
 }
 
 function dismissDeposit(dep: CachedDeposit) {
-  dropDeposit(dep.token, dep.block)
+  dropDeposit(dep.token, dep.block, 'dismissed')
 }
 
 // ── Stuck TX ──
@@ -1188,6 +1290,8 @@ onVisible(() => {
   }
 
   &__deposits-table { width: 100%; }
+
+  &__subtitle--minor { font-size: var(--text-sm); margin-top: var(--space-2); }
 
   &__token-id { font-size: var(--text-xs); color: var(--text-tertiary); margin-left: 4px; }
 

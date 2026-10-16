@@ -32,8 +32,11 @@ import { depositToken, removeDepositFromCache, setDepositStatus, approveExchange
 import { isApprovalDeclined } from '../utils/approvalPrompt'
 import { formatTokenAmount } from '../utils/format'
 import { createRunAgent, type RunAgent } from '../utils/runAgent'
+import { dedupLedgers } from '../utils/ledgerDedup'
+import { runJournal } from '../utils/runJournalStore'
+import { newRunId, type RunRecord } from '../utils/crossDexJournal'
 import {
-  runCrossDexSwap, realClock, nullJournal, isNeuFirst,
+  runCrossDexSwap, realClock, isNeuFirst,
   type LegDeps, type LegOutcome as RunnerLegOutcome,
 } from '../utils/crossDexLegRunner'
 import * as icpswap from '../services/icpswap'
@@ -72,7 +75,9 @@ export function buildLegDeps(store: ReturnType<typeof useExchangeStore>, run?: R
     taco: {
       treasury: () => ({ accountId: store.treasuryAccountId, principal: store.treasuryPrincipal }),
       depositToken: (token, assetType, amount, feeBps, fee, acct, princ, o) =>
-        depositToken(token, assetType, amount, feeBps, fee, acct, princ, { ...auth, runId: o.runId }),
+        depositToken(token, assetType, amount, feeBps, fee, acct, princ, {
+          ...auth, runId: o.runId, dedup: o.dedup, timeSynced: run?.timeSynced, intent: o.intent,
+        }),
       removeDepositFromCache: (block, token) => removeDepositFromCache(block, token),
       setDepositStatus: (block, status, token) => setDepositStatus(block, status, token),
       swapMultiHop: (i, o, a, r, m, b) => store.swapMultiHop(i, o, a, r, m, b, pin),
@@ -350,9 +355,14 @@ export function useCrossDexSwap() {
     // The swap's own agent, built from one identity object: every fund moving
     // and recovery call below is signed by it for this principal, whatever
     // happens to the session in other tabs meanwhile.
+    // A V1 TACO deposit on a ledger that deduplicates goes with created_at_time
+    // and a memo (resent unchanged when its answer is lost), which needs the
+    // run agent's clock synced with the replica.
+    const v1Taco = legs.some(l => l.dex === 'taco') && !store.useV2Deposit(fromAddr)
+    const dedup = v1Taco ? (await dedupLedgers()).has(fromAddr) : false
     let runAgent: RunAgent
     try {
-      runAgent = await createRunAgent({ expectPrincipal: store.principalText || undefined })
+      runAgent = await createRunAgent({ expectPrincipal: store.principalText || undefined, syncTime: dedup })
     } catch (err: any) {
       phase.value = 'ready'
       errorMsg.value = err?.message || 'Could not start the swap'
@@ -391,6 +401,23 @@ export function useCrossDexSwap() {
       }
     }
 
+    // Run record (best effort for the single swap): the Recover page lists a
+    // V1 deposit whose answer was lost from it.
+    const runId = newRunId('swap', Date.now())
+    const record: RunRecord = {
+      v: 2, id: runId, kind: 'swap', principal: runAgent.principalText, target: buyToken.address,
+      startedAt: Date.now(), updatedAt: Date.now(), phase: 'running', pendingSlow: 0,
+      assets: [{
+        token: fromAddr, symbol: sellToken.symbol, amountIn: amountInBigInt.value.toString(), atMax: false,
+        type: Object.keys(sellToken.asset_type)[0],
+        legs: legs.map(l => ({
+          dex: l.dex, amountIn: l.amountIn.toString(), expectedOut: l.expectedOut.toString(),
+          minOut: BigInt(Math.floor(Number(l.expectedOut) * (1 - slip))).toString(), state: 'waiting' as const,
+        })),
+      }],
+    }
+    if (!runJournal.start(record)) console.warn('[CrossDEX] run record not saved (storage); the swap goes on')
+
     // Leaving the page mid swap stops later steps of a leg; ask first. The
     // guard stays until every leg has settled, not just until the result shows.
     const blockUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
@@ -408,15 +435,19 @@ export function useCrossDexSwap() {
       v2Gross,
       fee,
       gate,
-      journal: nullJournal,
+      runId,
+      journal: runJournal.legJournal(runId, 0, legs.indexOf(leg)),
       strictJournal: false,
-      dedup: false,
+      dedup,
       onStep: s => setLegStep(leg.dex, s),
       probeLimit: 10n,
       sortV1Errors: false,
       log: (...a) => console.error(...a),
     }), buildLegDeps(store, runAgent), { log: (m) => console.info(m) })
-    void run.all.finally(() => window.removeEventListener('beforeunload', blockUnload))
+    void run.all.finally(() => {
+      window.removeEventListener('beforeunload', blockUnload)
+      runJournal.close(runId)
+    })
 
     const results = await run.ui
     outcomes.value = results
