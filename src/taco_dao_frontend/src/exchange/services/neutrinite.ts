@@ -20,6 +20,7 @@ import { getEffectiveNetwork } from '../../config/network-config'
 import { icrcIDL } from '../../shared/icrc-idl'
 import { withTimeout } from '../utils/withTimeout'
 import { mapWithConcurrency } from '../utils/concurrency'
+import { setItemWithCacheEviction } from '../utils/persistCache'
 
 const safeStringify = (obj: unknown) =>
   JSON.stringify(obj, (_, v) => (typeof v === 'bigint' ? v.toString() : v))
@@ -229,20 +230,24 @@ export async function sellFollowSec(sell: string): Promise<number | undefined> {
 
 // ── Pending-swap cache (localStorage) — survives a tab-close so the Recover page can sweep ──
 const PENDING_KEY = 'taco_neutrinite_pending'
-const PENDING_MAX = 30
+// Markers leave only by age (21 days) or when their funds came back.
+const PENDING_MAX = 500
 const PENDING_MAX_AGE_MS = 21 * 86_400_000
 
 export interface PendingNeutrinite { sell: string; buy: string; timestamp: number }
 
-export function savePendingSwap(sell: string, buy: string): void {
+/** Save the pair marker. Returns whether it was written; on a full storage it
+ *  frees exchange cache space and tries once more. */
+export function savePendingSwap(sell: string, buy: string): boolean {
   try {
     const raw = localStorage.getItem(PENDING_KEY)
     const list: PendingNeutrinite[] = raw ? JSON.parse(raw) : []
     const deduped = list.filter(e => !(e.sell === sell && e.buy === buy))
     deduped.unshift({ sell, buy, timestamp: Date.now() })
     const now = Date.now()
-    localStorage.setItem(PENDING_KEY, JSON.stringify(deduped.filter(e => now - e.timestamp < PENDING_MAX_AGE_MS).slice(0, PENDING_MAX)))
-  } catch { /* ignore */ }
+    setItemWithCacheEviction(PENDING_KEY, JSON.stringify(deduped.filter(e => now - e.timestamp < PENDING_MAX_AGE_MS).slice(0, PENDING_MAX)))
+    return true
+  } catch { return false }
 }
 export function getPendingSwaps(): PendingNeutrinite[] {
   try { const raw = localStorage.getItem(PENDING_KEY); return raw ? JSON.parse(raw) : [] } catch { return [] }

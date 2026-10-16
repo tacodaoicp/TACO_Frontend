@@ -29,6 +29,8 @@ const ICP_LEDGER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
 // ICPSwap pools come in multiple fee tiers; getPool is keyed by (token0, token1, fee).
 // Try each tier until we find a pool (0.3% first to match historical behaviour).
 const ICPSWAP_FEE_TIERS = [3000, 10000, 500, 100]
+// Approvals for a swap expire after this long.
+const APPROVAL_TTL_MS = 30 * 60_000
 
 interface Token {
   address: string
@@ -44,14 +46,39 @@ interface PoolData {
   canisterId: string
 }
 
+/** Filled in by icrc2Swap for the caller's recovery and reporting. */
+export interface IcpSwapTrack {
+  /** The last step that was started: approve, deposit (depositFrom), swap or withdraw. */
+  step?: 'approve' | 'deposit' | 'swap' | 'withdraw'
+  /** An earlier swap on this pair had already left a marker (its funds may still be in the pool). */
+  hadMarker?: boolean
+  /** The pair marker was written before the deposit. */
+  markerWritten?: boolean
+  /** The swap filled for this much (the withdraw may still have failed). */
+  swappedOut?: bigint
+}
+
 export interface IcpSwapParams {
   sellTokenPrincipal: string
   buyTokenPrincipal: string
   amountIn: bigint
   minAmountOut: bigint
   onStep?: (step: string) => void
-  /** Awaited after the approve and before any funds move; a throw here leaves no marker. */
-  beforeDeposit?: () => Promise<void>
+  /** Awaited after the approve and before any funds move; a throw, or false,
+   *  stops the swap with nothing moved but the approve fee and leaves no marker. */
+  beforeDeposit?: () => Promise<void | boolean>
+  track?: IcpSwapTrack
+}
+
+/** Error for a swap that stopped before any funds moved (only the approve fee was spent). */
+export class IcpSwapNotStarted extends Error {
+  readonly notStarted = true
+  constructor(message = 'Not started, your funds stayed in your wallet') { super(message); this.name = 'IcpSwapNotStarted' }
+}
+/** depositFrom refused: the pool did not take the funds (the caller still checks with one sweep). */
+export class IcpSwapDepositRefused extends Error {
+  readonly depositRefused = true
+  constructor(message: string) { super(message); this.name = 'IcpSwapDepositRefused' }
 }
 
 // ── Module state ──
@@ -64,12 +91,16 @@ let _anonAgent: HttpAgent | null = null
 // we persist the pair the moment funds start moving and clear it on success.
 // The Recover page reads this list and offers a sweep per pair.
 const PENDING_KEY = 'taco_icpswap_pending'
-const PENDING_MAX = 30
+// Markers leave only by age (21 days, the recovery window) or when their funds
+// came back; the count ceiling is far above what normal use reaches.
+const PENDING_MAX = 500
 const PENDING_MAX_AGE_MS = 21 * 86_400_000 // 21 days
 
 export interface PendingIcpSwap { sell: string; buy: string; timestamp: number }
 
-export function savePendingSwap(sell: string, buy: string): void {
+/** Save the pair marker. Returns whether it was written (a full or blocked
+ *  storage returns false, so a strict caller can stop before funds move). */
+export function savePendingSwap(sell: string, buy: string): boolean {
   try {
     const raw = localStorage.getItem(PENDING_KEY)
     const list: PendingIcpSwap[] = raw ? JSON.parse(raw) : []
@@ -79,7 +110,12 @@ export function savePendingSwap(sell: string, buy: string): void {
     const pruned = deduped.filter((e) => now - e.timestamp < PENDING_MAX_AGE_MS).slice(0, PENDING_MAX)
     // Recovery record: on a full storage, free exchange cache space and retry.
     setItemWithCacheEviction(PENDING_KEY, JSON.stringify(pruned))
-  } catch { /* localStorage full or unavailable — ignore */ }
+    return true
+  } catch { return false }
+}
+
+export function hasPendingSwap(sell: string, buy: string): boolean {
+  return getPendingSwaps().some(e => e.sell === sell && e.buy === buy)
 }
 
 export function getPendingSwaps(): PendingIcpSwap[] {
@@ -426,6 +462,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   const identity = await getCachedIdentity()
   const ownerPrincipal = identity.getPrincipal()
   if (ownerPrincipal.isAnonymous()) throw new Error('Not authenticated')
+  const track = params.track ?? {}
 
   params.onStep?.('Finding pool...')
   const poolId = await getPoolCanister(params.sellTokenPrincipal, params.buyTokenPrincipal)
@@ -440,8 +477,10 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   const feeResult = (await sellTokenActor.icrc1_fee()) as any
   const tokenFee = typeof feeResult === 'bigint' ? feeResult : BigInt(feeResult)
 
-  // 2. Approve pool for amountIn + fee
+  // 2. Approve pool for amountIn + fee. It expires after 30 minutes, so an
+  //    approval left by a swap that stopped before its deposit lapses on its own.
   params.onStep?.('Approving tokens...')
+  track.step = 'approve'
   const approvalResult = (await sellTokenActor.icrc2_approve({
     spender: { owner: Principal.fromText(poolId), subaccount: [] },
     amount: params.amountIn + tokenFee,
@@ -450,25 +489,29 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     from_subaccount: [],
     created_at_time: [],
     expected_allowance: [],
-    expires_at: [],
+    expires_at: [BigInt(Date.now() + APPROVAL_TTL_MS) * 1_000_000n],
   })) as any
   if ('Err' in approvalResult) throw new Error(`Approval failed: ${safeStringify(approvalResult.Err)}`)
-  if (params.beforeDeposit) await params.beforeDeposit()
+  if (params.beforeDeposit && (await params.beforeDeposit()) === false) throw new IcpSwapNotStarted()
 
   // 3. depositFrom (pool pulls via icrc2_transfer_from)
   // Persist the pair NOW (funds are about to move) so a tab-close mid-swap is
-  // recoverable via the Recover page. Cleared after a successful withdraw.
-  savePendingSwap(params.sellTokenPrincipal, params.buyTokenPrincipal)
+  // recoverable via the Recover page. A marker an earlier failed swap on this
+  // pair left behind stays until its funds come back.
+  track.hadMarker = hasPendingSwap(params.sellTokenPrincipal, params.buyTokenPrincipal)
+  track.markerWritten = savePendingSwap(params.sellTokenPrincipal, params.buyTokenPrincipal)
   params.onStep?.('Depositing tokens...')
+  track.step = 'deposit'
   const depositResult = (await poolActor.depositFrom({
     amount: params.amountIn,
     fee: tokenFee,
     token: params.sellTokenPrincipal,
   })) as any
-  if ('err' in depositResult) throw new Error(`DepositFrom failed: ${safeStringify(depositResult.err)}`)
+  if ('err' in depositResult) throw new IcpSwapDepositRefused(`DepositFrom failed: ${safeStringify(depositResult.err)}`)
 
   // 4. Swap the actual deposited amount
   params.onStep?.('Executing swap...')
+  track.step = 'swap'
   const swapResult = (await poolActor.swap({
     amountIn: depositResult.ok.toString(),
     amountOutMinimum: params.minAmountOut.toString(),
@@ -481,9 +524,11 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     throw new Error(`Swap failed: ${safeStringify(swapResult.err)}`)
   }
   const amountOut = swapResult.ok as bigint
+  track.swappedOut = amountOut
 
   // 5. Withdraw received tokens
   params.onStep?.('Withdrawing tokens...')
+  track.step = 'withdraw'
   const outTokenActor = Actor.createActor(icrcIDL, { agent: authedAgent, canisterId: params.buyTokenPrincipal })
   const outFeeResult = (await outTokenActor.icrc1_fee()) as any
   const outTokenFee = typeof outFeeResult === 'bigint' ? outFeeResult : BigInt(outFeeResult)
@@ -496,8 +541,9 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     throw new Error(`Withdraw failed: ${safeStringify(withdrawResult.err)}`)
   }
 
-  // Funds delivered — clear the pending-swap marker.
-  removePendingSwap(params.sellTokenPrincipal, params.buyTokenPrincipal)
+  // Funds delivered: clear the pair marker, unless an earlier failed swap on
+  // this pair left it (those funds may still sit in the pool).
+  if (!track.hadMarker) removePendingSwap(params.sellTokenPrincipal, params.buyTokenPrincipal)
   return { amountOut }
 }
 
@@ -507,6 +553,15 @@ export interface SweepParams {
   token0Principal: string
   token1Principal: string
   poolId?: string
+}
+
+/** What a sweep found and moved, per token (amounts as found, before the ledger fee). */
+export interface SweepReport {
+  found: Array<{ token: string; amount: bigint }>
+  moved: Array<{ token: string; amount: bigint }>
+}
+export interface SweepOptions {
+  report?: SweepReport
 }
 
 /**
@@ -523,7 +578,8 @@ export interface SweepParams {
  * reversed, which made withdraws use the wrong token id and always fail), and
  * they pass the token's real ledger fee (a fee of 0 makes ledgers refuse).
  */
-export async function sweep(params: SweepParams): Promise<boolean> {
+export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promise<boolean> {
+  const report = opts.report
   const authedAgent = await getCachedAgent()
   if (!authedAgent) throw new Error('Not authenticated')
   const identity = await getCachedIdentity()
@@ -566,6 +622,7 @@ export async function sweep(params: SweepParams): Promise<boolean> {
       const fee = await ledgerFee(tokenPrincipal)
       if (bal > fee) {
         foundAny = true
+        report?.found.push({ token: tokenPrincipal, amount: bal })
         const r = (await poolActor.deposit({ amount: bal, fee, token: tokenPrincipal })) as any
         if (!('ok' in r)) {
           allAttemptedOk = false
@@ -592,10 +649,13 @@ export async function sweep(params: SweepParams): Promise<boolean> {
       // Dust at or below the ledger fee cannot be paid out; treat as zero.
       if (slot.amount <= fee) continue
       foundAny = true
+      report?.found.push({ token: slot.token, amount: slot.amount })
       const r = (await poolActor.withdraw({ amount: slot.amount, fee, token: slot.token })) as any
       if (!('ok' in r)) {
         allAttemptedOk = false
         console.error('[icpswap.sweep] withdraw refused for', slot.token, safeStringify(r.err))
+      } else {
+        report?.moved.push({ token: slot.token, amount: slot.amount })
       }
     } catch (e) {
       allAttemptedOk = false
@@ -612,10 +672,10 @@ export async function sweep(params: SweepParams): Promise<boolean> {
  * automatic instead of a manual Recover-page trip. No sleep after the final
  * attempt.
  */
-export async function sweepWithRetry(params: SweepParams, attempts = 3, delayMs = 4000): Promise<boolean> {
+export async function sweepWithRetry(params: SweepParams, attempts = 3, delayMs = 4000, opts: SweepOptions = {}): Promise<boolean> {
   for (let i = 0; i < attempts; i++) {
     try {
-      if (await sweep(params)) return true
+      if (await sweep(params, opts)) return true
     } catch (e) {
       console.error(`[icpswap.sweepWithRetry] attempt ${i + 1} failed:`, e)
     }

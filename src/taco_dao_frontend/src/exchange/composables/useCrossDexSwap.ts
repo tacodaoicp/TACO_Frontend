@@ -437,6 +437,7 @@ export function useCrossDexSwap() {
     const minOut = BigInt(Math.floor(Number(leg.expectedOut) * (1 - slip)))
 
     if (leg.dex === 'icpswap') {
+      const track: icpswap.IcpSwapTrack = {}
       try {
         const r = await icpswap.icrc2Swap({
           sellTokenPrincipal: fromAddr,
@@ -444,9 +445,8 @@ export function useCrossDexSwap() {
           amountIn: leg.amountIn,
           minAmountOut: minOut,
           onStep: s => setLegStep('icpswap', s),
-          beforeDeposit: gate && (async () => {
-            if (!(await gate.wait('icpswap'))) throw Object.assign(new Error(NOT_STARTED), { notStarted: true })
-          }),
+          beforeDeposit: gate && (async () => gate.wait('icpswap')),
+          track,
         })
         setLegStep('icpswap', 'Done')
         return { dex: 'icpswap', success: true, amountOut: r.amountOut }
@@ -455,6 +455,22 @@ export function useCrossDexSwap() {
           // Released too late (page paused): only the approve ran, no funds moved, nothing to sweep.
           setLegStep('icpswap', NOT_STARTED)
           return { dex: 'icpswap', success: false, amountOut: 0n, error: NOT_STARTED, notStarted: true }
+        }
+        if (err?.depositRefused) {
+          // The pool refused the deposit, so normally nothing moved. One sweep
+          // makes sure; when it finds nothing, this route never started.
+          const report: icpswap.SweepReport = { found: [], moved: [] }
+          let swept = false, sweepThrew = false
+          try { swept = await icpswap.sweep({ token0Principal: fromAddr, token1Principal: toAddr }, { report }) }
+          catch { sweepThrew = true }
+          if (!sweepThrew && report.found.length === 0) {
+            if (!track.hadMarker) icpswap.removePendingSwap(fromAddr, toAddr)
+            setLegStep('icpswap', NOT_STARTED)
+            return { dex: 'icpswap', success: false, amountOut: 0n, error: err?.message || 'ICPSwap refused the deposit', notStarted: true }
+          }
+          if (swept) icpswap.removePendingSwap(fromAddr, toAddr)
+          setLegStep('icpswap', swept ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
+          return { dex: 'icpswap', success: false, amountOut: 0n, error: err?.message || 'ICPSwap swap failed', recovered: swept }
         }
         console.error('[CrossDEX] ICPSwap leg failed:', err?.message || err)
         setLegStep('icpswap', 'Recovering funds…')
