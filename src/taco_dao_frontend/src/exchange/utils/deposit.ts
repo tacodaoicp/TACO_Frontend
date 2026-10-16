@@ -288,58 +288,115 @@ export async function depositICRC(
   return (result as any).Ok
 }
 
-/**
- * Save every deposit to localStorage for recovery.
- * Keeps the last 50 deposits. Entries older than 21 days are pruned.
- */
-function saveDepositToCache(tokenCanisterId: string, block: bigint, amount: bigint, assetType: string) {
+// ── Deposit history (the Recover page's pointer to every V1 deposit) ──
+// One entry per V1 deposit, written right after the ledger returns the block.
+// An entry leaves only when its trade went through, a recovery confirmed the
+// refund, or the user dismissed it. Entries carry the principal that sent the
+// deposit (older entries have none) and a status: 'open' (may still need a
+// recovery) or 'settled' (the exchange settled it by itself).
+export interface DepositHistoryEntry {
+  token: string
+  block: string
+  amount: string
+  type: string
+  timestamp: number
+  principal?: string
+  status?: 'open' | 'settled'
+  runId?: string
+}
+
+const HISTORY_KEY = 'taco_deposit_history'
+const HISTORY_CAP = 200
+const HISTORY_MAX_AGE_MS = 21 * 86_400_000 // 21 days (block validity window)
+
+function readHistory(): DepositHistoryEntry[] {
   try {
-    const CACHE_KEY = 'taco_deposit_history'
-    const MAX_ENTRIES = 50
-    const MAX_AGE_MS = 21 * 86_400_000 // 21 days (block validity window)
+    const raw = localStorage.getItem(HISTORY_KEY)
+    const v = raw ? JSON.parse(raw) : []
+    return Array.isArray(v) ? v : []
+  } catch { return [] }
+}
 
-    const raw = localStorage.getItem(CACHE_KEY)
-    const history: Array<{ token: string; block: string; amount: string; type: string; timestamp: number }> =
-      raw ? JSON.parse(raw) : []
+/** Age out entries older than 21 days, then, above the cap, the oldest settled
+ *  ones. An open entry younger than 21 days is never evicted. */
+function pruneHistory(list: DepositHistoryEntry[], now = Date.now()): DepositHistoryEntry[] {
+  let out = list.filter(e => now - e.timestamp < HISTORY_MAX_AGE_MS)
+  if (out.length <= HISTORY_CAP) return out
+  const settled = out.filter(e => e.status === 'settled').sort((a, b) => a.timestamp - b.timestamp)
+  const drop = new Set<DepositHistoryEntry>()
+  for (const e of settled) {
+    if (out.length - drop.size <= HISTORY_CAP) break
+    drop.add(e)
+  }
+  out = out.filter(e => !drop.has(e))
+  return out
+}
 
-    // Add new entry
-    history.unshift({
-      token: tokenCanisterId,
-      block: block.toString(),
-      amount: amount.toString(),
-      type: assetType,
-      timestamp: Date.now(),
-    })
-
-    // Prune old entries + cap size
-    const now = Date.now()
-    const pruned = history.filter(e => now - e.timestamp < MAX_AGE_MS).slice(0, MAX_ENTRIES)
+function writeHistory(list: DepositHistoryEntry[]): boolean {
+  try {
     // Recovery record: on a full storage, free exchange cache space and retry.
-    setItemWithCacheEviction(CACHE_KEY, JSON.stringify(pruned))
-  } catch { /* localStorage full or unavailable — ignore */ }
+    setItemWithCacheEviction(HISTORY_KEY, JSON.stringify(pruneHistory(list)))
+    return true
+  } catch { return false }
+}
+
+const sameEntry = (e: DepositHistoryEntry, block: string, token?: string) =>
+  e.block === block && (token == null || e.token === token)
+
+/**
+ * Save a deposit for recovery. Returns whether it was written.
+ */
+export function saveDepositToCache(
+  tokenCanisterId: string, block: bigint, amount: bigint, assetType: string,
+  meta: { principal?: string; runId?: string } = {},
+): boolean {
+  const list = readHistory().filter(e => !sameEntry(e, block.toString(), tokenCanisterId))
+  list.unshift({
+    token: tokenCanisterId,
+    block: block.toString(),
+    amount: amount.toString(),
+    type: assetType,
+    timestamp: Date.now(),
+    principal: meta.principal,
+    status: 'open',
+    runId: meta.runId,
+  })
+  return writeHistory(list)
 }
 
 /**
  * Get cached deposit history for the Recover page.
  */
-export function getDepositHistory(): Array<{ token: string; block: string; amount: string; type: string; timestamp: number }> {
-  try {
-    const raw = localStorage.getItem('taco_deposit_history')
-    return raw ? JSON.parse(raw) : []
-  } catch { return [] }
+export function getDepositHistory(): DepositHistoryEntry[] {
+  return readHistory()
 }
 
 /**
- * Remove a deposit from cache (after successful recovery or use).
+ * Remove a deposit from cache: only after its trade went through, a recovery
+ * confirmed the refund, or the user dismissed it. Pass the token when known
+ * (block numbers are per ledger, so two tokens can share one).
  */
-export function removeDepositFromCache(block: string) {
+export function removeDepositFromCache(block: string, token?: string) {
+  const list = readHistory()
+  const next = list.filter(e => !sameEntry(e, block, token))
+  if (next.length !== list.length) writeHistory(next)
+}
+
+/** Mark a deposit settled by the exchange (kept for the user to check) or open again. */
+export function setDepositStatus(block: string, status: 'open' | 'settled', token?: string) {
+  const list = readHistory()
+  let changed = false
+  for (const e of list) if (sameEntry(e, block, token) && e.status !== status) { e.status = status; changed = true }
+  if (changed) writeHistory(list)
+}
+
+/** The principal of the current session, read once before funds move. */
+async function currentPrincipalText(): Promise<string | undefined> {
   try {
-    const CACHE_KEY = 'taco_deposit_history'
-    const raw = localStorage.getItem(CACHE_KEY)
-    if (!raw) return
-    const history = JSON.parse(raw) as Array<{ block: string }>
-    localStorage.setItem(CACHE_KEY, JSON.stringify(history.filter(e => e.block !== block)))
-  } catch { /* ignore */ }
+    const id = await getCachedIdentity()
+    const p = id.getPrincipal()
+    return p.isAnonymous() ? undefined : p.toText()
+  } catch { return undefined }
 }
 
 /**
@@ -363,6 +420,7 @@ export async function depositTokenForLiquidity(
   // The treasury as read by the check above (never an old saved copy).
   treasuryAccountIdHex = store.treasuryAccountId || treasuryAccountIdHex
   treasuryPrincipalText = store.treasuryPrincipal || treasuryPrincipalText
+  const principal = await currentPrincipalText()
   const agent = await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
 
@@ -403,7 +461,7 @@ export async function depositTokenForLiquidity(
     block = (result as any).Ok
   }
 
-  saveDepositToCache(tokenCanisterId, block, amount, typeStr)
+  saveDepositToCache(tokenCanisterId, block, amount, typeStr, { principal })
   return block
 }
 
@@ -432,6 +490,7 @@ export async function depositToken(
   }
   treasuryAccountIdHex = store.treasuryAccountId || treasuryAccountIdHex
   treasuryPrincipalText = store.treasuryPrincipal || treasuryPrincipalText
+  const principal = await currentPrincipalText()
   let block: bigint
   const typeStr = 'ICP' in assetType ? 'ICP' : 'ICRC3' in assetType ? 'ICRC3' : 'ICRC12'
 
@@ -442,7 +501,7 @@ export async function depositToken(
   }
 
   // Always save to cache — the next step (addPosition/addLiquidity/etc.) might fail
-  saveDepositToCache(tokenCanisterId, block, tradeAmount, typeStr)
+  saveDepositToCache(tokenCanisterId, block, tradeAmount, typeStr, { principal })
 
   return block
 }

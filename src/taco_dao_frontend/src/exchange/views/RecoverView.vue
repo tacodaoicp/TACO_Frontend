@@ -92,9 +92,10 @@
           click "Recover" to get your tokens back.
         </p>
 
-        <button v-if="cachedDeposits.length > 1" class="ex-btn ex-btn--primary" @click="recoverAllCached" :disabled="recovering || raRunning" style="margin-bottom:var(--space-3)">
-          {{ recovering ? 'Recovering...' : `Recover All (${cachedDeposits.length} deposits)` }}
+        <button v-if="recoverableDeposits.length > 1" class="ex-btn ex-btn--primary" @click="recoverAllCached" :disabled="recovering || raRunning" style="margin-bottom:var(--space-3)">
+          {{ recovering ? 'Recovering...' : `Recover All (${recoverableDeposits.length} deposits)` }}
         </button>
+        <div v-if="depositNote" class="ex-error-box" style="margin-bottom:var(--space-3)">{{ depositNote }}</div>
 
         <div class="ex-table-wrap">
           <table class="ex-table recover-view__deposits-table">
@@ -108,21 +109,23 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="dep in cachedDeposits" :key="dep.block">
+              <tr v-for="dep in cachedDeposits" :key="dep.token + ':' + dep.block">
                 <td>{{ getTokenSymbol(dep.token) }} <span class="recover-view__token-id">{{ dep.token.slice(0, 10) }}...</span></td>
                 <td class="num">{{ dep.block }}</td>
                 <td>{{ dep.type }}</td>
                 <td>{{ formatDepositAge(dep.timestamp) }}</td>
                 <td>
-                  <div style="display:flex;gap:4px">
+                  <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+                    <span v-if="isOtherWallet(dep)" class="recover-view__ra-detail">Saved by another wallet ({{ shortPrincipal(dep.principal!) }})</span>
                     <button
+                      v-else
                       class="ex-btn ex-btn--sm ex-btn--primary"
                       @click="recoverCachedDeposit(dep)"
                       :disabled="recovering || raRunning"
                     >{{ recovering ? '...' : 'Recover' }}</button>
                     <button
                       class="ex-btn ex-btn--sm ex-btn--outline"
-                      @click="dismissDeposit(dep.block)"
+                      @click="dismissDeposit(dep)"
                     >Dismiss</button>
                   </div>
                 </td>
@@ -301,7 +304,7 @@ import { onVisible } from '../composables/useVisibilityAware'
 import ExchangeTopNav from '../components/common/ExchangeTopNav.vue'
 import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
-import { getDepositHistory, removeDepositFromCache } from '../utils/deposit'
+import { getDepositHistory, removeDepositFromCache, type DepositHistoryEntry } from '../utils/deposit'
 import { useExchangeToast } from '../composables/useExchangeToast'
 import { getCachedIdentity } from '../../shared/auth-cache'
 import { mapWithConcurrency, withRetries } from '../utils/concurrency'
@@ -312,11 +315,49 @@ const store = useExchangeStore()
 const toast = useExchangeToast()
 
 // ── Cached Deposits ──
-interface CachedDeposit { token: string; block: string; amount: string; type: string; timestamp: number }
+// Pointer rules: a saved deposit leaves this list only when a recovery
+// confirmed the refund (true, or the exchange answering that the block was
+// already recovered or refunded) or the user dismissed it. A false or a failed
+// call never deletes it: a bare false can also mean the exchange refused the
+// call, and a thrown call changed nothing.
+type CachedDeposit = DepositHistoryEntry
 const cachedDeposits = ref<CachedDeposit[]>([])
+const depositNote = ref('')
 
 function loadCachedDeposits() {
   cachedDeposits.value = getDepositHistory()
+}
+
+/** Saved by a different wallet than the one connected now (entries without a principal predate the field). */
+function isOtherWallet(dep: CachedDeposit): boolean {
+  return !!dep.principal && !!store.principalText && dep.principal !== store.principalText
+}
+const recoverableDeposits = computed(() => cachedDeposits.value.filter(d => !isOtherWallet(d)))
+
+function shortPrincipal(p: string): string {
+  return p.length > 12 ? `${p.slice(0, 5)}…${p.slice(-3)}` : p
+}
+
+function dropDeposit(token: string, block: string) {
+  removeDepositFromCache(block, token)
+  cachedDeposits.value = cachedDeposits.value.filter(d => !(d.block === block && d.token === token))
+}
+
+/** A recoverBatch item that confirms the refund. */
+function batchItemRecovered(r: { success: boolean; error: string }): boolean {
+  return r.success || /already recovered|already refunded/i.test(r.error ?? '')
+}
+
+/** Text for a recovery call that threw (nothing changed on the exchange). */
+function recoveryThrowText(err: any): string {
+  const msg = String(err?.message ?? err ?? '')
+  if (store.isFrozen) return 'TACO is paused right now. Your deposit is safe there. Try again when it is back.'
+  if (msg.includes('Rate limit')) {
+    const s = Math.max(1, Math.ceil(store.msUntilCallsFree(1) / 1000))
+    return `TACO takes only a few calls per wallet every 90 seconds. Try again in ${s} s.`
+  }
+  if (msg.includes('Session expired') || msg.includes('Not authenticated')) return 'Your session expired. Reconnect your wallet, then try again.'
+  return 'Could not reach TACO, so nothing changed. Try again in a minute.'
 }
 
 function getTokenSymbol(address: string): string {
@@ -331,16 +372,19 @@ function formatDepositAge(timestamp: number): string {
   return `${Math.floor(diff / 86_400_000)}d ago`
 }
 
+const depositTokenType: Record<string, any> = {
+  ICP: { ICP: null },
+  ICRC12: { ICRC12: null },
+  ICRC3: { ICRC3: null },
+}
+
 async function recoverCachedDeposit(dep: CachedDeposit) {
   console.log(`[Recover] Attempting recovery: token=${dep.token.slice(0, 10)} block=${dep.block} type=${dep.type}`)
-  const tokenType: Record<string, any> = {
-    ICP: { ICP: null },
-    ICRC12: { ICRC12: null },
-    ICRC3: { ICRC3: null },
-  }
+  if (isOtherWallet(dep)) return
   recovering.value = true
   recoverError.value = ''
   recoverSuccess.value = false
+  depositNote.value = ''
   try {
     if (!store.isAuthenticated) {
       recoverError.value = 'Connect your wallet first'
@@ -348,7 +392,7 @@ async function recoverCachedDeposit(dep: CachedDeposit) {
     }
     // Prefer the LIVE backend asset_type (authoritative ICRC3/ICRC12/ICP) over the cached
     // dep.type, which may have been tagged ICRC12 by a stale/fallback token load.
-    const standard = store.getTokenByAddress(dep.token)?.asset_type ?? tokenType[dep.type] ?? { ICRC12: null }
+    const standard = store.getTokenByAddress(dep.token)?.asset_type ?? depositTokenType[dep.type] ?? { ICRC12: null }
     console.log(`[Recover] Calling recoverWronglysent(${dep.token}, ${dep.block}, ${JSON.stringify(standard)})`)
     const result = await store.recoverWronglysent(
       dep.token,
@@ -357,29 +401,21 @@ async function recoverCachedDeposit(dep: CachedDeposit) {
     )
     console.log('[Recover] Result:', result)
     if (result) {
-      removeDepositFromCache(dep.block)
-      cachedDeposits.value = cachedDeposits.value.filter(d => d.block !== dep.block)
+      dropDeposit(dep.token, dep.block)
       recoverSuccess.value = true
-      toast.success('Deposit Recovered')
+      toast.success('Deposit recovered')
     } else {
       // A bare false usually means the deposit was already used by its trade or
-      // already refunded. Keep the row so a support-resolved case stays one
-      // click away; the user can dismiss it once confirmed.
-      recoverError.value = `Block ${dep.block} was already used by its trade or already refunded. Check your wallet history for the refund. If you cannot find it, contact support with this block number. The entry stays in the list; dismiss it once settled.`
-      toast.warning('Recovery Notice', recoverError.value)
+      // already refunded, but it is also what a refused call returns. Keep the
+      // row so the case stays one click away; the user can dismiss it once settled.
+      depositNote.value = `TACO already settled this deposit. Check your wallet history, and if the ${getTokenSymbol(dep.token)} did not come back, contact support with deposit ${dep.block}.`
+      toast.warning('Recovery Notice', depositNote.value)
     }
   } catch (err: any) {
+    // Nothing changed on the exchange: the row stays.
     console.error('[Recover] Error:', err)
-    // Still remove — if the canister rejects it, the block is consumed
-    removeDepositFromCache(dep.block)
-    cachedDeposits.value = cachedDeposits.value.filter(d => d.block !== dep.block)
-    const msg = err.message || String(err)
-    if (msg.includes('assertion failed') || msg.includes('trap')) {
-      recoverError.value = `Block ${dep.block} already processed — removed from list.`
-    } else {
-      recoverError.value = `Recovery error: ${msg} — removed from list.`
-    }
-    toast.error('Recovery Failed', recoverError.value)
+    depositNote.value = recoveryThrowText(err)
+    toast.error('Recovery Failed', depositNote.value)
   } finally {
     recovering.value = false
   }
@@ -393,55 +429,57 @@ async function recoverAllCached() {
   recovering.value = true
   recoverError.value = ''
   recoverSuccess.value = false
+  depositNote.value = ''
 
   try {
-    const tokenType: Record<string, any> = {
-      ICP: { ICP: null },
-      ICRC12: { ICRC12: null },
-      ICRC3: { ICRC3: null },
-    }
-
-    // Build batch (max 20 per call)
-    const batch = cachedDeposits.value.slice(0, 20).map(dep => ({
+    // Build batch (max 20 per call); rows saved by another wallet are skipped.
+    const batch = recoverableDeposits.value.slice(0, 20).map(dep => ({
       identifier: dep.token,
       block: BigInt(dep.block),
-      tType: store.getTokenByAddress(dep.token)?.asset_type ?? tokenType[dep.type] ?? { ICRC12: null },
+      tType: store.getTokenByAddress(dep.token)?.asset_type ?? depositTokenType[dep.type] ?? { ICRC12: null },
     }))
+    if (batch.length === 0) return
 
     console.log(`[Recover] Batch recovering ${batch.length} deposits`)
     const results = await store.recoverBatch(batch)
 
+    // A limited caller gets one "Not allowed" row and nothing was looked at.
+    if (results.length === 1 && /not allowed/i.test(results[0].error ?? '') && !results[0].success) {
+      depositNote.value = recoveryThrowText(new Error('Rate limit'))
+      toast.warning('Recovery Notice', depositNote.value)
+      return
+    }
+
     let recovered = 0
     for (const result of results) {
-      const blockStr = result.block.toString()
-      // Always remove from cache — whether success, "Block already used", or other error
-      removeDepositFromCache(blockStr)
-      cachedDeposits.value = cachedDeposits.value.filter(d => d.block !== blockStr)
-      if (result.success) recovered++
+      // Only a confirmed refund removes the row.
+      if (batchItemRecovered(result)) {
+        recovered++
+        dropDeposit(result.identifier, result.block.toString())
+      }
     }
 
     if (recovered > 0) {
       recoverSuccess.value = true
-      recoverError.value = recovered < results.length
-        ? `Recovered ${recovered}/${results.length} deposits. The others were already used by their trades, already refunded, or expired.`
+      depositNote.value = recovered < results.length
+        ? `Recovered ${recovered} of ${results.length} deposits. The others were already used by their trades or already refunded, and stay listed until you dismiss them.`
         : ''
       toast.success('Batch Recovery Complete', recovered + ' deposits recovered')
     } else if (results.length > 0) {
-      recoverError.value = 'No deposits needed recovery. They were already used by their trades or already refunded; check your wallet history if in doubt.'
-      toast.warning('Recovery Notice', recoverError.value)
+      depositNote.value = 'No deposit was refunded. They were already used by their trades or already refunded; check your wallet history if in doubt. They stay listed until you dismiss them.'
+      toast.warning('Recovery Notice', depositNote.value)
     }
   } catch (err: any) {
     console.error('[Recover] Batch error:', err)
-    recoverError.value = err.message || 'Batch recovery failed'
-    toast.error('Recovery Failed', recoverError.value)
+    depositNote.value = recoveryThrowText(err)
+    toast.error('Recovery Failed', depositNote.value)
   } finally {
     recovering.value = false
   }
 }
 
-function dismissDeposit(block: string) {
-  removeDepositFromCache(block)
-  cachedDeposits.value = cachedDeposits.value.filter(d => d.block !== block)
+function dismissDeposit(dep: CachedDeposit) {
+  dropDeposit(dep.token, dep.block)
 }
 
 // ── Stuck TX ──
@@ -729,36 +767,40 @@ function formatRa(amount: bigint, address: string): string {
 // Phase: saved treasury deposits through recoverBatch, in chunks, entries kept on failure.
 async function raTreasury(): Promise<number> {
   const id = 'treasury'
-  const deposits = [...cachedDeposits.value]
+  const deposits = [...recoverableDeposits.value]
   if (deposits.length === 0) { raSet(id, 'Saved deposits', 'done', 'None saved, nothing to recover'); return 0 }
   raSet(id, 'Saved deposits', 'running', `Recovering ${deposits.length} saved deposits...`)
-  const tokenType: Record<string, any> = { ICP: { ICP: null }, ICRC12: { ICRC12: null }, ICRC3: { ICRC3: null } }
   let recovered = 0
   for (let i = 0; i < deposits.length; i += 20) {
     const chunk = deposits.slice(i, i + 20)
     const batch = chunk.map(dep => ({
       identifier: dep.token,
       block: BigInt(dep.block),
-      tType: store.getTokenByAddress(dep.token)?.asset_type ?? tokenType[dep.type] ?? { ICRC12: null },
+      tType: store.getTokenByAddress(dep.token)?.asset_type ?? depositTokenType[dep.type] ?? { ICRC12: null },
     }))
     let results: any[] | null = null
     for (let attempt = 0; attempt < 4 && results === null; attempt++) {
       try {
         results = await store.recoverBatch(batch)
       } catch (e: any) {
-        // The store's update-call limiter throws instead of queueing; wait it out.
-        if (String(e?.message ?? e).includes('Rate limit') && attempt < 3) {
+        // The client limiter throws before any call is sent; wait until a call fits.
+        if (String(e?.message ?? e).includes('Rate limit') && !store.isFrozen && attempt < 3) {
           raSet(id, 'Saved deposits', 'running', 'Waiting out the call rate limit...')
-          await sleep(20_000)
+          await sleep(Math.max(5_000, Math.min(95_000, store.msUntilCallsFree(1))))
         } else throw e
       }
     }
+    // The exchange itself refused (one "Not allowed" row, nothing looked at).
+    // Never call again inside the same window: a second refusal in a day bans the wallet.
+    const limited = (results ?? []).length === 1 && !results![0].success && /not allowed/i.test(results![0].error ?? '')
+    if (limited) {
+      raSet(id, 'Saved deposits', 'failed', 'TACO takes only a few calls per wallet every 90 seconds. Run Recover All again in a few minutes. Every deposit stays listed above.')
+      return recovered
+    }
     for (const r of results ?? []) {
-      const blockStr = r.block.toString()
-      if (r.success) {
+      if (batchItemRecovered(r)) {
         recovered++
-        removeDepositFromCache(blockStr)
-        cachedDeposits.value = cachedDeposits.value.filter(d => d.block !== blockStr)
+        dropDeposit(r.identifier, r.block.toString())
       }
       // Failures stay listed in Recent Deposits so support cases stay one click away.
     }
