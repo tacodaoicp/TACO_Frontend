@@ -44,6 +44,14 @@ export interface CrossDexSwapPlan {
   kind: 'single' | 'split'
   legs: CrossDexLeg[]
   totalExpectedOut: bigint
+  /** With a legCost: gross minus every used venue's cost (the objective). */
+  totalNetOut?: bigint
+}
+
+export interface CrossDexPlanOptions {
+  /** Cost of using a venue for `units` tenths of the total (output units). When
+   *  given, net = gross − Σ costs replaces gross − (numLegs − 1) · outTransferFee. */
+  legCost?: (dex: CrossDexVenue, units: number) => bigint
 }
 
 const GRID = 10 // 10 fractions: 10%, 20%, …, 100% (units of 10%)
@@ -61,7 +69,9 @@ export function buildCrossDexPlan(
   neuGrid: bigint[],
   total: bigint,
   outTransferFee: bigint,
+  opts: CrossDexPlanOptions = {},
 ): CrossDexSwapPlan {
+  const legCost = opts.legCost
   const icpOutAt = (u: number) => (u > 0 ? (icpGrid[u - 1] ?? 0n) : 0n)
   const tacoOutAt = (u: number) => (u > 0 ? (tacoGrid[u - 1]?.expectedOut ?? 0n) : 0n)
   const neuOutAt = (u: number) => (u > 0 ? (neuGrid[u - 1] ?? 0n) : 0n)
@@ -79,14 +89,16 @@ export function buildCrossDexPlan(
       if (numLegs === 0) continue
       const gross = icpOutAt(icpU) + tacoOutAt(tacoU) + neuOutAt(neuU)
       if (gross <= 0n) continue
-      const net = gross - BigInt(numLegs - 1) * outTransferFee
-      if (net > bestNet) { bestNet = net; best = { icpU, tacoU, neuU, gross } }
+      const net = legCost
+        ? gross - (icpU > 0 ? legCost('icpswap', icpU) : 0n) - (tacoU > 0 ? legCost('taco', tacoU) : 0n) - (neuU > 0 ? legCost('neutrinite', neuU) : 0n)
+        : gross - BigInt(numLegs - 1) * outTransferFee
+      if (best === null || net > bestNet) { bestNet = net; best = { icpU, tacoU, neuU, gross } }
     }
   }
 
   if (!best) {
     // No viable route on any venue.
-    return { kind: 'single', legs: [{ dex: 'icpswap', pctBP: 10000, amountIn: total, expectedOut: 0n }], totalExpectedOut: 0n }
+    return { kind: 'single', legs: [{ dex: 'icpswap', pctBP: 10000, amountIn: total, expectedOut: 0n }], totalExpectedOut: 0n, totalNetOut: legCost ? 0n : undefined }
   }
 
   // Build legs in venue order; the last used leg gets the remainder (no dust).
@@ -103,7 +115,7 @@ export function buildCrossDexPlan(
     return { dex: u.dex, pctBP: u.units * 1000, amountIn, expectedOut: u.expectedOut, tacoLegs: u.tacoLegs }
   })
 
-  return { kind: used.length === 1 ? 'single' : 'split', legs, totalExpectedOut: best.gross }
+  return { kind: used.length === 1 ? 'single' : 'split', legs, totalExpectedOut: best.gross, totalNetOut: legCost ? bestNet : undefined }
 }
 
 /**

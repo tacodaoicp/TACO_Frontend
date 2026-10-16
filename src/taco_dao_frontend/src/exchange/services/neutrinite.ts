@@ -209,6 +209,8 @@ const FOLLOW_TTL_MS = 6 * 60 * 60_000
 let _followMap: Map<string, number> | null = null
 let _followAt = 0
 let _followInflight: Promise<Map<string, number>> | null = null
+/** The last settings read succeeded (a missing row then means "not followed"). */
+let _followOk = false
 
 async function getFollowSettings(): Promise<Map<string, number>> {
   if (_followMap && Date.now() - _followAt < FOLLOW_TTL_MS) return _followMap
@@ -218,10 +220,11 @@ async function getFollowSettings(): Promise<Map<string, number>> {
       const rows = (await (await anonActor()).ledger_follow_settings()) as any[]
       const m = new Map<string, number>()
       for (const r of rows) { try { m.set(r.ledger.toText(), Number(r.follow_interval_sec)) } catch { /* skip row */ } }
-      _followMap = m; _followAt = Date.now()
+      _followMap = m; _followAt = Date.now(); _followOk = true
       return m
     } catch (e) {
       console.warn('[neutrinite] ledger_follow_settings failed; using prior cache:', e)
+      if (!_followMap) _followOk = false
       return _followMap ?? new Map()
     } finally { _followInflight = null }
   })()
@@ -240,6 +243,56 @@ export async function prefetchFollowSettings(): Promise<void> {
  */
 export async function sellFollowSec(sell: string): Promise<number | undefined> {
   try { return (await getFollowSettings()).get(sell) } catch { return undefined }
+}
+
+/**
+ * How fast the pylon credits a deposit of `ledger`: 'fast' (10 s or less, may
+ * join a split), 'slow' (11 to 40 s, only a 100% Neutrinite route), 'tooSlow'
+ * (above 40 s, never), 'none' (the settings were read and have no row for it:
+ * not followed, never), 'unknown' (the settings could not be read).
+ */
+export type FollowState = 'fast' | 'slow' | 'tooSlow' | 'none' | 'unknown'
+export async function followState(ledger: string): Promise<FollowState> {
+  let m: Map<string, number>
+  try { m = await getFollowSettings() } catch { return 'unknown' }
+  const sec = m.get(ledger)
+  if (sec == null) return _followOk ? 'none' : 'unknown'
+  if (sec <= 10) return 'fast'
+  if (sec <= NEUTRINITE_MAX_SELL_FOLLOW_SEC) return 'slow'
+  return 'tooSlow'
+}
+
+// dex_quote with its routes decoded (only the fields read). Kept apart from
+// the minimal quote IDL: if the routes ever fail to decode, the quote falls
+// back to the proven amount only call and the route is reported unknown.
+const pylonRoutesIDL = ({ IDL }: any) => {
+  const SupportedLedger = IDL.Variant({
+    ic: IDL.Principal,
+    other: IDL.Record({ ledger: IDL.Vec(IDL.Nat8), platform: IDL.Nat64 }),
+  })
+  const QuoteRequest = IDL.Record({ amount: IDL.Nat, ledger_from: SupportedLedger, ledger_to: SupportedLedger })
+  const Leg = IDL.Record({ ledger_from: IDL.Principal, ledger_to: IDL.Principal })
+  const Route = IDL.Record({ legs: IDL.Vec(Leg) })
+  const QuoteResponse = IDL.Variant({ err: IDL.Text, ok: IDL.Record({ amount_out: IDL.Nat, routes: IDL.Vec(Route) }) })
+  return IDL.Service({ dex_quote: IDL.Func([QuoteRequest], [QuoteResponse], ['query']) })
+}
+
+/** A quote plus the ledgers its internal routes pass through (null when unknown). */
+export async function quoteWithRoutes(sell: string, buy: string, amountIn: bigint): Promise<{ out: bigint; routeTokens: string[] | null }> {
+  if (amountIn <= 0n) return { out: 0n, routeTokens: null }
+  try {
+    if (!_anonAgent) await anonActor()
+    const actor = Actor.createActor(pylonRoutesIDL, { agent: _anonAgent!, canisterId: NEUTRINITE_PYLON }) as any
+    const res = await actor.dex_quote({ amount: amountIn, ledger_from: ledgerVar(sell), ledger_to: ledgerVar(buy) })
+    if (!('ok' in res)) return { out: 0n, routeTokens: null }
+    const toks = new Set<string>()
+    for (const r of res.ok.routes ?? []) for (const l of r.legs ?? []) {
+      toks.add(l.ledger_from.toText()); toks.add(l.ledger_to.toText())
+    }
+    return { out: res.ok.amount_out as bigint, routeTokens: toks.size ? [...toks] : null }
+  } catch {
+    return { out: await getQuoteAmount(sell, buy, amountIn), routeTokens: null }
+  }
 }
 
 // ── Pending-swap cache (localStorage) — survives a tab-close so the Recover page can sweep ──
