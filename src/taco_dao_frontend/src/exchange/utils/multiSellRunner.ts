@@ -349,7 +349,12 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
   return { res: { ok: true }, p: { run, deps: bound, tradingFeeBps, tokens, assets: prepAssets } }
 }
 
-/** Second in line TACO legs wait until every owner TACO leg is final (cap from the last owner start). */
+/**
+ * Queued TACO legs (second in line and on) wait until the TACO leg of every token they wait for
+ * is final. Late when one of those still running started more than the cap ago, or when one
+ * never started (held at the gate, or waiting in line itself) by the gate's limit plus one cap
+ * per place in line.
+ */
 function makeTurns(prep: Prepared, clock: Clock, capMs: number, quotes: QuoteDeps) {
   const ownerFinal = new Map<string, boolean>()
   const ownerStart = new Map<string, number>()
@@ -361,18 +366,20 @@ function makeTurns(prep: Prepared, clock: Clock, capMs: number, quotes: QuoteDep
     turnFor(pa: Prepared['assets'][number], tacoLi: number): LegTurn | undefined {
       if (!pa.plan.second) return undefined
       const owners = pa.plan.second.waitsFor
+      const place = Math.max(1, pa.plan.second.place ?? 1)
       const leg = pa.legs[tacoLi]
       return {
         plannedOut: leg.expectedOut,
         plannedMin: pa.minOut[tacoLi],
         wait: async () => {
           for (;;) {
-            if (owners.every(o => ownerFinal.get(o))) return 'go'
-            const starts = owners.map(o => ownerStart.get(o))
+            const running = owners.filter(o => !ownerFinal.get(o))
+            if (running.length === 0) return 'go'
+            const starts = running.map(o => ownerStart.get(o))
             const now = clock.now()
             if (starts.every(s => s != null) && now - Math.max(...(starts as number[])) > capMs) return 'late'
-            // owners never started (gate held them) past the gate's own limits: late too
-            if (now - t0 > NEU_STALE_MS + capMs) return 'late'
+            // a token it waits for never started (the gate held it, or it waits in line too)
+            if (now - t0 > NEU_STALE_MS + capMs * place) return 'late'
             await clock.sleep(250)
           }
         },
@@ -431,7 +438,7 @@ function launch(ctx: SaleCtx, prep: Prepared, deps: SaleDeps, hooks: RunHooks): 
         gate: isNeu || gated ? gate : undefined,
         gateWaitText: `Waiting for Neutrinite to confirm the ${symbolOf(plan.gate?.token ?? '')} deposit…`,
         turn,
-        turnWaitText: turn ? `Waiting for ${pa.plan.second!.waitsFor.map(symbolOf).join(' and ')} on TACO…` : undefined,
+        turnWaitText: turn ? `Waiting for ${joinNames(pa.plan.second!.waitsFor.map(symbolOf))} on TACO…` : undefined,
         runId: ctx.runId,
         journal: legJournal ?? nullJournal,
         strictJournal: true,

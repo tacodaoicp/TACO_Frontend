@@ -42,6 +42,8 @@ const ROUND_CAP = 64
 const ZERO_OUT = 100_000n
 const SECOND_MIN_LOSS_BP = 10n   // 0.1 %
 const SECOND_MIN_GAIN_BP = 5n    // 0.05 %
+/** Places in line behind the first wave on one pool (second in line is place 1). */
+export const MAX_QUEUE_DEPTH = 5
 const NOTE_MIN_BP = 30n          // 0.3 %
 const NOTE_MIN_ICP = 1_000_000n  // 0.01 ICP
 const ASK_MIN_BP = 50n           // 0.5 %
@@ -109,7 +111,9 @@ export interface AssetPlan {
   aloneReceiveOut: bigint
   footprint: Resource[]
   neutrinite: boolean
-  second?: { waitsFor: string[] }
+  /** Queued TACO part: it starts after every token in waitsFor is final. place 1 is second in
+   *  line, 2 third in line (waits for a second in line token too), and so on. */
+  second?: { waitsFor: string[]; place?: number }
   tacoSkippedForBudget: boolean
   tacoSkipLoss: bigint
   issue?: 'noRoute' | 'zeroOut' | 'tacoBusy'
@@ -142,6 +146,7 @@ export interface BatchPlan {
 }
 
 // ── helpers ──
+const NO_EXCLUSIONS: ReadonlySet<Resource> = new Set()
 export const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`)
 const hopPair = (h: DirectedHop): string => { const [a, b] = h.split('>'); return pairKey(a, b) }
 const big = (x: bigint, y: bigint) => (x > y ? x : y)
@@ -187,7 +192,7 @@ function legCostFn(P: PlanCtx, i: number) {
 }
 
 /** The quoted routes of a token, filtered (excluded pools, paused hubs) and repriced after prior flows. */
-function filteredBatch(P: PlanCtx, i: number, excluded: Set<Resource>, prior?: Map<DirectedHop, number>): any[] {
+function filteredBatch(P: PlanCtx, i: number, excluded: ReadonlySet<Resource>, prior?: Map<DirectedHop, number>): any[] {
   const q = P.quotes[i]
   const token = q.address
   return q.batch.map((b, k) => {
@@ -218,7 +223,7 @@ function priorKey(prior?: Map<DirectedHop, number>): string {
 }
 
 /** Plan one token (memoized). */
-async function planAsset(P: PlanCtx, i: number, excluded: Set<Resource>, flags: { taco: boolean; neu: boolean }, prior?: Map<DirectedHop, number>): Promise<AssetPlan> {
+async function planAsset(P: PlanCtx, i: number, excluded: ReadonlySet<Resource>, flags: { taco: boolean; neu: boolean }, prior?: Map<DirectedHop, number>): Promise<AssetPlan> {
   const key = `${i}|${[...excluded].sort().join(',')}|${flags.taco ? 1 : 0}${flags.neu ? 1 : 0}|${priorKey(prior)}`
   const hit = P.memo.get(key)
   if (hit) return hit
@@ -228,7 +233,7 @@ async function planAsset(P: PlanCtx, i: number, excluded: Set<Resource>, flags: 
   return plan
 }
 
-function planAssetNow(P: PlanCtx, i: number, excluded: Set<Resource>, flags: { taco: boolean; neu: boolean }, prior?: Map<DirectedHop, number>): AssetPlan {
+function planAssetNow(P: PlanCtx, i: number, excluded: ReadonlySet<Resource>, flags: { taco: boolean; neu: boolean }, prior?: Map<DirectedHop, number>): AssetPlan {
   const inp = P.inputs[i], q = P.quotes[i]
   const token = q.address
   const total = q.total
@@ -489,7 +494,16 @@ async function venueKeepingFallback(
   return { plans, excluded, flags, owners, decisions, fallbackUsed: true, skipped }
 }
 
-/** 4.6: second in line, after ownership and the budget pass. */
+/**
+ * 4.6: second in line, after ownership and the budget pass, as a queue per shared pool. A token
+ * that ownership moved may sell its TACO part after every token that uses one of its pools: the
+ * first wave tokens, and tokens already queued (third in line and on). It is planned on the
+ * flows of every other token through the quoted pool curves, so each place in line is priced
+ * after the ones before it. A token that a queued token already waits for keeps its first wave
+ * plan (the queued token was priced on it), so the waits never form a cycle. The line is capped
+ * at MAX_QUEUE_DEPTH places and by the TACO call budget; at run time each place gets the exact
+ * recheck and the s/2 send rule, with the 30 s cap counted from the tokens it waits for.
+ */
 async function secondInLine(P: PlanCtx, res: Resolution, alone: AssetPlan[], allowed: number): Promise<void> {
   const n = P.inputs.length
   const plans = res.plans
@@ -500,34 +514,38 @@ async function secondInLine(P: PlanCtx, res: Resolution, alone: AssetPlan[], all
     .sort((a, b) => (losses[b] > losses[a] ? 1 : losses[b] < losses[a] ? -1 : a - b))
   if (order.length === 0) return
   P.curves = P.curves ?? buildHopCurves(P.quotes, P.target)
-  const second = new Set<number>()
-  const secondPools = new Set<Resource>()
+  const place = new Map<number, number>()   // queued token -> its place in line (1 = second in line)
+  const waitedFor = new Set<number>()       // tokens some queued token waits for
   for (const b of order) {
-    // what lands before b: every first wave token's TACO splits
+    if (waitedFor.has(b)) continue
+    const flagsB = { ...res.flags[b], taco: !P.inputs[b].tacoPaused && res.flags[b].taco }
+    if (!flagsB.taco) continue
+    // what lands before b on its pools: the TACO splits of every other token as planned now
+    // (tokens on other pools add flows b never meets)
     const splits: Array<{ amountIn: bigint; hops: DirectedHop[]; hopAmounts?: bigint[] }> = []
     plans.forEach((p, j) => {
-      if (j === b || second.has(j)) return
+      if (j === b) return
       for (const l of p.legs) if (l.dex === 'taco') for (const t of l.tacoLegs ?? []) {
         splits.push({ amountIn: t.amountIn, hops: routeHopsOfLeg(t, p.address, P.target),
           hopAmounts: (t.hopDetails ?? []).length ? (t.hopDetails as any[]).map(h => BigInt(h.amountIn)) : undefined })
       }
     })
     const prior = tacoInflows(splits, P.curves)
-    const flagsB = { ...res.flags[b], taco: !P.inputs[b].tacoPaused && res.flags[b].taco }
-    if (!flagsB.taco) continue
-    const sa = await planAsset(P, b, secondPools, flagsB, prior)
+    const sa = await planAsset(P, b, NO_EXCLUSIONS, flagsB, prior)
     if (sa.issue) continue
     if ((sa.netOut - plans[b].netOut) * 10000n < plans[b].netOut * SECOND_MIN_GAIN_BP) continue
     const mine = new Set(tacoFootprint(sa))
-    const waits = [...Array(n).keys()].filter(j => j !== b && !second.has(j) && tacoFootprint(plans[j]).some(r => mine.has(r)))
+    const waits = [...Array(n).keys()].filter(j => j !== b && tacoFootprint(plans[j]).some(r => mine.has(r)))
     if (waits.length === 0) continue
+    const at = 1 + Math.max(0, ...waits.map(j => place.get(j) ?? 0))
+    if (at > MAX_QUEUE_DEPTH) continue
     const hadTaco = plans[b].legs.some(l => l.dex === 'taco')
     const hasTaco = sa.legs.some(l => l.dex === 'taco')
     if (!hadTaco && hasTaco && tacoTokens(plans) + 1 > allowed) continue
-    second.add(b)
-    for (const r of mine) secondPools.add(r)
-    res.decisions.push(`${P.inputs[b].token.symbol} second in line after ${waits.map(j => P.inputs[j].token.symbol).join('+')}: ${sa.netOut} (was ${plans[b].netOut})`)
-    plans[b] = { ...sa, second: { waitsFor: waits.map(j => plans[j].address) } }
+    place.set(b, at)
+    for (const j of waits) waitedFor.add(j)
+    res.decisions.push(`${P.inputs[b].token.symbol} ${at === 1 ? 'second' : `place ${at + 1}`} in line after ${waits.map(j => P.inputs[j].token.symbol).join('+')}: ${sa.netOut} (was ${plans[b].netOut})`)
+    plans[b] = { ...sa, second: { waitsFor: waits.map(j => plans[j].address), place: at } }
   }
 }
 
@@ -560,23 +578,47 @@ export function checkPlan(plan: BatchPlan, inputs: AssetInput[], allowed: number
       }
     }
   })
-  const first = plan.assets.filter(a => !a.second && !a.issue)
+  const live = plan.assets.filter(a => !a.issue)
+  const first = live.filter(a => !a.second)
   const seen = new Map<Resource, string>()
   for (const a of first) for (const r of a.footprint) {
     if (seen.has(r)) out.push(`first wave share ${r}: ${seen.get(r)} and ${a.symbol}`)
     seen.set(r, a.symbol)
   }
-  const seconds = plan.assets.filter(a => a.second && !a.issue)
-  const secondSeen = new Map<Resource, string>()
-  for (const a of seconds) {
-    for (const r of a.footprint) {
-      if (r === 'neutrinite') continue
-      if (secondSeen.has(r)) out.push(`second in line share ${r}: ${secondSeen.get(r)} and ${a.symbol}`)
-      secondSeen.set(r, a.symbol)
-      const owner = first.find(f => f.footprint.includes(r))
-      if (owner && !a.second!.waitsFor.includes(owner.address)) out.push(`${a.symbol} meets ${owner.symbol} on ${r} without waiting`)
+  // Queued TACO parts: each waits for tokens in this sale, never for itself (no cycle), and any
+  // two tokens on one TACO pool run one after the other (one waits for the other, directly or
+  // through the tokens it waits for).
+  const byAddr = new Map(live.map(a => [a.address, a]))
+  const before = new Map<string, Set<string>>()
+  const runsBefore = (addr: string): Set<string> => {
+    const hit = before.get(addr)
+    if (hit) return hit
+    const acc = new Set<string>() // every token that runs before addr (a cycle puts addr itself in)
+    before.set(addr, acc)
+    const stack = [...(byAddr.get(addr)?.second?.waitsFor ?? [])]
+    while (stack.length) {
+      const w = stack.pop()!
+      if (acc.has(w)) continue
+      acc.add(w)
+      for (const x of byAddr.get(w)?.second?.waitsFor ?? []) stack.push(x)
     }
-    if (a.second!.waitsFor.length === 0) out.push(`${a.symbol}: second in line with nothing to wait for`)
+    return acc
+  }
+  for (const a of live) {
+    if (!a.second) continue
+    if (a.second.waitsFor.length === 0) out.push(`${a.symbol}: second in line with nothing to wait for`)
+    for (const w of a.second.waitsFor) if (!byAddr.has(w)) out.push(`${a.symbol} waits for a token that is not in the sale`)
+    if (runsBefore(a.address).has(a.address)) out.push(`${a.symbol}: its line waits for itself`)
+    if (!a.legs.some(l => l.dex === 'taco')) out.push(`${a.symbol}: in line without a TACO part`)
+  }
+  const users = new Map<Resource, AssetPlan[]>()
+  for (const a of live) for (const r of a.footprint) if (r !== 'neutrinite') users.set(r, [...(users.get(r) ?? []), a])
+  for (const [r, us] of users) {
+    for (let x = 0; x < us.length; x++) for (let y = x + 1; y < us.length; y++) {
+      const A = us[x], B = us[y]
+      if (!A.second && !B.second) continue // two first wave tokens: reported above
+      if (!runsBefore(B.address).has(A.address) && !runsBefore(A.address).has(B.address)) out.push(`${A.symbol} and ${B.symbol} meet on ${r} without waiting`)
+    }
   }
   if (plan.assets.filter(a => a.neutrinite).length > 1) out.push('more than one Neutrinite token')
   if (plan.tacoAssetCount > allowed) out.push(`TACO tokens ${plan.tacoAssetCount} > allowed ${allowed}`)
