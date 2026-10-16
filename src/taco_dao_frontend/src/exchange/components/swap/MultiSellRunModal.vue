@@ -17,6 +17,8 @@
           </div>
         </div>
 
+        <p v-if="approvalSlow" class="ms-md__note ms-note-warn" aria-live="polite">Still waiting for the approval. You can close this window and the sale goes on by itself.</p>
+
         <div v-if="final && (receivedSoFar > 0n || unknownParts > 0)" class="ms-res-total">
           <div><small>You received</small><b class="num">{{ fmtIcp(receivedSoFar) }}</b></div>
           <span v-if="usdText" class="num ms-res-total__usd">{{ usdText }}</span>
@@ -69,6 +71,9 @@
         <p v-if="running" class="ms-md__foot">Keep this page open until it finishes. Anything that cannot finish goes back to your wallet, minus network fees.</p>
         <p v-if="run.phase === 'stopped'" class="ms-md__foot">Your tokens are still in your wallet.{{ run.approvalSpent ? ' Only the approval fee was spent.' : '' }}</p>
 
+        <div v-if="approvalSlow" class="ms-md__acts">
+          <button class="ex-btn ex-btn--ghost" @click="$emit('hide')">Close</button>
+        </div>
         <div v-if="!running" class="ms-md__acts">
           <template v-if="run.phase === 'stopped'">
             <button v-if="run.stop === 'notAuthenticated' || run.stop === 'sessionEndsSoon'" class="ex-btn ex-btn--ghost" @click="$emit('back')">Back to the sale</button>
@@ -102,7 +107,7 @@ import DexLegChip from './DexLegChip.vue'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
 const props = defineProps<{ run: MultiSellRun | null; icp: TokenInfo | null }>()
-const emit = defineEmits<{ done: []; recover: []; back: []; portfolio: []; connect: [] }>()
+const emit = defineEmits<{ done: []; recover: []; back: []; portfolio: []; connect: []; hide: [] }>()
 
 const store = useExchangeStore()
 const tokenOf = (a: string) => store.getTokenByAddress(a) ?? null
@@ -168,6 +173,12 @@ const now = ref(Date.now())
 const tick = setInterval(() => { now.value = Date.now() }, 1000)
 onBeforeUnmount(() => clearInterval(tick))
 const deferSec = computed(() => Math.max(0, Math.ceil(((props.run?.deferredUntil ?? 0) - now.value) / 1000)))
+/** A TACO approval in preflight has had no answer for 10 s: say so, and let the sheet close. */
+const APPROVAL_SLOW_MS = 10_000
+const approvalSlow = computed(() => {
+  const r = props.run
+  return !!r && r.phase === 'preparing' && r.approvalSince != null && now.value - r.approvalSince >= APPROVAL_SLOW_MS
+})
 
 const progressText = computed(() => {
   const r = props.run
@@ -190,7 +201,9 @@ const progressText = computed(() => {
 const stopMessage = computed(() => {
   const r = props.run
   const sym = r?.assets.find(a => a.address === r.stopAsset)?.symbol ?? ''
-  return stopText(r?.stop, sym, Math.ceil((r?.waitMs ?? 0) / 1000))
+  // the wait counts down with the sheet's clock
+  const waitSec = r?.waitUntil != null ? Math.max(0, Math.ceil((r.waitUntil - now.value) / 1000)) : Math.ceil((r?.waitMs ?? 0) / 1000)
+  return stopText(r?.stop, sym, waitSec)
 })
 
 // state cell per token (plan 6.4)
@@ -248,6 +261,7 @@ function onKey(e: KeyboardEvent) {
   if (e.key !== 'Escape' || !props.run) return
   if (props.run.phase === 'stopped') { e.preventDefault(); emit('back') }
   else if (final.value) { e.preventDefault(); emit('done') }
+  else if (approvalSlow.value) { e.preventDefault(); emit('hide') }
 }
 watch(() => !!props.run, async (open, was) => {
   if (open && !was) {

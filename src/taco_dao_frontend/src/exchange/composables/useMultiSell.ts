@@ -27,6 +27,7 @@ import { createRunAgent, type RunAgent } from '../utils/runAgent'
 import { withFundsLock, BUSY } from '../utils/saleLock'
 import { approveExchangeDeposit } from '../utils/deposit'
 import { buildLegDeps } from './useCrossDexSwap'
+import { stopText } from '../components/swap/multiSellCopy'
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
@@ -56,6 +57,10 @@ export interface MultiSellRun {
   stopAsset?: string
   approvalSpent?: boolean
   waitMs?: number
+  /** When the exchange's call window frees up again (a 'budget' stop counts down to it). */
+  waitUntil?: number
+  /** Preflight sent its TACO approvals at this time and waits for their answers. */
+  approvalSince?: number
   back?: BackReason
   deferredUntil?: number
   deferredCount?: number
@@ -63,7 +68,8 @@ export interface MultiSellRun {
   sessionExpired?: boolean
   /** Every leg promise settled (the lock is free again). */
   settled: boolean
-  /** The result was closed while slow legs still run (the card shows a banner). */
+  /** The sheet was closed while the sale still runs: slow legs after the result, or an approval
+   *  that takes long in preflight (the page shows a banner with View). */
   dismissed?: boolean
   /** The result was closed once (Done reset the basket); closing it again only hides it. */
   closedOnce?: boolean
@@ -645,7 +651,11 @@ export function useMultiSell() {
       },
       onPhase: (ph: RunPhase, info?: any) => {
         r.phase = ph
-        if (info?.stop) { r.stop = info.stop; r.stopAsset = info.stopAsset; r.approvalSpent = info.approvalSpent; r.waitMs = info.waitMs }
+        if (ph !== 'preparing') r.approvalSince = undefined
+        if (info?.stop) {
+          r.stop = info.stop; r.stopAsset = info.stopAsset; r.approvalSpent = info.approvalSpent; r.waitMs = info.waitMs
+          r.waitUntil = info.waitMs != null ? Date.now() + info.waitMs : undefined
+        }
         if (info?.back) r.back = info.back
         if (info?.deferredUntil) { r.deferredUntil = info.deferredUntil; r.deferredCount = info.deferredCount }
         if (ph === 'selling') {
@@ -654,6 +664,8 @@ export function useMultiSell() {
         }
       },
       onAssetSettled: () => refreshSoon(),
+      // the sheet says when an approval takes long, and can then be closed (the sale goes on)
+      onApprovals: () => { r.approvalSince = Date.now() },
       log: (...a: unknown[]) => console.info(...a),
     }
     const inputs = p.assets.map((a) => planInputs.value.find(i => i.token.address === a.address)!)
@@ -680,6 +692,12 @@ export function useMultiSell() {
         if (item) { item.balanceChanged = true; item.maxSellable = await computeMax(item.address) }
       }
       if (prepared.stop === 'ledgerFee') void store.refreshTokens?.()
+      // the sheet was closed while an approval took long: say how it ended (the banner keeps View)
+      if (r.dismissed) {
+        const sym = r.assets.find(a => a.address === r.stopAsset)?.symbol ?? ''
+        const why = stopText(prepared.stop, sym, Math.ceil((prepared.waitMs ?? 0) / 1000))
+        toast.info('Your last sale did not start', `${why} Your tokens are still in your wallet.${r.approvalSpent ? ' Only the approval fee was spent.' : ''}`)
+      }
       return
     }
     const result = await h.ui
@@ -689,7 +707,8 @@ export function useMultiSell() {
       r.sessionExpired = result.sessionExpired
       void store.refreshAfterMutation('swap')
       setTimeout(() => { void store.refreshAfterMutation('swap') }, 6000)
-      announce(result)
+      // a sheet closed before the result: one notice when every route has settled (below)
+      if (!r.dismissed) announce(result)
     }
     void h.all.then((fin) => {
       if (fin) {
@@ -761,6 +780,12 @@ export function useMultiSell() {
   function clearRun() { if (run.value?.settled) run.value = null }
   /** Show a closed result again (the banner's View). */
   function reopenRun() { if (run.value) run.value.dismissed = false }
+  /** Close the sheet of a sale whose approval takes long. Nothing is cancelled: the approval
+   *  may still land, and the sale goes on (or stops) by itself; the banner brings the sheet back. */
+  function hideRun() {
+    const r = run.value
+    if (r && !r.settled && r.phase === 'preparing' && r.approvalSince != null) r.dismissed = true
+  }
   /** Routes of a closed result that are still finishing. */
   const finishingRoutes = computed(() => {
     const r = run.value
@@ -773,7 +798,7 @@ export function useMultiSell() {
     basket, plan, quoting, refining, quoteError, run, confirmOpen, confirmFor, opening, slippage, backNote, sellAnyway,
     rows, ready, quoteAgeMs, extreme, impactAcknowledged, waitSec, isRunning, isBusy, icp, finishingRoutes,
     // actions
-    addTokens, setBasket, removeToken, setAmount, setMax, requote, openConfirm, cancelConfirm, confirm, done, clearRun, reopenRun,
+    addTokens, setBasket, removeToken, setAmount, setMax, requote, openConfirm, cancelConfirm, confirm, done, clearRun, reopenRun, hideRun,
     acknowledgeImpact, schedule,
   }
 }

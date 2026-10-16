@@ -80,6 +80,9 @@ export interface RunHooks {
   onLeg(asset: number, leg: number, patch: Partial<LegRun>): void
   onPhase(p: RunPhase, info?: { stop?: StopReason; back?: BackReason; stopAsset?: string; approvalSpent?: boolean; waitMs?: number; deferredUntil?: number; deferredCount?: number }): void
   onAssetSettled(asset: number): void
+  /** Preflight sent its TACO V2 approvals and waits for their answers (they have no time cap:
+   *  one that never answers ends with the IC call, about 5 minutes later). */
+  onApprovals?(count: number): void
   log?: (...a: unknown[]) => void
 }
 
@@ -320,6 +323,7 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
   const bound = deps.bind(run)
   let approvalSpent = false
   const v2Jobs = prepAssets.map((pa, k) => ({ pa, k })).filter(({ pa }) => tokens.get(pa.plan.address)!.v2 && pa.legs.some(l => l.dex === 'taco'))
+  if (v2Jobs.length > 0) try { hooks.onApprovals?.(v2Jobs.length) } catch { /* display only */ }
   const approvals = await Promise.all(v2Jobs.map(async ({ pa }) => {
     const t = tokens.get(pa.plan.address)!
     const tacoLeg = pa.legs.find(l => l.dex === 'taco')!

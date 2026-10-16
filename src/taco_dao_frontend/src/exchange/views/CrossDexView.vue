@@ -19,13 +19,14 @@
         <!-- above both modes: Swap is the default, and a sale's state matters whichever card shows -->
         <div v-if="finishing || finished || interrupted" class="crossdex-view__banners">
           <div v-if="finishing" class="crossdex-view__banner">
-            <span>Your last sale is still finishing{{ ms.finishingRoutes.value > 0 ? ` ${ms.finishingRoutes.value === 1 ? '1 route' : `${ms.finishingRoutes.value} routes`}` : '' }}. Keep this page open until it is done.</span>
+            <span v-if="ms.run.value?.phase === 'preparing'">Your last sale is waiting for its approval. Nothing has been sold yet.</span>
+            <span v-else>Your last sale is still finishing{{ ms.finishingRoutes.value > 0 ? ` ${ms.finishingRoutes.value === 1 ? '1 route' : `${ms.finishingRoutes.value} routes`}` : '' }}. Keep this page open until it is done.</span>
             <span class="crossdex-view__banner-acts">
               <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="ms.reopenRun()">View</button>
             </span>
           </div>
           <div v-else-if="finished" class="crossdex-view__banner">
-            <span>Your last sale has finished.</span>
+            <span>Your last sale {{ ms.run.value?.phase === 'stopped' ? 'did not start.' : 'has finished.' }}</span>
             <span class="crossdex-view__banner-acts">
               <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="ms.reopenRun()">View the result</button>
             </span>
@@ -79,6 +80,7 @@
       @recover="goRecover"
       @portfolio="goPortfolio"
       @connect="reconnect"
+      @hide="ms.hideRun()"
     />
   </div>
 </template>
