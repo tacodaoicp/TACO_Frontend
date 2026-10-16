@@ -589,6 +589,8 @@ export interface SweepReport {
   moved: Array<{ token: string; amount: bigint }>
   /** Passes that read every balance and found nothing (a pass that threw does not count). */
   emptyLooks?: number
+  /** sweepWithRetry: what the last pass threw (unset when the last pass did not throw). */
+  lastError?: unknown
 }
 export interface SweepOptions {
   report?: SweepReport
@@ -702,13 +704,17 @@ export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promi
  * sweep, retried. The pool credits a lost-response depositFrom asynchronously,
  * so the first look often races it; a few spaced retries make leg recovery
  * automatic instead of a manual Recover-page trip. No sleep after the final
- * attempt.
+ * attempt. What the last attempt threw goes to `opts.report.lastError`, so a
+ * caller can tell a dead session from a pool that had nothing.
  */
 export async function sweepWithRetry(params: SweepParams, attempts = 3, delayMs = 4000, opts: SweepOptions = {}): Promise<boolean> {
   for (let i = 0; i < attempts; i++) {
     try {
-      if (await sweep(params, opts)) return true
+      const ok = await sweep(params, opts)
+      if (opts.report) opts.report.lastError = undefined
+      if (ok) return true
     } catch (e) {
+      if (opts.report) opts.report.lastError = e
       console.error(`[icpswap.sweepWithRetry] attempt ${i + 1} failed:`, e)
     }
     if (i < attempts - 1) await new Promise(resolve => setTimeout(resolve, delayMs))

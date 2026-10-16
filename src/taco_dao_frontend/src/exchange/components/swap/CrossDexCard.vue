@@ -196,7 +196,9 @@
                     ? 'Your funds for this route stayed in your wallet.'
                     : lv.outcome?.recovered
                       ? 'Funds were refunded to your wallet.'
-                      : 'Funds were not recovered automatically. Use the Recover page to sweep them.' }}
+                      : lv.outcome?.reason === 'session'
+                        ? 'Your session expired before the funds could be recovered. Reconnect your wallet, then use the Recover page.'
+                        : 'Funds were not recovered automatically. Use the Recover page to sweep them.' }}
               </div>
             </div>
           </div>

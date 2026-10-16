@@ -269,12 +269,22 @@ export interface SweepReport {
   moved: Array<{ token: string; amount: bigint }>
   /** Passes that read every balance and found nothing (a pass that threw does not count). */
   emptyLooks?: number
+  /** sweepWithRetry: what the last pass threw (unset when the last pass did not throw). */
+  lastError?: unknown
 }
 
 // ── Helpers ──
 const errText = (err: any, fallback: string): string => {
   const m = err?.message
   return typeof m === 'string' && m ? m : fallback
+}
+
+/** The wallet session ended: the store's own message, or the agent's words for an expired or
+ *  invalid delegation (calls signed by a pinned run agent fail with those). */
+export function isSessionError(err: unknown): boolean {
+  if (err == null) return false
+  const m = String((err as any)?.message ?? err)
+  return /Session expired|Not authenticated|delegation has expired|Invalid delegation expiry|Invalid (basic )?signature/i.test(m)
 }
 
 export function defaultMinOut(expectedOut: bigint, slip: number): bigint {
@@ -365,9 +375,9 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
       // The pool refused the deposit, so normally nothing moved. One sweep
       // makes sure; when it finds nothing, this route never started.
       const report: SweepReport = { found: [], moved: [] }
-      let swept = false, sweepThrew = false
+      let swept = false, sweepThrew = false, sweepErr: unknown = null
       try { swept = await deps.icpswap.sweep({ token0Principal: sell, token1Principal: buy }, { report }) }
-      catch { sweepThrew = true }
+      catch (e) { sweepThrew = true; sweepErr = e }
       if (!sweepThrew && report.found.length === 0) {
         if (!track.hadMarker) deps.icpswap.removePendingSwap(sell, buy)
         ctx.onStep(NOT_STARTED)
@@ -378,7 +388,8 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
       ctx.onStep(swept ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
       return swept
         ? { dex: 'icpswap', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error: errText(err, 'ICPSwap swap failed'), recovered: true }
-        : { dex: 'icpswap', success: false, amountOut: 0n, state: 'needsRecovery', error: errText(err, 'ICPSwap swap failed'), recovered: false }
+        : { dex: 'icpswap', success: false, amountOut: 0n, state: 'needsRecovery', error: errText(err, 'ICPSwap swap failed'), recovered: false,
+            reason: isSessionError(sweepErr) ? 'session' : undefined }
     }
     ctx.log?.('[CrossDEX] ICPSwap leg failed:', err?.message || err)
     ctx.onStep('Recovering funds…')
@@ -391,7 +402,7 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
     try {
       recovered = await deps.icpswap.sweepWithRetry({ token0Principal: sell, token1Principal: buy }, 3, 4000, { report })
       if (recovered) deps.icpswap.removePendingSwap(sell, buy)
-    } catch { /* marker stays so the Recover page can sweep later */ }
+    } catch (e) { report.lastError = e /* marker stays so the Recover page can sweep later */ }
     const error = errText(err, 'ICPSwap swap failed')
     if (!recovered && track.step === 'withdraw' && track.swappedOut != null && report.found.length === 0 && (report.emptyLooks ?? 0) > 0) {
       // The withdraw ran but its answer was lost: the swap's output already left the pool for
@@ -421,10 +432,11 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
       }
     }
     ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
+    // a recovery that failed because the session ended says so: the sale asks to reconnect first
     return recovered
       ? { dex: 'icpswap', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true }
       : { dex: 'icpswap', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
-          failedAfterSwap: track.swappedOut != null }
+          failedAfterSwap: track.swappedOut != null, reason: isSessionError(report.lastError) ? 'session' : undefined }
   }
 }
 
@@ -469,6 +481,7 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // pair left (its funds are still there); otherwise the Recover page keeps it.
     let recovered = false
     let emptyLooks = 0
+    let lastErr: unknown = null
     const report: SweepReport = { found: [], moved: [] }
     for (let i = 0; i < 3 && !recovered; i++) {
       if (i > 0) await deps.clock.sleep(5000)
@@ -477,7 +490,8 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
         // a sweep throws when the pylon read or a withdraw fails, so a plain false is a real look
         // that found nothing above the start balances
         if (!recovered) emptyLooks++
-      } catch (e) { ctx.log?.(`[CrossDEX] Neutrinite sweep attempt ${i + 1} failed:`, e) }
+        lastErr = null
+      } catch (e) { lastErr = e; ctx.log?.(`[CrossDEX] Neutrinite sweep attempt ${i + 1} failed:`, e) }
     }
     // The start balances are the baseline of every look. Only when the pylon held no more than dust
     // of either token as this swap started does nothing above them mean nothing there at all: with an
@@ -503,7 +517,7 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     return recovered
       ? { dex: 'neutrinite', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true }
       : { dex: 'neutrinite', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
-          failedAfterSwap: track.swappedOut != null }
+          failedAfterSwap: track.swappedOut != null, reason: isSessionError(lastErr) ? 'session' : undefined }
   }
 }
 
