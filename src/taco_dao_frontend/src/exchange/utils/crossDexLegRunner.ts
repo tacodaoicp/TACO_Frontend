@@ -468,17 +468,26 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // that amount came back, and never one an earlier failed swap on this
     // pair left (its funds are still there); otherwise the Recover page keeps it.
     let recovered = false
-    let sweepThrew = false
+    let emptyLooks = 0
     const report: SweepReport = { found: [], moved: [] }
     for (let i = 0; i < 3 && !recovered; i++) {
       if (i > 0) await deps.clock.sleep(5000)
-      try { recovered = await deps.neutrinite.sweep(sell, buy, track.before, { report }) }
-      catch (e) { sweepThrew = true; ctx.log?.(`[CrossDEX] Neutrinite sweep attempt ${i + 1} failed:`, e) }
+      try {
+        recovered = await deps.neutrinite.sweep(sell, buy, track.before, { report })
+        // a sweep throws when the pylon read or a withdraw fails, so a plain false is a real look
+        // that found nothing above the start balances
+        if (!recovered) emptyLooks++
+      } catch (e) { ctx.log?.(`[CrossDEX] Neutrinite sweep attempt ${i + 1} failed:`, e) }
     }
-    if (!recovered && !sweepThrew && track.swappedOut != null && report.found.length === 0) {
-      // The swap filled and every look at the pylon came back empty (a sweep throws when the
-      // pylon read or a withdraw fails, so a plain false is a real empty look): the withdraw went
-      // through and only its answer was lost. Sold, for an amount the wallet shows.
+    // The start balances are the baseline of every look. Only when the pylon held no more than dust
+    // of either token as this swap started does nothing above them mean nothing there at all: with an
+    // older balance in the baseline, another swap or sweep of this wallet moving that balance meanwhile
+    // can make this swap's ICP look gone while it is still on the pylon.
+    const startClean = !!track.before && track.before.sell <= ctx.fee && track.before.buy <= ctx.buy.transfer_fee
+    if (!recovered && emptyLooks > 0 && startClean && track.swappedOut != null && report.found.length === 0) {
+      // The swap filled, the pylon held nothing of the pair before it, and a clean look finds nothing
+      // there now: the withdraw went through and only its answer was lost. Sold, for an amount the
+      // wallet shows. Every other uncertain case keeps reading needsRecovery with its marker.
       if (!track.hadMarker) deps.neutrinite.removePendingSwap(sell, buy)
       ctx.onStep('Done')
       return { dex: 'neutrinite', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
