@@ -611,7 +611,11 @@ export function useMultiSell() {
       announce(result)
     }
     void h.all.then((fin) => {
-      if (fin) { r.result = fin; r.slowLegs = 0; r.sessionExpired = fin.sessionExpired }
+      if (fin) {
+        r.result = fin; r.slowLegs = 0; r.sessionExpired = fin.sessionExpired
+        // slow legs that settled after the result may change it
+        if (['complete', 'partial', 'failed'].includes(r.phase)) r.phase = fin.phase
+      }
       r.settled = true
       inTabRun = false
       if (unloadGuard) { window.removeEventListener('beforeunload', unloadGuard); unloadGuard = null }

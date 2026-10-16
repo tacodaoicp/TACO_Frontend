@@ -421,7 +421,8 @@ function launch(ctx: SaleCtx, prep: Prepared, deps: SaleDeps, hooks: RunHooks): 
         strictJournal: true,
         dedup: t.dedup,
         onStep: (s) => {
-          patch(ai, li, { step: s, state: runs[ai].legs[li].state === 'waiting' && !/^Waiting/.test(s) ? 'running' : runs[ai].legs[li].state })
+          // waiting at the gate or for its turn shows as waiting; a recovery as recovering
+          patch(ai, li, { step: s, state: /^Waiting/.test(s) ? 'waiting' : /^Recovering/.test(s) ? 'recovering' : 'running' })
           if (leg.dex === 'taco' && (s === 'Depositing…' || s === 'Swapping…')) turns.started(pa.plan.address)
           try { legJournal.progress({ step: s }) } catch { /* best effort */ }
         },
