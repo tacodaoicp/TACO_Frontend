@@ -12,6 +12,7 @@
       inputmode="decimal"
       placeholder="0.00"
       :value="item.amountText"
+      :style="{ '--len': Math.max(item.amountText.length, 1) }"
       :disabled="locked"
       :aria-label="`${token?.symbol ?? ''} amount`"
       @input="onInput"
@@ -183,7 +184,9 @@ function via(l: CrossDexLeg): string {
   &__amt {
     width: 150px; height: 32px; border-radius: 6px;
     background: var(--tx-surface-2); border: 1px solid var(--tx-line-2);
-    text-align: right; padding: 0 10px; font-size: 15px; font-weight: 500; color: var(--tx-ink); outline: none;
+    text-align: right; padding: 0 10px; font-weight: 500;
+    // long amounts (Max of a big balance) shrink to stay fully visible
+    font-size: min(15px, calc(128px / (var(--len, 1) * 0.6))); color: var(--tx-ink); outline: none;
     &:focus { border-color: var(--tx-orange-line); box-shadow: 0 0 0 2px var(--tx-orange-dim); }
     &.is-err { border-color: var(--tx-sell); }
     &:disabled { opacity: 0.6; }
@@ -232,7 +235,7 @@ function via(l: CrossDexLeg): string {
   }
 
   @media (max-width: 600px) {
-    &__amt { width: 132px; font-size: 14px; }
+    &__amt { width: 132px; font-size: min(14px, calc(110px / (var(--len, 1) * 0.6))); }
     &__x { width: 44px; height: 44px; margin: -8px -8px -8px 0; }
   }
 }
