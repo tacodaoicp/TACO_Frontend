@@ -1,6 +1,8 @@
 <template>
   <div class="crossdex-view">
-    <div class="crossdex-view__glow" aria-hidden="true"></div>
+    <!-- the glow is clipped by its own box: the page itself must not clip (overflow hidden makes it
+         a scroll container, and the phone's sticky You receive bar then never sticks) -->
+    <div class="crossdex-view__glow-clip" aria-hidden="true"><div class="crossdex-view__glow"></div></div>
 
     <div class="crossdex-view__shell">
       <ExchangeTopNav active="crossdex" />
@@ -155,7 +157,17 @@ function reconnect() { void ms.done(); void auth.connect() }
   min-height: 100vh;
   padding: clamp(20px, 3vw, 28px) clamp(16px, 4vw, 40px) 60px;
   background: var(--tx-bg);
-  overflow: hidden;
+  // clip, not hidden: clipping keeps the view out of the scroll container chain, so position
+  // sticky inside it (the phone's You receive bar) sticks to the viewport
+  overflow-x: clip;
+
+  &__glow-clip {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
 
   &__glow {
     position: absolute;

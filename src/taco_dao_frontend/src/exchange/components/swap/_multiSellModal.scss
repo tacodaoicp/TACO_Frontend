@@ -5,7 +5,7 @@
   display: flex; align-items: center; justify-content: center; padding: 20px;
 }
 .ms-md {
-  width: 100%; max-width: 460px; max-height: 88vh; overflow-y: auto;
+  width: 100%; max-width: 460px; max-height: 88vh; max-height: 88dvh; overflow-y: auto;
   background: var(--tx-panel-bg); border: var(--tx-panel-border); border-radius: 14px;
   padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--tx-shadow-2);
   color: var(--tx-ink);
@@ -23,8 +23,13 @@
   }
   &__hr { height: 1px; background: var(--tx-line); border: 0; margin: 2px 0; }
   &__note { font-size: 12px; color: var(--tx-ink-3); line-height: 1.45; margin: 0; }
+  // The buttons stay in view at the bottom of a long sheet (8 or 10 tokens): a footer that the
+  // list scrolls under, out to the sheet's edges (negative margins and offset = the padding).
   &__acts {
-    display: flex; gap: 8px; margin-top: 4px;
+    display: flex; gap: 8px;
+    position: sticky; bottom: -20px; z-index: 2;
+    margin: 4px -20px -20px; padding: 12px 20px 20px;
+    background: var(--tx-panel-bg); border-top: 1px solid var(--tx-line);
     .ex-btn { flex: 1; height: 38px; }
   }
   &__wallet { font-size: 11px; color: var(--tx-ink-4); text-align: center; }
@@ -33,12 +38,16 @@
 @media (max-width: 600px) {
   .ms-modal-overlay { padding: 0; align-items: flex-end; }
   .ms-md {
-    max-width: none; max-height: 92vh; border-radius: 16px 16px 0 0; border-bottom: 0;
+    max-width: none; max-height: 92vh; max-height: 92dvh; border-radius: 16px 16px 0 0; border-bottom: 0;
     padding: 18px 16px calc(20px + env(safe-area-inset-bottom, 0px));
     &::before {
       content: ''; align-self: center; width: 36px; height: 4px; border-radius: 2px;
       background: var(--tx-line-hi); margin: -6px 0 2px; flex-shrink: 0;
     }
-    &__acts { position: sticky; bottom: 0; background: inherit; padding-top: 4px; }
+    &__acts {
+      bottom: calc(-20px - env(safe-area-inset-bottom, 0px));
+      margin: 4px -16px calc(-20px - env(safe-area-inset-bottom, 0px));
+      padding: 12px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+    }
   }
 }

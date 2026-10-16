@@ -25,13 +25,13 @@
         <p v-if="gateNote" class="ms-md__note">{{ gateNote }}</p>
         <p v-if="anyMax" class="ms-md__note">For tokens at Max, any fee room the routes do not need is sold too.</p>
         <p v-if="poolNote" class="ms-md__note">{{ poolNote }}</p>
+        <div class="ms-md__wallet num">Prices updated {{ ageText }} · wallet {{ shortP }}</div>
         <div class="ms-md__acts">
           <button class="ex-btn ex-btn--ghost" @click="$emit('cancel')">Cancel</button>
           <button class="ex-btn ex-btn--primary" :disabled="cooling || refreshing" @click="onConfirm">
             {{ refreshing ? 'Updating prices…' : assets.length === 1 ? `Sell ${assets[0].symbol}` : `Sell ${assets.length} tokens` }}
           </button>
         </div>
-        <div class="ms-md__wallet num">Prices updated {{ ageText }} · wallet {{ shortP }}</div>
       </div>
     </div>
   </Teleport>
