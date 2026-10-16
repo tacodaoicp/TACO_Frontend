@@ -16,23 +16,23 @@
             : 'Splits one swap across ICPSwap + TACO + Neutrinite for the best total output.'"
         />
 
-        <!-- above both modes: Swap is the default, and a sale's state matters whichever card shows -->
+        <!-- above both modes: Single swap is the default, and a sale's state matters whichever card shows -->
         <div v-if="finishing || finished || interrupted" class="crossdex-view__banners">
           <div v-if="finishing" class="crossdex-view__banner">
-            <span v-if="ms.run.value?.phase === 'preparing'">Your last sale is waiting for its approval. Nothing has been sold yet.</span>
-            <span v-else>Your last sale is still finishing{{ ms.finishingRoutes.value > 0 ? ` ${ms.finishingRoutes.value === 1 ? '1 route' : `${ms.finishingRoutes.value} routes`}` : '' }}. Keep this page open until it is done.</span>
+            <span v-if="ms.run.value?.phase === 'preparing'">{{ lastSale }} is waiting for its approval. Nothing has been sold yet.</span>
+            <span v-else>{{ lastSale }} is still finishing{{ ms.finishingRoutes.value > 0 ? ` ${ms.finishingRoutes.value === 1 ? '1 route' : `${ms.finishingRoutes.value} routes`}` : '' }}. Keep this page open until it is done.</span>
             <span class="crossdex-view__banner-acts">
-              <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="ms.reopenRun()">View</button>
+              <button class="ex-btn ex-btn--sm ex-btn--primary" @click="ms.reopenRun()">View</button>
             </span>
           </div>
           <div v-else-if="finished" class="crossdex-view__banner">
-            <span>Your last sale {{ ms.run.value?.phase === 'stopped' ? 'did not start.' : 'has finished.' }}</span>
+            <span>{{ lastSale }} {{ ms.run.value?.phase === 'stopped' ? 'did not start.' : 'has finished.' }}</span>
             <span class="crossdex-view__banner-acts">
-              <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="ms.reopenRun()">View the result</button>
+              <button class="ex-btn ex-btn--sm ex-btn--primary" @click="ms.reopenRun()">View the result</button>
             </span>
           </div>
           <div v-if="interrupted" class="crossdex-view__banner crossdex-view__banner--warn">
-            <strong>Your last sale did not finish</strong>
+            <strong>{{ lastSale }} did not finish</strong>
             <span>It stopped {{ interruptedAgo }} ago, before every part was done. Open the Recover page to get back anything left on a DEX.</span>
             <span class="crossdex-view__banner-acts">
               <router-link to="/recover" class="ex-btn ex-btn--sm ex-btn--primary">Open Recover page</router-link>
@@ -128,6 +128,8 @@ function setMode(m: 'swap' | 'many') {
   router.replace({ query: m === 'many' ? { ...rest, mode: 'many' } : rest })
 }
 const switchLocked = computed(() => ms.isBusy.value)
+/** The banners sit above both modes: in Single swap they name the mode the sale came from. */
+const lastSale = computed(() => (mode.value === 'many' ? 'Your last sale' : 'Your last Sell many sale'))
 /** A result closed while a route was still running, and that result once every route settled. */
 const finishing = computed(() => !!ms.run.value?.dismissed && !ms.run.value.settled)
 const finished = computed(() => !!ms.run.value?.dismissed && !!ms.run.value.settled)

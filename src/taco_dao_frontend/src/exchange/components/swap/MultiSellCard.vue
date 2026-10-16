@@ -1,7 +1,11 @@
 <template>
   <div class="ms-card">
+    <!-- the same header box as the Single swap card, so the mode switch does not move between modes -->
     <div class="ms-card__head">
-      <slot name="title" />
+      <div class="ms-card__titlebox">
+        <slot name="title" />
+        <p class="ms-card__sub">Sell several tokens for ICP in one go.</p>
+      </div>
       <button
         class="ms-card__gear"
         :class="{ 'is-on': showSettings }"
@@ -14,7 +18,6 @@
     <div v-if="showSettings" class="ex-field">
       <SlippageSelector v-model="ms.slippage.value" />
     </div>
-    <p class="ms-card__sub">Sell several tokens for ICP in one go.</p>
 
     <!-- not connected -->
     <div v-if="!store.isAuthenticated" class="ms-empty">
@@ -69,7 +72,7 @@
           <span v-if="updating" class="ms-refine"><span class="ms-spin"></span> updating…</span>
           <span v-else-if="ms.refining.value" class="ms-refine"><span class="ms-spin"></span> finding precise split…</span>
         </div>
-        <div class="ms-recv__row">
+        <div ref="recvRow" class="ms-recv__row">
           <span class="ms-recv__pill"><TokenCoin :token="ms.icp.value" :size="20" /> ICP</span>
           <span class="ms-recv__total num" :class="{ 'is-stale': updating }">
             <span v-if="ms.quoting.value && !plan" class="ex-skeleton" style="width:120px;height:24px;display:inline-block"></span>
@@ -109,8 +112,9 @@
       </div>
     </template>
 
-    <div class="ms-card__bar">
-      <div v-if="plan && (ms.ready.value || updating)" class="ms-card__bar-total">
+    <div class="ms-card__bar" :class="{ 'is-stuck': barStuck }">
+      <!-- the bar's own total only while the one above is out of view -->
+      <div v-if="plan && (ms.ready.value || updating) && !recvInView" class="ms-card__bar-total">
         <span>{{ updating ? 'Updating…' : 'You receive' }}</span>
         <b class="num" :class="{ 'is-stale': updating }">{{ fmtIcp(plan.totalReceiveOut) }}</b>
       </div>
@@ -124,6 +128,7 @@
         <button class="ms-link" @click="ms.sellAnyway.value = true">{{ sellNowText }}</button>
       </p>
     </div>
+    <div ref="barSentinel" class="ms-card__sentinel" aria-hidden="true"></div>
 
     <MultiTokenPicker
       :visible="pickerOpen"
@@ -147,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { useMultiSell } from '../../composables/useMultiSell'
@@ -274,6 +279,38 @@ function onPicked(addrs: string[]) {
   pickerOpen.value = false
   void ms.setBasket(addrs)
 }
+
+// The total and the Sell button stay in view when the card is taller than the screen (8 to 10
+// tokens): the bar is sticky. On wider screens it draws its box only while it floats (a sentinel
+// at its place in the card is below the screen); phones always float it above the bottom nav. Its
+// own total shows only while the main total is out of view, so the total never shows twice.
+const barSentinel = ref<HTMLElement | null>(null)
+const recvRow = ref<HTMLElement | null>(null)
+const barStuck = ref(false)
+const recvInView = ref(false)
+const hasIo = typeof IntersectionObserver !== 'undefined'
+let stuckIo: IntersectionObserver | null = null
+let recvIo: IntersectionObserver | null = null
+watch(barSentinel, (el) => {
+  stuckIo?.disconnect(); stuckIo = null
+  barStuck.value = false
+  if (!el || !hasIo) return
+  stuckIo = new IntersectionObserver(([e]) => {
+    barStuck.value = !e.isIntersecting && e.boundingClientRect.top > (e.rootBounds?.bottom ?? window.innerHeight)
+  }, { rootMargin: '0px 0px -12px 0px' })
+  stuckIo.observe(el)
+}, { flush: 'post' })
+watch(recvRow, (el) => {
+  recvIo?.disconnect(); recvIo = null
+  recvInView.value = false
+  if (!el || !hasIo) return
+  // the floating bar (and the bottom nav on phones) cover the bottom of the screen
+  let phone = false
+  try { phone = window.matchMedia('(max-width: 600px)').matches } catch { /* no matchMedia */ }
+  recvIo = new IntersectionObserver(([e]) => { recvInView.value = e.isIntersecting }, { rootMargin: `0px 0px -${phone ? 180 : 140}px 0px`, threshold: 1 })
+  recvIo.observe(el)
+}, { flush: 'post' })
+onBeforeUnmount(() => { stuckIo?.disconnect(); recvIo?.disconnect() })
 </script>
 
 <style scoped lang="scss">
@@ -288,26 +325,38 @@ function onPicked(addrs: string[]) {
   box-shadow: var(--tx-shadow-1);
   color: var(--tx-ink);
 
-  &__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  // the same header box as the Single swap card (CrossDexCard __header and __titlebox)
+  &__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  &__titlebox { display: flex; flex-direction: column; gap: 4px; min-width: 0; align-items: flex-start; @media (max-width: 600px) { flex: 1; align-items: stretch; } }
   &__gear {
     background: none; border: none; color: var(--tx-ink-3); cursor: pointer; padding: 4px; border-radius: 6px;
     &:hover, &.is-on { color: var(--tx-orange); }
   }
-  &__sub { font-size: 12px; color: var(--tx-ink-3); margin: -4px 0 0; line-height: 1.4; }
-  &__bar { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
-  &__bar-total { display: none; }
+  &__sub { font-size: 12px; color: var(--tx-ink-3); margin: 2px 0 0; line-height: 1.4; }
+  &__bar { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; position: sticky; bottom: 12px; z-index: 5; }
+  &__bar-total {
+    display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; color: var(--tx-ink-2);
+    b { font-size: 15px; font-weight: 600; color: var(--tx-ink); }
+  }
+  // marks where the bar sits in the card (the negative margin takes back the card's gap)
+  &__sentinel { height: 0; margin-top: -12px; }
 
+  @media (min-width: 601px) {
+    // the box is there all the time (transparent, the margins take back its border and padding) and
+    // shows only while the bar floats over the list
+    &__bar {
+      padding: 9px; margin: -6px -10px -10px; border: 1px solid transparent; border-radius: 12px;
+      transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+      &.is-stuck { background: var(--tx-panel-bg); border-color: var(--tx-line-2); box-shadow: var(--tx-shadow-2); }
+      &:not(.is-stuck) .ms-card__bar-total { display: none; }
+    }
+  }
   @media (max-width: 600px) {
-    padding: 16px;
     // the total and the button stay visible above the bottom nav
     &__bar {
-      position: sticky; bottom: calc(var(--tx-mobile-nav-h) + 8px); z-index: 5;
+      bottom: calc(var(--tx-mobile-nav-h) + 8px);
       background: var(--tx-panel-bg); border: 1px solid var(--tx-line-2); border-radius: 12px;
       padding: 10px; box-shadow: var(--tx-shadow-2); margin: 4px -6px 0;
-    }
-    &__bar-total {
-      display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; color: var(--tx-ink-2);
-      b { font-size: 15px; font-weight: 600; color: var(--tx-ink); }
     }
   }
 }

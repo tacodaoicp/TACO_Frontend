@@ -5,7 +5,7 @@
       :aria-pressed="modelValue === 'swap'"
       :disabled="disabled"
       @click="$emit('update:modelValue', 'swap')"
-    >Swap</button>
+    >Single swap</button>
     <button
       type="button"
       :aria-pressed="modelValue === 'many'"
