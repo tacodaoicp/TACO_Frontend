@@ -138,7 +138,7 @@
       :icp="ms.icp.value"
       :slippage="ms.slippage.value"
       :max-rows="ms.basket.value.filter(b => b.atMax).map(b => b.address)"
-      :principal="store.principalText"
+      :principal="ms.confirmFor.value || store.principalText"
       :refreshing="ms.quoting.value"
       :back-note="ms.backNote.value"
       @cancel="ms.cancelConfirm()"
@@ -249,6 +249,7 @@ const button = computed<{ label: string; enabled: boolean; action: 'connect' | '
   const rows = ms.rows.value
   if (rows.length === 0) return { label: 'Choose tokens', enabled: true, action: 'pick' }
   if (ms.isRunning.value) return { label: 'Your last sale is still finishing', enabled: false, action: 'none' }
+  if (ms.opening.value) return { label: 'Checking balances…', enabled: false, action: 'none' }
   if (rows.some(r => r.issue === 'empty')) return { label: 'Enter amounts', enabled: false, action: 'none' }
   if (rows.some(r => ['overMax', 'tooSmall', 'balanceChanged'].includes(r.issue ?? ''))) return { label: 'Fix the amounts above', enabled: false, action: 'none' }
   const blocked = rows.filter(r => ['noRoute', 'zeroOut', 'quoteFailed', 'paused'].includes(r.issue ?? ''))

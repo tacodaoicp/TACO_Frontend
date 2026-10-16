@@ -8,7 +8,7 @@
  * (utils/multiSellRunner) are pure; this file binds the real services, keeps
  * the basket and the quote cache, and turns runner events into reactive state.
  */
-import { ref, computed, reactive, watch } from 'vue'
+import { ref, computed, reactive, watch, effectScope } from 'vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { useExchangeToast } from './useExchangeToast'
 import { ICP_LEDGER_ID, FEE_HEADROOM_LEDGERS } from '../constants/tokens'
@@ -83,6 +83,11 @@ const run = ref<MultiSellRun | null>(null)
 const confirmOpen = ref(false)
 const impactAck = ref<{ set: string; maxPct: number } | null>(null)
 const backNote = ref('')
+/** The wallet the Confirm sheet was opened for: the sale signs for this principal or stops. */
+const confirmFor = ref('')
+/** openConfirm is reading balances and prices (the Sell button waits). */
+const opening = ref(false)
+let walletWatch = false
 const quoteCache = new Map<string, { quotes: AssetQuotes; follow: FollowState; at: number }>()
 let seq = 0
 let inTabRun = false
@@ -133,6 +138,38 @@ export function useMultiSell() {
 
   const tokenOf = (addr: string) => store.getTokenByAddress(addr) ?? null
   const v2Of = (addr: string) => !FEE_HEADROOM_LEDGERS.has(addr) && store.useV2Deposit(addr)
+
+  /** Forget the basket, its plan and quotes (they were read for one wallet). */
+  function clearBasket() {
+    seq++
+    if (debounce) { clearTimeout(debounce); debounce = null }
+    basket.value = []
+    plan.value = null
+    planInputs.value = []
+    planQuotes.value = []
+    quoteCache.clear()
+    quoting.value = false
+    refining.value = false
+    quoteError.value = ''
+    impactAck.value = null
+    backNote.value = ''
+  }
+
+  // A wallet change (logout, login, another tab) closes Confirm and clears the basket: its
+  // amounts, Max rows and quotes were read for the old wallet. A running sale keeps going on
+  // its own pinned agent; its basket goes when its result is closed (done). One watch for the
+  // module state, in a detached scope so it outlives the component that created it.
+  if (!walletWatch) {
+    walletWatch = true
+    effectScope(true).run(() => watch(() => store.principalText, (now, before) => {
+      if (now === before) return
+      confirmOpen.value = false
+      confirmFor.value = ''
+      if (confirmTimer) { clearInterval(confirmTimer); confirmTimer = null }
+      if (run.value && !run.value.settled && ['preparing', 'selling', 'settling'].includes(run.value.phase)) return
+      clearBasket()
+    }))
+  }
 
   function amountOf(item: BasketItem): bigint {
     const t = tokenOf(item.address)
@@ -213,6 +250,23 @@ export function useMultiSell() {
     item.atMax = true
     item.balanceChanged = false
     schedule(0)
+  }
+
+  /** Max rows read their balance again, so Confirm shows what the sale sells. True when one changed. */
+  async function refreshMaxRows(): Promise<boolean> {
+    const items = basket.value.filter(b => b.atMax && !b.balanceChanged)
+    if (items.length === 0) return false
+    const maxes = await Promise.all(items.map(b => computeMax(b.address)))
+    let changed = false
+    items.forEach((item, k) => {
+      const t = tokenOf(item.address)
+      const m = maxes[k]
+      if (!t || m == null || !item.atMax || !basket.value.includes(item)) return
+      item.maxSellable = m
+      const text = m > 0n ? formatAmountText(m, Number(t.decimals)) : ''
+      if (text !== item.amountText) { item.amountText = text; changed = true }
+    })
+    return changed
   }
 
   // ── quotes and plan ──
@@ -469,19 +523,34 @@ export function useMultiSell() {
 
   // ── confirm ──
   async function openConfirm() {
-    if (!plan.value) return
+    if (!plan.value || opening.value) return
+    const who = store.principalText
+    if (!who) return
+    opening.value = true
     backNote.value = ''
-    if (quoteAgeMs.value > QUOTE_FRESH_MS) await requote(true)
-    if (!ready.value) return
-    confirmOpen.value = true
+    try {
+      // Max rows sell the balance as it is now: read it again, and quote again if it moved
+      const changed = await refreshMaxRows()
+      if (store.principalText !== who) return
+      const stale = quoteAgeMs.value > QUOTE_FRESH_MS
+      if (changed || stale) await requote(stale)
+      if (!ready.value || store.principalText !== who) return
+    } finally { opening.value = false }
     run.value = null
     // the run modal, its result parts and the Recover page load now, so a deploy mid sale cannot block them
     void import('../views/RecoverView.vue').catch(() => { /* preload only */ })
+    showConfirm(who)
+  }
+  /** Open the Confirm sheet for `who` (prices refresh every 30 s while it is open). */
+  function showConfirm(who: string) {
+    confirmFor.value = who
+    confirmOpen.value = true
     if (confirmTimer) clearInterval(confirmTimer)
     confirmTimer = setInterval(() => { if (confirmOpen.value) void requote(true) }, QUOTE_FRESH_MS)
   }
   function cancelConfirm() {
     confirmOpen.value = false
+    confirmFor.value = ''
     if (confirmTimer) { clearInterval(confirmTimer); confirmTimer = null }
   }
 
@@ -548,14 +617,18 @@ export function useMultiSell() {
   async function confirm() {
     const p = plan.value, target = icp.value
     if (!p || !target || inTabRun || isRunning.value) return
+    // the sale signs for the wallet that was reviewed; a different one now never sells
+    const who = confirmFor.value
+    if (!who || store.principalText !== who) { cancelConfirm(); schedule(0); return }
     inTabRun = true
     confirmOpen.value = false
+    confirmFor.value = ''
     if (confirmTimer) { clearInterval(confirmTimer); confirmTimer = null }
     seq++ // stop refines and stale quote results
     refining.value = false
     const id = newRunId('many', Date.now())
     const r = reactive<MultiSellRun>({
-      id, phase: 'preparing', principal: store.principalText, startedAt: Date.now(), slowLegs: 0, settled: false,
+      id, phase: 'preparing', principal: who, startedAt: Date.now(), slowLegs: 0, settled: false,
       assets: p.assets.filter(a => !a.issue).map(a => ({
         address: a.address, symbol: a.symbol, amountIn: a.amountIn,
         atMax: !!planInputs.value.find(i => i.token.address === a.address)?.atMax,
@@ -583,7 +656,7 @@ export function useMultiSell() {
     }
     const inputs = p.assets.map((a) => planInputs.value.find(i => i.token.address === a.address)!)
     const h = startSale({
-      runId: id, target, slip: slippage.value / 100, confirmPrincipal: store.principalText,
+      runId: id, target, slip: slippage.value / 100, confirmPrincipal: who,
       inputs, plan: p, planFeeBps: planFeeBps.value,
     }, saleDeps(), hooks)
     const prepared = await h.prepared
@@ -597,7 +670,7 @@ export function useMultiSell() {
           : 'Prices moved while you confirmed. Check the new amounts and try again.'
         run.value = null
         await requote(true)
-        if (ready.value) confirmOpen.value = true
+        if (ready.value && store.principalText === who) showConfirm(who)
         return
       }
       if (prepared.stop === 'balanceChanged' && prepared.stopAsset) {
@@ -652,6 +725,8 @@ export function useMultiSell() {
     else run.value = null
     quoteCache.clear()
     plan.value = null
+    // the sale was for another wallet than the one connected now: its basket goes too
+    if (r && r.principal !== store.principalText) { clearBasket(); return }
     if (stopped) { schedule(0); return }
     const keep: BasketItem[] = []
     for (const item of basket.value) {
@@ -673,7 +748,7 @@ export function useMultiSell() {
 
   return {
     // state
-    basket, plan, quoting, refining, quoteError, run, confirmOpen, slippage, backNote, sellAnyway,
+    basket, plan, quoting, refining, quoteError, run, confirmOpen, confirmFor, opening, slippage, backNote, sellAnyway,
     rows, ready, quoteAgeMs, extreme, impactAcknowledged, waitSec, isRunning, isBusy, icp, finishingRoutes,
     // actions
     addTokens, setBasket, removeToken, setAmount, setMax, requote, openConfirm, cancelConfirm, confirm, done, clearRun,
