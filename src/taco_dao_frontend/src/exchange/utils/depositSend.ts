@@ -12,11 +12,14 @@
  *    that fails: nothing was sent).
  *  - Ok or Duplicate gives the block.
  *  - An Err answer to the first attempt means the ledger refused it: nothing moved.
- *  - A certified reject of the first attempt proves no state change: nothing moved.
+ *  - A certified reject of the first attempt: on a DFINITY ledger (dedup) a trap
+ *    rolls the transfer back, nothing moved; another ledger might have committed
+ *    before an inner await and trapped after it, so there it stays unknown.
  *  - Any other throw: on a deduplicating ledger with a synced clock, the
- *    identical transfer is sent again up to 3 times (2 s, 5 s, 10 s). A resend
- *    answered InsufficientFunds proves no earlier copy landed (the ledger checks
- *    duplicates before balances). Still unknown after the resends, or on any
+ *    identical transfer is sent again up to 3 times (2 s, 5 s, 10 s). Ok or
+ *    Duplicate gives the block. Any other answer, InsufficientFunds included (the
+ *    first copy may still sit in the ingress queue and land once a refund tops the
+ *    balance up), leaves it unknown. Still unknown after the resends, or on any
  *    other ledger: the deposit "may have been sent".
  *
  * Errors carry `deposit: 'notSent' | 'unknown'`; only notSent may end a route as
@@ -55,7 +58,8 @@ export interface DepositIntent {
 export interface SendDepositOpts {
   required: bigint
   to: string
-  /** The ledger deduplicates created_at_time + memo, so an identical resend is safe. */
+  /** A DFINITY ledger: it deduplicates created_at_time + memo (an identical resend is safe once
+   *  nowNs is known) and rolls a trapped transfer back. */
   dedup: boolean
   /** Replica synced clock in ns; null when the time sync failed (no created_at_time, no resend). */
   nowNs: (() => bigint) | null
@@ -87,7 +91,7 @@ export async function sendDeposit(o: SendDepositOpts): Promise<bigint> {
     first = await o.send(createdAtNs, memo)
   } catch (e) {
     if (o.isCertifiedReject(e)) {
-      throw new DepositError(errMsg(e, 'The ledger refused the transfer.'), 'notSent', 'rejected', e)
+      throw new DepositError(errMsg(e, 'The ledger refused the transfer.'), o.dedup ? 'notSent' : 'unknown', 'rejected', e)
     }
     if (!useIntent) {
       throw new DepositError('The deposit may have been sent, but its answer did not come back.', 'unknown', 'lost', e)
@@ -99,10 +103,9 @@ export async function sendDeposit(o: SendDepositOpts): Promise<bigint> {
         const r = await o.send(createdAtNs, memo)
         if ('Ok' in r) return r.Ok
         if ('Duplicate' in r) return r.Duplicate
-        // The ledger looks for a duplicate before it checks the balance, so a
-        // short balance proves the first transfer did not land.
-        if (r.insufficient) throw refused(r)
-        last = new Error(r.Err) // busy, upgrading, clock: the first one is still unknown
+        // busy, upgrading, clock, or a short balance: the first copy is still unknown
+        // (it may sit in the ingress queue and land later)
+        last = new Error(r.Err)
       } catch (e2) {
         if (e2 instanceof DepositError) throw e2
         last = e2

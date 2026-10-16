@@ -1091,8 +1091,8 @@ async function submitFullRange() {
         )
     if ('Ok' in result) {
       clearPendingDeposit()
-      if (block0 != null) removeDepositFromCache(block0.toString())
-      if (block1 != null) removeDepositFromCache(block1.toString())
+      if (block0 != null) removeDepositFromCache(block0.toString(), token0.value)
+      if (block1 != null) removeDepositFromCache(block1.toString(), token1.value)
       lpMinted.value = result.Ok.liquidityMinted.toString()
       phase.value = 'success'
       amount0.value = ''
@@ -1114,8 +1114,8 @@ async function submitFullRange() {
       const { classifyExchangeError, isAutoRefundError } = await import('../../utils/errors')
       if (isAutoRefundError(result.Err)) {
         clearPendingDeposit()
-        if (block0 != null) removeDepositFromCache(block0.toString())
-        if (block1 != null) removeDepositFromCache(block1.toString())
+        if (block0 != null) removeDepositFromCache(block0.toString(), token0.value)
+        if (block1 != null) removeDepositFromCache(block1.toString(), token1.value)
         error.value = 'Transaction rejected — your tokens are being refunded automatically.'
         phase.value = 'idle'
         toast.info('Auto-Refund', 'Transaction rejected — your tokens are being refunded automatically.')
@@ -1149,8 +1149,8 @@ async function submitFullRange() {
       const status = await verifyAfterTransportError(probe)
       if (status === 'succeeded') {
         clearPendingDeposit()
-        if (block0 != null) removeDepositFromCache(block0.toString())
-        if (block1 != null) removeDepositFromCache(block1.toString())
+        if (block0 != null) removeDepositFromCache(block0.toString(), token0.value)
+        if (block1 != null) removeDepositFromCache(block1.toString(), token1.value)
         phase.value = 'success'
         amount0.value = ''
         amount1.value = ''
@@ -1311,8 +1311,8 @@ async function submitConcentrated() {
         )
     if ('Ok' in result) {
       resultPositionId.value = result.Ok.positionId
-      if (block0 > 0n) removeDepositFromCache(block0.toString())
-      if (block1 > 0n) removeDepositFromCache(block1.toString())
+      if (block0 > 0n) removeDepositFromCache(block0.toString(), token0.value)
+      if (block1 > 0n) removeDepositFromCache(block1.toString(), token1.value)
       phase.value = 'success'
       amount0.value = ''
       amount1.value = ''
@@ -1329,8 +1329,8 @@ async function submitConcentrated() {
     } else {
       const { classifyExchangeError, isAutoRefundError } = await import('../../utils/errors')
       if (isAutoRefundError(result.Err)) {
-        if (block0 > 0n) removeDepositFromCache(block0.toString())
-        if (block1 > 0n) removeDepositFromCache(block1.toString())
+        if (block0 > 0n) removeDepositFromCache(block0.toString(), token0.value)
+        if (block1 > 0n) removeDepositFromCache(block1.toString(), token1.value)
         error.value = 'Transaction rejected — your tokens are being refunded automatically.'
         phase.value = 'idle'
         toast.info('Auto-Refund', 'Transaction rejected — your tokens are being refunded automatically.')
@@ -1355,8 +1355,8 @@ async function submitConcentrated() {
       }
       const status = await verifyAfterTransportError(probe)
       if (status === 'succeeded') {
-        if (block0 > 0n) removeDepositFromCache(block0.toString())
-        if (block1 > 0n) removeDepositFromCache(block1.toString())
+        if (block0 > 0n) removeDepositFromCache(block0.toString(), token0.value)
+        if (block1 > 0n) removeDepositFromCache(block1.toString(), token1.value)
         phase.value = 'success'
         amount0.value = ''
         amount1.value = ''

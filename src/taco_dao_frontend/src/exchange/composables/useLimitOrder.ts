@@ -220,7 +220,7 @@ export function useLimitOrder(
 
         if ('Ok' in result) {
           const order = result.Ok
-          if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
+          if (blockNumber != null) removeDepositFromCache(blockNumber.toString(), tokenInit)
           void store.refreshAfterMutation('order')
           if (order.remaining === 0n) {
             onFilledImmediately()
@@ -288,7 +288,7 @@ export function useLimitOrder(
           }
           const status = await verifyAfterTransportError(probe)
           if (status === 'succeeded' || status === 'partial') {
-            if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
+            if (blockNumber != null) removeDepositFromCache(blockNumber.toString(), tokenInit)
             void store.refreshAfterMutation('order')
             if (status === 'partial') {
               toast.success('Partially Filled', 'Network hiccup during submit — confirmed via query.')

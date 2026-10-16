@@ -676,7 +676,7 @@ export function useSwapFlow() {
           fee: swap.fee,
         }
         phase.value = 'success'
-        if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
+        if (blockNumber != null) removeDepositFromCache(blockNumber.toString(), tokenFrom.value!.address)
         void store.refreshAfterMutation('swap')
         toast.success('Split Swap Complete', formatTokenAmount(swap.amountOut, Number(tokenTo.value.decimals), tokenTo.value.symbol) + ' received via ' + plan.legs.length + ' routes')
       } else {
@@ -699,7 +699,7 @@ export function useSwapFlow() {
           probeSwapLanded(store, tokenFrom.value!.address, tokenTo.value!.address, amountInBigInt.value, submittedAt)
         )
         if (status === 'succeeded') {
-          if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
+          if (blockNumber != null) removeDepositFromCache(blockNumber.toString(), tokenFrom.value!.address)
           void store.refreshAfterMutation('swap')
           phase.value = 'success'
           toast.success('Split Swap Complete', 'Network hiccup during submit — confirmed via query.')
@@ -847,7 +847,7 @@ export function useSwapFlow() {
           fee: swap.fee,
         }
         phase.value = 'success'
-        if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
+        if (blockNumber != null) removeDepositFromCache(blockNumber.toString(), tokenFrom.value!.address)
         void store.refreshAfterMutation('swap')
         toast.success('Swap Complete', formatTokenAmount(swap.amountOut, Number(tokenTo.value!.decimals), tokenTo.value!.symbol) + ' received')
       } else {
@@ -876,7 +876,7 @@ export function useSwapFlow() {
           probeSwapLanded(store, tokenFrom.value!.address, tokenTo.value!.address, amountInBigInt.value, submittedAt)
         )
         if (status === 'succeeded') {
-          if (blockNumber != null) removeDepositFromCache(blockNumber.toString())
+          if (blockNumber != null) removeDepositFromCache(blockNumber.toString(), tokenFrom.value!.address)
           void store.refreshAfterMutation('swap')
           phase.value = 'success'
           toast.success('Swap Complete', 'Network hiccup during submit — confirmed via query.')

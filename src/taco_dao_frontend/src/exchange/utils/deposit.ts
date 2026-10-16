@@ -500,7 +500,7 @@ export async function depositToken(
   const block = await sendDeposit({
     required,
     to,
-    dedup: !!opts.dedup && synced,
+    dedup: !!opts.dedup, // resends also need nowNs, which is null when the clock is not synced
     nowNs: synced ? () => BigInt(Date.now() + agent.getTimeDiffMsecs()) * 1_000_000n : null,
     randomMemo: () => crypto.getRandomValues(new Uint8Array(8)),
     beforeSend: opts.intent?.beforeSend,
