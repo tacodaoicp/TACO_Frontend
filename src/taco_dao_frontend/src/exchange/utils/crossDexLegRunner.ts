@@ -507,7 +507,7 @@ function refusedRecently(ctx: LegCtx, deps: LegDeps): boolean {
 function markRefused(ctx: LegCtx, deps: LegDeps) {
   if (ctx.exchangeRefused && ctx.exchangeRefused.at == null) ctx.exchangeRefused.at = deps.clock.now()
 }
-const BUSY_NOT_SENT = 'TACO: not sent because TACO was busy for your wallet. This part stayed in your wallet.'
+const BUSY_NOT_SENT = 'TACO exchange: not sent because it was busy for your wallet. This part stayed in your wallet.'
 
 // TACO: gate, turn (second in line), deposit (V1) or nothing (V2, approved before
 // the sale), swap call.
@@ -521,7 +521,7 @@ async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOutIn: b
   if (ctx.turn) {
     // Second in line: its pools are shared with tokens whose TACO parts go first.
     // Nothing moves until they are final and an exact requote is close to the plan.
-    ctx.onStep(ctx.turnWaitText ?? 'Waiting for its turn on TACO…')
+    ctx.onStep(ctx.turnWaitText ?? 'Waiting for its turn…')
     const t = await ctx.turn.wait()
     if (t === 'late') {
       ctx.onStep('Not sent, the shared pools took too long')

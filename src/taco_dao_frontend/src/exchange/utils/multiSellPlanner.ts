@@ -750,10 +750,10 @@ function moveSentences(P: PlanCtx, plans: AssetPlan[]): Array<{ asset: string; t
     const s = p.symbol
     if (p.second) {
       const after = p.second.waitsFor.map(a => plans.find(x => x.address === a)?.symbol ?? '').filter(Boolean)
-      out.push({ asset: p.address, text: `Sells its TACO part right after ${joinNames(after)}.` })
+      out.push({ asset: p.address, text: `Sells its part on the TACO exchange right after ${joinNames(after)}.` })
       continue
     }
-    if (p.tacoSkippedForBudget) { out.push({ asset: p.address, text: `${s} skips TACO this time.` }); continue }
+    if (p.tacoSkippedForBudget) { out.push({ asset: p.address, text: `${s} skips the TACO exchange this time.` }); continue }
     const tacoBp = bpOf(p, 'taco'), icpBp = bpOf(p, 'icpswap'), neuBp = bpOf(p, 'neutrinite')
     const a = p.alone
     if (a.tacoBp > 0 && tacoBp === 0 && icpBp > 0 && neuBp > 0) { out.push({ asset: p.address, text: `${s} sells on ICPSwap and Neutrinite instead.` }); continue }

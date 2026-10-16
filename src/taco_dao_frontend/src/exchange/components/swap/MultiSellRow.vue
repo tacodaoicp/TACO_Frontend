@@ -62,7 +62,7 @@
       <div class="ms-row__foot">
         <span v-if="impact != null">Price impact {{ impact.toFixed(1) }}%</span>
         <span v-if="move">{{ move }}</span>
-        <span v-if="tacoPaused">TACO has {{ token?.symbol }} paused right now.</span>
+        <span v-if="tacoPaused">The TACO exchange has {{ token?.symbol }} paused right now.</span>
       </div>
     </div>
   </div>
@@ -143,7 +143,7 @@ const message = computed(() => {
     case 'noRoute': return `No way to sell ${s} for ICP right now.`
     case 'quoteFailed': return `Could not get a price for ${s}.`
     case 'zeroOut': return 'Too small to sell for ICP.'
-    case 'tacoBusy': return `TACO takes only a few trades per wallet every 90 seconds. ${s} can sell in ${props.waitSec ?? 0} s.`
+    case 'tacoBusy': return `The TACO exchange takes only a few trades per wallet every 90 seconds. ${s} can sell in ${props.waitSec ?? 0} s.`
   }
   if (impact.value != null && impact.value > 25) return `Price impact ${impact.value.toFixed(1)}%. Confirm below or sell less.`
   if (impact.value != null && impact.value > 15) return `Price impact ${impact.value.toFixed(1)}%. You are moving the price a lot.`

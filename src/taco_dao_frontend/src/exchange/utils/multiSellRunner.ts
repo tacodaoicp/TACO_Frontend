@@ -444,7 +444,7 @@ function launch(ctx: SaleCtx, prep: Prepared, deps: SaleDeps, hooks: RunHooks): 
         gate: isNeu || gated ? gate : undefined,
         gateWaitText: `Waiting for Neutrinite to confirm the ${symbolOf(plan.gate?.token ?? '')} deposit…`,
         turn,
-        turnWaitText: turn ? `Waiting for ${joinNames(pa.plan.second!.waitsFor.map(symbolOf))} on TACO…` : undefined,
+        turnWaitText: turn ? `Waiting for its turn after ${joinNames(pa.plan.second!.waitsFor.map(symbolOf))}…` : undefined,
         runId: ctx.runId,
         journal: legJournal ?? nullJournal,
         strictJournal: true,
@@ -501,7 +501,7 @@ function launch(ctx: SaleCtx, prep: Prepared, deps: SaleDeps, hooks: RunHooks): 
     }
     try { await prep.deps.taco.assertCanTrade() }
     catch {
-      for (const [, o] of pending) setAll(o, { state: 'needsRecovery', reason: 'tacoPaused', error: 'TACO is paused right now. Your deposit is safe there. Use the Recover page when it is back.' })
+      for (const [, o] of pending) setAll(o, { state: 'needsRecovery', reason: 'tacoPaused', error: 'The TACO exchange is paused right now. Your deposit is safe there. Use the Recover page when it is back.' })
       return
     }
     const items = pending.map(([, o]) => ({ identifier: o.deferred!.token, block: o.deferred!.block, tType: o.deferred!.assetType }))
@@ -512,7 +512,7 @@ function launch(ctx: SaleCtx, prep: Prepared, deps: SaleDeps, hooks: RunHooks): 
       return
     }
     if (results.length === 1 && !results[0].success && /not allowed/i.test(results[0].error ?? '')) {
-      for (const [, o] of pending) setAll(o, { state: 'needsRecovery', reason: 'rateLimited', error: 'TACO is busy for your wallet. Use the Recover page in a few minutes.' })
+      for (const [, o] of pending) setAll(o, { state: 'needsRecovery', reason: 'rateLimited', error: 'The TACO exchange is busy for your wallet. Use the Recover page in a few minutes.' })
       return
     }
     for (const [k, o] of pending) {

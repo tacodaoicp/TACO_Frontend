@@ -21,9 +21,10 @@
           <div class="ms-md__row"><span>Slippage tolerance</span><b class="num">{{ slippage }}%</b></div>
         </div>
         <hr class="ms-md__hr" />
-        <p class="ms-md__note">All {{ countText }} start together. Anything that cannot finish goes back to your wallet, minus network fees.</p>
+        <p class="ms-md__note">{{ batchNote }}</p>
         <p v-if="gateNote" class="ms-md__note">{{ gateNote }}</p>
-        <p v-if="anyMax" class="ms-md__note">For tokens at Max, any fee room the routes do not need is sold too.</p>
+        <p v-if="queueNote" class="ms-md__note">{{ queueNote }}</p>
+        <p v-if="anyMax" class="ms-md__note">For tokens at Max, whatever is not needed for fees is sold too, so nothing is left over.</p>
         <p v-if="poolNote" class="ms-md__note">{{ poolNote }}</p>
         <div class="ms-md__wallet num">Prices updated {{ ageText }} · wallet {{ shortP }}</div>
         <div class="ms-md__acts">
@@ -42,7 +43,7 @@ import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
 import { formatTokenAmount } from '../../utils/format'
 import { joinNames, type BatchPlan } from '../../utils/multiSellPlanner'
-import { poolNoteText } from './multiSellCopy'
+import { poolNoteText, queueNoteText } from './multiSellCopy'
 import TokenCoin from './TokenCoin.vue'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
@@ -61,7 +62,11 @@ const emit = defineEmits<{ confirm: []; cancel: [] }>()
 const store = useExchangeStore()
 const tokenOf = (a: string) => store.getTokenByAddress(a) ?? null
 const assets = computed(() => (props.plan?.assets ?? []).filter(a => !a.issue))
-const countText = computed(() => (assets.value.length === 1 ? '1 token' : `${assets.value.length} tokens`))
+// the tokens go out in one batch; the Neutrinite gate and the queued TACO exchange parts say what waits
+const batchNote = computed(() => (assets.value.length === 1
+  ? 'Anything that cannot finish goes back to your wallet, minus network fees.'
+  : `All ${assets.value.length} tokens sell in one batch. Anything that cannot finish goes back to your wallet, minus network fees.`))
+const queueNote = computed(() => (props.plan ? queueNoteText(props.plan) : ''))
 const fmtIcp = (v: bigint) => props.icp ? formatTokenAmount(v, Number(props.icp.decimals), props.icp.symbol) : v.toString()
 const fmtTok = (addr: string, v: bigint) => { const t = tokenOf(addr); return t ? formatTokenAmount(v, Number(t.decimals)) : v.toString() }
 const isMax = (a: string) => props.maxRows.includes(a)
@@ -79,7 +84,7 @@ const gateNote = computed(() => {
   const names = waitingAssets.filter(a => a !== g.token).map(a => assets.value.find(x => x.address === a)?.symbol ?? '').filter(Boolean)
   const others = `the ${joinNames(names)} ${names.length === 1 ? 'route' : 'routes'} that use the same markets`
   const who = own && names.length ? `Its other routes and ${others}` : own ? 'Its other routes' : others.charAt(0).toUpperCase() + others.slice(1)
-  return `${sym} starts first on Neutrinite. ${who} wait until Neutrinite confirms that deposit, usually within 10 seconds. Everything else starts at once.`
+  return `${sym} starts first on Neutrinite. ${who} wait until Neutrinite confirms that deposit, usually within 10 seconds.`
 })
 const poolNote = computed(() => (props.plan?.note && props.icp ? poolNoteText(props.plan.note, props.icp) : ''))
 

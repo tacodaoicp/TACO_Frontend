@@ -45,7 +45,7 @@
             </div>
             <div v-if="isOpen(ai)" class="ms-ar__detail">
               <template v-for="(l, li) in a.legs" :key="li">
-                <span v-if="running && !isFinal(l)">{{ dexName(l.venue) }}: {{ l.step || (l.state === 'waiting' ? 'Waiting…' : 'Starting…') }}</span>
+                <span v-if="running && !isFinal(l)">{{ venueLabel(l.venue) }}: {{ l.step || (l.state === 'waiting' ? 'Waiting…' : 'Starting…') }}</span>
                 <span v-else>{{ detail(a, l) }}</span>
                 <span v-if="l.error && showRawError(l)" class="ms-ar__err">{{ l.error }}</span>
               </template>
@@ -100,7 +100,7 @@ import { useExchangeStore } from '../../store/exchange.store'
 import { formatTokenAmount, formatUSD } from '../../utils/format'
 import type { MultiSellRun } from '../../composables/useMultiSell'
 import type { LegRun } from '../../utils/multiSellRunner'
-import { dexName, plural, legDetail, stopText, routeHopToken } from './multiSellCopy'
+import { plural, legDetail, stopText, routeHopToken, venueLabel, venueIn, recoverWhere } from './multiSellCopy'
 import { joinNames } from '../../utils/multiSellPlanner'
 import TokenCoin from './TokenCoin.vue'
 import DexLegChip from './DexLegChip.vue'
@@ -187,7 +187,7 @@ const progressText = computed(() => {
   if (r.phase === 'stopped') return r.approvalSpent ? 'Stopped before anything was sold.' : 'Stopped before any funds moved.'
   if (r.phase === 'settling') {
     const k = legs.value.filter(l => l.state === 'deferred').length
-    if (k) return deferSec.value > 0 ? `Refunding ${plural(k, 'route', 'routes')} after TACO's 90 second limit, in ${deferSec.value} s` : `Refunding ${plural(k, 'route', 'routes')}…`
+    if (k) return deferSec.value > 0 ? `Refunding ${plural(k, 'route', 'routes')} after the TACO exchange's 90 second limit, in ${deferSec.value} s` : `Refunding ${plural(k, 'route', 'routes')}…`
   }
   if (running.value) {
     const recovering = legs.value.filter(l => l.state === 'recovering').length
@@ -277,19 +277,21 @@ watch(() => !!props.run, async (open, was) => {
 }, { immediate: true })
 onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 
-const showRawError = (l: LegRun) => ['needsRecovery', 'tracked'].includes(l.state) && !!l.error && !/may have been sent|TACO takes only/i.test(l.error)
+// the raw message adds something only when it is the DEX's own words (the runner's notes repeat the row)
+const showRawError = (l: LegRun) => ['needsRecovery', 'tracked'].includes(l.state) && !!l.error
+  && !['maySent', 'tacoPaused', 'rateLimited'].includes(l.reason ?? '') && !/may have been sent|TACO takes only/i.test(l.error)
 
+// Refunds and recovery: each recovery line says what to do for its reason
 const refunds = computed(() => {
   const out: Array<{ what: string; where: string; bad: boolean }> = []
   for (const a of props.run?.assets ?? []) for (const l of a.legs) {
     const amt = `≈ ${fmtTok(a.address, l.amountIn)} ${a.symbol}`
     const mid = l.state === 'refunded' ? routeHopToken(l) : null
-    if (mid != null) out.push({ what: `${a.symbol} route on TACO`, where: mid && tokenOf(mid) ? `Came back as ${tokenOf(mid)!.symbol}.` : 'Came back as another token.', bad: false })
-    else if (l.state === 'refunded') out.push({ what: `${amt} from ${dexName(l.venue)}`, where: 'Sent back to your wallet.', bad: false })
-    else if (l.state === 'tracked') out.push({ what: `${a.symbol} deposit on TACO`, where: 'Use the Recover page.', bad: true })
-    else if (l.state === 'needsRecovery' && l.reason === 'maySent') out.push({ what: `${a.symbol} deposit on TACO`, where: 'Use the Recover page.', bad: true })
-    else if (l.state === 'needsRecovery' && l.failedAfterSwap) out.push({ what: `ICP from ${a.symbol} on ${dexName(l.venue)}`, where: 'Not sent yet. Use the Recover page.', bad: true })
-    else if (l.state === 'needsRecovery') out.push({ what: `${amt} on ${dexName(l.venue)}`, where: 'Not refunded yet. Use the Recover page.', bad: true })
+    if (mid != null) out.push({ what: `${a.symbol} route on the TACO exchange`, where: mid && tokenOf(mid) ? `Came back as ${tokenOf(mid)!.symbol}.` : 'Came back as another token.', bad: false })
+    else if (l.state === 'refunded') out.push({ what: `${amt} from ${venueIn(l.venue)}`, where: 'Sent back to your wallet.', bad: false })
+    else if (l.state === 'tracked' || (l.state === 'needsRecovery' && l.reason === 'maySent')) out.push({ what: `${a.symbol} deposit on the TACO exchange`, where: recoverWhere(l), bad: true })
+    else if (l.state === 'needsRecovery' && l.failedAfterSwap) out.push({ what: `ICP from your ${a.symbol} sale on ${venueIn(l.venue)}`, where: recoverWhere(l), bad: true })
+    else if (l.state === 'needsRecovery') out.push({ what: `${amt} on ${venueIn(l.venue)}`, where: recoverWhere(l), bad: true })
   }
   return out
 })

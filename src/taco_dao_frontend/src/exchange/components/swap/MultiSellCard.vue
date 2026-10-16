@@ -223,12 +223,12 @@ const budgetInfo = computed(() => {
   if (!p || skippedSyms.value.length === 0 || costlySkip.value) return ''
   const s = ms.waitSec.value
   return skippedSyms.value.length === 1
-    ? `TACO takes only a few trades per wallet every 90 seconds, so ${skippedSyms.value[0]} sells without TACO this time.${s > 0 ? ` Wait ${s} s to include it.` : ''}`
-    : `TACO takes only a few trades per wallet every 90 seconds, so ${joinNames(skippedSyms.value)} sell without TACO this time.${s > 0 ? ` Wait ${s} s to include them.` : ''}`
+    ? `The TACO exchange takes only a few trades per wallet every 90 seconds, so ${skippedSyms.value[0]} skips it this time.${s > 0 ? ` Wait ${s} s to include ${skippedSyms.value[0]}.` : ''}`
+    : `The TACO exchange takes only a few trades per wallet every 90 seconds, so ${joinNames(skippedSyms.value)} skip it this time.${s > 0 ? ` Wait ${s} s to include them.` : ''}`
 })
 const waitHelper = computed(() => {
   if (!costlySkip.value || !ms.icp.value) return ''
-  return `TACO takes only a few trades per wallet every 90 seconds. Waiting ${ms.waitSec.value} s lets ${someNames(skippedSyms.value)} use TACO too, for about ${aboutIcp(plan.value!.budget.gainIfWait, ms.icp.value)} ICP more.`
+  return `The TACO exchange takes only a few trades per wallet every 90 seconds. Waiting ${ms.waitSec.value} s lets ${someNames(skippedSyms.value)} use the TACO exchange too, for about ${aboutIcp(plan.value!.budget.gainIfWait, ms.icp.value)} ICP more.`
 })
 const sellNowText = computed(() => 'Sell now without waiting')
 watch(() => plan.value, () => { ms.sellAnyway.value = false })
