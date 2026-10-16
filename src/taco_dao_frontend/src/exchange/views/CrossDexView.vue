@@ -14,25 +14,36 @@
             : 'Splits one swap across ICPSwap + TACO + Neutrinite for the best total output.'"
         />
 
+        <!-- above both modes: Swap is the default, and a sale's state matters whichever card shows -->
+        <div v-if="finishing || finished || interrupted" class="crossdex-view__banners">
+          <div v-if="finishing" class="crossdex-view__banner">
+            <span>Your last sale is still finishing{{ ms.finishingRoutes.value > 0 ? ` ${ms.finishingRoutes.value === 1 ? '1 route' : `${ms.finishingRoutes.value} routes`}` : '' }}. Keep this page open until it is done.</span>
+            <span class="crossdex-view__banner-acts">
+              <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="ms.reopenRun()">View</button>
+            </span>
+          </div>
+          <div v-else-if="finished" class="crossdex-view__banner">
+            <span>Your last sale has finished.</span>
+            <span class="crossdex-view__banner-acts">
+              <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="ms.reopenRun()">View the result</button>
+            </span>
+          </div>
+          <div v-if="interrupted" class="crossdex-view__banner crossdex-view__banner--warn">
+            <strong>Your last sale did not finish</strong>
+            <span>It stopped {{ interruptedAgo }} ago, before every part was done. Open the Recover page to get back anything left on a DEX.</span>
+            <span class="crossdex-view__banner-acts">
+              <router-link to="/recover" class="ex-btn ex-btn--sm ex-btn--primary">Open Recover page</router-link>
+              <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="dismissInterrupted">Dismiss</button>
+            </span>
+          </div>
+        </div>
+
         <main id="ex-main" class="crossdex-view__main">
           <CrossDexCard v-show="mode === 'swap'" class="crossdex-view__card">
             <template #title><CrossDexModeSwitch :model-value="mode" :disabled="switchLocked" @update:model-value="setMode" /></template>
           </CrossDexCard>
           <MultiSellCard v-if="manyMounted" v-show="mode === 'many'" class="crossdex-view__card">
             <template #title><CrossDexModeSwitch :model-value="mode" :disabled="switchLocked" @update:model-value="setMode" /></template>
-            <template #banner>
-              <div v-if="ms.finishingRoutes.value > 0 && ms.run.value?.dismissed" class="crossdex-view__banner">
-                Your last sale is still finishing {{ ms.finishingRoutes.value === 1 ? '1 route' : `${ms.finishingRoutes.value} routes` }}.
-              </div>
-              <div v-if="interrupted" class="crossdex-view__banner crossdex-view__banner--warn">
-                <strong>Your last sale did not finish</strong>
-                <span>It stopped {{ interruptedAgo }} ago, before every part was done. Open the Recover page to get back anything left on a DEX.</span>
-                <span class="crossdex-view__banner-acts">
-                  <router-link to="/recover" class="ex-btn ex-btn--sm ex-btn--primary">Open Recover page</router-link>
-                  <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="dismissInterrupted">Dismiss</button>
-                </span>
-              </div>
-            </template>
           </MultiSellCard>
         </main>
 
@@ -113,6 +124,9 @@ function setMode(m: 'swap' | 'many') {
   router.replace({ query: m === 'many' ? { ...rest, mode: 'many' } : rest })
 }
 const switchLocked = computed(() => ms.isBusy.value)
+/** A result closed while a route was still running, and that result once every route settled. */
+const finishing = computed(() => !!ms.run.value?.dismissed && !ms.run.value.settled)
+const finished = computed(() => !!ms.run.value?.dismissed && !!ms.run.value.settled)
 
 const viewActive = ref(true)
 onActivated(() => { viewActive.value = true; void checkInterrupted() })
@@ -178,6 +192,7 @@ function reconnect() { void ms.done(); void auth.connect() }
   &__main { display: flex; justify-content: center; }
   &__card { width: 100%; }
 
+  &__banners { display: flex; flex-direction: column; gap: 8px; }
   &__banner {
     font-size: 12.5px; line-height: 1.45; color: var(--tx-ink-2);
     background: var(--tx-info-dim); border-radius: 8px; padding: 8px 10px;

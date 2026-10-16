@@ -197,21 +197,21 @@ export class RunJournal {
     this.live.delete(id)
   }
 
-  /** Change one leg of a stored run (the Recover page: dismissed, recovered). */
+  /** Change one leg of a stored run (the Recover page: dismissed, recovered). updatedAt stays the
+   *  sale's own last write: it is when an interrupted sale stopped, and the no Web Locks rule reads it. */
   markLeg(id: string, ai: number, li: number, patch: Partial<LegRecord>): boolean {
     const rec = this.live.get(id) ?? this.get(id)
     const leg = rec?.assets[ai]?.legs[li]
     if (!rec || !leg) return false
     Object.assign(leg, patch)
-    rec.updatedAt = this.clock.now()
     return this.writeRaw(rec)
   }
 
+  /** Mark a stored run (interrupted, checked); updatedAt stays as in markLeg. */
   markRun(id: string, patch: Partial<Pick<RunRecord, 'phase' | 'checked'>>): boolean {
     const rec = this.live.get(id) ?? this.get(id)
     if (!rec) return false
     Object.assign(rec, patch)
-    rec.updatedAt = this.clock.now()
     return this.writeRaw(rec)
   }
 

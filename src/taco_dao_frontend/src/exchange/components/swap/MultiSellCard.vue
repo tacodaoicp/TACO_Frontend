@@ -16,8 +16,6 @@
     </div>
     <p class="ms-card__sub">Sell several tokens for ICP in one go.</p>
 
-    <slot name="banner" />
-
     <!-- not connected -->
     <div v-if="!store.isAuthenticated" class="ms-empty">
       <div class="ms-empty__b">Connect your wallet to see the tokens you can sell.</div>

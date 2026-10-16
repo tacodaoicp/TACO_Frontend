@@ -65,6 +65,8 @@ export interface MultiSellRun {
   settled: boolean
   /** The result was closed while slow legs still run (the card shows a banner). */
   dismissed?: boolean
+  /** The result was closed once (Done reset the basket); closing it again only hides it. */
+  closedOnce?: boolean
 }
 
 const QUOTE_FRESH_MS = 30_000
@@ -699,8 +701,19 @@ export function useMultiSell() {
       inTabRun = false
       if (unloadGuard) { window.removeEventListener('beforeunload', unloadGuard); unloadGuard = null }
       void store.refreshAfterMutation('swap')
-      if (r.dismissed && run.value === r) run.value = null
+      // closed while a route was still finishing: say how it ended; the banner keeps the result one tap away
+      if (r.dismissed && fin) announceLate(fin)
     })
+  }
+
+  function announceLate(res: SaleResult) {
+    const anyRecover = res.assets.some(a => a.legs.some(l => ['needsRecovery', 'tracked'].includes(l.state)))
+    const anyRefund = res.assets.some(a => a.legs.some(l => l.state === 'refunded'))
+    const t = icp.value
+    const got = t ? formatTokenAmount(res.received, Number(t.decimals), t.symbol) : ''
+    if (anyRecover) toast.error('Your last sale has finished', 'Some funds need the Recover page. The result is on the CrossDEX page.')
+    else if (res.phase === 'complete') toast.success('Your last sale has finished', got ? `${got} received in total.` : undefined)
+    else toast.info('Your last sale has finished', anyRefund ? 'Some parts were refunded. The result is on the CrossDEX page.' : 'The result is on the CrossDEX page.')
   }
 
   function announce(res: SaleResult) {
@@ -719,7 +732,14 @@ export function useMultiSell() {
   async function done() {
     const r = run.value
     if (r && !r.settled && ['preparing', 'selling', 'settling'].includes(r.phase)) return
+    if (r?.closedOnce) {
+      // a result opened again from the banner: closing it changes nothing else
+      if (r.settled) run.value = null
+      else r.dismissed = true
+      return
+    }
     const stopped = r?.phase === 'stopped'
+    if (r) r.closedOnce = true
     // slow legs keep running (and keep the lock): the card shows a banner until they settle
     if (r && !r.settled) r.dismissed = true
     else run.value = null
@@ -739,6 +759,8 @@ export function useMultiSell() {
   }
 
   function clearRun() { if (run.value?.settled) run.value = null }
+  /** Show a closed result again (the banner's View). */
+  function reopenRun() { if (run.value) run.value.dismissed = false }
   /** Routes of a closed result that are still finishing. */
   const finishingRoutes = computed(() => {
     const r = run.value
@@ -751,7 +773,7 @@ export function useMultiSell() {
     basket, plan, quoting, refining, quoteError, run, confirmOpen, confirmFor, opening, slippage, backNote, sellAnyway,
     rows, ready, quoteAgeMs, extreme, impactAcknowledged, waitSec, isRunning, isBusy, icp, finishingRoutes,
     // actions
-    addTokens, setBasket, removeToken, setAmount, setMax, requote, openConfirm, cancelConfirm, confirm, done, clearRun,
+    addTokens, setBasket, removeToken, setAmount, setMax, requote, openConfirm, cancelConfirm, confirm, done, clearRun, reopenRun,
     acknowledgeImpact, schedule,
   }
 }
