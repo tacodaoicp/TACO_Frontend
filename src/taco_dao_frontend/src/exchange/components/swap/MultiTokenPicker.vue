@@ -114,7 +114,7 @@ import { useHoldings } from '../../composables/useHoldings'
 import { useIcpMarkets } from '../../composables/useIcpMarkets'
 import { ICP_LEDGER_ID, FEE_HEADROOM_LEDGERS } from '../../constants/tokens'
 import { crossDexMax } from '../../utils/crossDexCosts'
-import { formatTokenAmount, formatUSD } from '../../utils/format'
+import { formatTokenAmount } from '../../utils/format'
 import { MAX_TOKENS_PER_SALE } from '../../utils/multiSellPlanner'
 import TokenCoin from './TokenCoin.vue'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
@@ -147,6 +147,13 @@ watch(() => props.visible, async (v) => {
 
 interface Entry { token: TokenInfo; usd: number; amountText: string; usdText: string; tooSmall: boolean; noMarket: boolean; small: boolean }
 
+/** USD in the list: 2 decimals from a cent up, and "< $0.01" below a cent. */
+function usdCell(v: number): string {
+  if (!(v > 0) || !Number.isFinite(v)) return ''
+  if (v < 0.01) return '< $0.01'
+  return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 const loading = computed(() => store.tokens.some(t => t.address !== ICP_LEDGER_ID && holdings.balanceOf(t) == null) && store.isAuthenticated)
 
 const entries = computed<Entry[]>(() => {
@@ -163,7 +170,7 @@ const entries = computed<Entry[]>(() => {
       token: t,
       usd,
       amountText: formatTokenAmount(bal, Number(t.decimals)),
-      usdText: hasPrice ? formatUSD(usd) : 'No price',
+      usdText: hasPrice ? usdCell(usd) : 'No price',
       tooSmall: max <= 0n,
       noMarket: markets.hasIcpMarket(t.address) === false,
       small: hasPrice ? usd < 1 : max <= 0n,
@@ -186,7 +193,7 @@ function toggle(e: Entry) {
   if (isOn(e)) picked.value = picked.value.filter(a => a !== e.token.address)
   else if (!isDisabled(e)) picked.value = [...picked.value, e.token.address]
 }
-const pickedUsd = computed(() => formatUSD(picked.value.reduce((s, a) => s + (entries.value.find(e => e.token.address === a)?.usd ?? 0), 0)))
+const pickedUsd = computed(() => usdCell(picked.value.reduce((s, a) => s + (entries.value.find(e => e.token.address === a)?.usd ?? 0), 0)))
 
 function apply() {
   if (picked.value.length === 0) return
