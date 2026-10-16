@@ -493,9 +493,9 @@ onMounted(() => {
   &__leg-row, &__progress-row, &__outcome-row { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); }
   &__leg-dex {
     font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
-    &.is-icp { background: rgba(80, 120, 255, 0.15); color: #6f8cff; }
-    &.is-taco { background: rgba(196, 90, 10, 0.15); color: var(--accent-primary); }
-    &.is-neu { background: rgba(120, 200, 140, 0.15); color: #5fc07e; }
+    &.is-icp { background: var(--tx-dex-icpswap-dim); color: var(--tx-dex-icpswap); }
+    &.is-taco { background: var(--tx-dex-taco-dim); color: var(--tx-dex-taco); }
+    &.is-neu { background: var(--tx-dex-neutrinite-dim); color: var(--tx-dex-neutrinite); }
   }
   &__leg-pct { color: var(--text-secondary); }
   &__leg-out { margin-left: auto; color: var(--text-primary); }

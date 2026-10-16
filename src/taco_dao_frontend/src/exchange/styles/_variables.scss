@@ -57,6 +57,14 @@
   --tx-panel-bg:     linear-gradient(135deg, #221c18 0%, #19140f 100%);
   --tx-panel-bg-2:   linear-gradient(135deg, #2a231e 0%, #1e1813 100%);
   --tx-panel-border: 1px solid var(--tx-line-2);
+
+  /* DEX colors (CrossDEX badges, split bars, run chips) */
+  --tx-dex-icpswap:        #6f8cff;
+  --tx-dex-icpswap-dim:    rgba(80, 120, 255, 0.15);
+  --tx-dex-taco:           var(--tx-orange);
+  --tx-dex-taco-dim:       rgba(196, 90, 10, 0.15);
+  --tx-dex-neutrinite:     #5fc07e;
+  --tx-dex-neutrinite-dim: rgba(120, 200, 140, 0.15);
 }
 
 /* ─── Cotija (light) ───────────────────────────────────────────────── */
@@ -101,6 +109,14 @@
   --tx-panel-bg:     linear-gradient(135deg, #fffaf1 0%, #f5ede0 100%);
   --tx-panel-bg-2:   linear-gradient(135deg, #ffffff 0%, #f9f2e5 100%);
   --tx-panel-border: 1px solid var(--tx-line-2);
+
+  /* DEX colors (darker on the light theme so they stay readable) */
+  --tx-dex-icpswap:        #3b5bdb;
+  --tx-dex-icpswap-dim:    rgba(59, 91, 219, 0.10);
+  --tx-dex-taco:           var(--tx-orange);
+  --tx-dex-taco-dim:       rgba(216, 107, 28, 0.12);
+  --tx-dex-neutrinite:     #2f8f50;
+  --tx-dex-neutrinite-dim: rgba(47, 143, 80, 0.10);
 }
 
 /* ─── Shared scales (theme-agnostic) ───────────────────────────────── */
