@@ -125,10 +125,10 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
-import { formatTokenAmount, formatUSD } from '../../utils/format'
+import { formatTokenAmount } from '../../utils/format'
 import type { MultiSellRun } from '../../composables/useMultiSell'
 import type { LegRun } from '../../utils/multiSellRunner'
-import { plural, legDetail, stopText, routeHopToken, venueLabel, venueIn, recoverWhere } from './multiSellCopy'
+import { plural, legDetail, stopText, routeHopToken, venueLabel, venueIn, recoverWhere, aboutUsd } from './multiSellCopy'
 import { joinNames } from '../../utils/multiSellPlanner'
 import TokenCoin from './TokenCoin.vue'
 import DexLegChip from './DexLegChip.vue'
@@ -156,10 +156,10 @@ const slowCount = computed(() => legs.value.filter(l => l.state === 'slow' || (!
 const unknownParts = computed(() => legs.value.filter(l => l.state === 'doneUnknown').length)
 const receivedSoFar = computed(() => legs.value.reduce((s, l) => s + (SOLD.includes(l.state) && l.state !== 'doneUnknown' && l.amountOut != null
   ? l.amountOut - (l.venue === 'taco' ? 0n : 10_000n) : 0n), 0n))
+// the picker's dollar rule: 2 decimals from a cent up, "< $0.01" below
 const usdText = computed(() => {
   const p = props.icp ? store.getTokenPriceUSD(props.icp.address) : 0
-  const usd = p && receivedSoFar.value > 0n ? formatUSD(Number(receivedSoFar.value) / 1e8 * p) : ''
-  return usd ? `≈ ${usd}` : ''
+  return p && props.icp && receivedSoFar.value > 0n ? aboutUsd(Number(receivedSoFar.value) / 10 ** Number(props.icp.decimals) * p) : ''
 })
 
 const n = computed(() => props.run?.assets.length ?? 0)

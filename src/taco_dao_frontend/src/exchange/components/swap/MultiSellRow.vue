@@ -71,8 +71,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
-import { formatTokenAmount, formatUSD } from '../../utils/format'
+import { formatTokenAmount } from '../../utils/format'
 import { parseAmount } from '../../composables/useMultiSell'
+import { aboutUsd } from './multiSellCopy'
 import type { BasketItem, RowIssue } from '../../composables/useMultiSell'
 import type { AssetPlan } from '../../utils/multiSellPlanner'
 import type { CrossDexLeg, CrossDexVenue } from '../../utils/crossDexOptimizer'
@@ -116,7 +117,8 @@ const usdText = computed(() => {
   const p = store.getTokenPriceUSD(t.address)
   if (!p) return ''
   const amt = parseAmount(props.item.amountText, Number(t.decimals))
-  return `≈ ${formatUSD(Number(amt) / 10 ** Number(t.decimals) * p)}`
+  // the picker's rule: 2 decimals from a cent up, "< $0.01" below
+  return aboutUsd(Number(amt) / 10 ** Number(t.decimals) * p)
 })
 const tacoPaused = computed(() => !!props.token && store.isTokenPaused(props.token.address))
 

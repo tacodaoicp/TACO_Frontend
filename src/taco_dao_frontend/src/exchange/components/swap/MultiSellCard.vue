@@ -158,9 +158,9 @@ import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { useMultiSell } from '../../composables/useMultiSell'
 import { useHoldings } from '../../composables/useHoldings'
 import { ICP_LEDGER_ID } from '../../constants/tokens'
-import { formatTokenAmount, formatUSD } from '../../utils/format'
+import { formatTokenAmount } from '../../utils/format'
 import { MAX_TOKENS_PER_SALE, joinNames } from '../../utils/multiSellPlanner'
-import { poolNoteText, aboutIcp, plural, someNames } from './multiSellCopy'
+import { poolNoteText, aboutIcp, plural, someNames, usdCell, aboutUsd } from './multiSellCopy'
 import MultiSellRow from './MultiSellRow.vue'
 import MultiTokenPicker from './MultiTokenPicker.vue'
 import MultiSellConfirm from './MultiSellConfirm.vue'
@@ -190,6 +190,7 @@ const topHoldings = computed(() => store.tokens
   .sort((a, b) => holdings.usdValue(b) - holdings.usdValue(a)).slice(0, 4))
 
 const countText = computed(() => plural(ms.basket.value.length, 'token', 'tokens'))
+// dollar values follow the picker's rule: 2 decimals from a cent up, "< $0.01" below
 const basketUsd = computed(() => {
   let s = 0
   for (const r of ms.rows.value) {
@@ -198,13 +199,13 @@ const basketUsd = computed(() => {
     const p = store.getTokenPriceUSD(t.address)
     if (p) s += Number(r.amount) / 10 ** Number(t.decimals) * p
   }
-  return s > 0 ? formatUSD(s) : ''
+  return usdCell(s)
 })
 const receiveUsd = computed(() => {
   const p = plan.value, icp = ms.icp.value
   if (!p || !icp) return ''
   const price = store.getTokenPriceUSD(icp.address)
-  return price ? `≈ ${formatUSD(Number(p.totalReceiveOut) / 1e8 * price)}` : ''
+  return price ? aboutUsd(Number(p.totalReceiveOut) / 10 ** Number(icp.decimals) * price) : ''
 })
 const impactCls = computed(() => {
   const x = plan.value?.impactPct ?? 0

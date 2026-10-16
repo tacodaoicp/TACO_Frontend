@@ -21,6 +21,19 @@ export const venueIn = (d: CrossDexVenue) => (d === 'taco' ? 'the TACO exchange'
 /** The DEX at the start of a sentence. */
 export const venueSubject = (d: CrossDexVenue) => (d === 'taco' ? 'The TACO exchange' : dexName(d))
 
+/** A dollar value in the picker, the card and the result: 2 decimals from a cent up, "< $0.01"
+ *  below a cent, nothing when unknown or zero. */
+export function usdCell(v: number): string {
+  if (!(v > 0) || !Number.isFinite(v)) return ''
+  if (v < 0.01) return '< $0.01'
+  return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+/** An estimate in dollars: "≈ $0.70", or "< $0.01" alone. */
+export function aboutUsd(v: number): string {
+  const s = usdCell(v)
+  return s && !s.startsWith('<') ? `≈ ${s}` : s
+}
+
 /** An ICP amount for a sentence: 2 decimals, 4 when small. */
 export function aboutIcp(v: bigint, icp: TokenInfo): string {
   const n = Number(v) / 10 ** Number(icp.decimals)

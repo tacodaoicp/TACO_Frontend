@@ -116,6 +116,7 @@ import { ICP_LEDGER_ID, FEE_HEADROOM_LEDGERS } from '../../constants/tokens'
 import { crossDexMax } from '../../utils/crossDexCosts'
 import { formatTokenAmount } from '../../utils/format'
 import { MAX_TOKENS_PER_SALE } from '../../utils/multiSellPlanner'
+import { usdCell } from './multiSellCopy'
 import TokenCoin from './TokenCoin.vue'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
@@ -145,14 +146,8 @@ watch(() => props.visible, async (v) => {
   if (!touch) searchEl.value?.focus()
 }, { immediate: true })
 
+// USD in the list (usdCell): 2 decimals from a cent up, and "< $0.01" below a cent
 interface Entry { token: TokenInfo; usd: number; amountText: string; usdText: string; tooSmall: boolean; noMarket: boolean; small: boolean }
-
-/** USD in the list: 2 decimals from a cent up, and "< $0.01" below a cent. */
-function usdCell(v: number): string {
-  if (!(v > 0) || !Number.isFinite(v)) return ''
-  if (v < 0.01) return '< $0.01'
-  return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-}
 
 const loading = computed(() => store.tokens.some(t => t.address !== ICP_LEDGER_ID && holdings.balanceOf(t) == null) && store.isAuthenticated)
 
