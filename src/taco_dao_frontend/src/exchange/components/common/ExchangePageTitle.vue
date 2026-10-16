@@ -4,7 +4,7 @@
       {{ label }}
       <span v-if="qualifier" class="tx-serif tx-orange">{{ qualifier }}</span>
     </h1>
-    <div v-if="subtitle" class="tx-page-title__sub tx-ink-3">{{ subtitle }}</div>
+    <div v-if="subtitle || $slots.sub" class="tx-page-title__sub tx-ink-3"><slot name="sub">{{ subtitle }}</slot></div>
   </div>
 </template>
 

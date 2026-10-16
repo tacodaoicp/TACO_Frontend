@@ -20,13 +20,15 @@
           <div class="ms-md__row"><span>Price impact</span><b class="num">{{ plan.impactPct == null ? '…' : plan.impactPct.toFixed(1) + '%' }}</b></div>
           <div class="ms-md__row"><span>Slippage tolerance</span><b class="num">{{ slippage }}%</b></div>
         </div>
+        <!-- under the numbers it dates, above the notes: with 8 to 10 tokens the notes scroll under
+             the buttons, and which wallet sells must stay in view -->
+        <div class="ms-md__wallet num">Prices updated {{ ageText }} · wallet {{ shortP }}</div>
         <hr class="ms-md__hr" />
         <p class="ms-md__note">{{ batchNote }}</p>
         <p v-if="gateNote" class="ms-md__note">{{ gateNote }}</p>
         <p v-if="queueNote" class="ms-md__note">{{ queueNote }}</p>
         <p v-if="anyMax" class="ms-md__note">For tokens at Max, whatever is not needed for fees is sold too.</p>
         <p v-if="poolNote" class="ms-md__note">{{ poolNote }}</p>
-        <div class="ms-md__wallet num">Prices updated {{ ageText }} · wallet {{ shortP }}</div>
         <div class="ms-md__acts">
           <button ref="cancelBtn" class="ex-btn ex-btn--ghost" @click="$emit('cancel')">Cancel</button>
           <button class="ex-btn ex-btn--primary" :disabled="cooling || refreshing" @click="onConfirm">

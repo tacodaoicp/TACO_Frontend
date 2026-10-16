@@ -8,13 +8,16 @@
       <ExchangeTopNav active="crossdex" />
 
       <div class="crossdex-view__body">
-        <ExchangePageTitle
-          label="CrossDEX"
-          qualifier="best mix"
-          :subtitle="mode === 'many'
-            ? 'The tokens you pick sell in one batch, each on the DEXes that pay the most ICP.'
-            : 'Splits one swap across ICPSwap + TACO + Neutrinite for the best total output.'"
-        />
+        <ExchangePageTitle label="CrossDEX" qualifier="best mix">
+          <!-- both subtitles share one grid cell, so the box is as tall as the longer one in either
+               mode and a wrap of one can never move the mode switch -->
+          <template #sub>
+            <span class="crossdex-view__subs">
+              <span :class="{ 'is-off': mode !== 'swap' }" :aria-hidden="mode !== 'swap'">Splits one swap across ICPSwap + TACO + Neutrinite for the best total output.</span>
+              <span :class="{ 'is-off': mode !== 'many' }" :aria-hidden="mode !== 'many'">Your tokens sell in one batch, each on the DEXes that pay the most ICP.</span>
+            </span>
+          </template>
+        </ExchangePageTitle>
 
         <!-- above both modes: Single swap is the default, and a sale's state matters whichever card shows -->
         <div v-if="finishing || finished || interrupted" class="crossdex-view__banners">
@@ -208,6 +211,12 @@ function reconnect() { void ms.done(); void auth.connect() }
   &__main { display: flex; justify-content: center; }
   &__card { width: 100%; }
 
+  &__subs {
+    display: grid;
+    > span { grid-area: 1 / 1; }
+    .is-off { visibility: hidden; }
+  }
+
   &__banners { display: flex; flex-direction: column; gap: 8px; }
   &__banner {
     font-size: 12.5px; line-height: 1.45; color: var(--tx-ink-2);
@@ -215,7 +224,11 @@ function reconnect() { void ms.done(); void auth.connect() }
     display: flex; flex-direction: column; gap: 4px;
     &--warn { background: var(--tx-warning-dim); color: var(--tx-ink); strong { color: var(--tx-warning); } }
   }
-  &__banner-acts { display: flex; gap: 6px; margin-top: 4px; }
+  &__banner-acts {
+    display: flex; gap: 6px; margin-top: 4px;
+    // a finger sized target on touch screens
+    @media (pointer: coarse) { .ex-btn { min-height: 40px; padding: 0 14px; } }
+  }
 
   &__tip {
     gap: 10px;

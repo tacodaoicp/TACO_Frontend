@@ -1,5 +1,5 @@
 <template>
-  <div class="ms-card">
+  <div ref="cardEl" class="ms-card">
     <!-- the same header box as the Single swap card, so the mode switch does not move between modes -->
     <div class="ms-card__head">
       <div class="ms-card__titlebox">
@@ -112,7 +112,7 @@
       </div>
     </template>
 
-    <div class="ms-card__bar" :class="{ 'is-stuck': barStuck }">
+    <div ref="barEl" class="ms-card__bar" :class="{ 'is-stuck': barStuck }">
       <!-- the bar's own total only while the one above is out of view -->
       <div v-if="plan && (ms.ready.value || updating) && !recvInView" class="ms-card__bar-total">
         <span>{{ updating ? 'Updating…' : 'You receive' }}</span>
@@ -285,13 +285,14 @@ function onPicked(addrs: string[]) {
 // tokens): the bar is sticky. On wider screens it draws its box only while it floats (a sentinel
 // at its place in the card is below the screen); phones always float it above the bottom nav. Its
 // own total shows only while the main total is out of view, so the total never shows twice.
+const cardEl = ref<HTMLElement | null>(null)
+const barEl = ref<HTMLElement | null>(null)
 const barSentinel = ref<HTMLElement | null>(null)
 const recvRow = ref<HTMLElement | null>(null)
 const barStuck = ref(false)
 const recvInView = ref(false)
 const hasIo = typeof IntersectionObserver !== 'undefined'
 let stuckIo: IntersectionObserver | null = null
-let recvIo: IntersectionObserver | null = null
 watch(barSentinel, (el) => {
   stuckIo?.disconnect(); stuckIo = null
   barStuck.value = false
@@ -301,17 +302,41 @@ watch(barSentinel, (el) => {
   }, { rootMargin: '0px 0px -12px 0px' })
   stuckIo.observe(el)
 }, { flush: 'post' })
-watch(recvRow, (el) => {
-  recvIo?.disconnect(); recvIo = null
-  recvInView.value = false
-  if (!el || !hasIo) return
-  // the floating bar (and the bottom nav on phones) cover the bottom of the screen
-  let phone = false
-  try { phone = window.matchMedia('(max-width: 600px)').matches } catch { /* no matchMedia */ }
-  recvIo = new IntersectionObserver(([e]) => { recvInView.value = e.isIntersecting }, { rootMargin: `0px 0px -${phone ? 180 : 140}px 0px`, threshold: 1 })
-  recvIo.observe(el)
-}, { flush: 'post' })
-onBeforeUnmount(() => { stuckIo?.disconnect(); recvIo?.disconnect() })
+// The main total is in view while its row is inside the screen and wholly above the bar, measured
+// against the bar's live box: the bar is taller with its own total or the wait helper, and on phones
+// it floats over the bottom nav. Measured again on scroll, resize and any size change of the page,
+// the card or the bar (no fixed margins, so the total never shows twice or not at all).
+let frame = 0
+function measureRecv() {
+  frame = 0
+  const row = recvRow.value, bar = barEl.value
+  if (!row || !bar) { recvInView.value = false; return }
+  const r = row.getBoundingClientRect()
+  const bottom = Math.min(window.innerHeight, bar.getBoundingClientRect().top)
+  recvInView.value = r.height > 0 && r.top >= 0 && r.bottom <= bottom
+}
+function remeasure() { if (!frame) frame = requestAnimationFrame(measureRecv) }
+let sizes: ResizeObserver | null = null
+onMounted(() => {
+  // capture: a scroll of any scrolling box above the card counts too
+  window.addEventListener('scroll', remeasure, { passive: true, capture: true })
+  window.addEventListener('resize', remeasure, { passive: true })
+  if (typeof ResizeObserver !== 'undefined') {
+    sizes = new ResizeObserver(remeasure)
+    sizes.observe(document.documentElement)
+    if (cardEl.value) sizes.observe(cardEl.value)
+    if (barEl.value) sizes.observe(barEl.value)
+  }
+  remeasure()
+})
+watch(recvRow, remeasure, { flush: 'post' })
+onBeforeUnmount(() => {
+  stuckIo?.disconnect()
+  sizes?.disconnect()
+  window.removeEventListener('scroll', remeasure, { capture: true })
+  window.removeEventListener('resize', remeasure)
+  if (frame) cancelAnimationFrame(frame)
+})
 </script>
 
 <style scoped lang="scss">
