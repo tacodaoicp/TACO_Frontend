@@ -1,45 +1,14 @@
 import { createPinia } from 'pinia'
 import { createApp, defineAsyncComponent } from 'vue'
+import { createChunkRecovery } from './chunkRecovery'
 
-// ─── Chunk-load recovery ─────────────────────────────────────────────
-// Lazy route/app chunks are hashed; after a deploy a client holding an old
-// index.html requests a hash that no longer exists → the dynamic import rejects
-// ("Failed to fetch dynamically imported module" / ChunkLoadError) and the app
-// would hang at a blank screen. Recover with a ONE-TIME reload to pick up the
-// fresh manifest, guarded against reload loops (a genuine outage shouldn't loop).
-function isChunkLoadError(err) {
-  const m = (err && (err.message || err.toString && err.toString())) || ''
-  return /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk [\w-]+ failed/i.test(String(m))
-}
-function recoverFromChunkError(err) {
-  if (!isChunkLoadError(err)) return false
-  try {
-    if (sessionStorage.getItem('taco_chunk_reloaded') === '1') return false
-  } catch { /* private mode: best effort, skip the loop guard */ }
-  // A CrossDEX swap or sale holds the funds lock in this tab: a reload now
-  // would stop its later steps. Say an update is ready and reload once the
-  // lock is free.
-  if (window.__tacoFundsBusy) {
-    if (!window.__tacoReloadPending) {
-      window.__tacoReloadPending = true
-      try { window.dispatchEvent(new CustomEvent('taco:update-ready')) } catch { /* ignore */ }
-      const reloadWhenFree = () => {
-        if (window.__tacoFundsBusy) return
-        window.removeEventListener('taco:funds-free', reloadWhenFree)
-        try { sessionStorage.setItem('taco_chunk_reloaded', '1') } catch { /* ignore */ }
-        location.reload()
-      }
-      window.addEventListener('taco:funds-free', reloadWhenFree)
-    }
-    return true
-  }
-  try { sessionStorage.setItem('taco_chunk_reloaded', '1') } catch { /* ignore */ }
-  location.reload()
-  return true
-}
-function clearChunkReloadGuard() {
-  try { sessionStorage.removeItem('taco_chunk_reloaded') } catch { /* ignore */ }
-}
+// ─── Chunk-load recovery (see chunkRecovery.js) ──────────────────────
+const sessionStore = (() => { try { return window.sessionStorage } catch { return { getItem: () => null, setItem() {}, removeItem() {} } } })()
+const { recoverFromChunkError, clearChunkReloadGuard } = createChunkRecovery({
+  win: window,
+  session: sessionStore,
+  reload: () => location.reload(),
+})
 // Vite emits this on the window when a dynamically-imported chunk fails to load.
 window.addEventListener('vite:preloadError', (e) => {
   if (recoverFromChunkError(e && e.payload)) e.preventDefault()

@@ -34,7 +34,9 @@ function locksApi(): any {
   try { return (navigator as any).locks?.request ? (navigator as any).locks : null } catch { return null }
 }
 
-const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
+let sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
+/** Tests drive the hard release on a virtual clock. */
+export function setFundsLockSleep(fn: (ms: number) => Promise<void>) { sleep = fn }
 
 /**
  * Run `fn` while holding the funds lock. Returns BUSY (and never calls fn) when
