@@ -5,7 +5,8 @@
  * - Uses shared auth-cache.ts for identity/agent management
  * - Creates actors lazily from declarations/OTC_backend IDL
  * - Caches token metadata and treasury addresses (they rarely change)
- * - Tracks rate limit budget (21 update calls per 90s)
+ * - Tracks the rate limit budget (the exchange refuses the 21st update call in
+ *   90 s; the client stops at 20, counting every exchange tab of the browser)
  * - All query methods are free/unlimited; update methods are counted
  */
 
@@ -41,6 +42,7 @@ import { readCache, writeCache, isWithinAge, sweepCache, purgeUserCache } from '
 import { createCachedQuery, createKeyedQueryFactory, type CachedQuery } from '../utils/cachedQuery'
 import { isVisible as isDocumentVisible } from '../composables/useVisibilityAware'
 import { callsFailingSince, connectivityTick, lastCallOkAt, stalledSince, noteCallOk, noteCallError, noteCallStart, noteCallEnd } from '../utils/connectivity'
+import { createCallLog, newTabId, CLIENT_CALL_CAP } from '../utils/exchangeCallLog'
 
 // Refresh windows for the saved boot values. A saved value paints first and
 // is replaced on screen when the refresh lands. Tokens rarely change, but a
@@ -134,10 +136,11 @@ export const useExchangeStore = defineStore('exchange', () => {
   // DAO price keeps winning through that gap too.
   const pricesFromOldPools = ref(false)
 
-  // Rate limiter
-  const rateLimitCalls = ref<number[]>([])  // timestamps of update calls
-  const RATE_LIMIT_WINDOW = 90_000          // 90 seconds
-  const RATE_LIMIT_MAX = 21
+  // Rate limiter: a log of exchange update calls shared by every exchange tab
+  // of this browser (see utils/exchangeCallLog.ts). The exchange refuses the
+  // 21st call of a 90 s window, so the client stops at 20.
+  const callLog = createCallLog((() => { try { return window.localStorage } catch { return null } })(), newTabId())
+  const callLogTick = ref(0)
 
   // Actor cache
   let _queryActor: _SERVICE | null = null
@@ -257,24 +260,47 @@ export const useExchangeStore = defineStore('exchange', () => {
   // Rate Limiter
   // ═══════════════════════════════════════════
 
+  /** Update calls of this principal in the last 90 s, every exchange tab of this browser counted. */
+  function callsUsed(principal: string = principalText.value): number {
+    if (!principal) return 0
+    return callLog.used(principal)
+  }
+
+  /** Milliseconds until `n` more update calls fit under `cap` (0 when they fit now). */
+  function msUntilCallsFree(n: number, cap: number = CLIENT_CALL_CAP, principal: string = principalText.value): number {
+    if (!principal) return 0
+    return callLog.msUntilFree(principal, n, cap)
+  }
+
+  /** Another exchange tab of this browser was visible in the last 90 s. */
+  function otherExchangeTabSeen(): boolean {
+    return callLog.otherTabSeen()
+  }
+
   const callsRemaining = computed(() => {
-    const now = Date.now()
-    const recent = rateLimitCalls.value.filter(t => now - t < RATE_LIMIT_WINDOW)
-    return Math.max(0, RATE_LIMIT_MAX - recent.length)
+    void callLogTick.value
+    return Math.max(0, CLIENT_CALL_CAP - callsUsed())
   })
 
-  function trackUpdateCall() {
-    const now = Date.now()
-    rateLimitCalls.value = [
-      ...rateLimitCalls.value.filter(t => now - t < RATE_LIMIT_WINDOW),
-      now,
-    ]
+  /** Recorded right before the call is sent, under the principal that signs it. */
+  function trackUpdateCall(principal: string = principalText.value) {
+    if (principal) callLog.record(principal)
+    callLogTick.value++
   }
 
-  function canMakeUpdateCall(): boolean {
+  function canMakeUpdateCall(principal: string = principalText.value): boolean {
     if (isFrozen.value) return false
-    return callsRemaining.value > 0
+    return callsUsed(principal) < CLIENT_CALL_CAP
   }
+
+  // Presence stamp: lets a sale in one tab know another exchange tab is open
+  // (it then plans with fewer calls).
+  try {
+    const stamp = () => { if (typeof document === 'undefined' || document.visibilityState === 'visible') callLog.stampPresence() }
+    stamp()
+    setInterval(stamp, 20_000)
+    document.addEventListener('visibilitychange', stamp)
+  } catch { /* no document */ }
 
   /**
    * Called right before funds move (V1 flows transfer first and call the
@@ -285,7 +311,7 @@ export const useExchangeStore = defineStore('exchange', () => {
    * nothing has moved when it throws.
    */
   async function assertCanTrade(): Promise<void> {
-    if (callsRemaining.value <= 0) throw new Error('Rate limit reached. Wait before making more trades.')
+    if (callsUsed() >= CLIENT_CALL_CAP) throw new Error('Rate limit reached. Wait before making more trades.')
     const unreachable = "Can't reach the exchange right now. No funds were moved."
     const FEE_WINDOW = 60 * 60_000
     const TREASURY_WINDOW = 24 * 60 * 60_000
@@ -2510,6 +2536,9 @@ export const useExchangeStore = defineStore('exchange', () => {
     // Rate limiter
     callsRemaining,
     canMakeUpdateCall,
+    callsUsed,
+    msUntilCallsFree,
+    otherExchangeTabSeen,
     assertCanTrade,
 
     // Init
