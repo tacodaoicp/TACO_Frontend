@@ -335,10 +335,13 @@ export function refinedPlan(
   }
 }
 
-/** 4.8: a refined plan is kept only when it nets more and uses no resource outside the coarse footprint. */
-export function acceptRefined(coarse: AssetPlan, refined: AssetPlan): boolean {
+/** 4.8: a refined plan is kept only when it nets more, keeps its TACO leg above the token's
+ *  minimum (the exchange refuses a smaller one after the deposit) and uses no resource outside
+ *  the coarse footprint. */
+export function acceptRefined(coarse: AssetPlan, refined: AssetPlan, tacoMinimum: bigint): boolean {
   if (refined.netOut <= coarse.netOut) return false
   if (refined.legs.some(l => l.expectedOut <= 0n || l.amountIn <= 0n)) return false
+  if (refined.legs.some(l => l.dex === 'taco' && l.amountIn <= tacoMinimum)) return false
   const allowed = new Set(coarse.footprint)
   return refined.footprint.every(r => allowed.has(r))
 }

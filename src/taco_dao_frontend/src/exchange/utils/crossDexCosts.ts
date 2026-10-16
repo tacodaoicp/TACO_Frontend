@@ -46,8 +46,13 @@ export function planDebit(
  * whole balance, one more fee for sGLDT and EXE. 0 when nothing is left.
  */
 export function crossDexMax(balance: bigint, fee: bigint, tradingFeeBps: bigint, v2: boolean, headroom: boolean): bigint {
-  const reserve = fee * (v2 ? 6n : 5n) + (headroom ? fee : 0n) + tradingFeeOf(balance, tradingFeeBps)
+  const reserve = crossDexMaxReserve(balance, fee, tradingFeeBps, v2, headroom)
   return balance > reserve ? balance - reserve : 0n
+}
+
+/** What the CrossDEX Max keeps back from `balance` for fees (the most a Max row may grow at preflight). */
+export function crossDexMaxReserve(balance: bigint, fee: bigint, tradingFeeBps: bigint, v2: boolean, headroom: boolean): bigint {
+  return fee * (v2 ? 6n : 5n) + (headroom ? fee : 0n) + tradingFeeOf(balance, tradingFeeBps)
 }
 
 /**
@@ -55,7 +60,9 @@ export function crossDexMax(balance: bigint, fee: bigint, tradingFeeBps: bigint,
  * (the venues of the confirmed plan, at the same shares) fits the fresh balance.
  * Closed form A = (balance − fixed fees) / (1 + tacoShare × bps / 10000), then
  * checked against the exact debit. Returns null when nothing larger than the
- * confirmed total fits (the row then keeps its confirmed amount).
+ * confirmed total fits (the row then keeps its confirmed amount). Unbounded on
+ * its own: the caller caps the growth at the fee room the Max kept
+ * (crossDexMaxReserve), so a balance that grew never sells more than confirmed.
  */
 export function sellAllExactlyTotal(
   balance: bigint,

@@ -336,7 +336,7 @@ export function useMultiSell() {
         if (!refined || mySeq !== seq || confirmOpen.value) return
         const cur = plan.value!.assets[i]
         if (cur.address !== a.address) return
-        if (acceptRefined(cur, refined)) {
+        if (acceptRefined(cur, refined, planInputs.value[i].token.minimum_amount)) {
           const assets = [...plan.value!.assets]
           assets[i] = refined
           plan.value = { ...plan.value!, assets, ...totalsOf(assets) }
@@ -351,8 +351,8 @@ export function useMultiSell() {
     const sorted = [...a.legs].sort((x, y) => y.pctBP - x.pctBP)
     const A = sorted[0], B = sorted[1]
     const sumBp = A.pctBP + B.pctBP
-    const ga = A.dex === 'taco' ? tacoGrid(a, q, target) : gridOf(A.dex)
-    const gb = B.dex === 'taco' ? tacoGrid(a, q, target) : gridOf(B.dex)
+    const ga = A.dex === 'taco' ? tacoGrid(a, q, target, input) : gridOf(A.dex)
+    const gb = B.dex === 'taco' ? tacoGrid(a, q, target, input) : gridOf(B.dex)
     const aBp = interpolatePairSplit(ga, gb, sumBp)
     if (aBp == null) return null
     const bp = new Map<CrossDexVenue, number>(a.legs.map(l => [l.dex, l.pctBP]))
@@ -374,6 +374,8 @@ export function useMultiSell() {
         const r = await neutrinite.quoteWithRoutes(tok.address, target.address, amt)
         legs.push({ dex: d, pctBP: bp.get(d)!, amountIn: amt, expectedOut: r.out })
       } else {
+        // the exchange refuses a TACO part at or below the token minimum, after the deposit
+        if (amt <= tok.minimum_amount) return null
         const reqs = CROSSDEX_GRID_BPS.map(b => ({ bp: b, amt: (amt * b) / 10000n })).filter(r => r.amt > 0n)
         const batch = (await qd.batchMulti(reqs.map(r => ({ tokenSell: tok.address, tokenBuy: target.address, amountSell: r.amt })), CROSSDEX_MAX_ROUTES)) ?? []
         // only routes inside this token's coarse footprint
@@ -398,14 +400,16 @@ export function useMultiSell() {
     l.tacoLegs.forEach((t, j) => { if (t.amountIn > l.tacoLegs![k].amountIn) k = j })
     return l.tacoLegs.map((t, j) => (j === k ? { ...t, amountIn: t.amountIn + diff } : t))
   }
-  function tacoGrid(a: AssetPlan, q: AssetQuotes, target: TokenInfo): bigint[] {
-    // the within TACO optimum per 10% point, routes limited to this token's footprint
+  function tacoGrid(a: AssetPlan, q: AssetQuotes, target: TokenInfo, input: AssetInput): bigint[] {
+    // the within TACO optimum per 10% point, routes limited to this token's footprint; points at or
+    // below the token minimum are 0 (as in the coarse planner), so the split never moves TACO there
     const pairs = new Set(a.footprint.filter(r => r !== 'neutrinite').map(r => r.slice(5)))
     const filtered = q.batch.map((b: any) => ({ routes: (b?.routes ?? []).filter((r: any) => {
       const hops = (r.hopDetails ?? []).length ? r.hopDetails.map((h: any) => [h.tokenIn, h.tokenOut]) : [[q.address, target.address]]
       return hops.every(([x, y]: string[]) => pairs.has(x < y ? `${x}|${y}` : `${y}|${x}`))
     }) }))
-    return CROSSDEX_GRID_BPS.map((_, k) => buildTacoSplitPlan(filtered, q.requests, q.address, target.address, (k + 1) * 1000, { maxLegs: 3 }).bestOut)
+    return CROSSDEX_GRID_BPS.map((_, k) => ((q.total * BigInt(k + 1)) / 10n <= input.token.minimum_amount ? 0n
+      : buildTacoSplitPlan(filtered, q.requests, q.address, target.address, (k + 1) * 1000, { maxLegs: 3 }).bestOut))
   }
 
   function totalsOf(assets: AssetPlan[]) {

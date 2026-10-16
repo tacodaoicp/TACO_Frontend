@@ -26,9 +26,9 @@ import {
   type LegCtx, type LegDeps, type LegOutcome, type LegState, type LegReason, type LegTurn, type NeuGate, type AssetType, type Clock,
 } from './crossDexLegRunner'
 import type { AssetInput, BatchPlan, AssetPlan } from './multiSellPlanner'
-import { scaleAssetLegs, ICP_WITHDRAW_FEE } from './multiSellPlanner'
+import { scaleAssetLegs, checkPlan, joinNames, ICP_WITHDRAW_FEE, MAX_TACO_TOKENS } from './multiSellPlanner'
 import { verifyLegs, requoteRule, type QuoteDeps } from './multiSellQuotes'
-import { planDebit, requiredDeposit, sellAllExactlyTotal } from './crossDexCosts'
+import { planDebit, requiredDeposit, sellAllExactlyTotal, crossDexMaxReserve } from './crossDexCosts'
 import type { RunJournal, RunRecord } from './crossDexJournal'
 
 export const SALE_MIN_SESSION_MS = 15 * 60_000
@@ -42,7 +42,7 @@ export type RunPhase = 'idle' | 'confirming' | 'preparing' | 'selling' | 'settli
   | 'complete' | 'partial' | 'failed' | 'stopped'
 
 export type StopReason = 'busy' | 'storage' | 'notAuthenticated' | 'sessionEndsSoon' | 'walletChanged' | 'readFailed'
-  | 'balanceChanged' | 'ledgerFee' | 'budget' | 'approval' | 'unreachable' | 'frozen'
+  | 'balanceChanged' | 'ledgerFee' | 'budget' | 'approval' | 'unreachable' | 'frozen' | 'planInvalid'
 export type BackReason = 'moved' | 'feeChanged'
 
 export interface LegRun {
@@ -214,6 +214,15 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
   const assets = plan.assets.map((a, i) => ({ a, i, input: ctx.inputs[i] })).filter(x => !x.a.issue)
   if (assets.length === 0) return stop('readFailed')
 
+  // 1b. The plan's structural rules (legs add up, 1 to 3 TACO routes above the token minimum,
+  //     no first wave pool shared, every queued TACO part waits for the parts before it, one
+  //     Neutrinite token): a plan that breaks one never runs.
+  const problems = checkPlan(plan, ctx.inputs, MAX_TACO_TOKENS)
+  if (problems.length > 0) {
+    hooks.log?.('[Sell many] plan check failed, nothing sent:', problems)
+    return stop('planInvalid')
+  }
+
   // 2. Storage keeps data
   if (!deps.storageProbe()) return stop('storage')
 
@@ -237,7 +246,8 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
       Promise.all(assets.map(x => withRead(deps.clock, deps.balance(x.a.address), 'balance'))),
       Promise.all(assets.map(x => withRead(deps.clock, deps.liveFee(x.a.address), 'fee'))),
       anyTaco ? withRead(deps.clock, deps.assertCanTrade(), 'assertCanTrade').catch((e: any) => { throw Object.assign(new Error(e?.message ?? ''), { exchange: true }) }) : Promise.resolve(),
-      anyV1Taco ? withRead(deps.clock, deps.dedupLedgers(), 'dedup') : Promise.resolve(new Set<string>()),
+      // an unreadable dedup list only means no resends (the deposits go without created_at_time), never a stop
+      anyV1Taco ? withRead(deps.clock, deps.dedupLedgers(), 'dedup').catch(() => new Set<string>()) : Promise.resolve(new Set<string>()),
       Promise.all(assets.map(x => withRead(deps.clock, verifyLegs(x.a, x.input.token, ctx.target, deps.quotes), 'verify'))),
     ])
     balances = b; fees = f; dedupSet = d as Set<string>; verified = v
@@ -265,7 +275,10 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
     tokens.set(a.address, { info: input.token, v2: hasTaco && v2, fee: live > cached ? live : cached, dedup: dedupSet.has(a.address) })
   }
 
-  // 6. Sell all exactly for Max rows, then every token's exact debit must fit its fresh balance
+  // 6. Sell all exactly for Max rows, then every token's exact debit must fit its fresh balance.
+  //    A Max row grows by at most the fee room its Max kept back: a balance that grew since Max
+  //    (tokens arrived, a basket from earlier) stops the sale, since Confirm showed the smaller
+  //    amount and the minimums were verified for it.
   const prepAssets: Prepared['assets'] = []
   for (let k = 0; k < assets.length; k++) {
     const { a, input } = assets[k]
@@ -275,6 +288,9 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
     if (input.atMax) {
       const exact = sellAllExactlyTotal(balances[k], legs, t.fee, tradingFeeBps, t.v2, headroom)
       if (exact != null) {
+        const confirmed = legs.reduce((s, l) => s + l.amountIn, 0n)
+        const room = crossDexMaxReserve(balances[k], t.fee, tradingFeeBps, input.v2 || t.v2, headroom)
+        if (exact - confirmed > room) return stop('balanceChanged', { stopAsset: a.address })
         const scaled = scaleAssetLegs(legs, exact)
         // keep the TACO leg above the token minimum, else the confirmed amounts stay
         const tl = scaled.find(l => l.dex === 'taco')
