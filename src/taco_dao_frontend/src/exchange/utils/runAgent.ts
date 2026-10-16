@@ -69,8 +69,10 @@ export async function createRunAgent(opts: {
   }
   let timeSynced = false
   if (opts.syncTime) {
-    try { await withTimeout(agent.syncTime(), 5_000, 'syncTime'); timeSynced = true }
+    // syncTime can resolve without syncing (no replica time came back): ask the agent itself
+    try { await withTimeout(agent.syncTime(), 5_000, 'syncTime'); timeSynced = agent.hasSyncedTime() }
     catch (e) { console.warn('[CrossDEX] time sync failed; deposits go without created_at_time:', e) }
+    if (!timeSynced) console.warn('[CrossDEX] the replica time is unknown; deposits go without created_at_time')
   }
   return { agent, principal, principalText, expiresAtMs, timeSynced }
 }

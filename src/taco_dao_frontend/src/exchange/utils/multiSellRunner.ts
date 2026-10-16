@@ -419,6 +419,8 @@ function launch(ctx: SaleCtx, prep: Prepared, deps: SaleDeps, hooks: RunHooks): 
   const final = new Map<string, LegOutcome>()
   const deferredAt = new Map<string, number>()
   const jobs: Array<{ ai: number; li: number; p: Promise<LegOutcome> }> = []
+  // the first refusal by the exchange's call limit: later TACO calls in that window defer
+  const exchangeRefused = { at: null as number | null }
   prep.assets.forEach((pa, ai) => {
     const t = prep.tokens.get(pa.plan.address)!
     pa.legs.forEach((leg, li) => {
@@ -451,6 +453,7 @@ function launch(ctx: SaleCtx, prep: Prepared, deps: SaleDeps, hooks: RunHooks): 
         },
         probeLimit: 50n,
         sortV1Errors: true,
+        exchangeRefused,
         log: hooks.log,
       }
       const p = runCrossDexLeg(leg, lctx, prep.deps).then(o => {

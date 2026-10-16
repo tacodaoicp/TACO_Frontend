@@ -382,7 +382,8 @@ export function useCrossDexSwap() {
     const dedup = v1Taco ? (await dedupLedgers()).has(fromAddr) : false
     let runAgent: RunAgent
     try {
-      runAgent = await createRunAgent({ expectPrincipal: store.principalText || undefined, syncTime: dedup })
+      // the replica clock also dates the ICPSwap approval's expiry
+      runAgent = await createRunAgent({ expectPrincipal: store.principalText || undefined, syncTime: dedup || legs.some(l => l.dex === 'icpswap') })
     } catch (err: any) {
       phase.value = 'ready'
       errorMsg.value = err?.message || 'Could not start the swap'

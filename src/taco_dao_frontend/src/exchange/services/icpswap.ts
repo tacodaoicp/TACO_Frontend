@@ -31,6 +31,9 @@ const ICP_LEDGER_ID = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
 const ICPSWAP_FEE_TIERS = [3000, 10000, 500, 100]
 // Approvals for a swap expire after this long.
 const APPROVAL_TTL_MS = 30 * 60_000
+/** With no replica time sync a device clock running far behind would make a 30 minute approval
+ *  expired on arrival; then the approval gets a day (it is the exact amount, for this pool only). */
+const APPROVAL_TTL_UNSYNCED_MS = 24 * 60 * 60_000
 
 interface Token {
   address: string
@@ -56,6 +59,8 @@ export interface IcpSwapTrack {
   markerWritten?: boolean
   /** The swap filled for this much (the withdraw may still have failed). */
   swappedOut?: bigint
+  /** The pool answered the swap with an error: nothing was sold (the deposit sits unused). */
+  swapRefused?: boolean
 }
 
 export interface IcpSwapParams {
@@ -478,7 +483,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   const { agent: authedAgent } = await resolveAuth(params.agent, params.owner)
   const track = params.track ?? {}
 
-  params.onStep?.('Finding pool...')
+  params.onStep?.('Finding the pool…')
   const poolId = await getPoolCanister(params.sellTokenPrincipal, params.buyTokenPrincipal)
   const poolData = poolCache.get(`${params.sellTokenPrincipal}-${params.buyTokenPrincipal}`)!
   const zeroForOne = isZeroForOne(params.sellTokenPrincipal, poolData)
@@ -487,14 +492,19 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   const poolActor = Actor.createActor(poolIDL, { agent: authedAgent, canisterId: poolId })
 
   // 1. Token fee
-  params.onStep?.('Getting token fee...')
+  params.onStep?.('Reading the fee…')
   const feeResult = (await sellTokenActor.icrc1_fee()) as any
   const tokenFee = typeof feeResult === 'bigint' ? feeResult : BigInt(feeResult)
 
   // 2. Approve pool for amountIn + fee. It expires after 30 minutes, so an
   //    approval left by a swap that stopped before its deposit lapses on its own.
-  params.onStep?.('Approving tokens...')
+  //    The ledger reads expires_at on its own clock: the agent's offset to the
+  //    replica applies (a run agent syncs it), and an unsynced agent gets a day.
+  params.onStep?.('Approving…')
   track.step = 'approve'
+  const synced = typeof (authedAgent as any).hasSyncedTime === 'function' && !!(authedAgent as any).hasSyncedTime()
+  const skewMs = synced ? Number((authedAgent as any).getTimeDiffMsecs?.() ?? 0) || 0 : 0
+  const expiresAtMs = Date.now() + skewMs + (synced ? APPROVAL_TTL_MS : APPROVAL_TTL_UNSYNCED_MS)
   const approvalResult = (await sellTokenActor.icrc2_approve({
     spender: { owner: Principal.fromText(poolId), subaccount: [] },
     amount: params.amountIn + tokenFee,
@@ -503,7 +513,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     from_subaccount: [],
     created_at_time: [],
     expected_allowance: [],
-    expires_at: [BigInt(Date.now() + APPROVAL_TTL_MS) * 1_000_000n],
+    expires_at: [BigInt(Math.round(expiresAtMs)) * 1_000_000n],
   })) as any
   if ('Err' in approvalResult) throw new Error(`Approval failed: ${safeStringify(approvalResult.Err)}`)
   if (params.beforeDeposit && (await params.beforeDeposit()) === false) throw new IcpSwapNotStarted()
@@ -517,7 +527,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   if (!track.markerWritten && params.requireMarker) {
     throw new IcpSwapNotStarted('ICPSwap: the recovery note could not be saved, so this part was not sent', true)
   }
-  params.onStep?.('Depositing tokens...')
+  params.onStep?.('Depositing…')
   track.step = 'deposit'
   const depositResult = (await poolActor.depositFrom({
     amount: params.amountIn,
@@ -527,7 +537,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   if ('err' in depositResult) throw new IcpSwapDepositRefused(`DepositFrom failed: ${safeStringify(depositResult.err)}`)
 
   // 4. Swap the actual deposited amount
-  params.onStep?.('Executing swap...')
+  params.onStep?.('Swapping…')
   track.step = 'swap'
   const swapResult = (await poolActor.swap({
     amountIn: depositResult.ok.toString(),
@@ -538,13 +548,14 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   // caller) runs the retried sweep for every failure, and sweeping twice made
   // the second pass find nothing and report the funds as still stranded.
   if ('err' in swapResult) {
+    track.swapRefused = true
     throw new Error(`Swap failed: ${safeStringify(swapResult.err)}`)
   }
   const amountOut = swapResult.ok as bigint
   track.swappedOut = amountOut
 
   // 5. Withdraw received tokens
-  params.onStep?.('Withdrawing tokens...')
+  params.onStep?.('Withdrawing…')
   track.step = 'withdraw'
   const outTokenActor = Actor.createActor(icrcIDL, { agent: authedAgent, canisterId: params.buyTokenPrincipal })
   const outFeeResult = (await outTokenActor.icrc1_fee()) as any
@@ -576,6 +587,8 @@ export interface SweepParams {
 export interface SweepReport {
   found: Array<{ token: string; amount: bigint }>
   moved: Array<{ token: string; amount: bigint }>
+  /** Passes that read every balance and found nothing (a pass that threw does not count). */
+  emptyLooks?: number
 }
 export interface SweepOptions {
   report?: SweepReport
@@ -624,6 +637,7 @@ export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promi
 
   let foundAny = false
   let allAttemptedOk = true
+  let readsOk = true
 
   // 1. Deposit any tokens stuck in the user's pool subaccount FIRST, so the
   //    withdraw pass below can pay them out in the same sweep.
@@ -647,6 +661,7 @@ export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promi
       }
     } catch (e) {
       allAttemptedOk = false
+      readsOk = false
       console.error('[icpswap.sweep] subaccount deposit failed for', tokenPrincipal, e)
     }
   }
@@ -679,6 +694,7 @@ export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promi
     }
   }
 
+  if (report && !foundAny && readsOk) report.emptyLooks = (report.emptyLooks ?? 0) + 1
   return foundAny && allAttemptedOk
 }
 

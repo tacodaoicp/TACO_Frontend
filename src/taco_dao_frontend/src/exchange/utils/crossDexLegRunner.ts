@@ -192,6 +192,10 @@ export interface LegCtx {
   /** Second in line TACO leg: waits for its owners' TACO legs, then an exact recheck. */
   turn?: LegTurn
   turnWaitText?: string
+  /** Sell many: shared by the run's legs, set at the first refusal by the exchange's call limit.
+   *  For that window the run's later TACO calls wait for the one deferred refund instead (the
+   *  first refusal of a day only warns, the second bans the wallet for a day). */
+  exchangeRefused?: { at: number | null }
   log?: (...a: unknown[]) => void
 }
 
@@ -256,11 +260,15 @@ export interface IcpTrack {
   hadMarker?: boolean
   markerWritten?: boolean
   swappedOut?: bigint
+  /** The pool answered the swap with an error: nothing sold. */
+  swapRefused?: boolean
 }
 
 export interface SweepReport {
   found: Array<{ token: string; amount: bigint }>
   moved: Array<{ token: string; amount: bigint }>
+  /** Passes that read every balance and found nothing (a pass that threw does not count). */
+  emptyLooks?: number
 }
 
 // ── Helpers ──
@@ -343,6 +351,16 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
       return { dex: 'icpswap', success: false, amountOut: 0n, state: 'notSent', reason: journal ? 'journal' : 'gateLate',
         error: NOT_STARTED, notStarted: true }
     }
+    if (track.step == null || track.step === 'approve') {
+      // Failed before the deposit (the pool lookup, the fee read, the approve itself, or the
+      // check before the deposit): no marker was written and no depositFrom sent, so nothing
+      // moved but at most the approve fee, and there is nothing to sweep. An approval that
+      // did land expires on its own.
+      ctx.log?.('[CrossDEX] ICPSwap leg stopped before the deposit:', err?.message || err)
+      ctx.onStep(NOT_STARTED)
+      return { dex: 'icpswap', success: false, amountOut: 0n, state: 'notSent', reason: journalRefused || err?.journal ? 'journal' : undefined,
+        error: errText(err, 'ICPSwap approval failed'), notStarted: true }
+    }
     if (err?.depositRefused) {
       // The pool refused the deposit, so normally nothing moved. One sweep
       // makes sure; when it finds nothing, this route never started.
@@ -375,13 +393,31 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
       if (recovered) deps.icpswap.removePendingSwap(sell, buy)
     } catch { /* marker stays so the Recover page can sweep later */ }
     const error = errText(err, 'ICPSwap swap failed')
+    if (!recovered && track.step === 'withdraw' && track.swappedOut != null && report.found.length === 0 && (report.emptyLooks ?? 0) > 0) {
+      // The withdraw ran but its answer was lost: the swap's output already left the pool for
+      // the wallet (a full look finds nothing there). Sold, for an amount the wallet shows.
+      if (!track.hadMarker) deps.icpswap.removePendingSwap(sell, buy)
+      ctx.onStep('Done')
+      return { dex: 'icpswap', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
+    }
     if (ctx.sortV1Errors && recovered) {
-      // What came back decides: the bought token means the swap had sold (its
-      // withdraw failed), only the sold token means a refund.
+      // What came back decides whether the swap sold: never when the pool answered the swap
+      // with an error or the swap never ran, and never when at least this leg's deposit of the
+      // sold token came back. ICP an earlier failed swap left in the same pool can come back
+      // with it, so it alone proves nothing.
+      const soldBack = report.moved.filter(m => m.token === sell).reduce((a, m) => a + m.amount, 0n)
       const gotOut = report.moved.filter(m => m.token === buy).reduce((a, m) => a + m.amount, 0n)
-      if (gotOut > 0n) {
+      const sold = !track.swapRefused && (track.step === 'swap' || track.step === 'withdraw') && soldBack < leg.amountIn && gotOut > 0n
+      if (sold) {
         ctx.onStep('Done')
-        return { dex: 'icpswap', success: true, amountOut: gotOut, state: 'done', reason: 'afterSwap' }
+        if (track.swappedOut != null) {
+          return { dex: 'icpswap', success: true, amountOut: track.swappedOut < gotOut ? track.swappedOut : gotOut, state: 'done', reason: 'afterSwap' }
+        }
+        // the swap's answer was lost: with an earlier swap's marker on this pair, old ICP may be
+        // mixed in, so the amount is the wallet's to show
+        return track.hadMarker
+          ? { dex: 'icpswap', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
+          : { dex: 'icpswap', success: true, amountOut: gotOut, state: 'done', reason: 'afterSwap' }
       }
     }
     ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
@@ -453,6 +489,17 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
   }
 }
 
+/** The exchange refused one of this run's calls less than a call window ago. */
+export const REFUSED_WINDOW_MS = 95_000
+function refusedRecently(ctx: LegCtx, deps: LegDeps): boolean {
+  const at = ctx.exchangeRefused?.at
+  return at != null && deps.clock.now() - at < REFUSED_WINDOW_MS
+}
+function markRefused(ctx: LegCtx, deps: LegDeps) {
+  if (ctx.exchangeRefused && ctx.exchangeRefused.at == null) ctx.exchangeRefused.at = deps.clock.now()
+}
+const BUSY_NOT_SENT = 'TACO: not sent because TACO was busy for your wallet. This part stayed in your wallet.'
+
 // TACO: gate, turn (second in line), deposit (V1) or nothing (V2, approved before
 // the sale), swap call.
 async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOutIn: bigint): Promise<LegOutcome> {
@@ -505,6 +552,12 @@ async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOutIn: b
     deps.taco.setDepositStatus(block.toString(), 'settled', sell.address)
     ctx.journal.deposit('settled')
   }
+  if (refusedRecently(ctx, deps)) {
+    // another part of this sale was refused by the exchange's call limit moments ago: a deposit
+    // and a swap now would only draw a second refusal
+    ctx.onStep('Not sent, TACO is busy for your wallet')
+    return { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', reason: 'rateLimited', notStarted: true, error: BUSY_NOT_SENT }
+  }
   try {
     // Gross = exactly what the V1 path transfers.
     const grossTotal = ctx.v2Gross ?? requiredDeposit(leg.amountIn, ctx.tradingFeeBps, ctx.fee)
@@ -528,6 +581,15 @@ async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOutIn: b
       ctx.onStep('Failed, no funds moved')
       return { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', reason: 'journal',
         error: 'The recovery note could not be saved, so this part was not sent.', notStarted: true }
+    }
+    if (refusedRecently(ctx, deps)) {
+      // refused elsewhere in the sale while this deposit went out: no swap call in this window
+      if (!ctx.v2 && block != null) {
+        ctx.onStep('Waiting for the exchange call limit to refund it')
+        return deferredOutcome(sell, block, 'TACO takes only a few trades per wallet every 90 seconds. The refund starts after the window.')
+      }
+      ctx.onStep('Not sent, TACO is busy for your wallet')
+      return { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', reason: 'rateLimited', notStarted: true, error: BUSY_NOT_SENT }
     }
     ctx.onStep('Swapping…')
     const tacoLegs = leg.tacoLegs ?? []
@@ -584,6 +646,7 @@ async function runTaco(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOutIn: b
         || ('InvalidInput' in e && !String(e.InvalidInput).includes('already claimed by a concurrent'))
         || ('InsufficientFunds' in e && String(e.InsufficientFunds).startsWith('V2 pull declined'))
       if (prePull) {
+        if ('NotAuthorized' in e) markRefused(ctx, deps)
         ctx.onStep('Failed, no funds moved')
         return { dex: 'taco', success: false, amountOut: 0n, state: 'notSent', reason: 'NotAuthorized' in e ? 'rateLimited' : undefined,
           error: classified.message, recovered: false, notStarted: true }
@@ -659,6 +722,11 @@ async function recoverOnce(
   pointer: (s: 'used' | 'recovered') => void,
 ): Promise<LegOutcome> {
   const sell = ctx.sell
+  if (ctx.sortV1Errors && block != null && refusedRecently(ctx, deps)) {
+    // a refusal elsewhere in this sale: one batch refund after the window, not a call now
+    ctx.onStep('Waiting for the exchange call limit to refund it')
+    return deferredOutcome(sell, block, 'TACO takes only a few trades per wallet every 90 seconds. The refund starts after the window.')
+  }
   ctx.onStep('Recovering funds…')
   let recovered = false
   if (block != null) {
@@ -696,6 +764,7 @@ async function sortedV1Answer(
   if ('NotAuthorized' in e) {
     // Refused before the block was read (the exchange's call limit): the deposit
     // is untouched and is refunded in one batch after the window.
+    markRefused(ctx, deps)
     ctx.onStep('Waiting for the exchange call limit to refund it')
     return deferredOutcome(ctx.sell, block, 'TACO takes only a few trades per wallet every 90 seconds. The refund starts after the window.')
   }
@@ -711,7 +780,17 @@ async function sortedV1Answer(
     ctx.onStep('Refunded by TACO')
     return { dex: 'taco', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'exchange', reason: 'slippage', error: message, recovered: true, block }
   }
-  if ('RouteFailed' in e) return refundedByExchange('route')
+  if ('RouteFailed' in e) {
+    // Past the first hop the exchange sends what it had swapped so far (the hop's input token),
+    // not the sold token; on a single route that token is known.
+    const hop = Number(e.RouteFailed?.hop ?? 0)
+    if (hop > 0) {
+      const routes = leg.tacoLegs ?? []
+      const mid = routes.length === 1 ? routes[0].route?.[hop]?.tokenIn : undefined
+      return refundedByExchange(mid ? `routeHop:${mid}` : 'routeHop')
+    }
+    return refundedByExchange('route')
+  }
   if (sys != null) {
     if (/reverted/i.test(sys) && /refunded/i.test(sys)) return refundedByExchange('reverted')
     if (/already refunded/i.test(sys)) return refundedByExchange('admin refunded')
