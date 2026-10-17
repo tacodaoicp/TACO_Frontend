@@ -882,6 +882,9 @@ LOCAL METHODS
         refitChart()
     }
 
+    // the arrays the chart was last built with (JSON), to spot refreshes that bring the same numbers
+    let lastAppliedChart = ''
+
     // handle apply allocation data to chart
     const handleApplyDataToChart = async (seriesParams: number[], seriesNamesParams: string[], colorsParams: string[]) => {
 
@@ -891,6 +894,7 @@ LOCAL METHODS
         series.value = seriesParams
         seriesNames.value = seriesNamesParams
         colors.value = colorsParams
+        lastAppliedChart = JSON.stringify([seriesParams, seriesNamesParams, colorsParams])
 
         // Force chart update by updating options
         chartOptions.value = {
@@ -978,6 +982,91 @@ LOCAL METHODS
             currentTokenIcpCoinsLink.value = selectedToken.icpCoinsLink
         }
 
+    }
+
+    // percentages (share of the ICP value, 2 decimals), symbols and colors of the holdings
+    const computeHoldingsChart = (holdings: typeof fetchedTokenDetails.value) => {
+
+        // calculate total value across all tokens
+        // use bigint scaling to normalize by token decimals without precision loss
+        const ICP_SCALE = 100000000n
+        const toScaledValueIcp = (t: any) => {
+            const balance = BigInt(t.balance)
+            const decimals = BigInt(t.tokenDecimals ?? 8n)
+            const denom = 10n ** decimals
+            const priceScaled = BigInt(Math.round(Number(t.priceInICP) * Number(ICP_SCALE)))
+            return (balance * priceScaled) / denom
+        }
+        const totalValueScaled = holdings.reduce((sum: bigint, entry) => {
+            return sum + toScaledValueIcp(entry[1])
+        }, 0n)
+
+        // create percentages array
+        const percentages = holdings.map((entry) => {
+            if (totalValueScaled === 0n) return 0
+            const tokenScaled = toScaledValueIcp(entry[1])
+            const percentage = (Number(tokenScaled) / Number(totalValueScaled)) * 100
+            return Number(percentage.toFixed(2))
+        })
+
+        // create symbols array
+        const symbols = holdings.map((entry) => entry[1].tokenSymbol.toLowerCase())
+
+        // create colors array
+        const colors = symbols.map(symbol => {
+            const token = tokenData.find(token => token.symbol?.toLowerCase() === symbol)
+            return token?.color || '#ff0000'
+        })
+
+        return { totalValueScaled, percentages, symbols, colors }
+    }
+
+    // A refresh that brings the numbers the chart already shows keeps the chart as it is,
+    // instead of the remount in the data watcher below. The info card is refreshed as after
+    // a remount (first slice), or for the slice the user tapped, which then stays selected.
+    // Everything else remounts as before: changed numbers, a hovered slice or open tooltip,
+    // and a chart drawn at a width its box no longer has (with a tapped slice it is refitted
+    // in place instead, so the slice stays selected).
+    const keepChartForSameHoldings = (holdings: typeof fetchedTokenDetails.value) => {
+        try {
+            if (!chartHasBeenPopulated.value || !chartHasData.value) return false
+            const { percentages, symbols, colors } = computeHoldingsChart(holdings)
+            if (JSON.stringify([percentages, symbols, colors]) !== lastAppliedChart) return false
+            const el = chartRef.value?.$el as HTMLElement | undefined
+            const svg = el?.querySelector?.('svg.apexcharts-svg')
+            if (!el || !svg) return false
+
+            // apexcharts draws the svg at its element's inner width
+            const style = getComputedStyle(el)
+            const innerWidth = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+            const sized = Math.abs(Number(svg.getAttribute('width')) - innerWidth) <= 1
+
+            // a tapped slice stays selected, its card is refreshed
+            const slices = Array.from(el.querySelectorAll('.apexcharts-pie-area'))
+            const selected = slices.find(slice => slice.getAttribute('selected') === 'true')
+            if (selected) {
+                const index = Number(selected.getAttribute('j'))
+                if (!Number.isInteger(index) || index < 0 || index >= seriesNames.value.length) return false
+                handleChartSegmentClick(null, null, { dataPointIndex: index })
+                if (!sized) refitChart() // redraws in place, apexcharts keeps the selection
+                componentLoading.value = false
+                return true
+            }
+
+            const untouched = !slices.some(slice => slice.getAttribute('data:pieClicked') === 'true' || slice.hasAttribute('filter'))
+                && !el.querySelector('.apexcharts-tooltip.apexcharts-active')
+            if (!untouched || !sized) return false
+
+            // what the holdings watcher does after applying the data
+            const firstNonZeroIndex = percentages.findIndex(percentage => percentage > 0)
+            handleChartSegmentClick(null, null, {
+                dataPointIndex: firstNonZeroIndex >= 0 ? firstNonZeroIndex : 0
+            })
+            componentLoading.value = false
+            return true
+        } catch {
+            return false
+        }
     }
 
     /////////////
@@ -1239,43 +1328,8 @@ LOCAL METHODS
                 // safely extract holdings data
                 const holdings = fetchedTokenDetails.value || []
 
-                // calculate total value across all tokens
-                // use bigint scaling to normalize by token decimals without precision loss
-                const ICP_SCALE = 100000000n
-                const toScaledValueIcp = (t: any) => {
-                    const balance = BigInt(t.balance)
-                    const decimals = BigInt(t.tokenDecimals ?? 8n)
-                    const denom = 10n ** decimals
-                    const priceScaled = BigInt(Math.round(Number(t.priceInICP) * Number(ICP_SCALE)))
-                    return (balance * priceScaled) / denom
-                }
-                const totalValueScaled = holdings.reduce((sum: bigint, entry) => {
-                    return sum + toScaledValueIcp(entry[1])
-                }, 0n)
-                const totalValue = Number(totalValueScaled) / Number(ICP_SCALE)
-
-                // create percentages array
-                const percentages = holdings.map((entry) => {
-                    if (totalValueScaled === 0n) return 0
-                    const tokenScaled = toScaledValueIcp(entry[1])
-                    const percentage = (Number(tokenScaled) / Number(totalValueScaled)) * 100
-                    return Number(percentage.toFixed(2))
-                })
-
-                // create symbols array
-                const symbols = holdings.map((entry) => entry[1].tokenSymbol.toLowerCase())
-
-                // log
-                // console.log('symbols:', symbols)
-
-                // create colors array
-                const colors = symbols.map(symbol => {
-                    const token = tokenData.find(token => token.symbol?.toLowerCase() === symbol)
-                    return token?.color || '#ff0000'
-                })
-
-                // log
-                // console.log('colors:', colors)
+                // percentages, symbols and colors for the chart
+                const { totalValueScaled, percentages, symbols, colors } = computeHoldingsChart(holdings)
 
                 // if there are no holdings of value, show no holdings message
                 if (totalValueScaled === 0n) {
@@ -1335,6 +1389,8 @@ LOCAL METHODS
 
     watch(fetchedTokenDetails, (newData) => {
         if (newData && newData.length > 0 && showCurrentHoldings.value) {
+            // same numbers as the chart shows: no rebuild
+            if (keepChartForSameHoldings(newData)) return
             // Re-trigger the holdings watcher by toggling
             showCurrentHoldings.value = false
             nextTick(() => {
