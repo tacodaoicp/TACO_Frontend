@@ -344,8 +344,9 @@ export interface NeutriniteSwapParams {
   /** Called once the deposit is credited; false refuses the swap. */
   onCredited?: () => boolean
   /** Filled in for the caller's recovery: pylon balances before our deposit, the swap output,
-   *  and whether an earlier swap on this pair had already left a marker. */
-  track?: { before?: { sell: bigint; buy: bigint }; swappedOut?: bigint; hadMarker?: boolean }
+   *  whether an earlier swap on this pair had already left a marker, and whether dex_swap was sent
+   *  (it may have run even when its answer is lost). */
+  track?: { before?: { sell: bigint; buy: bigint }; swappedOut?: bigint; hadMarker?: boolean; swapSent?: boolean }
   /** A run's own agent and principal; default: the cached session. */
   agent?: HttpAgent
   owner?: Principal
@@ -435,6 +436,8 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   // doesn't trip min_amount_out.
   params.onStep?.('Swapping…')
   const swapMinOut = params.amountIn > 0n ? (params.minAmountOut * creditedDelta) / params.amountIn : params.minAmountOut
+  // from here the swap may run even when its answer is lost (the caller's recovery reads ICP back as sold)
+  if (params.track) params.track.swapSent = true
   const sw = (await pylon.dex_swap({
     account: userAccount,
     amount: creditedDelta,

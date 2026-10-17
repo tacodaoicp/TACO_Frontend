@@ -230,7 +230,7 @@ export interface LegDeps {
       sell: string; buy: string; amountIn: bigint; minAmountOut: bigint
       onStep?: (s: string) => void; canDeposit?: () => boolean; beforeTransfer?: () => boolean; requireMarker?: boolean
       onCredited?: () => boolean
-      track?: { before?: { sell: bigint; buy: bigint }; swappedOut?: bigint; hadMarker?: boolean }
+      track?: NeuTrack
     }): Promise<{ amountOut: bigint }>
     sweep(sell: string, buy: string, before?: { sell: bigint; buy: bigint }, opts?: { report?: SweepReport }): Promise<boolean>
     removePendingSwap(sell: string, buy: string): void
@@ -262,6 +262,15 @@ export interface IcpTrack {
   swappedOut?: bigint
   /** The pool answered the swap with an error: nothing sold. */
   swapRefused?: boolean
+}
+
+export interface NeuTrack {
+  /** The pylon balances of the pair as the swap started: the baseline of every recovery look. */
+  before?: { sell: bigint; buy: bigint }
+  swappedOut?: bigint
+  hadMarker?: boolean
+  /** dex_swap was sent: from here the swap may have run even when its answer is lost. */
+  swapSent?: boolean
 }
 
 export interface SweepReport {
@@ -444,7 +453,7 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
 async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: bigint): Promise<LegOutcome> {
   const sell = ctx.sell.address, buy = ctx.buy.address
   const gate = ctx.gate
-  const track: { before?: { sell: bigint; buy: bigint }; swappedOut?: bigint; hadMarker?: boolean } = {}
+  const track: NeuTrack = {}
   let journalRefused = false
   try {
     const r = await deps.neutrinite.executeSwap({
@@ -506,18 +515,37 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
       ctx.onStep('Done')
       return { dex: 'neutrinite', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
     }
-    if (recovered && !track.hadMarker) deps.neutrinite.removePendingSwap(sell, buy)
     const gotOut = report.moved.filter(m => m.token === buy).reduce((a, m) => a + m.amount, 0n)
-    if (recovered && (track.swappedOut != null || (ctx.sortV1Errors && gotOut > 0n))) {
-      // The swap filled and the retry delivered its output.
+    const soldBack = report.moved.filter(m => m.token === sell).reduce((a, m) => a + m.amount, 0n)
+    // What a look moved is this part's only when it could have come from it: ICP once its swap may
+    // have run, the sold token when its deposit came back. ICP another swap of the wallet left above
+    // the start balances can come back too, and alone proves nothing (no sale, no refund).
+    const swapMayHaveRun = track.swappedOut != null || !!track.swapSent
+    const depositBack = soldBack * 2n >= leg.amountIn
+    const own = recovered && (track.swappedOut != null || depositBack || (swapMayHaveRun && gotOut > 0n))
+    // From a start balance above dust, a look that brought back less ICP than the swap gave did not get
+    // all of it: another swap moving that balance meanwhile left the rest inside the baseline, still on
+    // the pylon. The part keeps its marker for the Recover page, and the total leaves it out.
+    const partOnly = own && !startClean && track.swappedOut != null && gotOut < track.swappedOut
+    // with the swap's answer lost there is no amount to check the ICP against: from a start balance
+    // above dust the marker stays, so the Recover page can still find any rest
+    const unchecked = !startClean && track.swappedOut == null && swapMayHaveRun && !depositBack
+    if (own && !partOnly && !unchecked && !track.hadMarker) deps.neutrinite.removePendingSwap(sell, buy)
+    if (own && !partOnly && (track.swappedOut != null || (ctx.sortV1Errors && swapMayHaveRun && !depositBack && gotOut > 0n))) {
+      // The swap filled and the retry delivered its output (never counted above what the swap gave).
       ctx.onStep('Done')
-      return { dex: 'neutrinite', success: true, amountOut: ctx.sortV1Errors && gotOut > 0n ? gotOut : track.swappedOut!, state: 'done', reason: 'afterSwap' }
+      const amountOut = !(ctx.sortV1Errors && gotOut > 0n) ? track.swappedOut!
+        : track.swappedOut != null && track.swappedOut < gotOut ? track.swappedOut : gotOut
+      return { dex: 'neutrinite', success: true, amountOut, state: 'done', reason: 'afterSwap' }
     }
-    ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
-    return recovered
-      ? { dex: 'neutrinite', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true }
-      : { dex: 'neutrinite', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
-          failedAfterSwap: track.swappedOut != null, reason: isSessionError(lastErr) ? 'session' : undefined }
+    if (own && !partOnly) {
+      ctx.onStep('Failed, funds recovered')
+      return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true }
+    }
+    // Not recovered, only part of the ICP, or nothing that is this part's: the marker stays.
+    ctx.onStep('Failed, recover on the Recover page')
+    return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
+      failedAfterSwap: track.swappedOut != null, reason: isSessionError(lastErr) ? 'session' : undefined }
   }
 }
 
