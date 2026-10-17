@@ -2065,6 +2065,10 @@ export const useTacoStore = defineStore('taco', () => {
                         principalNames: Record<string, { name: string; verified: boolean }>
                         neuronNames: Record<string, { name: string; verified: boolean }>
                     }
+                    // A copy without a single name is not a real list (a worker that sends the
+                    // names as Maps delivers them as empty objects): keep the names shown
+                    if (Object.keys(namesData.principalNames ?? {}).length === 0 &&
+                        Object.keys(namesData.neuronNames ?? {}).length === 0) return
                     // Convert from serialized object back to Maps
                     namesCache.value.principals = new Map(Object.entries(namesData.principalNames))
                     namesCache.value.neurons = new Map(Object.entries(namesData.neuronNames))
@@ -6173,6 +6177,9 @@ export const useTacoStore = defineStore('taco', () => {
                 // Update cache immediately
                 const userPrincipalStr = userPrincipal.value;
                 namesCache.value.principals.set(userPrincipalStr, { name, verified: false });
+
+                // Reload the names the data worker holds, so other pages and tabs show the new name
+                workerBridge.fetch('allNames', true)
                 
                 return result.ok;
             } else {
@@ -6205,6 +6212,9 @@ export const useTacoStore = defineStore('taco', () => {
                 // Update cache immediately
                 const mapKey = createNeuronKey(snsRoot, neuronId);
                 namesCache.value.neurons.set(mapKey, { name, verified: false });
+
+                // Reload the names the data worker holds, so other pages and tabs show the new name
+                workerBridge.fetch('allNames', true)
                 
                 return result.ok;
             } else {
