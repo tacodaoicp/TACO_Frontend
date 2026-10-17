@@ -12,8 +12,9 @@ import { getFrontendIdentity } from '../utils/frontend-identity'
 import { DelegationChain, DelegationIdentity, Ed25519KeyIdentity } from '@dfinity/identity'
 import { createAgent } from '@dfinity/utils'
 import { PriorityQueue } from './shared/priority-queue'
+import { coalesced } from './shared/coalesce'
 import { BackoffTracker } from './shared/backoff'
-import { setCached, getCachedMany, setCacheNetwork, type CachedEntry } from './shared/indexed-db'
+import { setCached, getCachedMany, setCacheNetwork, markRefreshed, type CachedEntry } from './shared/indexed-db'
 import { getHost, shouldFetchRootKey, setWorkerNetworkOverride } from './shared/canister-ids'
 import {
   // Public data fetch functions
@@ -72,6 +73,7 @@ import {
   fetchNachosVaultAnalytics,
   // Utilities
   serializeForTransfer,
+  samePayload,
   clearActorCache,
 } from './shared/fetch-functions'
 import type {
@@ -89,6 +91,7 @@ import {
   generateMessageId,
   createInitialState,
   getInitialLoadKeys,
+  CHANGE_ONLY_KEYS,
 } from './types'
 
 declare const self: DedicatedWorkerGlobalScope
@@ -190,7 +193,8 @@ const PUBLIC_KEYS: DataKey[] = [
   'nachosVaultAnalytics',
 ]
 
-// The two treasury payloads (~650 KB each, 2000 trades) are restored from
+// The trade history (~650 KB, 2000 trades) and timerStatus (copies saved
+// before it stopped embedding that history are as big) are restored from
 // IndexedDB in a second pass, so small route data never waits behind them.
 const HEAVY_CACHE_KEYS: DataKey[] = ['timerStatus', 'tradingStatus']
 
@@ -237,6 +241,8 @@ let debugEnabled = false // Debug mode - disabled by default in production
 let currentRoute = '/' // Current route for admin data gating
 let currentPrincipal: string | null = null // Text of currentIdentity's principal
 let creatingAnonymousAgent = false
+// Delegation and session key the authenticated agent was built from
+let identityJson: string | null = null
 
 // Principal each in-memory USER_KEYS entry belongs to. User data is only ever
 // served to that same principal (see setIdentity / clearIdentity).
@@ -299,16 +305,17 @@ function forgetDelivered(keys: DataKey[]): void {
   for (const key of keys) delivered.delete(key)
 }
 
-function sendResponse(response: WorkerResponse): void {
+function sendResponse(response: WorkerResponse, always = false): void {
   // Subscribe, INITIAL_LOAD, route changes and resume kicks all replay the
   // cache, which delivered every key three times per load (each one a
   // structured clone plus a decode on the page). Remember what the page holds
-  // and skip a CACHE_HIT that would resend it.
+  // and skip a CACHE_HIT that would resend it, unless it answers a view's own
+  // request (`always`).
   const { dataKey, state } = response.payload
   const at = state?.lastUpdated
   if (dataKey && at && state?.data != null &&
       (response.type === 'CACHE_HIT' || response.type === 'DATA_UPDATE')) {
-    if (response.type === 'CACHE_HIT' && delivered.get(dataKey) === at) return
+    if (response.type === 'CACHE_HIT' && !always && delivered.get(dataKey) === at) return
     delivered.set(dataKey, at)
   }
   self.postMessage(response)
@@ -351,23 +358,31 @@ function deserializeIdentity(serialized: SerializedIdentity): DelegationIdentity
 
 async function setIdentity(serialized: SerializedIdentity): Promise<void> {
   try {
-    // Clear actor cache for old agent before creating new one
-    if (authenticatedAgent) {
-      clearActorCache(authenticatedAgent)
+    // The page sends its identity on every login check. For the same
+    // delegation and session key the verified agent stays: a new one loses its
+    // subnet key cache and verifies again.
+    const json = `${serialized.delegationChainJson}\n${serialized.sessionKeyJson}`
+    if (json !== identityJson || !authenticatedAgent || !currentIdentity) {
+      // Clear actor cache for old agent before creating new one
+      if (authenticatedAgent) {
+        clearActorCache(authenticatedAgent)
+      }
+
+      currentIdentity = deserializeIdentity(serialized)
+      currentPrincipal = currentIdentity.getPrincipal().toText()
+      isAuthenticated = true
+
+      authenticatedAgent = await createAgent({
+        identity: currentIdentity,
+        host: getHost(),
+        fetchRootKey: shouldFetchRootKey(),
+      })
+      identityJson = json
+      wakeQueue()
+
+      if (debugEnabled) console.log('[AuthWorker-Dedicated] Identity set, agent created')
     }
-
-    currentIdentity = deserializeIdentity(serialized)
-    const principal = currentIdentity.getPrincipal().toText()
-    currentPrincipal = principal
-    isAuthenticated = true
-
-    authenticatedAgent = await createAgent({
-      identity: currentIdentity,
-      host: getHost(),
-      fetchRootKey: shouldFetchRootKey(),
-    })
-
-    if (debugEnabled) console.log('[AuthWorker-Dedicated] Identity set, agent created')
+    const principal = currentPrincipal!
 
     // Deliver cached user data, but only this principal's: data held in memory
     // for another principal is dropped, and the IndexedDB copy is used only
@@ -409,6 +424,7 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
     currentIdentity = null
     currentPrincipal = null
     authenticatedAgent = null
+    identityJson = null
   }
 }
 
@@ -452,6 +468,7 @@ function clearIdentity(): void {
   currentIdentity = null
   currentPrincipal = null
   authenticatedAgent = null
+  identityJson = null
   isAuthenticated = false
   isAdmin = false
 
@@ -551,11 +568,10 @@ function openHeavyFetches(): void {
   if (heavyCacheRead) return
   heavyCacheRead = true
   // A fetch queued while the copy loaded is only needed if it is missing or
-  // stale (or, for timerStatus, if it was stored without its trading status)
+  // stale, or was forced
   for (const key of HEAVY_CACHE_KEYS) {
     const state = dataStates.get(key)
-    const partial = key === 'timerStatus' && (state?.data as any)?.tradingStatus == null
-    if (state?.data && !partial && !isStale(key, state.lastUpdated) && !queue.isProcessing(key)) {
+    if (state?.data && !isStale(key, state.lastUpdated) && !queue.isProcessing(key) && !queue.isForced(key)) {
       queue.remove(key)
     }
   }
@@ -640,6 +656,7 @@ function handleMessage(message: WorkerRequest): void {
       // resume kick when the tab becomes visible again, and this body is
       // idempotent (cache replay + stale-only enqueue with backoff reset).
       currentRoute = newRoute
+      if (typeof message.payload.visible === 'boolean') isBackgroundTab = !message.payload.visible
       {
         // Proactively serve cache + prioritize fetches for the route
         const routeKeys = getInitialLoadKeys(newRoute)
@@ -708,6 +725,8 @@ function handleMessage(message: WorkerRequest): void {
       // SharedWorker (Android Chrome, WebViews).
       const route = message.payload.route || '/'
       currentRoute = route
+      // The page can start hidden (opened in the background)
+      if (typeof message.payload.visible === 'boolean') isBackgroundTab = !message.payload.visible
       // Only the backoff is reset: fetches already in flight stay marked as
       // processing, otherwise the queue starts the same keys a second time.
       backoff.resetAll()
@@ -826,6 +845,10 @@ function handleFetch(message: WorkerRequest): void {
   if (!dataKey || !HANDLED_KEYS.includes(dataKey)) {
     return
   }
+  // A view asking for a key waits for this reply (admin pages clear their
+  // spinners on it), so it is sent even when the page holds the data. Only the
+  // bridge's own route prefetch (quiet) skips what the page already has.
+  const replyAlways = !message.payload.quiet
 
   const requiresAuth = USER_KEYS.includes(dataKey) || AUTH_REQUIRED_KEYS.includes(dataKey)
   if (requiresAuth && !isAuthenticated) {
@@ -841,7 +864,7 @@ function handleFetch(message: WorkerRequest): void {
           state: { ...currentState, stale: true },
           fromCache: true,
         },
-      })
+      }, replyAlways)
     }
     return
   }
@@ -859,7 +882,7 @@ function handleFetch(message: WorkerRequest): void {
         state: currentState,
         fromCache: true,
       },
-    })
+    }, replyAlways)
   }
 
   if (force || !currentState?.data || isStale(dataKey, currentState.lastUpdated)) {
@@ -994,6 +1017,7 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
       // frees wedged connections so retries open fresh ones.
       fetch: abortingFetch,
     })
+    wakeQueue()
   } catch (error) {
     console.error(`[AuthWorker-Dedicated] FAILED to create anonymous agent for host ${getHost()} — no data can load:`, error)
     throw error
@@ -1043,6 +1067,34 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
 const MAX_CONCURRENT_FETCHES = 8
 let activeFetchCount = 0
 
+// The queue loop polls (the sleeps below), and is also woken when there is
+// something to do: a key queued, a fetch settled (a slot is free), an agent
+// ready. A key queued while it slept used to wait up to 500 ms to start.
+let wakeQueueLoop: (() => void) | null = null
+function wakeQueue(): void {
+  wakeQueueLoop?.()
+}
+function queueSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer)
+      wakeQueueLoop = null
+      resolve()
+    }
+    const timer = setTimeout(done, ms)
+    wakeQueueLoop = done
+  })
+}
+queue.onEnqueue = wakeQueue
+
+// Data that landed after this item was queued (a composite filled it in as a
+// sibling of another key, or another fetch finished) needs no second fetch
+function landedSince(item: { dataKey: DataKey; addedAt: number }): boolean {
+  const state = dataStates.get(item.dataKey)
+  return state?.data != null && !state.stale && (state.lastUpdated ?? 0) > item.addedAt &&
+    !isStale(item.dataKey, state.lastUpdated)
+}
+
 async function processQueue(): Promise<void> {
   if (isProcessing) return
   isProcessing = true
@@ -1051,7 +1103,7 @@ async function processQueue(): Promise<void> {
     // If no agent yet (agents are created on SET_NETWORK), wait rather than spin
     // the inner loop. Prevents CPU busy-wait before the network is configured.
     if (!anonymousAgent && !authenticatedAgent) {
-      await sleep(100)
+      await queueSleep(100)
       continue
     }
 
@@ -1068,6 +1120,12 @@ async function processQueue(): Promise<void> {
 
       const requiresAuth = USER_KEYS.includes(item.dataKey) || AUTH_REQUIRED_KEYS.includes(item.dataKey)
       if (requiresAuth && (!isAuthenticated || !authenticatedAgent)) {
+        queue.complete(item.dataKey)
+        continue
+      }
+
+      // A forced fetch always runs (a refresh after a mint must see the mint)
+      if (!item.force && landedSince(item)) {
         queue.complete(item.dataKey)
         continue
       }
@@ -1095,6 +1153,7 @@ async function processQueue(): Promise<void> {
         // Clamp: a RESET/INITIAL_LOAD zeroes the counter while fetches are in
         // flight; going negative would over-admit fetches.
         activeFetchCount = Math.max(0, activeFetchCount - 1)
+        wakeQueue()
       })
     }
 
@@ -1107,7 +1166,7 @@ async function processQueue(): Promise<void> {
     // only backoff-blocked keys remain; 50ms when actively processing.
     const isIdle = activeFetchCount === 0 && queue.isEmpty()
     const onlyBlocked = activeFetchCount === 0 && blockedThisPass.length > 0
-    await sleep(isIdle ? 500 : onlyBlocked ? 250 : 50)
+    await queueSleep(isIdle ? 500 : onlyBlocked ? 250 : 50)
   }
 }
 
@@ -1213,77 +1272,28 @@ const KEEP_TRYING: DataKey[] = [
 // ============================================================================
 // Composite Query Coalescing (from merged public worker)
 // ============================================================================
-let lastVoteDashboardResult: { data: any; timestamp: number } | null = null
-let lastLeaderboardResult: { data: any; timestamp: number } | null = null
-let lastEnhancedTreasuryResult: { data: any; timestamp: number } | null = null
 const COALESCE_MS = 5_000
 const TREASURY_COALESCE_MS = 5_000
 
-async function getVoteDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
-  if (lastVoteDashboardResult && (Date.now() - lastVoteDashboardResult.timestamp) < COALESCE_MS) {
-    return lastVoteDashboardResult.data
-  }
-  try {
-    const data = await fetchVoteDashboardData(agentRef)
-    lastVoteDashboardResult = { data, timestamp: Date.now() }
-    return data
-  } catch (err) {
-    console.warn('[AuthWorker-Dedicated] getVoteDashboard composite failed, falling back to individual calls:', err)
-    lastVoteDashboardResult = { data: null, timestamp: Date.now() }
-    return null
-  }
-}
+const getVoteDashboardCoalesced = coalesced('[AuthWorker-Dedicated] getVoteDashboard', (agent) => fetchVoteDashboardData(agent), COALESCE_MS)
+const getAllLeaderboardsCoalesced = coalesced('[AuthWorker-Dedicated] getAllLeaderboards', (agent) => fetchAllLeaderboardsData(agent), COALESCE_MS)
+const getEnhancedTreasuryDashboardCoalesced = coalesced('[AuthWorker-Dedicated] getEnhancedTreasuryDashboard', (agent) => fetchEnhancedTreasuryDashboardData(agent), TREASURY_COALESCE_MS)
 
-async function getAllLeaderboardsCoalesced(agentRef: HttpAgent): Promise<any | null> {
-  if (lastLeaderboardResult && (Date.now() - lastLeaderboardResult.timestamp) < COALESCE_MS) {
-    return lastLeaderboardResult.data
-  }
-  try {
-    const data = await fetchAllLeaderboardsData(agentRef)
-    lastLeaderboardResult = { data, timestamp: Date.now() }
-    return data
-  } catch (err) {
-    console.warn('[AuthWorker-Dedicated] getAllLeaderboards composite failed, falling back to individual calls:', err)
-    lastLeaderboardResult = { data: null, timestamp: Date.now() }
-    return null
-  }
-}
-
-// ============================================================================
-// Enhanced Treasury Dashboard Coalescing
-// ============================================================================
-
-async function getEnhancedTreasuryDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
-  if (lastEnhancedTreasuryResult && (Date.now() - lastEnhancedTreasuryResult.timestamp) < TREASURY_COALESCE_MS) {
-    return lastEnhancedTreasuryResult.data
-  }
-  try {
-    const data = await fetchEnhancedTreasuryDashboardData(agentRef)
-    lastEnhancedTreasuryResult = { data, timestamp: Date.now() }
-    return data
-  } catch (err) {
-    console.warn('[AuthWorker-Dedicated] getEnhancedTreasuryDashboard composite failed, falling back to individual calls:', err)
-    lastEnhancedTreasuryResult = { data: null, timestamp: Date.now() }
-    return null
-  }
+// A composite just filled in `key` as a sibling: a fetch of it still waiting
+// in the queue would only ask for the same data again
+function dropQueuedSibling(key: DataKey): void {
+  if (queue.has(key) && !queue.isProcessing(key) && !queue.isForced(key)) queue.remove(key)
 }
 
 async function populateEnhancedTreasurySiblings(dashboard: any, excludeKey: DataKey): Promise<void> {
-  const now = Date.now()
-  const freshState: Partial<DataState> = { lastUpdated: now, loading: false, error: null, stale: false }
-
   if (excludeKey !== 'rebalanceConfig') {
-    const rc = serializeForTransfer(dashboard.systemParameters)
-    updateState('rebalanceConfig', { data: rc, ...freshState })
-    broadcastUpdate('rebalanceConfig', rc)
-    await setCached('rebalanceConfig', rc)
+    await commitData('rebalanceConfig', serializeForTransfer(dashboard.systemParameters))
+    dropQueuedSibling('rebalanceConfig')
   }
 
   if (excludeKey !== 'tradingPauses') {
-    const tp = serializeForTransfer(dashboard.tradingPauses)
-    updateState('tradingPauses', { data: tp, ...freshState })
-    broadcastUpdate('tradingPauses', tp)
-    await setCached('tradingPauses', tp)
+    await commitData('tradingPauses', serializeForTransfer(dashboard.tradingPauses))
+    dropQueuedSibling('tradingPauses')
   }
 }
 
@@ -1306,14 +1316,6 @@ async function populateAllLeaderboardsSiblings(
   allBoards: any,
   excludeKey: DataKey
 ): Promise<void> {
-  const now = Date.now()
-  const freshState: Partial<DataState> = {
-    lastUpdated: now,
-    loading: false,
-    error: null,
-    stale: false
-  }
-
   const leaderboardKeys: DataKey[] = [
     'leaderboardAllTimeUSD',
     'leaderboardAllTimeICP',
@@ -1329,40 +1331,25 @@ async function populateAllLeaderboardsSiblings(
     if (key === excludeKey) continue // Skip the one we're already handling
 
     const backendKey = mapLeaderboardKey(key)
-    const boardData = serializeForTransfer(allBoards[backendKey])
-
-    updateState(key, { data: boardData, ...freshState })
-    broadcastUpdate(key, boardData)
-    await setCached(key, boardData)
+    await commitData(key, serializeForTransfer(allBoards[backendKey]))
+    dropQueuedSibling(key)
   }
 }
 
 async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey): Promise<void> {
   const now = Date.now()
-  const freshState: Partial<DataState> = { lastUpdated: now, loading: false, error: null, stale: false }
 
   if (excludeKey !== 'tokenDetails') {
-    const td = serializeForTransfer(dashboard.tokenDetails)
-    updateState('tokenDetails', { data: td, ...freshState })
-    broadcastUpdate('tokenDetails', td)
-    await setCached('tokenDetails', td)
+    await commitData('tokenDetails', serializeForTransfer(dashboard.tokenDetails))
+    dropQueuedSibling('tokenDetails')
   }
 
-  // Only on routes that show timerStatus: it embeds the ~650 KB trading status,
-  // and elsewhere every vote dashboard refresh pushed it to the page for
-  // nothing (a route that shows it fetches it on arrival when stale). Not
-  // before the stored trading status is read either: built without it, it
-  // would replace the good stored copy.
-  if (excludeKey !== 'timerStatus' && heavyCacheRead && getInitialLoadKeys(currentRoute).includes('timerStatus')) {
-    const cachedTS = dataStates.get('tradingStatus')?.data
-    const ts = serializeForTransfer({
-      snapshotInfo: dashboard.snapshotInfo,
-      tradingStatus: cachedTS ?? null,
-      tokenDetails: dashboard.tokenDetails,
-    })
-    updateState('timerStatus', { data: ts, ...freshState })
-    broadcastUpdate('timerStatus', ts)
-    await setCached('timerStatus', ts)
+  // Only on routes that show timerStatus (a route that shows it fetches it on
+  // arrival when stale); elsewhere every vote dashboard refresh pushed it to
+  // the page for nothing.
+  if (excludeKey !== 'timerStatus' && getInitialLoadKeys(currentRoute).includes('timerStatus')) {
+    await commitData('timerStatus', serializeForTransfer({ snapshotInfo: dashboard.snapshotInfo }))
+    dropQueuedSibling('timerStatus')
   }
 
   // aggregateAllocation — extract from dashboard and broadcast
@@ -1380,10 +1367,8 @@ async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey
         maxAllocations.push([principal, details.maxAllocationBasisPoints[0]])
       }
     }
-    const ma = serializeForTransfer(maxAllocations)
-    updateState('tokenMaxAllocations' as DataKey, { data: ma, ...freshState })
-    broadcastUpdate('tokenMaxAllocations' as DataKey, ma)
-    await setCached('tokenMaxAllocations' as DataKey, ma)
+    await commitData('tokenMaxAllocations', serializeForTransfer(maxAllocations))
+    dropQueuedSibling('tokenMaxAllocations')
   }
 
   // userAllocation — broadcast if present
@@ -1512,23 +1497,13 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       break
 
     case 'timerStatus': {
+      // Snapshot info only. It used to carry copies of the trading status
+      // (~650 KB) and the token details too, which their own keys deliver.
       const dashboard = await getVoteDashboardCoalesced(anonymousAgent!)
       if (!dashboard) {
-        const snapshotInfo = await fetchSnapshotInfoData(anonymousAgent!)
-        const cachedTS = dataStates.get('tradingStatus')?.data
-        const cachedTD = dataStates.get('tokenDetails')?.data
-        data = serializeForTransfer({
-          snapshotInfo,
-          tradingStatus: cachedTS ?? null,
-          tokenDetails: cachedTD ?? null,
-        })
+        data = serializeForTransfer({ snapshotInfo: await fetchSnapshotInfoData(anonymousAgent!) })
       } else {
-        const cachedTS = dataStates.get('tradingStatus')?.data
-        data = serializeForTransfer({
-          snapshotInfo: dashboard.snapshotInfo,
-          tradingStatus: cachedTS ?? null,
-          tokenDetails: dashboard.tokenDetails,
-        })
+        data = serializeForTransfer({ snapshotInfo: dashboard.snapshotInfo })
         await populateVoteDashboardSiblings(dashboard, 'timerStatus')
       }
       break
@@ -1657,21 +1632,47 @@ async function fetchData(dataKey: DataKey): Promise<void> {
     return
   }
 
-  updateState(dataKey, {
-    data,
-    loading: false,
-    error: null,
-    lastUpdated: Date.now(),
-    stale: false,
-  })
   if (owner) userKeyOwner.set(dataKey, owner)
-
-  broadcastUpdate(dataKey, data)
-  // Cache the RAW data (parity with the shared worker): setCached wraps it in
-  // its own envelope, and the restore rebuilds a DataState around it. Caching
-  // the whole DataState here double-wrapped every restore.
-  await setCached(dataKey, data, owner ?? undefined)
+  await commitData(dataKey, data, owner ?? undefined)
 }
+
+/**
+ * Store a fetch result and send it to the page. A result equal to the data
+ * held already is not written to IndexedDB again (markRefreshed keeps its time
+ * instead) and, for CHANGE_ONLY_KEYS, not sent again when the page holds it,
+ * unless the fetch was forced or the page is on an admin route (the timer
+ * panel there is rebuilt from every refresh). User data is always stored and
+ * sent. The RAW data is cached (parity with the shared worker): setCached
+ * wraps it in its own envelope, and the restore rebuilds a DataState around
+ * it. Caching the whole DataState here double-wrapped every restore.
+ */
+async function commitData(dataKey: DataKey, data: unknown, owner?: string): Promise<void> {
+  const prev = dataStates.get(dataKey)
+  const fresh = { lastUpdated: Date.now(), loading: false, error: null, stale: false }
+  if (!USER_KEYS.includes(dataKey) && prev?.data != null && samePayload(prev.data, data)) {
+    // The stored copy is this payload, unless writing it failed
+    if (!unsaved.has(dataKey)) markRefreshed(dataKey, fresh.lastUpdated)
+    if (CHANGE_ONLY_KEYS.includes(dataKey) && !queue.isForced(dataKey) && !currentRoute.startsWith('/admin') &&
+        prev.lastUpdated && delivered.get(dataKey) === prev.lastUpdated) {
+      // The page holds the previous payload, so it holds this one: only the time moves on
+      updateState(dataKey, fresh)
+      delivered.set(dataKey, fresh.lastUpdated)
+      return
+    }
+    updateState(dataKey, { data, ...fresh })
+    broadcastUpdate(dataKey, data)
+    return
+  }
+
+  updateState(dataKey, { data, ...fresh })
+  broadcastUpdate(dataKey, data)
+  if (await setCached(dataKey, data, owner)) unsaved.delete(dataKey)
+  else unsaved.add(dataKey)
+}
+
+// Keys whose last IndexedDB write failed (quota): their stored copy is older
+// than the data held here
+const unsaved = new Set<DataKey>()
 
 // ============================================================================
 // Auto-refresh Loop

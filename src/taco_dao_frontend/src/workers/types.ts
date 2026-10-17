@@ -235,6 +235,27 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
 // Background tab multiplier (3x slower)
 export const BACKGROUND_MULTIPLIER = 3
 
+// Keys whose subscribers only store what they receive. A refresh that returns
+// the payload a tab already holds is not sent to it again (each send is a
+// structured clone plus a decode in every tab; the trade history is ~650 KB).
+// Tabs on /admin pages still get every refresh: the admin timer panel is
+// rebuilt from each one. Not tacoProposals: each delivery also resets the
+// proposals list a "load more" extended.
+export const CHANGE_ONLY_KEYS: DataKey[] = [
+  'tradingStatus',
+  'timerStatus',
+  'leaderboardAllTimeUSD',
+  'leaderboardAllTimeICP',
+  'leaderboardOneYearUSD',
+  'leaderboardOneYearICP',
+  'leaderboardOneMonthUSD',
+  'leaderboardOneMonthICP',
+  'leaderboardOneWeekUSD',
+  'leaderboardOneWeekICP',
+  'leaderboardInfo',
+  'proposalsThreads',
+]
+
 // Idle timeout - stop refreshes after 5 minutes of inactivity
 export const IDLE_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -305,6 +326,7 @@ export interface WorkerRequest extends BaseMessage {
     route?: string // Current route for INITIAL_LOAD
     userPrincipal?: string // Principal text for getVoteDashboard
     enabled?: boolean // SET_DEBUG
+    quiet?: boolean // FETCH from the bridge's own route prefetch: no reply when the tab holds the data
   }
 }
 

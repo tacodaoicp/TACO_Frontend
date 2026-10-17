@@ -20,8 +20,9 @@ import { Principal } from '@dfinity/principal'
 import { DelegationChain, DelegationIdentity, Ed25519KeyIdentity } from '@dfinity/identity'
 import { createAgent } from '@dfinity/utils'
 import { PriorityQueue } from './shared/priority-queue'
+import { coalesced } from './shared/coalesce'
 import { BackoffTracker } from './shared/backoff'
-import { setCached, getCachedMany, setCacheNetwork, type CachedEntry } from './shared/indexed-db'
+import { setCached, getCachedMany, setCacheNetwork, markRefreshed, type CachedEntry } from './shared/indexed-db'
 import { getHost, shouldFetchRootKey, setWorkerNetworkOverride } from './shared/canister-ids'
 import {
   // Public data fetch functions
@@ -80,6 +81,7 @@ import {
   fetchNachosVaultAnalytics,
   // Utilities
   serializeForTransfer,
+  samePayload,
 } from './shared/fetch-functions'
 import type {
   DataKey,
@@ -98,6 +100,7 @@ import {
   createInitialState,
   ADMIN_PRELOAD_KEYS,
   getInitialLoadKeys,
+  CHANGE_ONLY_KEYS,
 } from './types'
 
 declare const self: SharedWorkerGlobalScope
@@ -205,7 +208,8 @@ const PUBLIC_KEYS: DataKey[] = [
   'nachosVaultAnalytics',
 ]
 
-// The two treasury payloads (~650 KB each, 2000 trades) are restored from
+// The trade history (~650 KB, 2000 trades) and timerStatus (copies saved
+// before it stopped embedding that history are as big) are restored from
 // IndexedDB in a second pass, so small route data never waits behind them.
 const HEAVY_CACHE_KEYS: DataKey[] = ['timerStatus', 'tradingStatus']
 
@@ -244,7 +248,6 @@ const queue = new PriorityQueue()
 const backoff = new BackoffTracker()
 
 let isProcessing = false
-let isBackgroundTab = false
 let isIdle = false
 let lastActivityTime = Date.now()
 let authenticatedAgent: HttpAgent | null = null
@@ -258,6 +261,8 @@ let debugEnabled = false // Debug mode - disabled by default in production
 let currentRoute = '/' // Current route for admin data gating
 let currentPrincipal: string | null = null // Text of currentIdentity's principal
 let creatingAnonymousAgent = false
+// Delegation and session key the authenticated agent was built from
+let identityJson: string | null = null
 
 // Principal each in-memory USER_KEYS entry belongs to. User data is only ever
 // served to that same principal (see setIdentity / clearIdentity).
@@ -273,11 +278,18 @@ const deliveredTo = new WeakMap<MessagePort, Map<DataKey, number>>()
 // Route each tab is on. Background refreshes of data that only some routes
 // show serve every open tab, not only the tab that reported its route last.
 const portRoutes = new Map<MessagePort, string>()
+// Visibility each tab reported, and when it last sent anything (see isBackground)
+const portVisible = new Map<MessagePort, boolean>()
+const portLastSeen = new Map<MessagePort, number>()
+// Tabs that forced a fetch of a key: its result reaches them even when unchanged
+const forcedPorts = new Map<DataKey, Set<MessagePort>>()
 
 // Initial load state - track which keys are priority for current route
 let initialLoadKeys: Set<DataKey> = new Set()
 let pendingPriorityKeys: Set<DataKey> = new Set() // Keys still being fetched
 let deferredLoadTriggered = false
+// Tabs whose INITIAL_LOAD the pending deferred load answers
+const deferredPorts = new Set<MessagePort>()
 
 // Queue of ports waiting for cached data after init
 const pendingCacheDeliveries: Array<{ port: MessagePort; keys: DataKey[] }> = []
@@ -401,12 +413,12 @@ function openHeavyFetches(): void {
   if (heavyCacheRead) return
   heavyCacheRead = true
   // A fetch queued while the copy loaded is only needed if it is missing or
-  // stale (or, for timerStatus, if it was stored without its trading status)
+  // stale, or was forced
   for (const key of HEAVY_CACHE_KEYS) {
     const state = dataStates.get(key)
-    const partial = key === 'timerStatus' && (state?.data as any)?.tradingStatus == null
-    if (state?.data && !partial && !isStale(key, state.lastUpdated) && !queue.isProcessing(key)) {
+    if (state?.data && !isStale(key, state.lastUpdated) && !queue.isProcessing(key) && !queue.isForced(key)) {
       queue.remove(key)
+      onPriorityKeyLoaded(key)
     }
   }
 }
@@ -530,18 +542,26 @@ function deserializeIdentity(serialized: SerializedIdentity): DelegationIdentity
 
 async function setIdentity(serialized: SerializedIdentity): Promise<void> {
   try {
-    currentIdentity = deserializeIdentity(serialized)
-    const principal = currentIdentity.getPrincipal().toText()
-    currentPrincipal = principal
-    isAuthenticated = true
+    // Every tab sends its identity when it connects and on later login checks.
+    // For the same delegation and session key the verified agent stays: a new
+    // one loses its subnet key cache and verifies again.
+    const json = `${serialized.delegationChainJson}\n${serialized.sessionKeyJson}`
+    if (json !== identityJson || !authenticatedAgent || !currentIdentity) {
+      currentIdentity = deserializeIdentity(serialized)
+      currentPrincipal = currentIdentity.getPrincipal().toText()
+      isAuthenticated = true
 
-    authenticatedAgent = await createAgent({
-      identity: currentIdentity,
-      host: getHost(),
-      fetchRootKey: shouldFetchRootKey(),
-    })
+      authenticatedAgent = await createAgent({
+        identity: currentIdentity,
+        host: getHost(),
+        fetchRootKey: shouldFetchRootKey(),
+      })
+      identityJson = json
+      wakeQueue()
 
-    if (debugEnabled) console.log('[AuthWorker] Identity set, agent created')
+      if (debugEnabled) console.log('[AuthWorker] Identity set, agent created')
+    }
+    const principal = currentPrincipal!
 
     // Immediately deliver cached user data, but only this principal's: data
     // held in memory for another principal is dropped, and the IndexedDB copy
@@ -584,6 +604,7 @@ async function setIdentity(serialized: SerializedIdentity): Promise<void> {
     currentIdentity = null
     currentPrincipal = null
     authenticatedAgent = null
+    identityJson = null
   }
 }
 
@@ -620,6 +641,7 @@ function clearIdentity(): void {
   currentIdentity = null
   currentPrincipal = null
   authenticatedAgent = null
+  identityJson = null
   isAuthenticated = false
   isAdmin = false
 
@@ -696,6 +718,10 @@ self.onconnect = (event: MessageEvent) => {
 function disconnectPort(port: MessagePort): void {
   connectedPorts.delete(port)
   portRoutes.delete(port)
+  portVisible.delete(port)
+  portLastSeen.delete(port)
+  deferredPorts.delete(port)
+  for (const ports of forcedPorts.values()) ports.delete(port)
   for (const subscribers of subscriptions.values()) {
     subscribers.delete(port)
   }
@@ -708,6 +734,7 @@ function disconnectPort(port: MessagePort): void {
 
 function handleMessage(port: MessagePort, message: WorkerRequest): void {
   if (debugEnabled) console.log(`[AuthWorker] handleMessage: ${message.type}`)
+  portLastSeen.set(port, Date.now())
   switch (message.type) {
     case 'SET_IDENTITY':
       if (message.payload.identity) {
@@ -730,15 +757,17 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
       // idempotent (cache replay + stale-only enqueue with backoff reset).
       currentRoute = newRoute
       portRoutes.set(port, newRoute)
+      if (typeof message.payload.visible === 'boolean') portVisible.set(port, message.payload.visible)
       {
         // Proactively serve cache + prioritize fetches for the route
         const routeKeys = getInitialLoadKeys(newRoute)
         for (const key of routeKeys) {
           if (!HANDLED_KEYS.includes(key)) continue
           const state = dataStates.get(key)
-          // Broadcast cached data immediately to subscribers
-          if (state?.data) {
-            broadcastToSubscribers(key, {
+          // Cached data for this tab. The other tabs already have it: sending
+          // it to them as well made one tab's navigation cost every tab.
+          if (state?.data && subscriptions.get(key)?.has(port)) {
+            sendResponse(port, {
               id: generateMessageId(),
               timestamp: Date.now(),
               type: 'CACHE_HIT',
@@ -773,7 +802,7 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
       break
 
     case 'SET_VISIBILITY':
-      isBackgroundTab = !message.payload.visible
+      portVisible.set(port, !!message.payload.visible)
       if (message.payload.visible) {
         recordActivity()
       }
@@ -810,8 +839,10 @@ function handleMessage(port: MessagePort, message: WorkerRequest): void {
 
     case 'PAGE_HIDDEN':
       // The tab closed, reloaded or went into the back-forward cache: its route
-      // no longer counts. After a restore the bridge sends SET_ROUTE again.
+      // no longer counts, and it is not visible. After a restore the bridge
+      // sends SET_ROUTE again.
       portRoutes.delete(port)
+      portVisible.set(port, false)
       break
 
     case 'PING':
@@ -867,6 +898,8 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
   const route = message.payload.route || '/'
   currentRoute = route
   portRoutes.set(port, route)
+  // A tab can start hidden (opened in the background)
+  if (typeof message.payload.visible === 'boolean') portVisible.set(port, message.payload.visible)
   debugLog(`handleInitialLoad called for route: ${route}, isInitialized=${isInitialized}`)
 
   // If not initialized yet, queue this for processing after init completes
@@ -876,27 +909,31 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
     return
   }
 
-  // Reset state for fresh page load. Only the backoff: fetches already in
-  // flight stay marked as processing and counted, otherwise the queue starts the
-  // same keys a second time (every vault query ran twice on a cold load).
-  backoff.resetAll()
-  deferredLoadTriggered = false
-  pendingPriorityKeys.clear()
+  // A fresh page load in this tab. The worker is shared, so what other tabs
+  // started stays as it is: fetches in flight (they stay marked as processing
+  // and counted, otherwise the queue starts the same keys a second time), the
+  // deferred load and the backoff of other keys. Only this route's keys and
+  // the prices and token details every page header shows retry at once.
+  for (const key of getInitialLoadKeys(route)) backoff.reset(key)
+  backoff.reset('cryptoPrices')
+  backoff.reset('tokenDetails')
 
   // Get priority keys for this route
-  const priorityKeys = getInitialLoadKeys(route)
-  initialLoadKeys = new Set(priorityKeys.filter(key => HANDLED_KEYS.includes(key)))
+  const priorityKeys = new Set(getInitialLoadKeys(route).filter(key => HANDLED_KEYS.includes(key)))
 
   // Add userAllocation if authenticated (commonly needed)
-  if (isAuthenticated && !initialLoadKeys.has('userAllocation')) {
-    initialLoadKeys.add('userAllocation')
+  if (isAuthenticated) {
+    priorityKeys.add('userAllocation')
   }
+  // Keys a pending deferred load skips (already handled here)
+  for (const key of priorityKeys) initialLoadKeys.add(key)
+  if (!deferredLoadTriggered) deferredPorts.add(port)
 
-  debugLog(`Priority keys for route: ${Array.from(initialLoadKeys).join(', ') || 'none'}`)
+  debugLog(`Priority keys for route: ${Array.from(priorityKeys).join(', ') || 'none'}`)
 
   // Send cached data ONLY for priority keys immediately
-  if (debugEnabled) console.log(`[AuthWorker] Sending cached data for ${initialLoadKeys.size} priority keys`)
-  for (const key of initialLoadKeys) {
+  if (debugEnabled) console.log(`[AuthWorker] Sending cached data for ${priorityKeys.size} priority keys`)
+  for (const key of priorityKeys) {
     const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
     // Skip auth-required keys if not authenticated AND no cached data
     if (requiresAuth && !isAuthenticated) {
@@ -937,7 +974,7 @@ function handleInitialLoad(port: MessagePort, message: WorkerRequest): void {
         : (!requiresAuth || isAuthenticated)
       if (canFetch) {
         if (debugEnabled) console.log(`[AuthWorker] Queuing fetch for ${key} (stale/missing, canFetch=true)`)
-        pendingPriorityKeys.add(key)
+        if (!deferredLoadTriggered) pendingPriorityKeys.add(key)
         queue.enqueue(key, 'critical')
       } else {
         if (debugEnabled) console.log(`[AuthWorker] Cannot fetch ${key} - requires auth, isAuth=${isAuthenticated}`)
@@ -977,6 +1014,11 @@ function triggerDeferredLoad(): void {
 
   if (debugEnabled) console.log('[AuthWorker] All priority keys loaded - starting deferred load for non-priority keys')
 
+  // Cached data goes to the tabs that are loading, not to every tab: the
+  // others already have it
+  const ports = [...deferredPorts]
+  deferredPorts.clear()
+
   // Send cached data and queue fetches for remaining keys
   const routeKeys = openRouteKeys()
   for (const key of HANDLED_KEYS) {
@@ -987,19 +1029,21 @@ function triggerDeferredLoad(): void {
     if (requiresAuth && !isAuthenticated) continue
 
     const state = dataStates.get(key)
-    // Send cached data to all subscribers
     if (state?.data) {
-      broadcastToSubscribers(key, {
-        id: generateMessageId(),
-        timestamp: Date.now(),
-        type: 'CACHE_HIT',
-        payload: {
-          dataKey: key,
-          data: state.data,
-          state,
-          fromCache: true,
-        },
-      })
+      for (const p of ports) {
+        if (!subscriptions.get(key)?.has(p)) continue
+        sendResponse(p, {
+          id: generateMessageId(),
+          timestamp: Date.now(),
+          type: 'CACHE_HIT',
+          payload: {
+            dataKey: key,
+            data: state.data,
+            state,
+            fromCache: true,
+          },
+        })
+      }
     }
     // Queue fetch if stale
     if (!state?.data || isStale(key, state.lastUpdated)) {
@@ -1039,6 +1083,10 @@ function handleFetch(port: MessagePort, message: WorkerRequest): void {
     if (debugEnabled) console.log(`[AuthWorker] FETCH ignored - dataKey=${dataKey} not in HANDLED_KEYS`)
     return
   }
+  // A view asking for a key waits for this reply (admin pages clear their
+  // spinners on it), so it is sent even when the tab holds the data. Only the
+  // bridge's own route prefetch (quiet) skips what the tab already has.
+  const replyAlways = !message.payload.quiet
   if (debugEnabled) console.log(`[AuthWorker] FETCH request: ${dataKey}, force=${force}, isAuth=${isAuthenticated}, hasAnon=${!!anonymousAgent}`)
 
   // USER_KEYS and AUTH_REQUIRED_KEYS require authentication
@@ -1058,7 +1106,7 @@ function handleFetch(port: MessagePort, message: WorkerRequest): void {
           state: { ...currentState, stale: true },
           fromCache: true,
         },
-      })
+      }, replyAlways)
     }
     // Don't queue for refresh - will fail without auth
     return
@@ -1078,11 +1126,16 @@ function handleFetch(port: MessagePort, message: WorkerRequest): void {
         state: currentState,
         fromCache: true,
       },
-    })
+    }, replyAlways)
   }
 
   // Queue for refresh if needed
   // The queue processor will wait for agent initialization before processing
+  if (force) {
+    let ports = forcedPorts.get(dataKey)
+    if (!ports) forcedPorts.set(dataKey, (ports = new Set()))
+    ports.add(port)
+  }
   if (force || !currentState?.data || isStale(dataKey, currentState.lastUpdated)) {
     if (debugEnabled) console.log(`[AuthWorker] Queuing ${dataKey} for fetch (force=${force}, hasData=${!!currentState?.data}, queueSize=${queue.size})`)
     // force: a fetch of this key already running may predate the request (a
@@ -1233,6 +1286,7 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
   try {
     await createAnonymousAgent()
     debugLog(`Agent ready after SET_NETWORK: anonymousAgent=${!!anonymousAgent}`)
+    wakeQueue()
   } catch (err) {
     debugLog(`Failed to create agent after SET_NETWORK: ${err}`)
   } finally {
@@ -1285,6 +1339,34 @@ async function handleSetNetwork(message: WorkerRequest): Promise<void> {
 const MAX_CONCURRENT_FETCHES = 8
 let activeFetchCount = 0
 
+// The queue loop polls (the sleeps below), and is also woken when there is
+// something to do: a key queued, a fetch settled (a slot is free), an agent
+// ready. A key queued while it slept used to wait up to 500 ms to start.
+let wakeQueueLoop: (() => void) | null = null
+function wakeQueue(): void {
+  wakeQueueLoop?.()
+}
+function queueSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer)
+      wakeQueueLoop = null
+      resolve()
+    }
+    const timer = setTimeout(done, ms)
+    wakeQueueLoop = done
+  })
+}
+queue.onEnqueue = wakeQueue
+
+// Data that landed after this item was queued (a composite filled it in as a
+// sibling of another key, or another fetch finished) needs no second fetch
+function landedSince(item: { dataKey: DataKey; addedAt: number }): boolean {
+  const state = dataStates.get(item.dataKey)
+  return state?.data != null && !state.stale && (state.lastUpdated ?? 0) > item.addedAt &&
+    !isStale(item.dataKey, state.lastUpdated)
+}
+
 async function processQueue(): Promise<void> {
   if (isProcessing) return
   isProcessing = true
@@ -1294,7 +1376,7 @@ async function processQueue(): Promise<void> {
     // If no agent available yet, wait before trying to process
     // This prevents spinning the CPU waiting for SET_NETWORK
     if (!anonymousAgent && !authenticatedAgent) {
-      await sleep(100)
+      await queueSleep(100)
       continue
     }
 
@@ -1324,6 +1406,14 @@ async function processQueue(): Promise<void> {
       if (requiresAuth && (!isAuthenticated || !authenticatedAgent)) {
         if (debugEnabled) console.log(`[AuthWorker] Skipping ${item.dataKey} - requires auth but not authenticated`)
         queue.complete(item.dataKey)
+        onPriorityKeyLoaded(item.dataKey)
+        continue
+      }
+
+      // A forced fetch always runs (a refresh after a mint must see the mint)
+      if (!item.force && landedSince(item)) {
+        queue.complete(item.dataKey)
+        onPriorityKeyLoaded(item.dataKey)
         continue
       }
 
@@ -1354,6 +1444,7 @@ async function processQueue(): Promise<void> {
         // Clamp: a concurrent INITIAL_LOAD (new tab) zeroes the counter while
         // fetches are in flight; going negative would over-admit fetches.
         activeFetchCount = Math.max(0, activeFetchCount - 1)
+        wakeQueue()
       })
     }
 
@@ -1367,7 +1458,7 @@ async function processQueue(): Promise<void> {
     // flight), poll a little slower than the active 50ms — we're just waiting on timers.
     const isIdle = activeFetchCount === 0 && queue.isEmpty()
     const onlyBlocked = activeFetchCount === 0 && blockedThisPass.length > 0
-    await sleep(isIdle ? 500 : onlyBlocked ? 250 : 50)
+    await queueSleep(isIdle ? 500 : onlyBlocked ? 250 : 50)
   }
 }
 
@@ -1463,59 +1554,20 @@ const KEEP_TRYING: DataKey[] = [
 // ============================================================================
 // Composite Query Coalescing (from merged public worker)
 // ============================================================================
-let lastVoteDashboardResult: { data: any; timestamp: number } | null = null
-let lastLeaderboardResult: { data: any; timestamp: number } | null = null
-let lastEnhancedTreasuryResult: { data: any; timestamp: number } | null = null
 const COALESCE_MS = 5_000
 const TREASURY_COALESCE_MS = 5_000
 
-async function getVoteDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
-  if (lastVoteDashboardResult && (Date.now() - lastVoteDashboardResult.timestamp) < COALESCE_MS) {
-    return lastVoteDashboardResult.data
-  }
-  try {
-    // Public data - no principal needed for anonymous queries
-    const data = await fetchVoteDashboardData(agentRef)
-    lastVoteDashboardResult = { data, timestamp: Date.now() }
-    return data
-  } catch (err) {
-    console.warn('[AuthWorker] getVoteDashboard composite failed, falling back to individual calls:', err)
-    lastVoteDashboardResult = { data: null, timestamp: Date.now() }
-    return null
-  }
-}
+// Public data - no principal needed for anonymous queries
+const getVoteDashboardCoalesced = coalesced('[AuthWorker] getVoteDashboard', (agent) => fetchVoteDashboardData(agent), COALESCE_MS)
+const getAllLeaderboardsCoalesced = coalesced('[AuthWorker] getAllLeaderboards', (agent) => fetchAllLeaderboardsData(agent), COALESCE_MS)
+const getEnhancedTreasuryDashboardCoalesced = coalesced('[AuthWorker] getEnhancedTreasuryDashboard', (agent) => fetchEnhancedTreasuryDashboardData(agent), TREASURY_COALESCE_MS)
 
-async function getAllLeaderboardsCoalesced(agentRef: HttpAgent): Promise<any | null> {
-  if (lastLeaderboardResult && (Date.now() - lastLeaderboardResult.timestamp) < COALESCE_MS) {
-    return lastLeaderboardResult.data
-  }
-  try {
-    const data = await fetchAllLeaderboardsData(agentRef)
-    lastLeaderboardResult = { data, timestamp: Date.now() }
-    return data
-  } catch (err) {
-    console.warn('[AuthWorker] getAllLeaderboards composite failed, falling back to individual calls:', err)
-    lastLeaderboardResult = { data: null, timestamp: Date.now() }
-    return null
-  }
-}
-
-// ============================================================================
-// Enhanced Treasury Dashboard Coalescing
-// ============================================================================
-
-async function getEnhancedTreasuryDashboardCoalesced(agentRef: HttpAgent): Promise<any | null> {
-  if (lastEnhancedTreasuryResult && (Date.now() - lastEnhancedTreasuryResult.timestamp) < TREASURY_COALESCE_MS) {
-    return lastEnhancedTreasuryResult.data
-  }
-  try {
-    const data = await fetchEnhancedTreasuryDashboardData(agentRef)
-    lastEnhancedTreasuryResult = { data, timestamp: Date.now() }
-    return data
-  } catch (err) {
-    console.warn('[AuthWorker] getEnhancedTreasuryDashboard composite failed, falling back to individual calls:', err)
-    lastEnhancedTreasuryResult = { data: null, timestamp: Date.now() }
-    return null
+// A composite just filled in `key` as a sibling: a fetch of it still waiting
+// in the queue would only ask for the same data again
+function dropQueuedSibling(key: DataKey): void {
+  if (queue.has(key) && !queue.isProcessing(key) && !queue.isForced(key)) {
+    queue.remove(key)
+    onPriorityKeyLoaded(key)
   }
 }
 
@@ -1524,19 +1576,14 @@ async function getEnhancedTreasuryDashboardCoalesced(agentRef: HttpAgent): Promi
  * Covers rebalanceConfig and tradingPauses.
  */
 async function populateEnhancedTreasurySiblings(dashboard: any, excludeKey: DataKey): Promise<void> {
-  const now = Date.now()
-  const freshState: Partial<DataState> = { lastUpdated: now, loading: false, error: null, stale: false }
-
   if (excludeKey !== 'rebalanceConfig') {
-    const rc = serializeForTransfer(dashboard.systemParameters)
-    updateState('rebalanceConfig', { data: rc, ...freshState })
-    await setCached('rebalanceConfig', rc)
+    await commitData('rebalanceConfig', serializeForTransfer(dashboard.systemParameters))
+    dropQueuedSibling('rebalanceConfig')
   }
 
   if (excludeKey !== 'tradingPauses') {
-    const tp = serializeForTransfer(dashboard.tradingPauses)
-    updateState('tradingPauses', { data: tp, ...freshState })
-    await setCached('tradingPauses', tp)
+    await commitData('tradingPauses', serializeForTransfer(dashboard.tradingPauses))
+    dropQueuedSibling('tradingPauses')
   }
 }
 
@@ -1559,14 +1606,6 @@ async function populateAllLeaderboardsSiblings(
   allBoards: any,
   excludeKey: DataKey
 ): Promise<void> {
-  const now = Date.now()
-  const freshState: Partial<DataState> = {
-    lastUpdated: now,
-    loading: false,
-    error: null,
-    stale: false
-  }
-
   const leaderboardKeys: DataKey[] = [
     'leaderboardAllTimeUSD',
     'leaderboardAllTimeICP',
@@ -1582,10 +1621,8 @@ async function populateAllLeaderboardsSiblings(
     if (key === excludeKey) continue // Skip the one we're already handling
 
     const backendKey = mapLeaderboardKey(key)
-    const boardData = serializeForTransfer(allBoards[backendKey])
-
-    updateState(key, { data: boardData, ...freshState })
-    await setCached(key, boardData)
+    await commitData(key, serializeForTransfer(allBoards[backendKey]))
+    dropQueuedSibling(key)
   }
 }
 
@@ -1596,31 +1633,21 @@ async function populateAllLeaderboardsSiblings(
  */
 async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey): Promise<void> {
   const now = Date.now()
-  const freshState: Partial<DataState> = { lastUpdated: now, loading: false, error: null, stale: false }
 
   // Only populate the primary key for vote dashboard - tokenDetails
   // Other siblings (totalTreasuryValueInUsd, aggregateAllocation, etc.) are NOT in HANDLED_KEYS
   // They can still be fetched on-demand but won't auto-refresh
   if (excludeKey !== 'tokenDetails') {
-    const td = serializeForTransfer(dashboard.tokenDetails)
-    updateState('tokenDetails', { data: td, ...freshState })
-    await setCached('tokenDetails', td)
+    await commitData('tokenDetails', serializeForTransfer(dashboard.tokenDetails))
+    dropQueuedSibling('tokenDetails')
   }
 
-  // timerStatus is in HANDLED_KEYS, so update it. Only on routes that show it:
-  // it embeds the ~650 KB trading status, and elsewhere every vote dashboard
-  // refresh pushed it to the page for nothing (a route that shows it fetches
-  // it on arrival when stale). Not before the stored trading status is read
-  // either: built without it, it would replace the good stored copy.
-  if (excludeKey !== 'timerStatus' && heavyCacheRead && openRouteKeys().has('timerStatus')) {
-    const cachedTS = dataStates.get('tradingStatus')?.data
-    const ts = serializeForTransfer({
-      snapshotInfo: dashboard.snapshotInfo,
-      tradingStatus: cachedTS ?? null,
-      tokenDetails: dashboard.tokenDetails,
-    })
-    updateState('timerStatus', { data: ts, ...freshState })
-    await setCached('timerStatus', ts)
+  // timerStatus is in HANDLED_KEYS, so update it. Only on routes that show it
+  // (a route that shows it fetches it on arrival when stale); elsewhere every
+  // vote dashboard refresh pushed it to the page for nothing.
+  if (excludeKey !== 'timerStatus' && openRouteKeys().has('timerStatus')) {
+    await commitData('timerStatus', serializeForTransfer({ snapshotInfo: dashboard.snapshotInfo }))
+    dropQueuedSibling('timerStatus')
   }
 
   // aggregateAllocation — extract from dashboard and broadcast
@@ -1645,9 +1672,8 @@ async function populateVoteDashboardSiblings(dashboard: any, excludeKey: DataKey
         maxAllocations.push([principal, details.maxAllocationBasisPoints[0]])
       }
     }
-    const ma = serializeForTransfer(maxAllocations)
-    updateState('tokenMaxAllocations' as DataKey, { data: ma, ...freshState })
-    await setCached('tokenMaxAllocations' as DataKey, ma)
+    await commitData('tokenMaxAllocations', serializeForTransfer(maxAllocations))
+    dropQueuedSibling('tokenMaxAllocations')
   }
 
   // userAllocation — if present in response, broadcast to all ports
@@ -1688,7 +1714,13 @@ async function fetchData(dataKey: DataKey): Promise<void> {
   }
 
   debugLog(`Starting network fetch for ${dataKey}`)
-  updateState(dataKey, { loading: true, error: null })
+  // Only a forced fetch tells the tabs that it started (dataless, see
+  // updateState). A background refresh says nothing until it has news.
+  if (queue.isForced(dataKey)) {
+    updateState(dataKey, { loading: true, error: null })
+  } else {
+    dataStates.set(dataKey, { ...(dataStates.get(dataKey) || createInitialState()), loading: true, error: null })
+  }
 
   // Who and where this fetch is for; checked again when the answer lands
   const epoch = networkEpoch
@@ -1796,25 +1828,14 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       break
 
     case 'timerStatus': {
-      // timerStatus combines snapshotInfo + tradingStatus + tokenDetails
+      // Snapshot info only. It used to carry copies of the trading status
+      // (~650 KB) and the token details too, which their own keys deliver.
       const dashboard = await getVoteDashboardCoalesced(anonymousAgent!)
       if (!dashboard) {
         // Fallback: fetch snapshotInfo individually
-        const snapshotInfo = await fetchSnapshotInfoData(anonymousAgent!)
-        const cachedTS = dataStates.get('tradingStatus')?.data
-        const cachedTD = dataStates.get('tokenDetails')?.data
-        data = serializeForTransfer({
-          snapshotInfo,
-          tradingStatus: cachedTS ?? null,
-          tokenDetails: cachedTD ?? null,
-        })
+        data = serializeForTransfer({ snapshotInfo: await fetchSnapshotInfoData(anonymousAgent!) })
       } else {
-        const cachedTS = dataStates.get('tradingStatus')?.data
-        data = serializeForTransfer({
-          snapshotInfo: dashboard.snapshotInfo,
-          tradingStatus: cachedTS ?? null,
-          tokenDetails: dashboard.tokenDetails,
-        })
+        data = serializeForTransfer({ snapshotInfo: dashboard.snapshotInfo })
         await populateVoteDashboardSiblings(dashboard, 'timerStatus')
       }
       break
@@ -1976,20 +1997,70 @@ async function fetchData(dataKey: DataKey): Promise<void> {
   }
 
   debugLog(`Fetch completed for ${dataKey}, updating state`)
-  updateState(dataKey, {
-    data,
-    lastUpdated: Date.now(),
-    loading: false,
-    error: null,
-    stale: false,
-  })
   if (owner) userKeyOwner.set(dataKey, owner)
-
-  await setCached(dataKey, data, owner ?? undefined)
-  if (debugEnabled) console.log(`[AuthWorker] Cached ${dataKey} to IndexedDB`)
+  await commitData(dataKey, data, owner ?? undefined)
 
   // Notify that this priority key has loaded (triggers deferred load when all done)
   onPriorityKeyLoaded(dataKey)
+}
+
+/**
+ * Store a fetch result and send it to the subscribed tabs. A result equal to
+ * the data held already is not written to IndexedDB again (markRefreshed keeps
+ * its time instead) and, for CHANGE_ONLY_KEYS, not sent again to the tabs that
+ * hold it, except the tabs that forced the fetch. User data is always stored
+ * and sent.
+ */
+async function commitData(dataKey: DataKey, data: unknown, owner?: string): Promise<void> {
+  const prev = dataStates.get(dataKey)
+  const fresh = { lastUpdated: Date.now(), loading: false, error: null, stale: false }
+  if (!USER_KEYS.includes(dataKey) && prev?.data != null && samePayload(prev.data, data)) {
+    // The stored copy is this payload, unless writing it failed
+    if (!unsaved.has(dataKey)) markRefreshed(dataKey, fresh.lastUpdated)
+    if (CHANGE_ONLY_KEYS.includes(dataKey)) {
+      const state: DataState = { ...prev, ...fresh }
+      dataStates.set(dataKey, state)
+      sendUnchanged(dataKey, prev.lastUpdated, state)
+    } else {
+      updateState(dataKey, { data, ...fresh })
+    }
+    forcedPorts.delete(dataKey)
+    return
+  }
+
+  forcedPorts.delete(dataKey)
+  updateState(dataKey, { data, ...fresh })
+  if (await setCached(dataKey, data, owner)) unsaved.delete(dataKey)
+  else unsaved.add(dataKey)
+  if (debugEnabled) console.log(`[AuthWorker] Cached ${dataKey} to IndexedDB`)
+}
+
+// Keys whose last IndexedDB write failed (quota): their stored copy is older
+// than the data held here
+const unsaved = new Set<DataKey>()
+
+// An unchanged CHANGE_ONLY_KEYS payload: a tab that holds the previous one
+// holds this one too, and only its time moves on. A tab that does not hold it
+// gets it as usual, and so do a tab that forced the fetch (its view waits for
+// the answer) and a tab on an admin page (the timer panel there is rebuilt
+// from every refresh).
+function sendUnchanged(dataKey: DataKey, prevAt: number | null, state: DataState): void {
+  const subscribers = subscriptions.get(dataKey)
+  if (!subscribers) return
+  const forcedBy = forcedPorts.get(dataKey)
+  for (const port of subscribers) {
+    const held = deliveredTo.get(port)
+    if (prevAt && held?.get(dataKey) === prevAt && !forcedBy?.has(port) && !portRoutes.get(port)?.startsWith('/admin')) {
+      held.set(dataKey, state.lastUpdated!)
+      continue
+    }
+    sendResponse(port, {
+      id: generateMessageId(),
+      timestamp: Date.now(),
+      type: 'DATA_UPDATE',
+      payload: { dataKey, data: state.data, state, fromCache: false },
+    })
+  }
 }
 
 // ============================================================================
@@ -2049,11 +2120,12 @@ function forgetDelivered(keys: DataKey[]): void {
   }
 }
 
-function sendResponse(port: MessagePort, response: WorkerResponse): void {
+function sendResponse(port: MessagePort, response: WorkerResponse, always = false): void {
   // Subscribe, INITIAL_LOAD, route changes and resume kicks all replay the
   // cache, which delivered every key to the same tab three or more times per
   // load (each one a structured clone plus a decode on the page). Remember
-  // what each tab holds and skip a CACHE_HIT that would resend it.
+  // what each tab holds and skip a CACHE_HIT that would resend it, unless it
+  // answers a view's own request (`always`).
   const { dataKey, state } = response.payload
   const at = state?.lastUpdated
   if (dataKey && at && state?.data != null &&
@@ -2063,7 +2135,7 @@ function sendResponse(port: MessagePort, response: WorkerResponse): void {
       held = new Map()
       deliveredTo.set(port, held)
     }
-    if (response.type === 'CACHE_HIT' && held.get(dataKey) === at) return
+    if (response.type === 'CACHE_HIT' && !always && held.get(dataKey) === at) return
     held.set(dataKey, at)
   }
 
@@ -2106,8 +2178,22 @@ function debugLog(message: string): void {
 function isStale(dataKey: DataKey, lastUpdated: number | null): boolean {
   if (!lastUpdated) return true
   const threshold = STALENESS_THRESHOLDS[dataKey]
-  const multiplier = isBackgroundTab ? BACKGROUND_MULTIPLIER : 1
+  const multiplier = isBackground() ? BACKGROUND_MULTIPLIER : 1
   return Date.now() - lastUpdated > threshold * multiplier
+}
+
+// Background (the slower BACKGROUND_MULTIPLIER rate) only while no tab is
+// visible. Each tab reports its own visibility: the last report of any tab
+// used to set it for all, so hiding one tab slowed the visible one. A tab that
+// has sent nothing for IDLE_TIMEOUT_MS no longer counts as visible, so one
+// that crashed or was killed without pagehide cannot keep it so forever.
+function isBackground(): boolean {
+  if (portVisible.size === 0) return false
+  const now = Date.now()
+  for (const [port, visible] of portVisible) {
+    if (visible && now - (portLastSeen.get(port) ?? 0) <= IDLE_TIMEOUT_MS) return false
+  }
+  return true
 }
 
 function sleep(ms: number): Promise<void> {

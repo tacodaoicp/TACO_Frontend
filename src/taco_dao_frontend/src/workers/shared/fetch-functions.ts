@@ -185,6 +185,30 @@ export function serializeForTransfer(obj: unknown): unknown {
 }
 
 /**
+ * Whether two serializeForTransfer results hold the same data. A refresh that
+ * returns what the worker already has is then neither resent nor restored.
+ */
+export function samePayload(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false
+    for (let i = 0; i < a.length; i++) {
+      if (!samePayload(a[i], b[i])) return false
+    }
+    return true
+  }
+  if (Array.isArray(b)) return false
+  const keysA = Object.keys(a)
+  if (keysA.length !== Object.keys(b).length) return false
+  for (const key of keysA) {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return false
+    if (!samePayload((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) return false
+  }
+  return true
+}
+
+/**
  * Restore BigInt and other types from serialized strings
  */
 export function deserializeFromTransfer(obj: unknown): unknown {
