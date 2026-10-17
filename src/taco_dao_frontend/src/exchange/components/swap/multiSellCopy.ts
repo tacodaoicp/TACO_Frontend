@@ -147,7 +147,7 @@ export function legDetail(l: LegRun, sym: string, amountIn: string, outText: str
       if (l.reason === 'neuMismatch') return `${label}: not swapped, because the amount it received did not match this part. Use the Recover page to send it back.`
       // some or all of the ICP may already be in the wallet (a lost withdraw answer, or only part came
       // back from a look): the wallet comes first
-      if (l.outMaybeSent) return `${subject} sold this part. The ICP may already be in your wallet, check it before using the Recover page.`
+      if (l.outMaybeSent) return `${subject} sold this part. The ICP may already be in your wallet. Check it before using the Recover page.`
       return l.failedAfterSwap
         ? `${subject} sold this part but could not send the ICP to your wallet.`
         : `${subject} stopped after the deposit and the automatic refund did not go through.`

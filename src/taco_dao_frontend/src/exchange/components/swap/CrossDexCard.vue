@@ -316,7 +316,7 @@ function formatTo(amt: bigint): string {
 /** A route whose withdraw answer was lost: its output may already be in the wallet. */
 function maybeSentNote(reason?: string): string {
   const sym = cx.tokenTo.value?.symbol ?? 'output'
-  return `The swap went through. The ${sym} may already be in your wallet, check it before using the Recover page.`
+  return `The swap went through. The ${sym} may already be in your wallet. Check it before using the Recover page.`
     + (reason === 'session' ? ' If it is not there, reconnect your wallet first.' : '')
 }
 
