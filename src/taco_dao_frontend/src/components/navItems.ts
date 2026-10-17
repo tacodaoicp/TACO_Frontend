@@ -49,14 +49,21 @@ export const loadApexcharts = () => import('vue3-apexcharts').catch(() => {})
 export const loadWizard = () => import('../views/WizardView.vue')
 export const warmWizard = () => { loadWizard().catch(() => {}) }
 
+// An early load that fails must not reload the page: main.js skips its chunk error reload while
+// window.tacoWarmLoads is above 0, and the navigation that needs the chunk recovers as before.
+const win = window as Window & { tacoWarmLoads?: number }
+const warm = (load: () => Promise<unknown>) => {
+  win.tacoWarmLoads = (win.tacoWarmLoads || 0) + 1
+  load().catch(() => {}).finally(() => { win.tacoWarmLoads!-- })
+}
+
 // Pages load their code on the first visit. A pointer down, touch, hover or focus on a link starts that
-// early, through the router's own loaders, so the tap that follows finds the page ready. Not while
-// offline: a failed load reloads the page (main.js), and a hover alone should never do that.
+// early, through the router's own loaders, so the tap that follows finds the page ready (not while offline).
 export function warmRoute(router: Router, to?: string) {
   if (!to || navigator.onLine === false) return
   const target = router.resolve(to)
-  loadRouteLocation(target).catch(() => {})
-  if (CHART_ROUTES.includes(target.path)) loadApexcharts()
+  warm(() => loadRouteLocation(target))
+  if (CHART_ROUTES.includes(target.path)) warm(loadApexcharts)
 }
 
 // warm a nav item's page (or the wizard) before its click

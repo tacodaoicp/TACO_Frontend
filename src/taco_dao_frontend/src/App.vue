@@ -208,13 +208,16 @@
   router.afterEach(clearRoutePending)
   router.onError(clearRoutePending)
 
-  // the Grand Tour opens its pages (and offers the wizard at the end) with no tap to warm them on
+  // the Grand Tour opens its pages (and offers the wizard at the end) with no tap to warm them on;
+  // they are warmed once the tour itself has loaded (a tour that fails to load recovers as before)
   watch(grandTourActive, (active) => {
     if (!active) return
-    import('./components/tour/tourScript')
-      .then(({ tourScript }) => { for (const scene of tourScript) warmRoute(router, scene.route) })
+    Promise.all([import('./components/tour/GrandTour.vue'), import('./components/tour/tourScript')])
+      .then(([, { tourScript }]) => {
+        for (const scene of tourScript) warmRoute(router, scene.route)
+        warmWizard()
+      })
       .catch(() => {})
-    warmWizard()
   })
 
   // images
