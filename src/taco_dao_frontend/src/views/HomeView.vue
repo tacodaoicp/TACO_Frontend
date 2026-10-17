@@ -35,6 +35,7 @@
               <!-- Exchange CTA Banner -->
               <a :href="exchangeUrl"
                  class="home-view__exchange-cta"
+                 :class="{ 'home-view__exchange-cta--paused': ctaOffscreen }"
                  target="_blank"
                  rel="noopener">
                 <span class="home-view__exchange-cta__icon">&#x1F4CA;</span>
@@ -78,7 +79,7 @@
                     </button>
 
                     <!-- chart - lazy loaded for performance -->
-                    <div v-if="shouldLoadDex && homeSeen"
+                    <div v-if="shouldLoadDex && homeSeen && chartDatafeed"
                          class="home-view__taco-token-chart__inline">
 
                       <!-- pair switch — TACO/ICP always visible (so users know
@@ -623,8 +624,12 @@
     </div>
 
     <!-- animated background -->
-    <ul class="floating-tacos overflow-hidden"
-        :style="{ opacity: isBelowTheFoldVisible ? 0 : 1 }">
+    <ul ref="tacosEl"
+        class="floating-tacos overflow-hidden"
+        :class="{ 'floating-tacos--paused': tacosPaused }"
+        :style="{ opacity: isBelowTheFoldVisible ? 0 : 1 }"
+        @transitionend="onTacosFade"
+        @transitioncancel="onTacosFade">
       <li>{{ floatingEmoji1 }}</li>
       <li>{{ floatingEmoji2 }}</li>
       <li>{{ floatingEmoji1 }}</li>
@@ -673,7 +678,7 @@
         <!-- message middle -->
         <div class="home-view__chart-modal__dialog__middle" style="width: 100%; height: 100%;">
 
-            <div v-if="viewingChartModal" style="width: 100%; height: 100%;">
+            <div v-if="viewingChartModal && chartDatafeed" style="width: 100%; height: 100%;">
               <TradingChart
                 :token0="TACO_PRINCIPAL"
                 :token1="chartQuotePrincipal"
@@ -863,6 +868,11 @@
       transform: translateY(-1px);
       border-color: rgba(255, 194, 120, 0.75);
       box-shadow: 0 4px 14px rgba(232, 131, 12, 0.26);
+      animation-play-state: paused;
+    }
+
+    // far off screen (HomeView script)
+    &--paused {
       animation-play-state: paused;
     }
 
@@ -1620,6 +1630,11 @@
       }
     }
 
+    // faded out (HomeView script)
+    &--paused li {
+      animation-play-state: paused;
+    }
+
   }
 
 }
@@ -2284,13 +2299,13 @@
   // Imports //
   /////////////
 
-  import { ref, onMounted, computed, onUnmounted, watch } from "vue";
+  import { ref, shallowRef, onMounted, computed, onUnmounted, watch, defineAsyncComponent } from "vue";
   import { useMediaQuery } from '@vueuse/core'
   import { useRoute } from 'vue-router'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
-  import TradingChart from "../components/charts/TradingChart.vue"
   import { useOtcKlineDatafeed } from "../composables/useOtcKlineDatafeed"
+  import type { KlineDatafeed } from "../components/charts/types"
   import TacoCoinIcon from "../assets/tokens/tacoCoinIcon.vue"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
   import TacoChefWave from '../assets/images/chef/chef-wave.png'
@@ -2317,6 +2332,10 @@ import youtubeThumb from '../assets/images/getting-started-video.webp'
   import KongSwapLogo from '../assets/images/exchanges/kongSwapLogo.vue'
   import IcpSwapLogo from '../assets/images/exchanges/icpSwapLogo.vue'
   import IcpSwapText from '../assets/images/exchanges/icpSwapText.vue'
+
+  // the TACO chart (lightweight-charts) loads only where its tile can show, see startChart
+  const loadTradingChart = () => import("../components/charts/TradingChart.vue")
+  const TradingChart = defineAsyncComponent(loadTradingChart)
 
   ///////////
   // Store //
@@ -2394,7 +2413,8 @@ import youtubeThumb from '../assets/images/getting-started-video.webp'
   const TACO_PRINCIPAL = 'kknbx-zyaaa-aaaaq-aae4a-cai'
   const ICP_PRINCIPAL = 'ryjl3-tyaaa-aaaaa-aaaba-cai'
   const CKUSDC_PRINCIPAL = 'xevnm-gaaaa-aaaar-qafnq-cai'
-  const chartDatafeed = useOtcKlineDatafeed()
+  // set by startChart, once the chart can show
+  const chartDatafeed = shallowRef<KlineDatafeed | null>(null)
   const chartQuote = ref<'icp' | 'ckusdc'>('icp')
   const chartQuotePrincipal = computed(() =>
     chartQuote.value === 'icp' ? ICP_PRINCIPAL : CKUSDC_PRINCIPAL,
@@ -2413,7 +2433,7 @@ import youtubeThumb from '../assets/images/getting-started-video.webp'
     : (cb) => setTimeout(cb, 200)
   const probeCkusdc = () => idleProbeCkusdc(async () => {
     try {
-      const data = await chartDatafeed.getRange(
+      const data = await chartDatafeed.value!.getRange(
         TACO_PRINCIPAL, CKUSDC_PRINCIPAL, { hour: null }, [], 5n,
       )
       hasCkusdcKlines.value = Array.isArray(data) && data.length > 0
@@ -2429,7 +2449,17 @@ import youtubeThumb from '../assets/images/getting-started-video.webp'
   // phones and tablets (same query as the bottom bar) show only the video tile
   const isShell = useMediaQuery('(max-width: 991.98px), (pointer: coarse)')
   const homeSeen = ref(route.path === '/')
-  watch(homeSeen, seen => { if (seen) probeCkusdc() }, { immediate: true })
+  // The chart tile shows only when !isShell. A desktop (fine pointer) starts the chart code and its
+  // datafeed (the OTC agent and pool info) at setup at any width, so the chart is there the moment its
+  // tile is; phones and touch tablets load neither, unless the tile can show after all.
+  const startChart = () => {
+    if (chartDatafeed.value) return
+    loadTradingChart().catch(() => {})
+    chartDatafeed.value = useOtcKlineDatafeed()
+  }
+  if (!window.matchMedia('(pointer: coarse)').matches) startChart()
+  watch(isShell, shell => { if (!shell) startChart() }, { immediate: true })
+  watch(() => homeSeen.value && !!chartDatafeed.value, ready => { if (ready) probeCkusdc() }, { immediate: true })
 
   // Pause YouTube when navigating away from home (HomeView stays in DOM via KeepAlive + v-show)
   watch(() => route.path, (newPath) => {
@@ -2461,9 +2491,6 @@ import youtubeThumb from '../assets/images/getting-started-video.webp'
   const kongSwapLogo = KongSwapLogo
   const icpSwapLogo = IcpSwapLogo
   const icpSwapText = IcpSwapText
-
-  // neurons count
-  const localNeuronsCount = ref(0)
 
   //////////////
   // Computed //
@@ -2566,16 +2593,17 @@ import youtubeThumb from '../assets/images/getting-started-video.webp'
   })
 
   // format number
+  const compactNumber = new Intl.NumberFormat('en-US', {
+      notation: 'compact',
+      compactDisplay: 'short'
+  })
   const formatNumber = computed(() => {
     return (num: number) => {
       if (typeof num !== 'number') {
         return num
       }
       if (num >= 1000) {
-        return new Intl.NumberFormat('en-US', {
-            notation: 'compact',
-            compactDisplay: 'short'
-        }).format(num).toLowerCase();
+        return compactNumber.format(num).toLowerCase();
       }
       return num.toFixed(2)
     }
@@ -2602,6 +2630,53 @@ import youtubeThumb from '../assets/images/getting-started-video.webp'
 
     })
   }  
+
+  // Home's observers run only while Home is shown. Hidden Home stays mounted (KeepAlive + v-show), and a
+  // live observer there kept the page effects of the other routes busy on every frame.
+  let belowTheFoldObserver: IntersectionObserver | null = null
+  let ctaObserver: IntersectionObserver | null = null
+  const ctaOffscreen = ref(false)
+  const observeHome = (onHome: boolean) => {
+    belowTheFoldObserver?.disconnect()
+    ctaObserver?.disconnect()
+    belowTheFoldObserver = ctaObserver = null
+    if (!onHome) {
+      // what the observer reports for the hidden element
+      isBelowTheFoldVisible.value = false
+      ctaOffscreen.value = false
+      return
+    }
+    const belowTheFold = document.querySelector('.home-view__below-the-fold')
+    if (belowTheFold) {
+      belowTheFoldObserver = new IntersectionObserver(handleIntersection, { threshold: 0.01 })
+      belowTheFoldObserver.observe(belowTheFold)
+    } else {
+      console.error('Could not find below the fold')
+    }
+    // the exchange button's pulse (a box shadow, painted on the main thread) pauses while the button is more
+    // than a screen away from view of the scrolling content, so it runs again before it scrolls back in
+    const cta = document.querySelector('.home-view__exchange-cta')
+    if (cta) {
+      ctaObserver = new IntersectionObserver(entries => {
+        ctaOffscreen.value = !entries[entries.length - 1].isIntersecting
+      }, { root: document.querySelector('.app__content'), rootMargin: '100% 0px' })
+      ctaObserver.observe(cta)
+    }
+  }
+  watch(() => route.path === '/', observeHome)
+
+  // The floating tacos pause once they have faded out (fully transparent, so nothing visible stops)
+  // and run on from there as they fade back in.
+  const tacosEl = ref<HTMLElement | null>(null)
+  const tacosFadedOut = ref(false)
+  const tacosPaused = computed(() => isBelowTheFoldVisible.value && tacosFadedOut.value)
+  const tacosTransparent = () => !!tacosEl.value && getComputedStyle(tacosEl.value).opacity === '0'
+  const onTacosFade = (e: TransitionEvent) => {
+    if (e.target !== e.currentTarget || e.propertyName !== 'opacity') return
+    tacosFadedOut.value = isBelowTheFoldVisible.value && tacosTransparent()
+  }
+  // a fade starts from running tacos, and one with nothing to do (already transparent) pauses at once
+  watch(isBelowTheFoldVisible, visible => { tacosFadedOut.value = visible && tacosTransparent() }, { flush: 'post' })
 
   // redirect to dao page
   const redirectToDao = () => {
@@ -2681,43 +2756,8 @@ import youtubeThumb from '../assets/images/getting-started-video.webp'
     // Prefetch common routes in background (non-blocking)
     prefetchRoutes()
 
-    // Fetch neurons count in background if user is already logged in
-    // Note: checkIfLoggedIn is already called in App.vue
-    if (userLoggedIn.value) {
-      tacoStore.getTacoNeurons().then(rawNeurons => {
-        localNeuronsCount.value = rawNeurons.length
-      }).catch(err => { console.error('Failed to load neurons count:', err) })
-    }
-
-    // get the below the fold element
-    const belowTheFold = document.querySelector('.home-view__below-the-fold')
-
-    // if below the fold exists
-    if (belowTheFold) {
-      
-      // create intersection observer
-      const observer = new IntersectionObserver(handleIntersection, {
-
-        // set threshold
-        threshold: 0.01
-
-      })
-
-      // sart observing below the fold
-      observer.observe(belowTheFold)
-      
-      // store observer for cleanup
-      ;(window as any).belowTheFoldObserver = observer
-
-    } 
-    
-    // else no below the fold element
-    else {
-
-      // log error
-      console.error('Could not find below the fold')
-
-    }
+    // observe while Home is shown
+    observeHome(route.path === '/')
 
     // Defer the heavy DEX/YouTube iframes off the homepage critical path.
     // They're below the fold; loading them in an idle tick keeps first paint
@@ -2732,37 +2772,10 @@ import youtubeThumb from '../assets/images/getting-started-video.webp'
 
   })
 
-  // Watch for login state changes to update neurons count
-  watch(userLoggedIn, (loggedIn) => {
-    if (loggedIn) {
-      tacoStore.getTacoNeurons().then(rawNeurons => {
-        localNeuronsCount.value = rawNeurons.length
-      }).catch(err => { console.error('Failed to load neurons count:', err) })
-    } else {
-      localNeuronsCount.value = 0
-    }
-  })
-
-  // clean up observer
+  // clean up observers
   onUnmounted(() => {
-
-    // get the observer
-    const observer = (window as any).belowTheFoldObserver
-    
-    // if observer exists
-    if (observer) {
-
-      // stop observing
-      observer.disconnect()
-      
-      // log
-      // console.log('Intersection observer disconnected')
-      
-      // clean up
-      delete (window as any).belowTheFoldObserver
-
-    }
-
+    belowTheFoldObserver?.disconnect()
+    ctaObserver?.disconnect()
   })
 
 </script>
