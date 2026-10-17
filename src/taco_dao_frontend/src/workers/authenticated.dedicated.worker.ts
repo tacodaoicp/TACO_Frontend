@@ -1405,6 +1405,9 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 
   // Who and where this fetch is for; checked again when the answer lands
   const epoch = networkEpoch
+  // A forced fetch sends its own composite query instead of taking the answer
+  // of one that may have started before the action it wants to see
+  const joinRunning = !queue.isForced(dataKey)
   const owner = USER_KEYS.includes(dataKey) ? currentPrincipal : null
 
   let data: unknown
@@ -1416,7 +1419,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       break
 
     case 'tokenDetails': {
-      const dashboard = await getVoteDashboardCoalesced(anonymousAgent!)
+      const dashboard = await getVoteDashboardCoalesced(anonymousAgent!, { joinRunning })
       if (!dashboard) {
         const rawTokenData = await fetchTokenDetailsData(anonymousAgent!)
         data = serializeForTransfer(rawTokenData)
@@ -1429,7 +1432,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
 
     case 'tokenMaxAllocations': {
       // Derived from vote dashboard — use coalesced fetch to avoid duplicate network calls
-      const tmaDashboard = await getVoteDashboardCoalesced(anonymousAgent!)
+      const tmaDashboard = await getVoteDashboardCoalesced(anonymousAgent!, { joinRunning })
       if (tmaDashboard?.tokenDetails) {
         const maxAllocations: [any, bigint][] = []
         for (const [principal, details] of tmaDashboard.tokenDetails) {
@@ -1446,7 +1449,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
     }
 
     case 'tradingStatus': {
-      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(anonymousAgent!)
+      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(anonymousAgent!, { joinRunning })
       if (!enhancedDashboard) {
         data = serializeForTransfer(await fetchTradingStatusData(anonymousAgent!))
       } else {
@@ -1463,7 +1466,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
     case 'leaderboardOneMonthICP':
     case 'leaderboardOneWeekUSD':
     case 'leaderboardOneWeekICP': {
-      const allBoards = await getAllLeaderboardsCoalesced(anonymousAgent!)
+      const allBoards = await getAllLeaderboardsCoalesced(anonymousAgent!, { joinRunning })
       if (!allBoards) {
         // Fallback to individual call
         let timeframe: 'AllTime' | 'OneYear' | 'OneMonth' | 'OneWeek' = 'AllTime'
@@ -1507,7 +1510,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
     case 'timerStatus': {
       // Snapshot info only. It used to carry copies of the trading status
       // (~650 KB) and the token details too, which their own keys deliver.
-      const dashboard = await getVoteDashboardCoalesced(anonymousAgent!)
+      const dashboard = await getVoteDashboardCoalesced(anonymousAgent!, { joinRunning })
       if (!dashboard) {
         data = serializeForTransfer({ snapshotInfo: await fetchSnapshotInfoData(anonymousAgent!) })
       } else {
@@ -1559,7 +1562,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       data = serializeForTransfer(await fetchPenalizedNeuronsData(agent))
       break
     case 'rebalanceConfig': {
-      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(agent)
+      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(agent, { joinRunning })
       if (enhancedDashboard) {
         data = serializeForTransfer(enhancedDashboard.systemParameters)
         await populateEnhancedTreasurySiblings(enhancedDashboard, 'rebalanceConfig')
@@ -1575,7 +1578,7 @@ async function fetchData(dataKey: DataKey): Promise<void> {
       data = serializeForTransfer(await fetchPriceAlertsData(agent))
       break
     case 'tradingPauses': {
-      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(agent)
+      const enhancedDashboard = await getEnhancedTreasuryDashboardCoalesced(agent, { joinRunning })
       if (enhancedDashboard) {
         data = serializeForTransfer(enhancedDashboard.tradingPauses)
         await populateEnhancedTreasurySiblings(enhancedDashboard, 'tradingPauses')
