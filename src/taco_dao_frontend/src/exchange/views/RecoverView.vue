@@ -29,18 +29,24 @@
           Anything found is returned to your wallet. A full run can take a few minutes; you can watch it work below.
         </p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="ex-btn ex-btn--primary" :disabled="!store.isAuthenticated || raRunning || saleRunning" @click="recoverAll()">
-            {{ raRunning && raScope === 'all' ? `Running... ${raElapsed}s` : 'Recover All' }}
+          <!-- a swap or sale still running in any tab: the run waits for it (never past the lock's cap) -->
+          <button class="ex-btn ex-btn--primary" :disabled="!store.isAuthenticated || raRunning || raWaiting" @click="recoverAll()">
+            {{ raLabel('all', 'Recover All') }}
           </button>
-          <button class="ex-btn ex-btn--outline" :disabled="!store.isAuthenticated || raRunning || saleRunning" @click="recoverAll('icpswap')">
-            {{ raRunning && raScope === 'icpswap' ? `Running... ${raElapsed}s` : 'ICPSwap Only' }}
+          <button class="ex-btn ex-btn--outline" :disabled="!store.isAuthenticated || raRunning || raWaiting" @click="recoverAll('icpswap')">
+            {{ raLabel('icpswap', 'ICPSwap Only') }}
           </button>
-          <button class="ex-btn ex-btn--outline" :disabled="!store.isAuthenticated || raRunning || saleRunning" @click="recoverAll('neutrinite')">
-            {{ raRunning && raScope === 'neutrinite' ? `Running... ${raElapsed}s` : 'Neutrinite Only' }}
+          <button class="ex-btn ex-btn--outline" :disabled="!store.isAuthenticated || raRunning || raWaiting" @click="recoverAll('neutrinite')">
+            {{ raLabel('neutrinite', 'Neutrinite Only') }}
           </button>
         </div>
         <p class="recover-view__desc" style="margin:0">The two smaller buttons run just that exchange's checks, same scan, same recovery.</p>
-        <div v-if="saleRunning || lockNote" class="ex-error-box">{{ SALE_RUNNING_RECOVERY_TEXT }}</div>
+        <div v-if="raWaiting" class="recover-view__ra-wait" role="status">
+          <span>{{ RECOVERY_WAITS_TEXT }}</span>
+          <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="stopWaiting">Stop waiting</button>
+        </div>
+        <div v-else-if="saleRunning" class="ex-warning-box">A sale is running in this browser. Recover All waits for it, and the other recovery buttons work again when it ends.</div>
+        <div v-else-if="lockNote" class="ex-error-box">{{ SALE_RUNNING_RECOVERY_TEXT }}</div>
         <div v-if="!store.isAuthenticated" class="recover-view__desc">Connect your wallet to run this.</div>
         <div v-if="raRows.length > 0" class="recover-view__stuck-list">
           <div v-for="row in raRows" :key="row.id" class="recover-view__stuck-item">
@@ -327,6 +333,8 @@
 // evicted mid Recover All run. The promises keep running; a re-entered
 // instance must not double-start, so the flag lives outside the component.
 let raActive = false
+/** A Recover All waiting for the funds lock (aborting it stops the wait). */
+let raWait: AbortController | null = null
 </script>
 
 <script setup lang="ts">
@@ -338,7 +346,7 @@ import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { getDepositHistory, removeDepositFromCache } from '../utils/deposit'
 import { runJournal } from '../utils/runJournalStore'
-import { withFundsLock, isSaleRunning, BUSY, SALE_RUNNING_RECOVERY_TEXT } from '../utils/saleLock'
+import { withFundsLock, isSaleRunning, BUSY, SALE_RUNNING_RECOVERY_TEXT, RECOVERY_WAITS_TEXT, FUNDS_LOCK_CAP_MS } from '../utils/saleLock'
 import { useInterruptedSale } from '../composables/useInterruptedSale'
 import { mergeDepositRows, isOtherWallet as isOtherWalletRow, batchItemRecovered, batchRefused, type DepositRow, type MaySentRow } from '../utils/recoverRows'
 import { useExchangeToast } from '../composables/useExchangeToast'
@@ -1105,11 +1113,36 @@ async function raPulls(): Promise<void> {
 
 type RaScope = 'all' | 'icpswap' | 'neutrinite'
 const raScope = ref<RaScope>('all')
+const raWaiting = ref(false)
 
-function recoverAll(scope: RaScope = 'all') {
-  if (raActive || !store.isAuthenticated) return
-  return guarded(() => recoverAllInner(scope))
+function raLabel(scope: RaScope, idle: string): string {
+  if (raRunning.value && raScope.value === scope) return `Running... ${raElapsed.value}s`
+  if (raWaiting.value && raScope.value === scope) return 'Starts when the swap ends'
+  return idle
 }
+
+// Recover All and its scope buttons take the funds lock exclusive, waiting for it: a single swap or a sale
+// of any tab keeps its pair markers and its balances in the pools and on the pylon until it ends (a marker
+// this run removed, or a balance it swept, would leave that swap reading its own funds wrong). Every holder
+// lets go by the lock's cap, so the wait never goes past it; a new swap meanwhile is refused (it queues
+// behind this run). The run itself is unchanged: the full scan and every sweep.
+function recoverAll(scope: RaScope = 'all') {
+  if (raActive || raWait || !store.isAuthenticated) return
+  raScope.value = scope
+  const ctl = new AbortController()
+  raWait = ctl
+  const done = () => { if (raWait === ctl) raWait = null; raWaiting.value = false }
+  return withFundsLock('exclusive', () => { done(); return recoverAllInner(scope) }, {
+    waitMs: FUNDS_LOCK_CAP_MS,
+    signal: ctl.signal,
+    onWait: () => { raWaiting.value = true },
+  }).then((r) => {
+    if (r !== BUSY) return
+    done()
+    if (!ctl.signal.aborted) toast.warning('Recovery did not start', 'A swap was still running after 10 minutes. Try again when it ends.')
+  })
+}
+function stopWaiting() { raWait?.abort() }
 async function recoverAllInner(scope: RaScope) {
   if (raActive || !store.isAuthenticated) return
   raActive = true
@@ -1169,11 +1202,18 @@ onMounted(() => {
   loadPendingSwaps()
   void loadPendingPulls()
   void checkInterrupted()
-  // If a run from an evicted instance is still going, reflect it and clear
-  // the button once it finishes.
+  // If a run from an evicted instance is still going, or still waiting for the
+  // funds lock, reflect it and clear the button once it finishes.
   if (raActive) {
     raRunning.value = true
     const t = setInterval(() => { if (!raActive) { raRunning.value = false; clearInterval(t) } }, 2000)
+  } else if (raWait) {
+    raWaiting.value = true
+    const t = setInterval(() => {
+      if (raActive) raRunning.value = true
+      if (!raWait) raWaiting.value = false
+      if (!raWait && !raActive) { raRunning.value = false; clearInterval(t) }
+    }, 1000)
   }
 })
 
@@ -1314,6 +1354,12 @@ onVisible(() => {
   &__token-id { font-size: var(--text-xs); color: var(--text-tertiary); margin-left: 4px; }
 
   &__interrupted {
+    font-size: var(--text-sm); line-height: 1.45; color: var(--text-primary);
+    background: var(--tx-warning-dim); border-radius: 8px; padding: 8px 10px;
+  }
+  // Recover All waits for a running swap: says so plainly, with a way to stop waiting
+  &__ra-wait {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
     font-size: var(--text-sm); line-height: 1.45; color: var(--text-primary);
     background: var(--tx-warning-dim); border-radius: 8px; padding: 8px 10px;
   }

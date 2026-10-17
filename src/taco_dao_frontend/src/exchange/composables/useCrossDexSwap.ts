@@ -386,7 +386,8 @@ export function useCrossDexSwap() {
       const first = await Promise.race([locked.then(v => (v === BUSY ? 'busy' : 'done')), ui])
       if (first === 'busy') {
         phase.value = 'ready'
-        toast.warning('Sale in progress', 'A Sell many sale is running. Try again when it finishes.')
+        // a Sell many sale holds the funds lock, or Recover All holds it or waits for it
+        toast.warning('Swap not started', 'A sale or a recovery is running in this browser. Try again when it finishes.')
       }
     } finally {
       executing = false
