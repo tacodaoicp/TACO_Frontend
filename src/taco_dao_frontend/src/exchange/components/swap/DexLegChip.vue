@@ -83,11 +83,12 @@ const meaning = computed(() => {
     animation: dex-chip-spin 0.7s linear infinite;
   }
 
-  &--done { border-color: color-mix(in srgb, var(--tx-buy) 35%, transparent); .dex-chip__g { color: var(--tx-buy); } }
-  &--low { border-color: color-mix(in srgb, var(--tx-warning) 45%, transparent); .dex-chip__g { color: var(--tx-warning); } }
-  &--ref { border-color: color-mix(in srgb, var(--tx-warning) 45%, transparent); .dex-chip__g { color: var(--tx-warning); } }
-  &--defer { .dex-chip__g { color: var(--tx-warning); } }
-  &--fail { border-color: color-mix(in srgb, var(--tx-sell) 45%, transparent); .dex-chip__g { color: var(--tx-sell); } }
+  // the glyphs use the text inks (at least 4.5:1 on the chip in both themes); the borders keep the base colours
+  &--done { border-color: color-mix(in srgb, var(--tx-buy) 35%, transparent); .dex-chip__g { color: var(--tx-buy-ink); } }
+  &--low { border-color: color-mix(in srgb, var(--tx-warning) 45%, transparent); .dex-chip__g { color: var(--tx-warning-ink); } }
+  &--ref { border-color: color-mix(in srgb, var(--tx-warning) 45%, transparent); .dex-chip__g { color: var(--tx-warning-ink); } }
+  &--defer { .dex-chip__g { color: var(--tx-warning-ink); } }
+  &--fail { border-color: color-mix(in srgb, var(--tx-sell) 45%, transparent); .dex-chip__g { color: var(--tx-sell-ink); } }
   &--unsure { border-color: color-mix(in srgb, var(--tx-warning) 55%, transparent); .dex-chip__g { color: var(--tx-warning-ink); font-weight: 800; } }
   &--skip { color: var(--tx-muted-ink); .dex-chip__g { color: var(--tx-ink-3); } }
   &--wait .dex-chip__g { color: var(--tx-ink-3); }

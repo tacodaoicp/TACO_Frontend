@@ -635,7 +635,7 @@ onMounted(() => {
     &.is-partial { background: var(--tx-warning-dim); color: var(--tx-warning-ink); }
     &.is-error { background: var(--tx-sell-dim); color: var(--tx-sell-ink); }
   }
-  &__exec-sub { margin: 0; font-size: var(--text-xs); color: var(--text-tertiary); }
+  &__exec-sub { margin: 0; font-size: var(--text-xs); color: var(--tx-muted-ink); }
 
   &__exec-legs { display: flex; flex-direction: column; gap: 10px; }
   &__exec-leg {
@@ -652,7 +652,7 @@ onMounted(() => {
   &__exec-leg-icon { margin-left: auto; display: inline-flex; align-items: center; }
   &__check { color: var(--tx-buy-ink); font-weight: 700; }
   &__cross { color: var(--tx-sell-ink); font-weight: 700; }
-  &__skip { color: var(--tx-ink-3); font-weight: 700; }
+  &__skip { color: var(--tx-muted-ink); font-weight: 700; }
   &__ref { color: var(--tx-ink-2); font-weight: 700; }
   &__warn {
     width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
