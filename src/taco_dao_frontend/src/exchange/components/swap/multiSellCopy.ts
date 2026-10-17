@@ -144,6 +144,9 @@ export function legDetail(l: LegRun, sym: string, amountIn: string, outText: str
       if (l.reason === 'admin') return `The TACO exchange could not confirm this part. Do not repeat this sale. Open the Recover page${l.block != null ? `, or contact support with deposit ${l.block}` : ''}.`
       if (l.reason === 'tacoPaused') return 'The TACO exchange is paused right now. Your deposit is safe there. Use the Recover page when it is back.'
       if (l.reason === 'rateLimited') return 'The TACO exchange is busy for your wallet. Use the Recover page in a few minutes.'
+      // some or all of the ICP may already be in the wallet (a lost withdraw answer, or only part came
+      // back from a look): the wallet comes first
+      if (l.outMaybeSent) return `${subject} sold this part. The ICP may already be in your wallet, check it before using the Recover page.`
       return l.failedAfterSwap
         ? `${subject} sold this part but could not send the ICP to your wallet.`
         : `${subject} stopped after the deposit and the automatic refund did not go through.`
@@ -158,6 +161,7 @@ export function recoverWhere(l: LegRun): string {
   if (l.reason === 'admin') return 'Outcome unknown. Do not repeat the sale.'
   if (l.reason === 'tacoPaused') return 'Safe on the TACO exchange. Recover when it is back.'
   if (l.reason === 'rateLimited') return 'Recover in a few minutes.'
+  if (l.outMaybeSent) return 'May be in your wallet already. Check it before using the Recover page.'
   if (l.failedAfterSwap) return 'Not sent yet. Use the Recover page.'
   return 'Not refunded yet. Use the Recover page.'
 }

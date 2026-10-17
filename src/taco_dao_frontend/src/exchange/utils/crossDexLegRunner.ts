@@ -126,6 +126,11 @@ export interface LegOutcome {
   refundedBy?: 'us' | 'exchange'
   /** The swap ran but its output could not be sent to the wallet. */
   failedAfterSwap?: boolean
+  /** With failedAfterSwap: some or all of the output may already be in the wallet. The withdraw's
+   *  answer was lost and no look found the output, a look found it and then lost its own answer, or
+   *  a look brought back only part of it. The total leaves it out; the text says to check the wallet
+   *  before the Recover page. */
+  outMaybeSent?: boolean
   /** TACO V1 deposit block, when one was made. */
   block?: bigint
   /** V1 deposit to refund after the exchange's call window (Sell many). */
@@ -263,6 +268,8 @@ export interface IcpTrack {
   swappedOut?: bigint
   /** The pool answered the swap with an error: nothing sold. */
   swapRefused?: boolean
+  /** The pool answered the withdraw with an error (unset when its answer was lost). */
+  withdrawRefused?: boolean
 }
 
 export interface NeuTrack {
@@ -272,6 +279,8 @@ export interface NeuTrack {
   hadMarker?: boolean
   /** dex_swap was sent: from here the swap may have run even when its answer is lost. */
   swapSent?: boolean
+  /** The withdraw answered with a refusal (unset when its answer was lost, so it may have run). */
+  withdrawRefused?: boolean
 }
 
 export interface SweepReport {
@@ -442,11 +451,17 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
       }
     }
     ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
-    // a recovery that failed because the session ended says so: the sale asks to reconnect first
+    // The output may already be in the wallet when the withdraw's answer was lost (not refused) and no
+    // look found it in the pool, or when a look found it and a later look found nothing (that look's
+    // own withdraw lost its answer). A recovery that failed because the session ended says so: the sale
+    // asks to reconnect first.
+    const foundOut = report.found.some(f => f.token === buy)
+    const outMaybeSent = track.step === 'withdraw' && track.swappedOut != null
+      && ((!track.withdrawRefused && !foundOut) || (foundOut && (report.emptyLooks ?? 0) > 0))
     return recovered
       ? { dex: 'icpswap', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true }
       : { dex: 'icpswap', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
-          failedAfterSwap: track.swappedOut != null, reason: isSessionError(report.lastError) ? 'session' : undefined }
+          failedAfterSwap: track.swappedOut != null, outMaybeSent, reason: isSessionError(report.lastError) ? 'session' : undefined }
   }
 }
 
@@ -496,6 +511,9 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     let recovered = false
     let emptyLooks = 0
     let lastErr: unknown = null
+    // a look found the ICP and threw (its own withdraw failed or lost its answer), then a later look
+    // found nothing: the ICP left the pylon, for the wallet
+    let foundOutBefore = false, emptyAfterFound = false
     const report: SweepReport = { found: [], moved: [] }
     for (let i = 0; i < 3 && !recovered; i++) {
       if (i > 0) await deps.clock.sleep(5000)
@@ -503,9 +521,10 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
         recovered = await deps.neutrinite.sweep(sell, buy, track.before, { report })
         // a sweep throws when the pylon read or a withdraw fails, so a plain false is a real look
         // that found nothing above the start balances
-        if (!recovered) emptyLooks++
+        if (!recovered) { emptyLooks++; if (foundOutBefore) emptyAfterFound = true }
         lastErr = null
       } catch (e) { lastErr = e; ctx.log?.(`[CrossDEX] Neutrinite sweep attempt ${i + 1} failed:`, e) }
+      if (report.found.some(f => f.token === buy)) foundOutBefore = true
     }
     // The start balances are the baseline of every look. Only when the pylon held no more than dust
     // of either token as this swap started does nothing above them mean nothing there at all: with an
@@ -547,10 +566,15 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
       ctx.onStep('Failed, funds recovered')
       return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true }
     }
-    // Not recovered, only part of the ICP, or nothing that is this part's: the marker stays.
+    // Not recovered, only part of the ICP, or nothing that is this part's: the marker stays. The
+    // ICP may already be in the wallet when the withdraw's answer was lost (not refused) and no look
+    // found it, when a look found it and then lost its own answer, or when a look brought back only
+    // part of it.
     ctx.onStep('Failed, recover on the Recover page')
+    const outMaybeSent = partOnly || (track.swappedOut != null
+      && ((!track.withdrawRefused && !report.found.some(f => f.token === buy)) || emptyAfterFound))
     return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
-      failedAfterSwap: track.swappedOut != null, reason: isSessionError(lastErr) ? 'session' : undefined }
+      failedAfterSwap: track.swappedOut != null, outMaybeSent, reason: isSessionError(lastErr) ? 'session' : undefined }
   }
 }
 

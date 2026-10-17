@@ -61,6 +61,9 @@ export interface IcpSwapTrack {
   swappedOut?: bigint
   /** The pool answered the swap with an error: nothing was sold (the deposit sits unused). */
   swapRefused?: boolean
+  /** The pool answered the withdraw with an error: the output stays in the pool (unset when the
+   *  withdraw's answer was lost, so it may have run). */
+  withdrawRefused?: boolean
 }
 
 export interface IcpSwapParams {
@@ -566,6 +569,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     token: params.buyTokenPrincipal,
   })) as any
   if ('err' in withdrawResult) {
+    track.withdrawRefused = true
     throw new Error(`Withdraw failed: ${safeStringify(withdrawResult.err)}`)
   }
 

@@ -348,9 +348,10 @@ export interface NeutriniteSwapParams {
    *  recovery look could not tell this swap's tokens from that balance. */
   maxSellBefore?: bigint
   /** Filled in for the caller's recovery: pylon balances before our deposit, the swap output,
-   *  whether an earlier swap on this pair had already left a marker, and whether dex_swap was sent
-   *  (it may have run even when its answer is lost). */
-  track?: { before?: { sell: bigint; buy: bigint }; swappedOut?: bigint; hadMarker?: boolean; swapSent?: boolean }
+   *  whether an earlier swap on this pair had already left a marker, whether dex_swap was sent
+   *  (it may have run even when its answer is lost), and whether the withdraw answered with a
+   *  refusal (unset when its answer was lost). */
+  track?: { before?: { sell: bigint; buy: bigint }; swappedOut?: bigint; hadMarker?: boolean; swapSent?: boolean; withdrawRefused?: boolean }
   /** A run's own agent and principal; default: the cached session. */
   agent?: HttpAgent
   owner?: Principal
@@ -476,6 +477,8 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   const inner = cmd && 'ok' in cmd ? cmd.ok.commands?.[0]?.transfer : null
   if (!(inner && 'ok' in inner)) {
     console.warn('[neutrinite] output withdraw not delivered:', safeStringify(cmd))
+    // answered with a refusal: the output stays on the pylon (a thrown call may have run)
+    if (params.track) params.track.withdrawRefused = true
     throw new Error('Neutrinite swapped, but sending the output to your wallet failed')
   }
 

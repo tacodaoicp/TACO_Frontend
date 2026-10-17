@@ -196,9 +196,11 @@
                     ? 'Your funds for this route stayed in your wallet.'
                     : lv.outcome?.recovered
                       ? 'Funds were refunded to your wallet.'
-                      : lv.outcome?.reason === 'session'
-                        ? 'Your session expired before the funds could be recovered. Reconnect your wallet, then use the Recover page.'
-                        : 'Funds were not recovered automatically. Use the Recover page to sweep them.' }}
+                      : lv.outcome?.outMaybeSent
+                        ? maybeSentNote(lv.outcome.reason)
+                        : lv.outcome?.reason === 'session'
+                          ? 'Your session expired before the funds could be recovered. Reconnect your wallet, then use the Recover page.'
+                          : 'Funds were not recovered automatically. Use the Recover page to sweep them.' }}
               </div>
             </div>
           </div>
@@ -309,6 +311,13 @@ function formatFrom(amt: bigint): string {
 function formatTo(amt: bigint): string {
   const t = cx.tokenTo.value
   return t ? formatTokenAmount(amt, Number(t.decimals), t.symbol) : amt.toString()
+}
+
+/** A route whose withdraw answer was lost: its output may already be in the wallet. */
+function maybeSentNote(reason?: string): string {
+  const sym = cx.tokenTo.value?.symbol ?? 'output'
+  return `The swap went through. The ${sym} may already be in your wallet, check it before using the Recover page.`
+    + (reason === 'session' ? ' If it is not there, reconnect your wallet first.' : '')
 }
 
 type LegStatus = 'running' | 'success' | 'failed'
