@@ -1550,6 +1550,16 @@ onMounted(() => {
     workerBridge.fetch('aggregateAllocation', false);
     workerBridge.fetch('tradingPauses', false);
     workerBridge.fetch('neuronAllocations', false);
+
+    // The data worker has no fetch for portfolioSnapshotStatus, so the snapshot card is filled
+    // from the treasury dashboard (anonymous query) unless this tab already has the status
+    if (!cachedPortfolioSnapshotStatus.value) {
+        tacoStore.fetchEnhancedTreasuryDashboard().then(() => {
+            const minutes = cachedPortfolioSnapshotStatus.value?.intervalMinutes
+            // the interval input starts at the real interval, as when the status was already here
+            if (minutes && newPortfolioSnapshotInterval.value === 60) newPortfolioSnapshotInterval.value = minutes
+        });
+    }
 });
 
 // Watch cached data and sync to local refs
@@ -2535,6 +2545,8 @@ async function refreshUserVotingPower() {
 function refreshPortfolioSnapshotStatus() {
     console.log('AdminView: Triggering worker refresh for portfolio snapshot status');
     workerBridge.fetch('portfolioSnapshotStatus', true);
+    // the worker has no fetch for this key; the treasury dashboard carries the status
+    tacoStore.fetchEnhancedTreasuryDashboard();
 }
 
 async function showStartPortfolioSnapshotsConfirmation() {
