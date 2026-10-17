@@ -226,18 +226,43 @@ function othersName(n: number, noun: string, total?: number, confirmed?: number)
   if (n === 1) return total === 2 ? `The other ${noun}` : total === 3 ? `The third ${noun}` : `The last ${noun}`
   return n === 2 ? `The other two ${noun}s` : `The other ${noun}s`
 }
+const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten']
+/** "One part", "Two parts", "12 parts" at the start of a sentence. */
+const countOf = (n: number, noun: string) => `${COUNT_WORDS[n] ?? String(n)} ${n === 1 ? noun : `${noun}s`}`
+/** The same sentences, each kind with its own count ("One part sold, and its ICP may already be in your
+ *  wallet. One part may not have sold."): when kinds mix, or after a count of tokens. */
+function countedText(kinds: Record<UnsureKind, number>, sym: string, noun: string): string {
+  const out: string[] = []
+  if (kinds.icp) out.push(`${countOf(kinds.icp, noun)} sold, and ${kinds.icp === 1 ? 'its' : 'their'} ${sym} may already be in your wallet.`)
+  if (kinds.sale) out.push(`${countOf(kinds.sale, noun)} may not have sold.`)
+  if (kinds.back) out.push(`${countOf(kinds.back, noun)} ${kinds.back === 1 ? 'was' : 'were'} not swapped, and ${kinds.back === 1 ? 'its' : 'their'} tokens may already be back in your wallet.`)
+  return out.join(' ')
+}
 /** The sentences for every part or route that may already be settled in the wallet, by kind. `also`: other
- *  parts or routes are confirmed (`total` and `confirmed` name the rest when one kind covers it). */
-export function unsureText(kinds: Record<UnsureKind, number>, sym: string, opts: { noun?: 'route' | 'part'; whole?: boolean; also?: boolean; total?: number; confirmed?: number } = {}): string {
+ *  parts or routes are confirmed (`total` and `confirmed` name the rest when one kind covers it). `counted`:
+ *  the text follows a count of tokens, so each kind gets its own count. Kinds that mix always get counts. */
+export function unsureText(kinds: Record<UnsureKind, number>, sym: string, opts: { noun?: 'route' | 'part'; whole?: boolean; also?: boolean; total?: number; confirmed?: number; counted?: boolean } = {}): string {
   const kindsUsed = (Object.keys(kinds) as UnsureKind[]).filter(k => kinds[k] > 0)
-  const name = (n: number) => (kindsUsed.length === 1 ? othersName(n, opts.noun ?? 'route', opts.total, opts.confirmed) : undefined)
-  const o = (n: number) => ({ noun: opts.noun, whole: opts.whole && kindsUsed.length === 1 && n === 1, also: opts.also, others: opts.also ? name(n) : undefined })
+  if (kindsUsed.length > 1 || opts.counted) return countedText(kinds, sym, opts.noun ?? 'route')
+  const name = (n: number) => othersName(n, opts.noun ?? 'route', opts.total, opts.confirmed)
+  const o = (n: number) => ({ noun: opts.noun, whole: opts.whole && n === 1, also: opts.also, others: opts.also ? name(n) : undefined })
   const out: string[] = []
   if (kinds.icp) out.push(soldMaybeInWallet(kinds.icp, sym, o(kinds.icp)))
   if (kinds.sale) out.push(maybeNotSold(kinds.sale, o(kinds.sale)))
   if (kinds.back) out.push(notSwappedMaybeBack(kinds.back, o(kinds.back)))
   return out.join(' ')
 }
+/** "1 of 4 tokens is fully sold." */
+export function fullySoldText(sold: number, total: number): string {
+  return `${sold} of ${plural(total, 'token', 'tokens')} ${sold === 1 ? 'is' : 'are'} fully sold.`
+}
+/** "1 of 3 routes filled." (a partial fill with no route left unsure) */
+export function filledText(filled: number, total: number): string {
+  return `${filled} of ${plural(total, 'route', 'routes')} filled.`
+}
+/** A single swap where every route was refused or refunded: nothing left the wallet for good. */
+export const NOTHING_SWAPPED = 'Nothing was swapped'
+export const NOTHING_SWAPPED_TEXT = 'Your funds stayed in or went back to your wallet, minus network fees.'
 /** "2 of 3 routes are confirmed." */
 export function confirmedText(confirmed: number, total: number, noun: 'route' | 'token' = 'route'): string {
   return `${confirmed} of ${plural(total, noun, `${noun}s`)} ${confirmed === 1 ? 'is' : 'are'} confirmed.`

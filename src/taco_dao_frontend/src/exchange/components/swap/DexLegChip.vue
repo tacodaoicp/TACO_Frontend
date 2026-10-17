@@ -90,7 +90,7 @@ const meaning = computed(() => {
   &--defer { .dex-chip__g { color: var(--tx-warning-ink); } }
   &--fail { border-color: color-mix(in srgb, var(--tx-sell) 45%, transparent); .dex-chip__g { color: var(--tx-sell-ink); } }
   &--unsure { border-color: color-mix(in srgb, var(--tx-warning) 55%, transparent); .dex-chip__g { color: var(--tx-warning-ink); font-weight: 800; } }
-  &--skip { color: var(--tx-muted-ink); .dex-chip__g { color: var(--tx-ink-3); } }
+  &--skip { color: var(--tx-muted-ink); .dex-chip__g { color: var(--tx-muted-ink); } }
   &--wait .dex-chip__g { color: var(--tx-ink-3); }
 }
 @keyframes dex-chip-spin { to { transform: rotate(360deg); } }

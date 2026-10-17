@@ -276,9 +276,10 @@ function cell(a: MultiSellRun['assets'][number]): { text: string; cls: string; s
   // the rest of the token's parts may already be settled in the wallet: the wallet first, not partly sold
   // and not a failure
   const restMaybe = ls.filter(l => !SOLD.includes(l.state)).every(maybeSentLeg)
-  if (sold.length > 0 && restMaybe) return { text: 'Check wallet', cls: 'warn', glyph: '!', tag }
+  // the unsure glyph is ? everywhere (the chips, this cell, the single swap route card)
+  if (sold.length > 0 && restMaybe) return { text: 'Check wallet', cls: 'warn', glyph: '?', tag }
   if (sold.length > 0) return { text: 'Partly sold', cls: 'part', out, tag }
-  if (bad && onlyMaybeSent(ls)) return { text: 'Check wallet', cls: 'warn', glyph: '!' }
+  if (bad && onlyMaybeSent(ls)) return { text: 'Check wallet', cls: 'warn', glyph: '?' }
   if (bad) return { text: 'Needs recovery', cls: 'fail' }
   if (ls.some(l => l.state === 'refunded')) return { text: 'Refunded', cls: 'ref', glyph: '↩' }
   return { text: 'Not sent', cls: 'skip' }

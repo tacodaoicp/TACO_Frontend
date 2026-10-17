@@ -45,7 +45,7 @@ import {
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
 import { icrcIDL } from '../../shared/icrc-idl'
-import { CHECK_WALLET, NOT_IN_WALLET, unsureKinds, unsureText, confirmedText, maybeSentLeg } from '../components/swap/multiSellCopy'
+import { CHECK_WALLET, NOT_IN_WALLET, NOTHING_SWAPPED, NOTHING_SWAPPED_TEXT, unsureKinds, unsureText, confirmedText, filledText, maybeSentLeg } from '../components/swap/multiSellCopy'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
 export type CrossDexPhase =
@@ -550,7 +550,8 @@ export function useCrossDexSwap() {
       if (maybeSent) {
         toast.warning(CHECK_WALLET, `${confirmedText(successes.length, results.length)} ${unsureText(kinds, buyToken.symbol, { also: true, total: results.length, confirmed: successes.length })} Check your wallet before you swap again.`)
       } else {
-        toast.warning('Partial fill', `${confirmedText(successes.length, results.length)} Check each route's status. Anything not recovered automatically is on the Recover page.`)
+        // no route is unsure: the others are known refunded, not sent or on the Recover page
+        toast.warning('Partial fill', `${filledText(successes.length, results.length)} Check each route's status. Anything not recovered automatically is on the Recover page.`)
       }
     } else {
       // A dead session fails every leg the same way; reset auth once instead of
@@ -566,6 +567,8 @@ export function useCrossDexSwap() {
       // a route may already be settled in the wallet: never "failed" without the wallet first (the message
       // does not repeat the title)
       if (maybeSent) toast.warning(CHECK_WALLET, `${unsureText(kinds, buyToken.symbol, { whole: results.length === 1 })} ${NOT_IN_WALLET}`)
+      // every route refused or refunded: nothing to do, a neutral verdict without the raw errors
+      else if (results.every(r => r.state === 'refunded' || r.state === 'notSent')) toast.info(NOTHING_SWAPPED, NOTHING_SWAPPED_TEXT)
       else toast.error('CrossDEX Swap Failed', errorMsg.value)
     }
   }

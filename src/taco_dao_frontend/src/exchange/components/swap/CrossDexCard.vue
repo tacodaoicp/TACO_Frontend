@@ -176,7 +176,7 @@
                 <span v-if="lv.status === 'running'" class="crossdex-card__spinner"></span>
                 <span v-else-if="lv.status === 'success'" class="crossdex-card__check">✓</span>
                 <!-- it may already be settled in the wallet: a warning, not a failure -->
-                <span v-else-if="lv.status === 'unsure'" class="crossdex-card__warn" role="img" :aria-label="unsureAria(lv.outcome)">!</span>
+                <span v-else-if="lv.status === 'unsure'" class="crossdex-card__warn" role="img" :aria-label="unsureAria(lv.outcome)">?</span>
                 <!-- nothing left the wallet for this route: not sent, as Sell many draws it -->
                 <span v-else-if="lv.status === 'skipped'" class="crossdex-card__skip" role="img" aria-label="Not sent, stayed in your wallet">○</span>
                 <span v-else-if="lv.status === 'refunded'" class="crossdex-card__ref" role="img" aria-label="Refunded to your wallet">↩</span>
@@ -236,7 +236,7 @@ import { useCrossDexSwap, type LegOutcome } from '../../composables/useCrossDexS
 import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { formatTokenAmount } from '../../utils/format'
-import { CHECK_WALLET, NOT_IN_WALLET, swapMaybeSentSummary, unsureKind, unsureKinds, maybeSentLeg } from './multiSellCopy'
+import { CHECK_WALLET, NOT_IN_WALLET, NOTHING_SWAPPED, NOTHING_SWAPPED_TEXT, swapMaybeSentSummary, unsureKind, unsureKinds, maybeSentLeg } from './multiSellCopy'
 import { isHeldReason } from '../../utils/crossDexLegRunner'
 import { getTokenIcon } from '../../utils/token-icons'
 import TokenSelector from './TokenSelector.vue'
@@ -379,10 +379,14 @@ const legViews = computed(() => {
 // a failed route that may already be settled in the wallet: the verdict says to check the wallet, never that
 // everything failed or that only some routes filled
 const maybeSent = computed(() => ['partial', 'error'].includes(cx.phase.value) && cx.outcomes.value.some(o => !o.success && maybeSentLeg(o)))
-const verdictCls = computed(() => (maybeSent.value ? 'partial' : cx.phase.value))
+// every route refused or refunded: nothing left the wallet for good, a neutral verdict (not a failure)
+const nothingSwapped = computed(() => cx.phase.value === 'error' && !maybeSent.value && cx.outcomes.value.length > 0
+  && cx.outcomes.value.every(o => o.state === 'refunded' || o.state === 'notSent'))
+const verdictCls = computed(() => (maybeSent.value ? 'partial' : nothingSwapped.value ? 'neutral' : cx.phase.value))
 
 const execStatusLabel = computed(() => {
   if (maybeSent.value) return CHECK_WALLET
+  if (nothingSwapped.value) return NOTHING_SWAPPED
   switch (cx.phase.value) {
     case 'executing': return 'Running'
     case 'success': return 'Complete'
@@ -411,6 +415,7 @@ const summaryLine = computed(() => {
     })
   }
   if (cx.phase.value === 'partial') return `Partial fill: received ${totalStr}. Check each route's status above. Anything not recovered automatically is on the Recover page.`
+  if (nothingSwapped.value) return `${NOTHING_SWAPPED}. ${NOTHING_SWAPPED_TEXT}`
   if (cx.phase.value === 'error') return `No route went through. Check each route's status above. Anything not recovered automatically is on the Recover page.`
   return ''
 })
@@ -634,6 +639,7 @@ onMounted(() => {
     &.is-success { background: var(--tx-buy-dim); color: var(--tx-buy-ink); }
     &.is-partial { background: var(--tx-warning-dim); color: var(--tx-warning-ink); }
     &.is-error { background: var(--tx-sell-dim); color: var(--tx-sell-ink); }
+    &.is-neutral { background: var(--tx-surface-3); color: var(--tx-ink-2); }
   }
   &__exec-sub { margin: 0; font-size: var(--text-xs); color: var(--tx-muted-ink); }
 
@@ -680,6 +686,7 @@ onMounted(() => {
     &.is-success { background: rgba(60, 180, 90, 0.12); color: var(--text-primary); }
     &.is-partial { background: rgba(220, 160, 40, 0.12); color: var(--text-primary); }
     &.is-error { background: rgba(220, 70, 70, 0.1); color: var(--text-primary); }
+    &.is-neutral { background: var(--tx-surface-2); color: var(--text-primary); }
   }
   &__exec-actions { display: flex; gap: 8px; .ex-btn { flex: 1; text-align: center; } }
 }
