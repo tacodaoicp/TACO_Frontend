@@ -337,13 +337,16 @@
     const idleShims = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
     idleShims(() => { tacoStore.initializeShims() })
 
-    // Deeper idle: download the pages people open next without running them (a first visit, a tap while
-    // offline or in a tab that outlived a deploy then reads them from the HTTP cache). Only a chart page
-    // runs apexcharts now, so its chart does not collapse and reflow while the 574 KB lib loads; other
-    // pages get it with the first chart page (router guard above). The wizard runs so it opens at once.
+    // Download the pages people open next without running them (a first visit, a tap while offline or
+    // in a tab that outlived a deploy then reads them from the HTTP cache). This starts now, not at idle:
+    // on a busy phone the first idle moment can come after the first tap. The queue (navItems.ts) keeps
+    // it to two low priority downloads at a time and holds it while a page opens.
+    prefetchPages()
+
+    // Deeper idle: only a chart page runs apexcharts now, so its chart does not collapse and reflow while
+    // the 574 KB lib loads; other pages get it with the first chart page (router guard above).
     const idleDeep = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000))
     idleDeep(() => {
-      prefetchPages()
       if (CHART_ROUTES.includes(route.path)) loadApexcharts()
     })
 
