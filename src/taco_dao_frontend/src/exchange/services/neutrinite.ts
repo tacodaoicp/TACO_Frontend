@@ -304,14 +304,14 @@ const PENDING_MAX_AGE_MS = 21 * 86_400_000
 
 export interface PendingNeutrinite { sell: string; buy: string; timestamp: number }
 
-/** Save the pair marker. Returns whether it was written; on a full storage it
+/** Save the pair marker (dated `at`). Returns whether it was written; on a full storage it
  *  frees exchange cache space and tries once more. */
-export function savePendingSwap(sell: string, buy: string): boolean {
+export function savePendingSwap(sell: string, buy: string, at: number = Date.now()): boolean {
   try {
     const raw = localStorage.getItem(PENDING_KEY)
     const list: PendingNeutrinite[] = raw ? JSON.parse(raw) : []
     const deduped = list.filter(e => !(e.sell === sell && e.buy === buy))
-    deduped.unshift({ sell, buy, timestamp: Date.now() })
+    deduped.unshift({ sell, buy, timestamp: at })
     const now = Date.now()
     setItemWithCacheEviction(PENDING_KEY, JSON.stringify(deduped.filter(e => now - e.timestamp < PENDING_MAX_AGE_MS).slice(0, PENDING_MAX)))
     return true
@@ -320,12 +320,14 @@ export function savePendingSwap(sell: string, buy: string): boolean {
 export function getPendingSwaps(): PendingNeutrinite[] {
   try { const raw = localStorage.getItem(PENDING_KEY); return raw ? JSON.parse(raw) : [] } catch { return [] }
 }
-export function removePendingSwap(sell: string, buy: string): void {
+/** Remove the pair marker. With `at`, only the marker dated `at` (the one a swap wrote itself): a marker
+ *  another tab saved for the pair since then stays. */
+export function removePendingSwap(sell: string, buy: string, at?: number): void {
   try {
     const raw = localStorage.getItem(PENDING_KEY)
     if (!raw) return
     const list = JSON.parse(raw) as PendingNeutrinite[]
-    localStorage.setItem(PENDING_KEY, JSON.stringify(list.filter(e => !(e.sell === sell && e.buy === buy))))
+    localStorage.setItem(PENDING_KEY, JSON.stringify(list.filter(e => !(e.sell === sell && e.buy === buy && (at == null || e.timestamp === at)))))
   } catch { /* ignore */ }
 }
 
@@ -348,8 +350,8 @@ export interface NeutriniteSwapParams {
    *  the wallet (an earlier swap's leftover, or another swap's deposit): the credit check and a
    *  recovery look could not tell this swap's tokens from that balance. */
   maxSellBefore?: bigint
-  /** Stop before the deposit when the pair marker is already saved: an earlier swap of this pair has
-   *  not settled, and its deposit may still be credited while this one waits for its own. */
+  /** Stop before the deposit when a marker of an earlier swap of the sold token (for any buy token) is
+   *  saved: it has not settled, and its deposit may still be credited while this one waits for its own. */
   stopIfPending?: boolean
   /** The sell ledger's fee. The pylon credits a deposit minus one ledger fee, so a rise of the
    *  virtual balance more than one fee away from amountIn minus this fee is not this deposit (another
@@ -359,7 +361,7 @@ export interface NeutriniteSwapParams {
    *  the swap output, whether an earlier swap on this pair had already left a marker, whether
    *  dex_swap was sent (it may have run even when its answer is lost) or answered with an error,
    *  and whether the withdraw answered with a refusal (unset when its answer was lost). */
-  track?: { before?: { sell: bigint; buy: bigint }; credited?: bigint; swappedOut?: bigint; hadMarker?: boolean; swapSent?: boolean; swapRefused?: boolean; withdrawRefused?: boolean }
+  track?: { before?: { sell: bigint; buy: bigint }; credited?: bigint; swappedOut?: bigint; hadMarker?: boolean; swapSent?: boolean; swapRefused?: boolean; withdrawRefused?: boolean; markerAt?: number }
   /** A run's own agent and principal; default: the cached session. */
   agent?: HttpAgent
   owner?: Principal
@@ -403,7 +405,9 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   if (params.maxSellBefore != null && balanceBefore > params.maxSellBefore) {
     throw new NeutriniteNotStarted('Neutrinite still holds some of this token from another swap of yours, so its share was not sent', false, true)
   }
-  if (params.stopIfPending && getPendingSwaps().some(e => e.sell === params.sell && e.buy === params.buy)) {
+  // the pylon holds the sold token per ledger, whatever it was bought for: an earlier swap of this token for
+  // any buy token whose deposit may still be credited stops this one too
+  if (params.stopIfPending && getPendingSwaps().some(e => e.sell === params.sell)) {
     throw new NeutriniteNotStarted('An earlier Neutrinite swap of this token is still listed on the Recover page, so its share was not sent', false, true)
   }
   const depositAccount = sellEp.account // { owner: pylon, subaccount: [bytes] }
@@ -415,13 +419,17 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   if (params.beforeTransfer?.() === false) throw new NeutriniteNotStarted('Neutrinite: the recovery note could not be saved, so its share was not sent', true)
   // Persist the pair NOW (funds are about to move) so a tab close is recoverable via the Recover page.
   const hadMarker = getPendingSwaps().some(e => e.sell === params.sell && e.buy === params.buy)
-  const markerWritten = savePendingSwap(params.sell, params.buy)
+  const markerAt = Date.now()
+  const markerWritten = savePendingSwap(params.sell, params.buy, markerAt)
   if (!markerWritten && params.requireMarker) {
     throw new NeutriniteNotStarted('Neutrinite: the recovery note could not be saved, so its share was not sent', true)
   }
+  // this swap removes only the marker it wrote (another tab may save one for the pair meanwhile)
+  const dropOwnMarker = () => { if (!hadMarker && markerWritten) removePendingSwap(params.sell, params.buy, markerAt) }
   if (params.track) {
     params.track.before = { sell: balanceBefore, buy: findEndpoint(accounts, params.buy)?.balance ?? 0n }
     params.track.hadMarker = hadMarker
+    if (markerWritten) params.track.markerAt = markerAt
   }
   params.onStep?.('Depositing…')
   const tr = (await tokenActor.icrc1_transfer({
@@ -432,7 +440,7 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   if ('Err' in tr) {
     // Nothing moved. Keep a marker an earlier failed swap on this pair left behind.
     if (params.track) params.track.before = undefined
-    if (!hadMarker) removePendingSwap(params.sell, params.buy)
+    dropOwnMarker()
     throw new Error('Neutrinite deposit failed: ' + safeStringify(tr.Err))
   }
 
@@ -514,7 +522,7 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
     throw new Error('Neutrinite swapped, but sending the output to your wallet failed')
   }
 
-  removePendingSwap(params.sell, params.buy)
+  dropOwnMarker()
   return { amountOut }
 }
 
@@ -536,8 +544,9 @@ export interface NeutriniteSweepOptions {
   /** A run's own agent and principal; default: the cached session. */
   agent?: HttpAgent
   owner?: Principal
-  /** Filled with what was found and withdrawn, per token. */
-  report?: { found: Array<{ token: string; amount: bigint }>; moved: Array<{ token: string; amount: bigint }> }
+  /** Filled with what was found and withdrawn, per token, and the withdraws that answered with a refusal
+   *  (a refusal moved nothing; a lost answer may have). */
+  report?: { found: Array<{ token: string; amount: bigint }>; moved: Array<{ token: string; amount: bigint }>; refused?: Array<{ token: string; amount: bigint }> }
 }
 
 export async function sweep(sell: string, buy: string, before?: { sell: bigint; buy: bigint }, opts: NeutriniteSweepOptions = {}): Promise<boolean> {
@@ -573,6 +582,8 @@ export async function sweep(sell: string, buy: string, before?: { sell: bigint; 
       const inner = res && 'ok' in res ? res.ok.commands?.[0]?.transfer : null
       if (!(inner && 'ok' in inner)) {
         allOk = false
+        // answered: the transfer did not run
+        opts.report?.refused?.push({ token: tok, amount })
         console.warn('[neutrinite.sweep] withdraw not delivered for', tok, safeStringify(res))
       } else {
         opts.report?.moved.push({ token: tok, amount })

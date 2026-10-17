@@ -416,6 +416,11 @@ export function useCrossDexSwap() {
     const v2 = store.useV2Deposit(fromAddr)
     const tradingFeeBps = store.tradingFeeBps
     const fee = sellToken.transfer_fee
+    // The Neutrinite route's start check, credit check and looks read the fee the pylon nets from a
+    // deposit: pin the larger of the live and the listed fee for it, as Sell many does.
+    const neuFee = legs.some(l => l.dex === 'neutrinite')
+      ? await withTimeout(store.fetchLedgerFee(fromAddr, 0), 3_000, 'icrc1_fee').then(f => (f > fee ? f : fee), () => fee)
+      : fee
     // V2 approval is hoisted OUT of the concurrent, timed leg section below, so
     // it resolves BEFORE any leg moves funds; the TACO leg then reuses the
     // standing allowance.
@@ -474,7 +479,7 @@ export function useCrossDexSwap() {
       v2,
       tradingFeeBps,
       v2Gross,
-      fee,
+      fee: leg.dex === 'neutrinite' ? neuFee : fee,
       gate,
       runId,
       journal: runJournal.legJournal(runId, 0, legs.indexOf(leg)),

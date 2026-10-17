@@ -251,7 +251,8 @@ export interface LegDeps {
       track?: NeuTrack
     }): Promise<{ amountOut: bigint }>
     sweep(sell: string, buy: string, before?: { sell: bigint; buy: bigint }, opts?: { report?: SweepReport }): Promise<boolean>
-    removePendingSwap(sell: string, buy: string): void
+    /** With `at`, only the pair marker dated `at` (the one this route wrote). */
+    removePendingSwap(sell: string, buy: string, at?: number): void
   }
   taco: {
     treasury(): { accountId: string; principal: string }
@@ -301,6 +302,8 @@ export interface NeuTrack {
   swapRefused?: boolean
   /** The withdraw answered with a refusal (unset when its answer was lost, so it may have run). */
   withdrawRefused?: boolean
+  /** The timestamp of the pair marker this route wrote (it removes only that one). */
+  markerAt?: number
 }
 
 export interface SweepReport {
@@ -308,6 +311,8 @@ export interface SweepReport {
    *  balance whose withdraw answered with an error (`refused`). */
   found: Array<{ token: string; amount: bigint; sub?: boolean; refused?: boolean }>
   moved: Array<{ token: string; amount: bigint }>
+  /** Neutrinite: the withdraws that answered with a refusal (they moved nothing; a lost answer may have). */
+  refused?: Array<{ token: string; amount: bigint }>
   /** Passes that read every balance and found nothing (a pass that threw does not count). */
   emptyLooks?: number
   /** sweepWithRetry: what the last pass threw (unset when the last pass did not throw). */
@@ -623,7 +628,12 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     if (err?.creditMismatch) {
       // The pylon credited an amount that is not this deposit: another deposit of the wallet was
       // credited before it or with it. Nothing was swapped, and a look could not tell this part's tokens
-      // from the others, so all of it stays on the pylon for the Recover page, with the marker.
+      // from the others. Everything above the start balances is the wallet's, so one sweep sends it home
+      // (this part's deposit and the other one); the marker stays, and the row says to check the wallet
+      // before the Recover page.
+      ctx.onStep('Recovering funds…')
+      try { await deps.neutrinite.sweep(sell, buy, track.before, { report: { found: [], moved: [], refused: [] } }) }
+      catch (e) { ctx.log?.('[CrossDEX] Neutrinite sweep after a credit mismatch failed:', e) }
       ctx.onStep('Failed, recover on the Recover page')
       return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'needsRecovery', reason: 'neuMismatch', error, recovered: false }
     }
@@ -638,7 +648,7 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // a look found the ICP and threw (its own withdraw failed or lost its answer), then a later look
     // found nothing: the ICP left the pylon, for the wallet
     let foundOutBefore = false, emptyAfterFound = false
-    const report: SweepReport = { found: [], moved: [] }
+    const report: SweepReport = { found: [], moved: [], refused: [] }
     for (let i = 0; i < 3 && !recovered; i++) {
       if (i > 0) await deps.clock.sleep(5000)
       try {
@@ -659,7 +669,7 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
       // The swap filled, the pylon held nothing of the pair before it, and a clean look finds nothing
       // there now: the withdraw went through and only its answer was lost. Sold, for an amount the
       // wallet shows. Every other uncertain case keeps reading needsRecovery with its marker.
-      if (!track.hadMarker) deps.neutrinite.removePendingSwap(sell, buy)
+      if (!track.hadMarker && track.markerAt != null) deps.neutrinite.removePendingSwap(sell, buy, track.markerAt)
       ctx.onStep('Done')
       return { dex: 'neutrinite', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
     }
@@ -677,8 +687,11 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // have run, the sold token when its deposit came back. ICP another swap of the wallet left above
     // the start balances can come back too, and alone proves nothing (no sale, no refund). A swap that
     // answered with an error did not run, nor did one whose credit a look still found on the pylon
-    // (a look that lost its own answer may have sent it to the wallet unseen).
-    const depositSeen = report.found.some(f => f.token === sell && nearCredit(f.amount))
+    // (a look that lost its own answer may have sent it to the wallet unseen), unless that look's
+    // withdraw of it was refused: the swap may have taken the credit between the look's read and its
+    // withdraw.
+    const depositSeen = report.found.some(f => f.token === sell && nearCredit(f.amount)
+      && !(report.refused ?? []).some(r => r.token === sell && r.amount === f.amount))
     const swapMayHaveRun = track.swappedOut != null || (!!track.swapSent && !track.swapRefused && !depositSeen)
     const own = recovered && (track.swappedOut != null || depositBack || (swapMayHaveRun && gotOut > 0n))
     // From a start balance above dust, a look that brought back less ICP than the swap gave did not get
@@ -688,7 +701,7 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // with the swap's answer lost there is no amount to check the ICP against: from a start balance
     // above dust the marker stays, so the Recover page can still find any rest
     const unchecked = !startClean && track.swappedOut == null && swapMayHaveRun && !depositBack
-    if (own && !partOnly && !unchecked && !track.hadMarker) deps.neutrinite.removePendingSwap(sell, buy)
+    if (own && !partOnly && !unchecked && !track.hadMarker && track.markerAt != null) deps.neutrinite.removePendingSwap(sell, buy, track.markerAt)
     if (own && !partOnly && track.swappedOut == null && swapMayHaveRun && !depositBack && gotOut > 0n) {
       // The swap's answer was lost and a look brought ICP back: it sold. The swap cannot fill below its
       // minimum scaled to the credit, so from a start balance above dust, less than that is only part of
