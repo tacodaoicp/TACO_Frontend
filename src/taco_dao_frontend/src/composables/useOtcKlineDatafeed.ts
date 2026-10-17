@@ -10,8 +10,6 @@
  * with a 5-minute TTL.
  */
 
-import { Actor, HttpAgent } from '@dfinity/agent'
-import { idlFactory } from 'declarations/OTC_backend/OTC_backend.did.js'
 import type { _SERVICE, pool } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 import { getNetworkHost } from '../shared/auth-cache'
 import { getEffectiveNetwork } from '../config/network-config'
@@ -20,23 +18,34 @@ import type { KlineDatafeed } from '../components/charts/types'
 
 const POOL_TTL_MS = 5 * 60 * 1000
 
-let _actor: _SERVICE | null = null
+let _actorPromise: Promise<_SERVICE> | null = null
 let _poolCanister: Array<[string, string]> | null = null
 let _poolFetchedAt = 0
 let _poolPromise: Promise<void> | null = null
 
-async function getActor(): Promise<_SERVICE> {
-  if (_actor) return _actor
-  // Anonymous public chart/kline data — skip per-query signature verification.
-  const agent = new HttpAgent({ host: getNetworkHost(), verifyQuerySignatures: false })
-  if (getEffectiveNetwork() === 'local') {
-    await agent.fetchRootKey()
-  }
-  _actor = Actor.createActor<_SERVICE>(idlFactory, {
-    agent,
-    canisterId: getCanisterId('exchange'),
+// The agent and the IDL load with the first call, so the page that uses the
+// chart does not wait for them. Calls made meanwhile share one agent.
+function getActor(): Promise<_SERVICE> {
+  _actorPromise ??= (async () => {
+    const [{ Actor, HttpAgent }, { idlFactory }] = await Promise.all([
+      import('@dfinity/agent'),
+      import('declarations/OTC_backend/OTC_backend.did.js'),
+    ])
+    // Anonymous public chart/kline data — skip per-query signature verification.
+    const agent = new HttpAgent({ host: getNetworkHost(), verifyQuerySignatures: false })
+    if (getEffectiveNetwork() === 'local') {
+      await agent.fetchRootKey()
+    }
+    return Actor.createActor<_SERVICE>(idlFactory, {
+      agent,
+      canisterId: getCanisterId('exchange'),
+    })
+  })().catch((err) => {
+    // a failed load or root key fetch is tried again on the next call, as before
+    _actorPromise = null
+    throw err
   })
-  return _actor
+  return _actorPromise
 }
 
 async function ensurePoolInfo(): Promise<void> {
