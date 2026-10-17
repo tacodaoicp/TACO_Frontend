@@ -167,6 +167,7 @@
     import { storeToRefs } from 'pinia'
     import { tokenData } from '../data/TokenData'
     import { workerBridge } from '../../stores/worker-bridge'
+    import { localeDateString, localeTimeString } from '../../utils/intlCache'
 
     ///////////
     // store //
@@ -227,7 +228,7 @@
             month: 'numeric',
             day: 'numeric'
         }
-        return `${date.toLocaleTimeString('en-US', timeOptions)} ${date.toLocaleDateString('en-US', dateOptions)}`
+        return `${localeTimeString(date, 'en-US', timeOptions)} ${localeDateString(date, 'en-US', dateOptions)}`
     }
 
     // format amount

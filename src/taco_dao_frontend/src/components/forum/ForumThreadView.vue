@@ -2378,6 +2378,7 @@
     import TacoError from '../../assets/images/tacoError.vue'
     import { Principal } from '@dfinity/principal'
     import { getEffectiveNetwork } from '../../config/network-config'
+    import { localeDateString } from '../../utils/intlCache'
 
     // Helper functions for runtime network detection
     function shouldFetchRootKey() {
@@ -3662,14 +3663,14 @@
 
     // date formatting
     const formatShortDate = (date: Date) => {
-        return date.toLocaleDateString('en-US', {
+        return localeDateString(date, 'en-US', {
             year: 'numeric',
             month: '2-digit',
             day: '2-digit'
         })
     }
     const formatDate = (date: Date) => {
-        return date.toLocaleDateString('en-US', {
+        return localeDateString(date, 'en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
@@ -3680,7 +3681,7 @@
     const formatTimestampDate = (timestamp: bigint) => {
         // convert nanoseconds to milliseconds for Date constructor
         const milliseconds = Number(timestamp) / 1_000_000
-        return new Date(milliseconds).toLocaleDateString('en-US', {
+        return localeDateString(new Date(milliseconds), 'en-US', {
             year: 'numeric',
             month: '2-digit',
             day: '2-digit'
@@ -3689,7 +3690,7 @@
     const formatTimestampDateLong = (timestamp: bigint) => {
         // convert nanoseconds to milliseconds for Date constructor
         const milliseconds = Number(timestamp) / 1_000_000
-        return new Date(milliseconds).toLocaleDateString('en-US', {
+        return localeDateString(new Date(milliseconds), 'en-US', {
             year: 'numeric',
             month: 'short',
             day: 'numeric',
