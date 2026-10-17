@@ -1023,10 +1023,12 @@ LOCAL METHODS
 
     // A refresh that brings the numbers the chart already shows keeps the chart as it is,
     // instead of the remount in the data watcher below. The info card is refreshed as after
-    // a remount (first slice), or for the slice the user tapped, which then stays selected.
+    // a remount (first slice), or for the slice the user tapped, which then stays selected,
+    // and the container is cropped again, as the remount did.
     // Everything else remounts as before: changed numbers, a hovered slice or open tooltip,
-    // and a chart drawn at a width its box no longer has (with a tapped slice it is refitted
-    // in place instead, so the slice stays selected).
+    // a chart drawn at a width its box no longer has, and label boxes that no longer fit their
+    // text (a font that loaded after the last draw). With a tapped slice those last two are
+    // refitted in place instead, so the slice stays selected.
     const keepChartForSameHoldings = (holdings: typeof fetchedTokenDetails.value) => {
         try {
             if (!chartHasBeenPopulated.value || !chartHasData.value) return false
@@ -1041,6 +1043,20 @@ LOCAL METHODS
             const innerWidth = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
             const sized = Math.abs(Number(svg.getAttribute('width')) - innerWidth) <= 1
 
+            // apexcharts sizes each label box from its text when it draws (text width + 2 x padding)
+            const labelPadding = 2 * chartOptions.value.dataLabels.background.padding
+            const labelsFit = Array.from(el.querySelectorAll('.apexcharts-datalabels')).every(label => {
+                const text = label.querySelector('text') as SVGGraphicsElement | null
+                const box = label.querySelector('rect')
+                return !text || !box || Math.abs(Number(box.getAttribute('width')) - (text.getBBox().width + labelPadding)) <= 1
+            })
+
+            // crop to the pie as drawn now (it may have been redrawn after a resize since the last crop)
+            const recrop = () => {
+                handleSetTacoChartMaxHeight()
+                setTimeout(handleSetTacoChartMaxHeight, 350)
+            }
+
             // a tapped slice stays selected, its card is refreshed
             const slices = Array.from(el.querySelectorAll('.apexcharts-pie-area'))
             const selected = slices.find(slice => slice.getAttribute('selected') === 'true')
@@ -1048,20 +1064,22 @@ LOCAL METHODS
                 const index = Number(selected.getAttribute('j'))
                 if (!Number.isInteger(index) || index < 0 || index >= seriesNames.value.length) return false
                 handleChartSegmentClick(null, null, { dataPointIndex: index })
-                if (!sized) refitChart() // redraws in place, apexcharts keeps the selection
+                if (!sized || !labelsFit) refitChart() // redraws in place, apexcharts keeps the selection
+                else recrop()
                 componentLoading.value = false
                 return true
             }
 
             const untouched = !slices.some(slice => slice.getAttribute('data:pieClicked') === 'true' || slice.hasAttribute('filter'))
                 && !el.querySelector('.apexcharts-tooltip.apexcharts-active')
-            if (!untouched || !sized) return false
+            if (!untouched || !sized || !labelsFit) return false
 
             // what the holdings watcher does after applying the data
             const firstNonZeroIndex = percentages.findIndex(percentage => percentage > 0)
             handleChartSegmentClick(null, null, {
                 dataPointIndex: firstNonZeroIndex >= 0 ? firstNonZeroIndex : 0
             })
+            recrop()
             componentLoading.value = false
             return true
         } catch {
