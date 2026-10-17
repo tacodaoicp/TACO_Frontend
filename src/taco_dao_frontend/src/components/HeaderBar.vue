@@ -739,9 +739,9 @@
   // Imports //
   /////////////
 
-  import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+  import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick, defineAsyncComponent } from 'vue'
   import { RouterLink, useRouter, useRoute } from 'vue-router'
-  import { navItems, isNavActive, navDrawerOpen, openDrawer, closeDrawer, inBottomBar, warmNavItem, warmRoute, type NavItem } from './navItems'
+  import { navItems, isNavActive, navDrawerOpen, openDrawer, closeDrawer, inBottomBar, loadWizard, warmNavItem, warmRoute, type NavItem } from './navItems'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
@@ -754,7 +754,9 @@
   import { Tooltip } from 'bootstrap'
   // import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
   import { getEffectiveNetwork } from '../config/network-config'
-  import WizardModal from "../views/WizardView.vue"
+
+  // the wizard loads at idle (App.vue) and when its link is pointed at, not with the page
+  const WizardModal = defineAsyncComponent(loadWizard)
 
   ////////////
   // Stores //
@@ -853,7 +855,7 @@
   // price for the drawer, ellipsis until loaded
   const usd = (v: number, d: number) => v > 0 ? '$' + v.toFixed(d) : '…'
 
-  // warm a link's page before its click
+  // warm a link's page (or the wizard) before its click
   const warm = (item: NavItem) => warmNavItem(router, item)
   const warmWallet = () => warmRoute(router, '/wallet')
 

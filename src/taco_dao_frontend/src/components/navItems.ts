@@ -45,6 +45,10 @@ export const closeDrawer = () => { navDrawerOpen.value = false }
 export const CHART_ROUTES = ['/dao', '/vote', '/vault', '/portfolio_history']
 export const loadApexcharts = () => import('vue3-apexcharts').catch(() => {})
 
+// the wizard dialog, loaded at idle (App.vue) and on intent instead of with the header
+export const loadWizard = () => import('../views/WizardView.vue')
+export const warmWizard = () => { loadWizard().catch(() => {}) }
+
 // Pages load their code on the first visit. A pointer down, touch, hover or focus on a link starts that
 // early, through the router's own loaders, so the tap that follows finds the page ready. Not while
 // offline: a failed load reloads the page (main.js), and a hover alone should never do that.
@@ -55,8 +59,9 @@ export function warmRoute(router: Router, to?: string) {
   if (CHART_ROUTES.includes(target.path)) loadApexcharts()
 }
 
-// warm a nav item's page before its click
-export const warmNavItem = (router: Router, item: NavItem) => warmRoute(router, item.to)
+// warm a nav item's page (or the wizard) before its click
+export const warmNavItem = (router: Router, item: NavItem) =>
+  item.action === 'wizard' ? warmWizard() : warmRoute(router, item.to)
 
 export function isNavActive(item: NavItem, route: RouteLocationNormalizedLoaded) {
   if (!item.to) return false

@@ -100,7 +100,7 @@
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
   import { useRoute, useRouter, START_LOCATION } from 'vue-router'
-  import { CHART_ROUTES, loadApexcharts, warmRoute } from './components/navItems'
+  import { CHART_ROUTES, loadApexcharts, warmRoute, warmWizard } from './components/navItems'
 
   // Lazy load HomeView to reduce initial bundle
   const HomeView = defineAsyncComponent(() => import('./views/HomeView.vue'))
@@ -208,12 +208,13 @@
   router.afterEach(clearRoutePending)
   router.onError(clearRoutePending)
 
-  // the Grand Tour opens its pages with no tap to warm them on
+  // the Grand Tour opens its pages (and offers the wizard at the end) with no tap to warm them on
   watch(grandTourActive, (active) => {
     if (!active) return
     import('./components/tour/tourScript')
       .then(({ tourScript }) => { for (const scene of tourScript) warmRoute(router, scene.route) })
       .catch(() => {})
+    warmWizard()
   })
 
   // images
@@ -326,11 +327,12 @@
     // Deeper idle: download the pages people open next without running them (a first visit, a tap while
     // offline or in a tab that outlived a deploy then reads them from the HTTP cache). Only a chart page
     // runs apexcharts now, so its chart does not collapse and reflow while the 574 KB lib loads; other
-    // pages get it with the first chart page (router guard above).
+    // pages get it with the first chart page (router guard above). The wizard runs so it opens at once.
     const idleDeep = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000))
     idleDeep(() => {
       prefetchPages()
       if (CHART_ROUTES.includes(route.path)) loadApexcharts()
+      warmWizard()
     })
 
   }
