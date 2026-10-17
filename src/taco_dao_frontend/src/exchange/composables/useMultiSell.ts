@@ -26,7 +26,7 @@ import { dedupLedgers } from '../utils/ledgerDedup'
 import { createRunAgent, type RunAgent } from '../utils/runAgent'
 import { withFundsLock, BUSY } from '../utils/saleLock'
 import { approveExchangeDeposit } from '../utils/deposit'
-import { buildLegDeps } from './useCrossDexSwap'
+import { buildLegDeps, runLedgerFee } from './useCrossDexSwap'
 import { stopText, maybeSentLeg, onlyMaybeSent, soldMaybeInWallet, CHECK_WALLET, CHECK_WALLET_NOTE, NOT_IN_WALLET } from '../components/swap/multiSellCopy'
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
@@ -589,7 +589,8 @@ export function useMultiSell() {
         if (v == null) throw new Error('balance unreadable')
         return v
       },
-      liveFee: (t) => store.fetchLedgerFee(t, 0),
+      // with the run's own agent: the pinned fee feeds the legs' start checks and deposit windows
+      liveFee: (t, run) => runLedgerFee(run as RunAgent, t, 10_000),
       assertCanTrade: () => store.assertCanTrade(),
       tradingFeeBps: () => store.tradingFeeBps,
       dedupLedgers: () => dedupLedgers(),

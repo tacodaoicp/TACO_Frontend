@@ -18,6 +18,7 @@
  */
 
 import { ref, computed, watch } from 'vue'
+import { Actor } from '@dfinity/agent'
 import { useExchangeStore } from '../store/exchange.store'
 import { useExchangeToast } from './useExchangeToast'
 import { useExchangeAuth } from './useExchangeAuth'
@@ -43,6 +44,7 @@ import {
 } from '../utils/crossDexLegRunner'
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
+import { icrcIDL } from '../../shared/icrc-idl'
 import { CHECK_WALLET, NOT_IN_WALLET, soldMaybeInWallet } from '../components/swap/multiSellCopy'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
@@ -56,6 +58,21 @@ export type LegOutcome = RunnerLegOutcome
 const GRID_BPS = CROSSDEX_GRID_BPS
 const MAX_ROUTES_PER_FRACTION = CROSSDEX_MAX_ROUTES
 
+/** A token's ledger fee read with a run's own agent: the fee a run pins feeds the start checks and the
+ *  deposit windows of its legs, so it is not the shared anonymous read the amount fields use. */
+export async function runLedgerFee(run: RunAgent, token: string, ms: number): Promise<bigint> {
+  const f = await withTimeout(Actor.createActor(icrcIDL, { agent: run.agent, canisterId: token }).icrc1_fee() as Promise<any>, ms, 'icrc1_fee')
+  return typeof f === 'bigint' ? f : BigInt(f)
+}
+
+/** A device time (ms) on the replica's clock, in ns: only with the run's clock synced (the offset is then
+ *  known); else null, and a caller keeps every record. */
+function replicaNs(run: RunAgent | undefined, ms: number | undefined): bigint | undefined {
+  if (!run?.timeSynced || ms == null) return undefined
+  const diff = Number((run.agent as any).getTimeDiffMsecs?.() ?? 0) || 0
+  return BigInt(Math.round(ms + diff)) * 1_000_000n
+}
+
 /**
  * The real services, bound for the leg runner. With a run agent every fund
  * moving and recovery call is signed by that agent for its principal.
@@ -68,7 +85,8 @@ export function buildLegDeps(store: ReturnType<typeof useExchangeStore>, run?: R
       icrc2Swap: (p) => icpswap.icrc2Swap({ ...p, ...auth }),
       sweep: (p, o) => icpswap.sweep(p, { ...o, ...auth }),
       sweepWithRetry: (p, a, d, o) => icpswap.sweepWithRetry(p, a, d, { ...o, ...auth }),
-      withdrawRecords: (p) => icpswap.getPoolWithdrawRecords(p, { owner: run?.principal, agent: run?.agent }),
+      // records from the part's start on (the replica's clock), every record when the run's clock is not synced
+      withdrawRecords: (p, sinceMs) => icpswap.getPoolWithdrawRecords(p, { owner: run?.principal, agent: run?.agent, sinceNs: replicaNs(run, sinceMs) }),
       removePendingSwap: icpswap.removePendingSwap,
     },
     neutrinite: {
@@ -417,9 +435,10 @@ export function useCrossDexSwap() {
     const tradingFeeBps = store.tradingFeeBps
     const fee = sellToken.transfer_fee
     // The Neutrinite route's start check, credit check and looks read the fee the pylon nets from a
-    // deposit: pin the larger of the live and the listed fee for it, as Sell many does.
+    // deposit: pin the larger of the live and the listed fee for it, as Sell many does (read with the
+    // swap's own agent).
     const neuFee = legs.some(l => l.dex === 'neutrinite')
-      ? await withTimeout(store.fetchLedgerFee(fromAddr, 0), 3_000, 'icrc1_fee').then(f => (f > fee ? f : fee), () => fee)
+      ? await runLedgerFee(runAgent, fromAddr, 3_000).then(f => (f > fee ? f : fee), () => fee)
       : fee
     // V2 approval is hoisted OUT of the concurrent, timed leg section below, so
     // it resolves BEFORE any leg moves funds; the TACO leg then reuses the

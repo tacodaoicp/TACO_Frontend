@@ -112,7 +112,9 @@ export interface SaleDeps {
   /** The tab's current principal (store.principalText). */
   currentPrincipal(): string
   balance(token: string): Promise<bigint>
-  liveFee(token: string): Promise<bigint>
+  /** The token's ledger fee, read with the run's own agent (the pinned fee feeds the start checks and the
+   *  deposit windows of the legs). */
+  liveFee(token: string, run: RunAgentLike): Promise<bigint>
   /** Exchange frozen check, fresh trading fee and treasury (throws the user message). */
   assertCanTrade(): Promise<void>
   tradingFeeBps(): bigint
@@ -253,7 +255,7 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
   try {
     const [b, f, , d, v] = await Promise.all([
       Promise.all(assets.map(x => withRead(deps.clock, deps.balance(x.a.address), 'balance'))),
-      Promise.all(assets.map(x => withRead(deps.clock, deps.liveFee(x.a.address), 'fee'))),
+      Promise.all(assets.map(x => withRead(deps.clock, deps.liveFee(x.a.address, run), 'fee'))),
       anyTaco ? withRead(deps.clock, deps.assertCanTrade(), 'assertCanTrade').catch((e: any) => { throw Object.assign(new Error(e?.message ?? ''), { exchange: true }) }) : Promise.resolve(),
       // an unreadable dedup list only means no resends (the deposits go without created_at_time), never a stop
       anyV1Taco ? withRead(deps.clock, deps.dedupLedgers(), 'dedup').catch(() => new Set<string>()) : Promise.resolve(new Set<string>()),

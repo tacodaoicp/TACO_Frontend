@@ -350,8 +350,9 @@ export interface NeutriniteSwapParams {
    *  the wallet (an earlier swap's leftover, or another swap's deposit): the credit check and a
    *  recovery look could not tell this swap's tokens from that balance. */
   maxSellBefore?: bigint
-  /** Stop before the deposit when a marker of an earlier swap of the sold token (for any buy token) is
-   *  saved: it has not settled, and its deposit may still be credited while this one waits for its own. */
+  /** Stop before the deposit when a marker of an earlier swap of the sold token (for any buy token), or of
+   *  one that sells this swap's buy token, is saved: it has not settled, and its deposit may still be
+   *  credited while this one runs. */
   stopIfPending?: boolean
   /** The sell ledger's fee. The pylon credits a deposit minus one ledger fee, so a rise of the
    *  virtual balance more than one fee away from amountIn minus this fee is not this deposit (another
@@ -406,8 +407,10 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
     throw new NeutriniteNotStarted('Neutrinite still holds some of this token from another swap of yours, so its share was not sent', false, true)
   }
   // the pylon holds the sold token per ledger, whatever it was bought for: an earlier swap of this token for
-  // any buy token whose deposit may still be credited stops this one too
-  if (params.stopIfPending && getPendingSwaps().some(e => e.sell === params.sell)) {
+  // any buy token whose deposit may still be credited stops this one too, and so does an earlier swap that
+  // sells this part's buy token (its late credit would land above the start balances, where this part's
+  // recovery looks count it as this part's output)
+  if (params.stopIfPending && getPendingSwaps().some(e => e.sell === params.sell || e.sell === params.buy)) {
     throw new NeutriniteNotStarted('An earlier Neutrinite swap of this token is still listed on the Recover page, so its share was not sent', false, true)
   }
   const depositAccount = sellEp.account // { owner: pylon, subaccount: [bytes] }

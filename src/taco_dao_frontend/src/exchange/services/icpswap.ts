@@ -19,6 +19,7 @@ import { getCachedAgent, getCachedIdentity, getNetworkHost } from '../../shared/
 import { getEffectiveNetwork } from '../../config/network-config'
 import { icrcIDL } from '../../shared/icrc-idl'
 import { setItemWithCacheEviction } from '../utils/persistCache'
+import { depositNothingMoved } from '../utils/crossDexLegRunner'
 
 // BigInt-safe JSON.stringify for IC canister error objects
 const safeStringify = (obj: unknown) =>
@@ -81,8 +82,9 @@ export interface IcpSwapParams {
   beforeDeposit?: () => Promise<void | boolean>
   /** Stop before the deposit when the pair marker could not be written. */
   requireMarker?: boolean
-  /** Stop before the approve (and again right before the marker is written) when the pair marker is
-   *  already saved: an earlier swap of this pair has not settled, and its funds may be in the pool. */
+  /** Stop before the approve (and again right before the marker is written) when the marker of the pair,
+   *  or of the reverse pair (the same pool), is already saved: an earlier swap has not settled, and its
+   *  funds may be in the pool. */
   stopIfPending?: boolean
   /** Stop before the approve when the pool already holds more than this (or the token's ledger fee,
    *  whichever is larger) of either token for the wallet, in its unused balance or its pool subaccount.
@@ -102,14 +104,21 @@ export class IcpSwapNotStarted extends Error {
   readonly notStarted = true
   constructor(message = 'Not started, your funds stayed in your wallet', readonly journal = false, readonly held = false) { super(message); this.name = 'IcpSwapNotStarted' }
 }
-/** depositFrom refused: the pool did not take the funds (the caller still checks with one sweep). */
+/** depositFrom refused: the pool did not take the funds. `nothingMoved`: its answer shows no tokens moved
+ *  (the ledger refused the pull, or one of the pool's own checks before it); otherwise the caller checks
+ *  with one look. */
 export class IcpSwapDepositRefused extends Error {
   readonly depositRefused = true
-  constructor(message: string) { super(message); this.name = 'IcpSwapDepositRefused' }
+  constructor(message: string, readonly nothingMoved = false) { super(message); this.name = 'IcpSwapDepositRefused' }
 }
 
 // ── Module state ──
+// Two pool caches. poolCache holds what the factory answered the shared anonymous agent (a query that
+// skips signature checks): quotes and market lists only, advisory. verifiedPoolCache holds what a verified
+// lookup returned (getPoolData with an agent): the only source of a pool id for a call that moves or reads
+// funds. A funds call never falls back to the advisory id.
 const poolCache = new Map<string, PoolData>()
+const verifiedPoolCache = new Map<string, PoolData>()
 let _anonAgent: HttpAgent | null = null
 
 // ── Pending-swap cache (localStorage) ──
@@ -199,6 +208,25 @@ const factoryIDL = ({ IDL }: any) => {
   })
 }
 
+/** getPool called as an update call (a query method runs replicated when called this way): its answer is
+ *  certified by the subnet, and the agent checks the certificate whatever its query settings. The session
+ *  and run agents come from @dfinity/utils createAgent, which leaves query signature checks off, so a
+ *  query through them would not be verified. */
+const factoryVerifiedIDL = ({ IDL }: any) => {
+  const Token = IDL.Record({ address: IDL.Text, standard: IDL.Text })
+  const GetPoolArgs = IDL.Record({ token0: Token, token1: Token, fee: IDL.Nat })
+  const PoolData = IDL.Record({
+    key: IDL.Text,
+    token0: Token,
+    token1: Token,
+    fee: IDL.Nat,
+    tickSpacing: IDL.Int,
+    canisterId: IDL.Principal,
+  })
+  const PoolResult = IDL.Variant({ ok: PoolData, err: IDL.Text })
+  return IDL.Service({ getPool: IDL.Func([GetPoolArgs], [PoolResult], []) })
+}
+
 const poolIDL = ({ IDL }: any) => {
   const SwapArgs = IDL.Record({
     amountIn: IDL.Text,
@@ -240,17 +268,30 @@ function standardOf(addr: string): string {
   return addr === ICP_LEDGER_ID ? 'ICP' : 'ICRC1'
 }
 
-// ── Pool resolution (anonymous; query) ──
-export async function getPoolCanister(token0Principal: string, token1Principal: string): Promise<string> {
+// ── Pool resolution ──
+export interface PoolLookupOptions {
+  /** A verified lookup for a funds call: the factory's getPool as an update call signed by this agent (a
+   *  run's own agent, else the session's), cached apart from the advisory answers. Without it the lookup
+   *  is the anonymous query (quotes and market lists). */
+  agent?: HttpAgent
+}
+
+/** The pool of a pair: its canister id and the pool's own token order. */
+async function getPoolData(token0Principal: string, token1Principal: string, opts: PoolLookupOptions = {}): Promise<PoolData> {
   const cacheKey = `${token0Principal}-${token1Principal}`
-  const cached = poolCache.get(cacheKey)
-  if (cached) return cached.canisterId
+  const verified = !!opts.agent
+  const cached = verified ? verifiedPoolCache.get(cacheKey) : (poolCache.get(cacheKey) ?? verifiedPoolCache.get(cacheKey))
+  if (cached) return cached
 
-  const agent = await getAnonAgent()
-  const factoryActor = Actor.createActor(factoryIDL, { agent, canisterId: ICPSWAP_FACTORY_ID })
+  const agent = opts.agent ?? (await getAnonAgent())
+  const factoryActor = Actor.createActor(verified ? factoryVerifiedIDL : factoryIDL, { agent, canisterId: ICPSWAP_FACTORY_ID })
   let lastErr: any = null
+  // a verified lookup asks the fee tier the quotes found first (one call in the usual case); the answer
+  // itself is what the factory certifies, whatever the advisory cache said
+  const hint = verified ? poolCache.get(cacheKey)?.fee : undefined
+  const tiers = hint != null ? [Number(hint), ...ICPSWAP_FEE_TIERS.filter(f => f !== Number(hint))] : ICPSWAP_FEE_TIERS
 
-  for (const fee of ICPSWAP_FEE_TIERS) {
+  for (const fee of tiers) {
     const poolArgs = {
       token0: { address: token0Principal, standard: standardOf(token0Principal) },
       token1: { address: token1Principal, standard: standardOf(token1Principal) },
@@ -260,8 +301,8 @@ export async function getPoolCanister(token0Principal: string, token1Principal: 
       const result = (await factoryActor.getPool(poolArgs)) as any
       if ('ok' in result) {
         const poolData: PoolData = { ...result.ok, canisterId: result.ok.canisterId.toText() }
-        poolCache.set(cacheKey, poolData)
-        return poolData.canisterId
+        ;(verified ? verifiedPoolCache : poolCache).set(cacheKey, poolData)
+        return poolData
       }
       lastErr = result.err
     } catch (e) {
@@ -271,6 +312,12 @@ export async function getPoolCanister(token0Principal: string, token1Principal: 
   throw new Error(
     `No ICPSwap pool for token pair across fee tiers (${ICPSWAP_FEE_TIERS.join(', ')}): ${safeStringify(lastErr)}`,
   )
+}
+
+/** The pool canister of a pair. With `opts.agent` a verified lookup (every call that moves or reads funds);
+ *  without it the anonymous query, for quotes and market lists only. */
+export async function getPoolCanister(token0Principal: string, token1Principal: string, opts: PoolLookupOptions = {}): Promise<string> {
+  return (await getPoolData(token0Principal, token1Principal, opts)).canisterId
 }
 
 function isZeroForOne(sellTokenPrincipal: string, poolData: PoolData): boolean {
@@ -433,30 +480,36 @@ export async function getStuckPoolWithdraws(
 }
 
 /**
- * The wallet's withdraw records in the pool of a pair: the token and status of each. A CrossDEX leg
- * reads them before it calls a withdraw whose answer was lost "sold": a pool can take a withdraw off
- * the balance and never pay it out (CreditCompleted), which every balance read shows as nothing left
- * in the pool. null = the pool could not be read ("no info").
+ * The wallet's withdraw records in the pool of a pair: the token, status and pool time (ns) of each. A
+ * CrossDEX leg reads them before it calls a withdraw whose answer was lost "sold": a pool can take a
+ * withdraw off the balance and never pay it out (CreditCompleted), which every balance read shows as
+ * nothing left in the pool. With `sinceNs` (on the pool's clock), only records from then on: an older
+ * unfinished record (an incident still with ICPSwap support) is not one of this part's withdraws.
+ * null = the pool could not be read ("no info").
  */
 export async function getPoolWithdrawRecords(
   params: SweepParams,
-  opts: { owner?: Principal; agent?: HttpAgent } = {},
-): Promise<Array<{ token: string; status: string }> | null> {
+  opts: { owner?: Principal; agent?: HttpAgent; sinceNs?: bigint } = {},
+): Promise<Array<{ token: string; status: string; timestampNs: bigint }> | null> {
   try {
     const owner = opts.owner ?? (await getCachedIdentity()).getPrincipal()
     if (owner.isAnonymous()) return null
-    const poolId = params.poolId ?? (await getPoolCanister(params.token0Principal, params.token1Principal))
-    // this answer decides whether a part reads sold and drops its marker: a verified read (the run's own
-    // agent, else the session's), never the shared anonymous agent that skips query signature checks
+    // this answer decides whether a part reads sold and drops its marker: the run's own agent, else the
+    // session's, never the shared anonymous agent, and the pool id from the verified lookup
     const agent = opts.agent ?? (await getCachedAgent())
     if (!agent) return null
+    const poolId = params.poolId ?? (await getPoolCanister(params.token0Principal, params.token1Principal, { agent }))
     const actor = Actor.createActor(poolTxIDL, { agent, canisterId: poolId })
     const res = (await actor.getTransactionsByOwner(owner)) as any
     if (!('ok' in res)) return null
-    const out: Array<{ token: string; status: string }> = []
+    const out: Array<{ token: string; status: string; timestampNs: bigint }> = []
     for (const [, tx] of res.ok as Array<[bigint, any]>) {
       const w = tx.action && 'Withdraw' in tx.action ? tx.action.Withdraw : null
-      if (w) out.push({ token: (w.transfer.token as Principal).toText(), status: Object.keys(w.status)[0] })
+      if (!w) continue
+      // candid int (Motoko Time.Time), decoded as a bigint of ns
+      const ts = BigInt(tx.timestamp as bigint)
+      if (opts.sinceNs != null && ts < opts.sinceNs) continue
+      out.push({ token: (w.transfer.token as Principal).toText(), status: Object.keys(w.status)[0], timestampNs: ts })
     }
     return out
   } catch (e) {
@@ -478,8 +531,9 @@ export async function getQuoteAmount(
 ): Promise<bigint> {
   if (amountIn <= 0n) return 0n
   try {
-    const poolId = await getPoolCanister(sellTokenPrincipal, buyTokenPrincipal)
-    const poolData = poolCache.get(`${sellTokenPrincipal}-${buyTokenPrincipal}`)!
+    // a quote: the advisory lookup
+    const poolData = await getPoolData(sellTokenPrincipal, buyTokenPrincipal)
+    const poolId = poolData.canisterId
     const zeroForOne = isZeroForOne(sellTokenPrincipal, poolData)
     const agent = await getAnonAgent()
     const poolActor = Actor.createActor(poolIDL, { agent, canisterId: poolId })
@@ -540,18 +594,21 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   const track = params.track ?? {}
   const sell = params.sellTokenPrincipal, buy = params.buyTokenPrincipal
 
+  // 0. An earlier swap of this pair that has not settled (its marker is saved in this browser): its
+  //    funds may still be in the pool or on their way, and a recovery sweep of this swap would take them
+  //    for its own. The reverse pair counts too: it is the same pool and the same balances of the wallet.
+  //    Checked before anything is spent.
+  if (params.stopIfPending && (hasPendingSwap(sell, buy) || hasPendingSwap(buy, sell))) throw new IcpSwapNotStarted(HELD_MARKER, false, true)
+
   params.onStep?.('Finding the pool…')
-  const poolId = await getPoolCanister(sell, buy)
-  const poolData = poolCache.get(`${sell}-${buy}`)!
+  // The pool id becomes the approve spender and the depositFrom target, and its token order maps the
+  // start check's balances: a verified lookup with this swap's own agent (never the advisory id quotes use).
+  const poolData = await getPoolData(sell, buy, { agent: authedAgent })
+  const poolId = poolData.canisterId
   const zeroForOne = isZeroForOne(sell, poolData)
 
   const sellTokenActor = Actor.createActor(icrcIDL, { agent: authedAgent, canisterId: sell })
   const poolActor = Actor.createActor(poolIDL, { agent: authedAgent, canisterId: poolId })
-
-  // 0. An earlier swap of this pair that has not settled (its marker is saved in this browser): its
-  //    funds may still be in the pool or on their way, and a recovery sweep of this swap would take them
-  //    for its own. Checked before anything is spent.
-  if (params.stopIfPending && hasPendingSwap(sell, buy)) throw new IcpSwapNotStarted(HELD_MARKER, false, true)
 
   // 1. Token fee; with maxUnusedBefore, in the same round trip, what the pool already holds for the wallet
   //    (its unused balances and its pool subaccount, as a recovery sweep reads them) and the buy token's
@@ -611,10 +668,10 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   // Persist the pair NOW (funds are about to move) so a tab-close mid-swap is
   // recoverable via the Recover page. A marker an earlier failed swap on this
   // pair left behind stays until its funds come back. With stopIfPending, a
-  // marker another tab saved for the pair since the check above stops this one
-  // (nothing awaited from this check to the write).
+  // marker another tab saved for the pair (or the reverse pair) since the check
+  // above stops this one (nothing awaited from this check to the write).
   track.hadMarker = hasPendingSwap(sell, buy)
-  if (params.stopIfPending && track.hadMarker) throw new IcpSwapNotStarted(HELD_MARKER, false, true)
+  if (params.stopIfPending && (track.hadMarker || hasPendingSwap(buy, sell))) throw new IcpSwapNotStarted(HELD_MARKER, false, true)
   const markerAt = Date.now()
   track.markerWritten = savePendingSwap(sell, buy, markerAt)
   if (track.markerWritten) track.markerAt = markerAt
@@ -628,7 +685,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     fee: tokenFee,
     token: sell,
   })) as any
-  if ('err' in depositResult) throw new IcpSwapDepositRefused(`DepositFrom failed: ${safeStringify(depositResult.err)}`)
+  if ('err' in depositResult) throw new IcpSwapDepositRefused(`DepositFrom failed: ${safeStringify(depositResult.err)}`, depositNothingMoved(depositResult.err))
 
   // 4. Swap the actual deposited amount
   params.onStep?.('Swapping…')
@@ -696,6 +753,10 @@ export interface SweepOptions {
   /** A run's own agent and principal; default: the cached session. */
   agent?: HttpAgent
   owner?: Principal
+  /** Withdraw only this token's unused balance, and only when it is at least `min` (the look of a CrossDEX
+   *  part whose deposit the pool refused: a smaller balance, the other token and the pool subaccount can
+   *  only be another swap's, left for the Recover page). A balance left this way is not reported. */
+  only?: { token: string; min: bigint }
 }
 
 /**
@@ -714,9 +775,11 @@ export interface SweepOptions {
  */
 export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promise<boolean> {
   const report = opts.report
+  const only = opts.only
   const { agent: authedAgent, owner: ownerPrincipal } = await resolveAuth(opts.agent, opts.owner)
 
-  const poolId = params.poolId ?? (await getPoolCanister(params.token0Principal, params.token1Principal))
+  // the pool id from the verified lookup with the same agent (a look's reading decides what a part reads)
+  const poolId = params.poolId ?? (await getPoolCanister(params.token0Principal, params.token1Principal, { agent: authedAgent }))
   const poolActor = Actor.createActor(poolIDL, { agent: authedAgent, canisterId: poolId })
 
   // Canonical token order comes from the pool itself, never from the caller.
@@ -743,7 +806,8 @@ export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promi
   // 1. Deposit any tokens stuck in the user's pool subaccount FIRST, so the
   //    withdraw pass below can pay them out in the same sweep.
   const userSubaccount = principalToSubAccount(ownerPrincipal)
-  for (const tokenPrincipal of [canonical0, canonical1]) {
+  // (with `only`: a depositFrom never goes through the subaccount, so a balance there is another swap's)
+  for (const tokenPrincipal of only ? [] : [canonical0, canonical1]) {
     try {
       const tokenActor = Actor.createActor(icrcIDL, { agent: authedAgent, canisterId: tokenPrincipal })
       const bal = (await tokenActor.icrc1_balance_of({
@@ -777,6 +841,7 @@ export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promi
   for (const slot of slots) {
     try {
       if (slot.amount <= 0n) continue
+      if (only && (slot.token !== only.token || slot.amount < only.min)) continue
       const fee = await ledgerFee(slot.token)
       // Dust at or below the ledger fee cannot be paid out; treat as zero.
       if (slot.amount <= fee) continue

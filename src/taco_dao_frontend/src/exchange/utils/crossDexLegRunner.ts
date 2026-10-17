@@ -236,11 +236,13 @@ export interface LegDeps {
       maxUnusedBefore?: { sell: bigint; buy: bigint }
       track?: IcpTrack
     }): Promise<{ amountOut: bigint }>
-    sweep(p: { token0Principal: string; token1Principal: string }, opts?: { report?: SweepReport }): Promise<boolean>
+    /** `only`: withdraw only that token, and only a balance of at least `min` (see services/icpswap.ts). */
+    sweep(p: { token0Principal: string; token1Principal: string }, opts?: { report?: SweepReport; only?: { token: string; min: bigint } }): Promise<boolean>
     sweepWithRetry(p: { token0Principal: string; token1Principal: string }, attempts?: number, delayMs?: number, opts?: { report?: SweepReport }): Promise<boolean>
     /** The wallet's withdraw records in the pool of the pair (token and status per record), null when
-     *  the pool cannot be read. */
-    withdrawRecords?(p: { token0Principal: string; token1Principal: string }): Promise<Array<{ token: string; status: string }> | null>
+     *  the pool cannot be read. `sinceMs` (this device's clock): only records from then on, when the run's
+     *  clock is synced with the replica (else every record). */
+    withdrawRecords?(p: { token0Principal: string; token1Principal: string }, sinceMs?: number): Promise<Array<{ token: string; status: string }> | null>
     /** With `at`, only the pair marker dated `at` (the one this route wrote). */
     removePendingSwap(sell: string, buy: string, at?: number): void
   }
@@ -346,6 +348,24 @@ export function neuCreditMatches(amount: bigint, amountIn: bigint, fee: bigint):
   return amount > 0n && d <= fee
 }
 
+/** An ICPSwap depositFrom error that shows no tokens moved. The pool passes the ledger's own refusal of the
+ *  pull on as its text (debug_show of the ICRC-2 TransferFromError, "#InsufficientAllowance({allowance = 0})"),
+ *  answers its checks before the pull ("Input amount should be greater than fee", UnsupportedToken), and the
+ *  token adapter refuses a standard without transferFrom before calling the ledger. Anything else (a ledger
+ *  call that failed in flight, which the pool marks failed) may have moved them. Two devices of one wallet
+ *  that approve the same pool share one allowance (the later approve replaces the earlier one), so an
+ *  InsufficientAllowance refusal happens with no fault at all while the other device's deposit sits in the
+ *  pool. */
+export function depositNothingMoved(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const e = err as Record<string, unknown>
+  if ('InsufficientFunds' in e || 'UnsupportedToken' in e) return true
+  const t = typeof e.InternalError === 'string' ? e.InternalError : ''
+  return /^#(InsufficientAllowance|InsufficientFunds|BadFee|BadBurn|TooOld|CreatedInFuture|Duplicate|TemporarilyUnavailable|GenericError)\b/.test(t)
+    || /^Input amount should be greater than/.test(t)
+    || /Unsupport(ed)? method 'transferFrom'/.test(t)
+}
+
 export function defaultMinOut(expectedOut: bigint, slip: number): bigint {
   return BigInt(Math.floor(Number(expectedOut) * (1 - slip)))
 }
@@ -389,11 +409,16 @@ export async function runCrossDexLeg(leg: CrossDexLeg, ctx: LegCtx, deps: LegDep
   return out
 }
 
+/** The pool's withdraw records count from the part's start minus this (the device and replica clocks may
+ *  differ by that much even when synced): an older unfinished record is not one of this part's withdraws. */
+export const RECORDS_SKEW_MS = 10 * 60_000
+
 // ICPSwap: start check, approve, gate, marker, depositFrom, swap, withdraw.
 async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: bigint): Promise<LegOutcome> {
   const sell = ctx.sell.address, buy = ctx.buy.address
   const track: IcpTrack = {}
   let journalRefused = false
+  const startMs = deps.clock.now()
   try {
     const r = await deps.icpswap.icrc2Swap({
       sellTokenPrincipal: sell,
@@ -440,13 +465,14 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
         error: errText(err, 'ICPSwap approval failed'), notStarted: true }
     }
     const sum = (list: ReadonlyArray<{ token: string; amount: bigint }>, tok: string) => list.filter(m => m.token === tok).reduce((a, m) => a + m.amount, 0n)
-    // The pool's records of the wallet's withdraws (read once): true when none of the pair is left
-    // unfinished, false when one is, null when the pool could not be read.
+    // The pool's records of the wallet's withdraws from this part's start on (read once): true when none of
+    // the pair is left unfinished, false when one is, null when the pool could not be read. A record from
+    // before the part (an older incident still with ICPSwap support) is not this part's.
     let recs: boolean | null | undefined
     const recordsClean = async (): Promise<boolean | null> => {
       if (recs === undefined) {
         try {
-          const list = (await deps.icpswap.withdrawRecords?.({ token0Principal: sell, token1Principal: buy })) ?? null
+          const list = (await deps.icpswap.withdrawRecords?.({ token0Principal: sell, token1Principal: buy }, startMs - RECORDS_SKEW_MS)) ?? null
           recs = list == null ? null : !list.some(r => r.status !== 'Completed' && (r.token === buy || r.token === sell))
         } catch { recs = null }
       }
@@ -460,13 +486,23 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
       if (!track.hadMarker || (await recordsClean()) === true) deps.icpswap.removePendingSwap(sell, buy, track.markerAt)
     }
     if (err?.depositRefused) {
-      // The pool refused the deposit, so normally nothing moved. One sweep makes sure. It is this part's
-      // refund only when at least its deposit came back: a look that found less of the sold token than the
-      // deposit found another swap's balance of the wallet (sent to the wallet too), and this route never
-      // started.
+      // The pool refused the deposit. When its answer shows nothing moved (the ledger refused the pull, as
+      // when another device of the wallet approved the same pool since and so replaced this part's
+      // allowance, or one of the pool's own checks stopped it), there is nothing to look for, and a look
+      // would only move another swap's balance: the part never started.
+      if (err?.nothingMoved) {
+        await dropMarker()
+        ctx.onStep(NOT_STARTED)
+        return { dex: 'icpswap', success: false, amountOut: 0n, state: 'notSent',
+          error: errText(err, 'ICPSwap refused the deposit'), notStarted: true }
+      }
+      // Otherwise one look makes sure. The pool credits a deposit in full, so only a sold token balance of
+      // at least this part's deposit can hold it: the look withdraws only that, and a smaller balance, the
+      // bought token and the pool subaccount (another swap's) stay for the Recover page. Nothing that size
+      // there: this route never started.
       const report: SweepReport = { found: [], moved: [] }
       let swept = false, sweepThrew = false, sweepErr: unknown = null
-      try { swept = await deps.icpswap.sweep({ token0Principal: sell, token1Principal: buy }, { report }) }
+      try { swept = await deps.icpswap.sweep({ token0Principal: sell, token1Principal: buy }, { report, only: { token: sell, min: leg.amountIn } }) }
       catch (e) { sweepThrew = true; sweepErr = e }
       if (!sweepThrew && !report.found.some(f => !f.sub && f.token === sell && f.amount >= leg.amountIn)) {
         await dropMarker()
