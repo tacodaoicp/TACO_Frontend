@@ -3,7 +3,7 @@
 /////////////
 
 // vue
-import { ref, computed, watch } from 'vue'
+import { ref, shallowRef, computed, watch, toRaw } from 'vue'
 import { defineStore } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
@@ -1741,7 +1741,76 @@ export const useTacoStore = defineStore('taco', () => {
     
     // logs
     const systemLogs = ref<SystemLog[]>([])
-    const tradingLogs = ref<TradingLog[]>([])
+    // Executed trades of the last trading status that had any (set by the tradingStatus
+    // subscription and refreshTimerStatus). The admin trading log (TradingLogs.vue) is built
+    // from them only when a page reads it, instead of in every tab on every update.
+    const tradingLogTrades = shallowRef<TradeRecord[]>([])
+    const tradingLogs = computed<TradingLog[]>(() => {
+        const executedTrades = tradingLogTrades.value
+        if (executedTrades.length === 0) return []
+
+        // Look tokens up by principal text. Principal.toText is costly, and
+        // searching the token list for each of ~2000 trades ran it twice per
+        // token per trade: seconds of main thread on phones, on every load.
+        // The decoder reuses one Principal object per id, so with this memo
+        // each id is converted once.
+        const principalText = new Map<Principal, string>()
+        const textOf = (p: Principal): string => {
+            let text = principalText.get(p)
+            if (text === undefined) {
+                text = p.toText()
+                principalText.set(p, text)
+            }
+            return text
+        }
+        const tokenByText = new Map<string, any>()
+        // raw entries: the list is only ever replaced whole, and for worker data its raw
+        // Principals are the decoder's shared objects, the same ones the trades hold
+        for (const t of toRaw(fetchedTokenDetails.value)) {
+            try {
+                const text = textOf(t[0] as Principal)
+                if (!tokenByText.has(text)) tokenByText.set(text, t[1])
+            } catch { /* skip a malformed entry */ }
+        }
+
+        return executedTrades.map((trade: TradeRecord) => {
+            if (trade.error && trade.error.length > 0) {
+                return {
+                    timestamp: trade.timestamp,
+                    message: `Failed: ${trade.error[0]}`
+                };
+            }
+
+            // Find token details from our trusted tokens list
+            let soldText = ''
+            let boughtText = ''
+            try {
+                soldText = textOf(trade.tokenSold as Principal)
+                boughtText = textOf(trade.tokenBought as Principal)
+            } catch { /* reported as unknown below */ }
+            const soldToken = tokenByText.get(soldText);
+            const boughtToken = tokenByText.get(boughtText);
+
+            if (!soldToken || !boughtToken) {
+                return {
+                    timestamp: trade.timestamp,
+                    message: `Trade with unknown tokens: ${soldText} -> ${boughtText}`
+                };
+            }
+
+            // Format amounts using token decimals from our trusted tokens
+            const formattedSoldAmount = Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals));
+            const formattedBoughtAmount = Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals));
+
+            // Extract exchange name from the variant
+            const exchangeName = Object.keys(trade.exchange)[0];
+
+            return {
+                timestamp: trade.timestamp,
+                message: `${formattedSoldAmount} ${soldToken.tokenSymbol} → ${formattedBoughtAmount} ${boughtToken.tokenSymbol} on ${exchangeName}`
+            };
+        });
+    })
 
     // other
     const tokenMetadataCache = new Map<string, TokenMetadata>();
@@ -1864,111 +1933,57 @@ export const useTacoStore = defineStore('taco', () => {
             })
         )
 
-        // tradingStatus
+        // tradingStatus - also the treasury part of timerHealth (the admin timer panel)
         workerUnsubscribers.push(
             workerBridge.subscribe('tradingStatus', (data: unknown) => {
                 if (data) {
                     // Deserialize BigInt values from worker
-                    fetchedTradingStatus.value = deserializeFromTransfer(data)
+                    const status = deserializeFromTransfer(data) as any
+                    fetchedTradingStatus.value = status
+                    try {
+                        const ts = status?.ok
+                        if (ts) {
+                            timerHealth.value.treasury = {
+                                shortSync: {
+                                    active: true,
+                                    lastSync: ts.metrics?.lastUpdate || null
+                                },
+                                longSync: {
+                                    active: true,
+                                    lastSync: ts.metrics?.lastUpdate || null
+                                },
+                                rebalanceStatus: ts.rebalanceStatus?.Idle !== undefined ? 'Idle' :
+                                    ts.rebalanceStatus?.Trading !== undefined ? 'Trading' : 'Failed',
+                                rebalanceError: ts.rebalanceStatus?.Failed,
+                                tradingMetrics: ts.metrics,
+                                // the same array as fetchedTradingStatus, not a second copy
+                                recentTrades: ts.executedTrades
+                            }
+                            if (ts.executedTrades && ts.executedTrades.length > 0) {
+                                tradingLogTrades.value = ts.executedTrades
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error reading the trading status for the timer health:', error)
+                    }
                 }
             })
         )
 
-        // timerStatus - updates timerHealth ref AND tradingLogs
+        // timerStatus - updates the snapshot part of timerHealth. The payload may also carry a
+        // copy of the trading status and token details; those arrive through their own keys,
+        // so only snapshotInfo is decoded
         workerUnsubscribers.push(
             workerBridge.subscribe('timerStatus', (data: unknown) => {
                 if (data && typeof data === 'object') {
                     // Deserialize BigInt values from worker
-                    const statusData = deserializeFromTransfer(data) as { snapshotInfo: any; tradingStatus: any; tokenDetails: any[] }
-                    // Update timerHealth based on snapshotInfo and tradingStatus
-                    if (statusData.snapshotInfo) {
+                    const snapshotInfo = deserializeFromTransfer((data as { snapshotInfo?: unknown }).snapshotInfo) as any
+                    if (snapshotInfo) {
                         timerHealth.value.snapshot = {
                             active: true,
-                            lastSnapshotTime: statusData.snapshotInfo.lastSnapshotTime,
+                            lastSnapshotTime: snapshotInfo.lastSnapshotTime,
                             nextExpectedSnapshot: null,
                             inProgress: false
-                        }
-                    }
-                    if (statusData.tradingStatus?.ok) {
-                        const ts = statusData.tradingStatus.ok
-                        timerHealth.value.treasury = {
-                            shortSync: {
-                                active: true,
-                                lastSync: ts.metrics?.lastUpdate || null
-                            },
-                            longSync: {
-                                active: true,
-                                lastSync: ts.metrics?.lastUpdate || null
-                            },
-                            rebalanceStatus: ts.rebalanceStatus?.Idle !== undefined ? 'Idle' :
-                                ts.rebalanceStatus?.Trading !== undefined ? 'Trading' : 'Failed',
-                            rebalanceError: ts.rebalanceStatus?.Failed,
-                            tradingMetrics: ts.metrics,
-                            recentTrades: ts.executedTrades
-                        }
-
-                        // Also populate tradingLogs from executedTrades
-                        const executedTrades = ts.executedTrades
-                        if (executedTrades && executedTrades.length > 0) {
-                            // Look tokens up by principal text. Principal.toText is costly, and
-                            // searching the token list for each of ~2000 trades ran it twice per
-                            // token per trade: seconds of main thread on phones, on every load.
-                            // The decoder reuses one Principal object per id, so with this memo
-                            // each id is converted once.
-                            const principalText = new Map<Principal, string>()
-                            const textOf = (p: Principal): string => {
-                                let text = principalText.get(p)
-                                if (text === undefined) {
-                                    text = p.toText()
-                                    principalText.set(p, text)
-                                }
-                                return text
-                            }
-                            const tokenByText = new Map<string, any>()
-                            for (const t of fetchedTokenDetails.value) {
-                                try {
-                                    const text = textOf(t[0] as Principal)
-                                    if (!tokenByText.has(text)) tokenByText.set(text, t[1])
-                                } catch { /* skip a malformed entry */ }
-                            }
-
-                            tradingLogs.value = executedTrades.map((trade: TradeRecord) => {
-                                if (trade.error && trade.error.length > 0) {
-                                    return {
-                                        timestamp: trade.timestamp,
-                                        message: `Failed: ${trade.error[0]}`
-                                    };
-                                }
-
-                                // Find token details from our trusted tokens list
-                                let soldText = ''
-                                let boughtText = ''
-                                try {
-                                    soldText = textOf(trade.tokenSold as Principal)
-                                    boughtText = textOf(trade.tokenBought as Principal)
-                                } catch { /* reported as unknown below */ }
-                                const soldToken = tokenByText.get(soldText);
-                                const boughtToken = tokenByText.get(boughtText);
-
-                                if (!soldToken || !boughtToken) {
-                                    return {
-                                        timestamp: trade.timestamp,
-                                        message: `Trade with unknown tokens: ${soldText} -> ${boughtText}`
-                                    };
-                                }
-
-                                // Format amounts using token decimals from our trusted tokens
-                                const formattedSoldAmount = Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals));
-                                const formattedBoughtAmount = Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals));
-
-                                // Extract exchange name from the variant
-                                const exchangeName = Object.keys(trade.exchange)[0];
-
-                                return {
-                                    timestamp: trade.timestamp,
-                                    message: `${formattedSoldAmount} ${soldToken.tokenSymbol} → ${formattedBoughtAmount} ${boughtToken.tokenSymbol} on ${exchangeName}`
-                                };
-                            });
                         }
                     }
                 }
@@ -4264,65 +4279,9 @@ export const useTacoStore = defineStore('taco', () => {
                     recentTrades: executedTrades
                 };
                 
-                // Update trading logs from executed trades
+                // Update trading logs from executed trades (built when read, see tradingLogs)
                 if (executedTrades) {
-                    // console.log('refreshTimerStatus: Processing trades with token details:', 
-                    //     fetchedTokenDetails.value.map(t => ({
-                    //         id: (t[0] as Principal).toText(),
-                    //         symbol: t[1]?.tokenSymbol,
-                    //         decimals: t[1]?.tokenDecimals?.toString()
-                    //     }))
-                    // )
-                    tradingLogs.value = executedTrades.map((trade: TradeRecord) => {
-                        if (trade.error && trade.error.length > 0) {
-                            return {
-                                timestamp: trade.timestamp,
-                                message: `Failed: ${trade.error[0]}`
-                            };
-                        }
-                        
-                        // Find token details from our trusted tokens list
-                        const soldToken = fetchedTokenDetails.value.find(t => {
-                            try {
-                                const tradeTokenId = (trade.tokenSold as Principal).toText();
-                                const listTokenId = (t[0] as Principal).toText();
-                                return tradeTokenId === listTokenId;
-                            } catch (error) {
-                                console.error('Error comparing sold token IDs:', error);
-                                return false;
-                            }
-                        })?.[1];
-
-                        const boughtToken = fetchedTokenDetails.value.find(t => {
-                            try {
-                                const tradeTokenId = (trade.tokenBought as Principal).toText();
-                                const listTokenId = (t[0] as Principal).toText();
-                                return tradeTokenId === listTokenId;
-                            } catch (error) {
-                                console.error('Error comparing bought token IDs:', error);
-                                return false;
-                            }
-                        })?.[1];
-
-                        if (!soldToken || !boughtToken) {
-                            return {
-                                timestamp: trade.timestamp,
-                                message: `Trade with unknown tokens: ${(trade.tokenSold as Principal).toText()} -> ${(trade.tokenBought as Principal).toText()}`
-                            };
-                        }
-
-                        // Format amounts using token decimals from our trusted tokens
-                        const formattedSoldAmount = Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals));
-                        const formattedBoughtAmount = Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals));
-
-                        // Extract exchange name from the variant
-                        const exchangeName = Object.keys(trade.exchange)[0];
-
-                        return {
-                            timestamp: trade.timestamp,
-                            message: `${formattedSoldAmount} ${soldToken.tokenSymbol} → ${formattedBoughtAmount} ${boughtToken.tokenSymbol} on ${exchangeName}`
-                        };
-                    });
+                    tradingLogTrades.value = toRaw(executedTrades)
                 }
                 
                 //console.log('refreshTimerStatus: Updated treasuryStatus:', timerHealth.value.treasury.shortSync);
