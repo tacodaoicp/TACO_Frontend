@@ -159,6 +159,10 @@ const anyRecover = computed(() => legs.value.some(l => ['needsRecovery', 'tracke
 // a part that may already be settled in the wallet: the verdict never says failed or partly done without the
 // wallet first
 const anyMaybeSent = computed(() => legs.value.some(maybeSentLeg))
+// a sale that sold nothing with every part refunded or not sent: nothing to do, a neutral verdict (as the
+// single swap's Nothing was swapped)
+const nothingSold = computed(() => props.run?.phase === 'failed' && !anyMaybeSent.value && legs.value.length > 0
+  && legs.value.every(l => l.state === 'refunded' || l.state === 'notSent'))
 // every part that did not sell for sure may already be settled in the wallet (nothing else is missing)
 const restUnsure = computed(() => legs.value.filter(l => !SOLD.includes(l.state)).every(maybeSentLeg))
 const hedgedOnly = computed(() => onlyMaybeSent(legs.value))
@@ -196,6 +200,7 @@ const pill = computed(() => {
   if (p === 'complete') return { text: 'Complete', cls: 'ok' }
   if (p === 'partial') return { text: anyMaybeSent.value && restUnsure.value ? 'Unconfirmed' : 'Partly done', cls: 'part' }
   if (p === 'stopped') return { text: 'Stopped', cls: 'stop' }
+  if (nothingSold.value) return { text: 'Nothing sold', cls: 'stop' }
   return anyMaybeSent.value ? { text: 'Unconfirmed', cls: 'part' } : { text: 'Failed', cls: 'fail' }
 })
 const routes = computed(() => legs.value.length)
@@ -210,7 +215,7 @@ const fillCls = computed(() => {
   const p = props.run?.phase
   // nothing confirmed sold, but a part may have sold: the bar matches the pill, not a failure
   const unsure = p === 'failed' && anyMaybeSent.value
-  return { 'is-prep': p === 'preparing', 'is-ok': p === 'complete', 'is-part': p === 'partial' || unsure, 'is-fail': p === 'failed' && !unsure, 'is-stop': p === 'stopped' }
+  return { 'is-prep': p === 'preparing', 'is-ok': p === 'complete', 'is-part': p === 'partial' || unsure, 'is-fail': p === 'failed' && !unsure && !nothingSold.value, 'is-stop': p === 'stopped' || nothingSold.value }
 })
 
 const now = ref(Date.now())

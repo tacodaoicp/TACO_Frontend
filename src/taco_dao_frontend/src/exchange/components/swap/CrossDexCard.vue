@@ -236,7 +236,7 @@ import { useCrossDexSwap, type LegOutcome } from '../../composables/useCrossDexS
 import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { formatTokenAmount } from '../../utils/format'
-import { CHECK_WALLET, NOT_IN_WALLET, NOTHING_SWAPPED, NOTHING_SWAPPED_TEXT, swapMaybeSentSummary, unsureKind, unsureKinds, maybeSentLeg } from './multiSellCopy'
+import { CHECK_WALLET, NOT_IN_WALLET, NOTHING_SWAPPED, nothingSwappedText, swapMaybeSentSummary, unsureKind, unsureKinds, maybeSentLeg } from './multiSellCopy'
 import { isHeldReason } from '../../utils/crossDexLegRunner'
 import { getTokenIcon } from '../../utils/token-icons'
 import TokenSelector from './TokenSelector.vue'
@@ -415,7 +415,8 @@ const summaryLine = computed(() => {
     })
   }
   if (cx.phase.value === 'partial') return `Partial fill: received ${totalStr}. Check each route's status above. Anything not recovered automatically is on the Recover page.`
-  if (nothingSwapped.value) return `${NOTHING_SWAPPED}. ${NOTHING_SWAPPED_TEXT}`
+  // the pill already says Nothing was swapped
+  if (nothingSwapped.value) return nothingSwappedText(cx.outcomes.value.some(o => o.state === 'refunded'))
   if (cx.phase.value === 'error') return `No route went through. Check each route's status above. Anything not recovered automatically is on the Recover page.`
   return ''
 })

@@ -45,7 +45,7 @@ import {
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
 import { icrcIDL } from '../../shared/icrc-idl'
-import { CHECK_WALLET, NOT_IN_WALLET, NOTHING_SWAPPED, NOTHING_SWAPPED_TEXT, unsureKinds, unsureText, confirmedText, filledText, maybeSentLeg } from '../components/swap/multiSellCopy'
+import { CHECK_WALLET, NOT_IN_WALLET, NOTHING_SWAPPED, nothingSwappedText, unsureKinds, unsureText, confirmedText, filledText, maybeSentLeg } from '../components/swap/multiSellCopy'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
 export type CrossDexPhase =
@@ -581,8 +581,9 @@ export function useCrossDexSwap() {
       // does not repeat the title)
       if (maybeSent) toast.warning(CHECK_WALLET, `${unsureText(kinds, buyToken.symbol, { whole: results.length === 1 })} ${NOT_IN_WALLET}`)
       // every route refused or refunded: nothing to do, a neutral verdict without the raw errors
-      else if (results.every(r => r.state === 'refunded' || r.state === 'notSent')) toast.info(NOTHING_SWAPPED, NOTHING_SWAPPED_TEXT)
-      else toast.error('CrossDEX Swap Failed', errorMsg.value)
+      else if (results.every(r => r.state === 'refunded' || r.state === 'notSent')) toast.info(NOTHING_SWAPPED, nothingSwappedText(results.some(r => r.state === 'refunded')))
+      // the card's words; the raw errors stay on the route cards
+      else toast.error('CrossDEX Swap Failed', 'No route went through. Anything not recovered automatically is on the Recover page.')
     }
   }
 

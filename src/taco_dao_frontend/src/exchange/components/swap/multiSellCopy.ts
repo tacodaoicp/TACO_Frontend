@@ -262,7 +262,10 @@ export function filledText(filled: number, total: number): string {
 }
 /** A single swap where every route was refused or refunded: nothing left the wallet for good. */
 export const NOTHING_SWAPPED = 'Nothing was swapped'
-export const NOTHING_SWAPPED_TEXT = 'Your funds stayed in or went back to your wallet, minus network fees.'
+/** Its text: the fees only when a route was refunded (a route not sent moved nothing). */
+export function nothingSwappedText(anyRefunded: boolean): string {
+  return anyRefunded ? 'Your funds stayed in or went back to your wallet, minus network fees.' : 'Your funds stayed in your wallet.'
+}
 /** "2 of 3 routes are confirmed." */
 export function confirmedText(confirmed: number, total: number, noun: 'route' | 'token' = 'route'): string {
   return `${confirmed} of ${plural(total, noun, `${noun}s`)} ${confirmed === 1 ? 'is' : 'are'} confirmed.`
