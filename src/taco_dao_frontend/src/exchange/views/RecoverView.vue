@@ -368,7 +368,8 @@ import type { RunRecord } from '../utils/crossDexJournal'
 import { useInterruptedSale } from '../composables/useInterruptedSale'
 import { mergeDepositRows, isOtherWallet as isOtherWalletRow, batchItemRecovered, batchRefused, type DepositRow, type MaySentRow } from '../utils/recoverRows'
 import { useExchangeToast } from '../composables/useExchangeToast'
-import { getCachedIdentity } from '../../shared/auth-cache'
+import { getCachedIdentity, createAgentFor } from '../../shared/auth-cache'
+import type { HttpAgent } from '@dfinity/agent'
 import { mapWithConcurrency, withRetries } from '../utils/concurrency'
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
@@ -732,13 +733,28 @@ const canSweepManual = computed(() =>
 
 const NOT_DISMISSED = 'Not dismissed'
 const DISMISS_BUSY_TEXT = 'A swap, sale or recovery is running in this browser. Dismiss this row when it ends.'
-const STUCK_ROW_TEXT = 'ICPSwap still lists a withdraw of this pair that it has not finished, so the row stays.'
-/** The pool of the pair lists an unfinished withdraw of the wallet (of any age): its funds may be stuck there. */
-async function unfinishedWithdraw(sell: string, buy: string): Promise<boolean> {
+const STUCK_ROW_TEXT = {
+  unfinished: 'ICPSwap still lists a withdraw of this pair that it has not finished, so the row stays. Sales skip ICPSwap for this pair while it is listed. Dismiss it once ICPSwap support has the record id.',
+  unread: "ICPSwap's records of this pair could not be read, so the row stays. Sales skip ICPSwap for this pair while it is listed. Sweep it again later.",
+} as const
+/** A node signed agent for the records reads (as the swap's own run agent), one per wallet. */
+let recordsAgent: { key: string; agent: Promise<HttpAgent> } | null = null
+async function recordsReader(): Promise<{ owner: Principal; agent: HttpAgent }> {
+  const identity = await getCachedIdentity()
+  const owner = identity.getPrincipal()
+  if (recordsAgent?.key !== owner.toText()) recordsAgent = { key: owner.toText(), agent: createAgentFor(identity) }
+  try { return { owner, agent: await recordsAgent.agent } } catch (e) { recordsAgent = null; throw e }
+}
+/** Why the pair's ICPSwap marker stays after a sweep: the pool lists an unfinished withdraw of the wallet (of
+ *  any age), whose funds may be stuck there, or its records could not be read (no answer is never read as no
+ *  problem). null when neither. */
+async function markerHold(sell: string, buy: string): Promise<keyof typeof STUCK_ROW_TEXT | null> {
   try {
-    const recs = await icpswap.getPoolWithdrawRecords({ token0Principal: sell, token1Principal: buy })
-    return !!recs?.some(r => r.status !== 'Completed')
-  } catch { return false }
+    const { owner, agent } = await recordsReader()
+    const recs = await icpswap.getPoolWithdrawRecords({ token0Principal: sell, token1Principal: buy }, { owner, agent })
+    if (recs == null) return 'unread'
+    return recs.some(r => r.status !== 'Completed') ? 'unfinished' : null
+  } catch { return 'unread' }
 }
 
 function sweepPending(p: icpswap.PendingIcpSwap) {
@@ -755,9 +771,10 @@ async function sweepPendingInner(p: icpswap.PendingIcpSwap) {
     if (recovered) {
       sweepSuccess.value = true
       // a withdraw of the pair that ICPSwap has not finished (taken off the balance, never paid) shows on no
-      // balance: the row stays while the pool lists one
-      if (await unfinishedWithdraw(p.sell, p.buy)) {
-        toast.success('Sweep Complete', STUCK_ROW_TEXT)
+      // balance: the row stays while the pool lists one, or while its records cannot be read
+      const hold = await markerHold(p.sell, p.buy)
+      if (hold) {
+        toast.success('Sweep Complete', STUCK_ROW_TEXT[hold])
       } else {
         icpswap.removePendingSwap(p.sell, p.buy)
         pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
@@ -819,6 +836,7 @@ async function dismissPendingNeu(p: neutrinite.PendingNeutrinite) {
   pendingNeu.value = pendingNeu.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
 }
 
+const NEU_HELD_ROW_TEXT = 'Neutrinite has not credited a deposit of this pair yet, so the row stays. Sweep it again in a minute.'
 function sweepNeuPending(p: neutrinite.PendingNeutrinite) {
   if (sweeping.value) return
   return exclusiveRecovery('neu:' + p.sell + p.buy, () => sweepNeuPendingInner(p))
@@ -831,10 +849,16 @@ async function sweepNeuPendingInner(p: neutrinite.PendingNeutrinite) {
   try {
     const recovered = await neutrinite.sweep(p.sell, p.buy)
     if (recovered) {
-      neutrinite.removePendingSwap(p.sell, p.buy)
-      pendingNeu.value = pendingNeu.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
       sweepSuccess.value = true
-      toast.success('Sweep Complete')
+      // a deposit of the pair the pylon has not credited yet sits on its deposit account on the ledger, where
+      // no sweep reaches it: the row stays while the sold token is there (read after the sweep)
+      if (await neutrinite.sellStillHeld(p.sell)) {
+        toast.success('Sweep Complete', NEU_HELD_ROW_TEXT)
+      } else {
+        neutrinite.removePendingSwap(p.sell, p.buy)
+        pendingNeu.value = pendingNeu.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
+        toast.success('Sweep Complete')
+      }
     } else {
       // false: nothing above the fee was found (a failed withdraw throws and lands in the catch below)
       sweepError.value = 'Nothing to recover yet. If you just swapped, the deposit may still be crediting, so try again in a few seconds. If nothing shows up after a few minutes, you can dismiss this row.'
@@ -990,8 +1014,8 @@ async function raMarkers(): Promise<number> {
       if (ok) {
         swept++
         // a withdraw of the pair that ICPSwap has not finished shows on no balance: the marker stays while the
-        // pool lists one, of any age
-        if (await unfinishedWithdraw(p.sell, p.buy)) { kept++; return }
+        // pool lists one, of any age, or while its records cannot be read
+        if (await markerHold(p.sell, p.buy)) { kept++; return }
         icpswap.removePendingSwap(p.sell, p.buy)
         pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
       }
@@ -999,7 +1023,7 @@ async function raMarkers(): Promise<number> {
   })
   raSet(id, 'Interrupted CrossDEX swaps', 'done',
     (swept > 0 ? `Recovered funds from ${swept} of ${markers.length} pairs.` : 'Nothing left stranded for those pairs.')
-    + (kept > 0 ? ` ${kept === 1 ? 'One pair stays listed' : `${kept} pairs stay listed`}: ICPSwap has a withdraw of it that is not finished.` : ''))
+    + (kept > 0 ? ` ${kept === 1 ? 'One pair stays listed' : `${kept} pairs stay listed`}: ICPSwap has a withdraw of it that is not finished, or its records could not be read.` : ''))
   return swept
 }
 
@@ -1140,14 +1164,18 @@ async function raNeutrinite(): Promise<number> {
       raSet('neu:' + d.ledger, 'Neutrinite balance', d.ok ? 'done' : 'failed',
         (d.ok ? 'Returned ' : 'Could not withdraw ') + formatRa(d.amount, d.ledger))
     }
-    // A saved pair marker is cleared only when funds for one of its tokens actually moved.
+    // A saved pair marker is cleared only when funds for one of its tokens actually moved, and none of its sold
+    // token still waits on the pylon deposit account for its credit (read after the sweep).
+    let kept = 0
     for (const m of [...pendingNeu.value]) {
       if (details.some(d => d.ok && (d.ledger === m.sell || d.ledger === m.buy))) {
+        if (await neutrinite.sellStillHeld(m.sell)) { kept++; continue }
         neutrinite.removePendingSwap(m.sell, m.buy)
         pendingNeu.value = pendingNeu.value.filter(e => !(e.sell === m.sell && e.buy === m.buy))
       }
     }
-    raSet(id, 'Neutrinite pylon', 'done', n > 0 ? `Recovered ${n} balance${n > 1 ? 's' : ''}` : 'No balances held by the pylon')
+    raSet(id, 'Neutrinite pylon', 'done', (n > 0 ? `Recovered ${n} balance${n > 1 ? 's' : ''}` : 'No balances held by the pylon')
+      + (kept > 0 ? `. ${kept === 1 ? 'One pair stays listed' : `${kept} pairs stay listed`}: Neutrinite has not credited a deposit of it yet.` : ''))
     return n
   } catch (e: any) {
     raSet(id, 'Neutrinite pylon', 'failed', e?.message || 'Pylon check failed')

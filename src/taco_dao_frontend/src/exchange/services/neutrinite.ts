@@ -192,6 +192,28 @@ export function verifiedDepositSub(agent: HttpAgent, owner: Principal): Promise<
   return p
 }
 
+/** Does the pylon still hold some of the sold token for this wallet: on its deposit account on the ledger (a
+ *  deposit it has not credited yet, out of every sweep's reach) or credited (read again, a credit can land
+ *  while a sweep runs)? Above the ledger fee. true when it cannot be read: a pair marker stays rather than go
+ *  on no answer. */
+export async function sellStillHeld(sell: string, opts: { agent?: HttpAgent; owner?: Principal } = {}): Promise<boolean> {
+  try {
+    const { agent, owner } = await resolveAuth(opts.agent, opts.owner)
+    const sub = await verifiedDepositSub(agent, owner)
+    const ledger = Actor.createActor(icrcIDL, { agent, canisterId: sell }) as any
+    const [raw, f] = await Promise.all([
+      ledger.icrc1_balance_of({ owner: Principal.fromText(NEUTRINITE_PYLON), subaccount: [sub] }) as Promise<bigint>,
+      ledger.icrc1_fee() as Promise<bigint>,
+    ])
+    const fee = BigInt(f)
+    if (BigInt(raw) > fee) return true
+    // after the deposit account: a credit that moved the tokens meanwhile shows here
+    const pylon = await authedPylon(agent)
+    const rows = (await pylon.icrc55_accounts({ owner, subaccount: [] })) as any[]
+    return (findEndpoint(rows, sell)?.balance ?? 0n) > fee
+  } catch { return true }
+}
+
 const sameBytes = (a: ArrayLike<number> | undefined, b: ArrayLike<number> | undefined) =>
   !!a && !!b && a.length === b.length && Array.prototype.every.call(a, (x: number, i: number) => x === b[i])
 
