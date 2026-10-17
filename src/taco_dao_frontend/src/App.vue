@@ -164,7 +164,7 @@
   const syncThemeColor = () => {
     const colour = getComputedStyle(document.documentElement).getPropertyValue('--card-gradient-from').trim()
     if (!colour) return
-    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    let meta = document.querySelector('meta[name="theme-color"]')
     if (!meta) {
       meta = document.createElement('meta')
       meta.name = 'theme-color'
