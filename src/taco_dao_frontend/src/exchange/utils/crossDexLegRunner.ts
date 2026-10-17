@@ -112,7 +112,8 @@ export const isNeuFirst = (legs: ReadonlyArray<{ dex: CrossDexVenue }>) =>
 export type LegState = 'waiting' | 'running' | 'recovering' | 'deferred' | 'slow'
   | 'done' | 'doneUnknown' | 'belowMin' | 'refunded' | 'notSent' | 'needsRecovery' | 'tracked'
 export type LegReason = 'maySent' | 'unconfirmed' | 'admin' | 'afterSwap' | 'rateLimited' | 'tacoPaused'
-  | 'secondLate' | 'secondMoved' | 'secondCheck' | 'gateLate' | 'journal' | 'session' | 'slippage' | 'timeout' | 'neuHeld' | string
+  | 'secondLate' | 'secondMoved' | 'secondCheck' | 'gateLate' | 'journal' | 'session' | 'slippage' | 'timeout' | 'neuHeld'
+  | 'neuMismatch' | string
 export type AssetType = { ICP: null } | { ICRC12: null } | { ICRC3: null }
 
 export interface LegOutcome {
@@ -239,6 +240,8 @@ export interface LegDeps {
       onStep?: (s: string) => void; canDeposit?: () => boolean; beforeTransfer?: () => boolean; requireMarker?: boolean
       onCredited?: () => boolean
       maxSellBefore?: bigint
+      stopIfPending?: boolean
+      creditFee?: bigint
       track?: NeuTrack
     }): Promise<{ amountOut: bigint }>
     sweep(sell: string, buy: string, before?: { sell: bigint; buy: bigint }, opts?: { report?: SweepReport }): Promise<boolean>
@@ -280,10 +283,14 @@ export interface IcpTrack {
 export interface NeuTrack {
   /** The pylon balances of the pair as the swap started: the baseline of every recovery look. */
   before?: { sell: bigint; buy: bigint }
+  /** What the credit poll saw credited for this deposit (it matched the deposit). */
+  credited?: bigint
   swappedOut?: bigint
   hadMarker?: boolean
   /** dex_swap was sent: from here the swap may have run even when its answer is lost. */
   swapSent?: boolean
+  /** dex_swap answered with an error: it did not run. */
+  swapRefused?: boolean
   /** The withdraw answered with a refusal (unset when its answer was lost, so it may have run). */
   withdrawRefused?: boolean
 }
@@ -309,6 +316,15 @@ export function isSessionError(err: unknown): boolean {
   if (err == null) return false
   const m = String((err as any)?.message ?? err)
   return /Session expired|Not authenticated|delegation has expired|Invalid delegation expiry|Invalid (basic )?signature/i.test(m)
+}
+
+/** The Neutrinite pylon nets one ledger fee from a deposit: an amount within one fee of the deposit
+ *  minus that fee is the deposit's credit (read on the live pylon: its ledger fee for each ledger is
+ *  the ledger's own fee, and every deposit leaves its deposit account as the deposit minus the fee). */
+export function neuCreditMatches(amount: bigint, amountIn: bigint, fee: bigint): boolean {
+  const expected = amountIn - fee
+  const d = amount > expected ? amount - expected : expected - amount
+  return amount > 0n && d <= fee
 }
 
 export function defaultMinOut(expectedOut: bigint, slip: number): bigint {
@@ -502,6 +518,12 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
       // leftover, or another swap's deposit) stops the part before its deposit: neither the credit
       // check nor a recovery look could tell this part's tokens from that balance
       maxSellBefore: ctx.fee,
+      // so does the marker of an earlier swap of the pair that has not settled: its deposit may still
+      // be credited while this part waits for its own
+      stopIfPending: true,
+      // a credit that is not this deposit (another deposit of the wallet credited before it or with
+      // it) is never swapped: the pylon nets one fee from a deposit
+      creditFee: ctx.fee,
       canDeposit: gate && (() => !gate.isOpen()),
       beforeTransfer: () => {
         if (!ctx.journal.beforeMove('neuTransfer') && ctx.strictJournal) { journalRefused = true; return false }
@@ -522,6 +544,13 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
       ctx.onStep('Failed, nothing left your wallet')
       return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'notSent',
         reason: journalRefused || err?.journal ? 'journal' : err?.held ? 'neuHeld' : undefined, error, notStarted: true }
+    }
+    if (err?.creditMismatch) {
+      // The pylon credited an amount that is not this deposit: another deposit of the wallet was
+      // credited before it or with it. Nothing was swapped, and a look could not tell this part's tokens
+      // from the others, so all of it stays on the pylon for the Recover page, with the marker.
+      ctx.onStep('Failed, recover on the Recover page')
+      return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'needsRecovery', reason: 'neuMismatch', error, recovered: false }
     }
     ctx.onStep('Recovering funds…')
     // Sweep only what this swap added on the pylon, retried because a deposit
@@ -560,12 +589,22 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
       return { dex: 'neutrinite', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
     }
     const gotOut = report.moved.filter(m => m.token === buy).reduce((a, m) => a + m.amount, 0n)
-    const soldBack = report.moved.filter(m => m.token === sell).reduce((a, m) => a + m.amount, 0n)
+    const soldMoved = report.moved.filter(m => m.token === sell)
+    const soldBack = soldMoved.reduce((a, m) => a + m.amount, 0n)
+    // The sold token that came back is this part's deposit only when it is this part's credit (within
+    // one fee): the amount the credit poll saw, or the deposit minus the pylon's fee when the poll never
+    // saw it. Another swap's sold token can land on the pylon meanwhile and come back with a look; it
+    // never outweighs this part's own ICP.
+    const credit = track.credited ?? (leg.amountIn > ctx.fee ? leg.amountIn - ctx.fee : 0n)
+    const nearCredit = (a: bigint) => a > 0n && (a > credit ? a - credit : credit - a) <= ctx.fee
+    const depositBack = soldMoved.some(m => nearCredit(m.amount)) || nearCredit(soldBack)
     // What a look moved is this part's only when it could have come from it: ICP once its swap may
     // have run, the sold token when its deposit came back. ICP another swap of the wallet left above
-    // the start balances can come back too, and alone proves nothing (no sale, no refund).
-    const swapMayHaveRun = track.swappedOut != null || !!track.swapSent
-    const depositBack = soldBack * 2n >= leg.amountIn
+    // the start balances can come back too, and alone proves nothing (no sale, no refund). A swap that
+    // answered with an error did not run, nor did one whose credit a look still found on the pylon
+    // (a look that lost its own answer may have sent it to the wallet unseen).
+    const depositSeen = report.found.some(f => f.token === sell && nearCredit(f.amount))
+    const swapMayHaveRun = track.swappedOut != null || (!!track.swapSent && !track.swapRefused && !depositSeen)
     const own = recovered && (track.swappedOut != null || depositBack || (swapMayHaveRun && gotOut > 0n))
     // From a start balance above dust, a look that brought back less ICP than the swap gave did not get
     // all of it: another swap moving that balance meanwhile left the rest inside the baseline, still on
@@ -575,11 +614,27 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // above dust the marker stays, so the Recover page can still find any rest
     const unchecked = !startClean && track.swappedOut == null && swapMayHaveRun && !depositBack
     if (own && !partOnly && !unchecked && !track.hadMarker) deps.neutrinite.removePendingSwap(sell, buy)
-    if (own && !partOnly && (track.swappedOut != null || (swapMayHaveRun && !depositBack && gotOut > 0n))) {
+    if (own && !partOnly && track.swappedOut == null && swapMayHaveRun && !depositBack && gotOut > 0n) {
+      // The swap's answer was lost and a look brought ICP back: it sold. The swap cannot fill below its
+      // minimum scaled to the credit, so from a start balance above dust, less than that is only part of
+      // its ICP (another swap moving its own balance meanwhile left the rest inside the baseline): the
+      // part keeps its marker, and the rest may already be in the wallet. More ICP than the plan's output
+      // holds another swap's ICP too: the wallet shows the amount.
+      const scaledMin = track.credited != null && leg.amountIn > 0n ? (minOut * track.credited) / leg.amountIn : minOut
+      if (!startClean && gotOut < scaledMin) {
+        ctx.onStep('Failed, recover on the Recover page')
+        return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
+          failedAfterSwap: true, outMaybeSent: true, reason: isSessionError(lastErr) ? 'session' : undefined }
+      }
+      ctx.onStep('Done')
+      return gotOut > leg.expectedOut
+        ? { dex: 'neutrinite', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
+        : { dex: 'neutrinite', success: true, amountOut: gotOut, state: 'done', reason: 'afterSwap' }
+    }
+    if (own && !partOnly && track.swappedOut != null) {
       // The swap filled and the retry delivered its output (never counted above what the swap gave).
       ctx.onStep('Done')
-      const amountOut = !(gotOut > 0n) ? track.swappedOut!
-        : track.swappedOut != null && track.swappedOut < gotOut ? track.swappedOut : gotOut
+      const amountOut = gotOut > 0n && gotOut < track.swappedOut ? gotOut : track.swappedOut
       return { dex: 'neutrinite', success: true, amountOut, state: 'done', reason: 'afterSwap' }
     }
     if (own && !partOnly) {
@@ -589,12 +644,15 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // Not recovered, only part of the ICP, or nothing that is this part's: the marker stays. The
     // ICP may already be in the wallet when the withdraw's answer was lost (not refused) and no look
     // found it, when a look found it and then lost its own answer, or when a look brought back only
-    // part of it.
+    // part of it. With the swap's answer lost, a look that sent ICP to the wallet (it answered, a
+    // later step of that look failed) or found ICP that a later look no longer finds says the same:
+    // the swap ran.
     ctx.onStep('Failed, recover on the Recover page')
-    const outMaybeSent = partOnly || (track.swappedOut != null
+    const icpBackUnsure = track.swappedOut == null && swapMayHaveRun && (gotOut > 0n || emptyAfterFound)
+    const outMaybeSent = partOnly || icpBackUnsure || (track.swappedOut != null
       && ((!track.withdrawRefused && !report.found.some(f => f.token === buy)) || emptyAfterFound))
     return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
-      failedAfterSwap: track.swappedOut != null, outMaybeSent, reason: isSessionError(lastErr) ? 'session' : undefined }
+      failedAfterSwap: track.swappedOut != null || icpBackUnsure, outMaybeSent, reason: isSessionError(lastErr) ? 'session' : undefined }
   }
 }
 

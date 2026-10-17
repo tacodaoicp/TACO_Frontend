@@ -21,6 +21,7 @@ import { icrcIDL } from '../../shared/icrc-idl'
 import { withTimeout } from '../utils/withTimeout'
 import { mapWithConcurrency } from '../utils/concurrency'
 import { setItemWithCacheEviction } from '../utils/persistCache'
+import { neuCreditMatches } from '../utils/crossDexLegRunner'
 
 const safeStringify = (obj: unknown) =>
   JSON.stringify(obj, (_, v) => (typeof v === 'bigint' ? v.toString() : v))
@@ -347,22 +348,38 @@ export interface NeutriniteSwapParams {
    *  the wallet (an earlier swap's leftover, or another swap's deposit): the credit check and a
    *  recovery look could not tell this swap's tokens from that balance. */
   maxSellBefore?: bigint
-  /** Filled in for the caller's recovery: pylon balances before our deposit, the swap output,
-   *  whether an earlier swap on this pair had already left a marker, whether dex_swap was sent
-   *  (it may have run even when its answer is lost), and whether the withdraw answered with a
-   *  refusal (unset when its answer was lost). */
-  track?: { before?: { sell: bigint; buy: bigint }; swappedOut?: bigint; hadMarker?: boolean; swapSent?: boolean; withdrawRefused?: boolean }
+  /** Stop before the deposit when the pair marker is already saved: an earlier swap of this pair has
+   *  not settled, and its deposit may still be credited while this one waits for its own. */
+  stopIfPending?: boolean
+  /** The sell ledger's fee. The pylon credits a deposit minus one ledger fee, so a rise of the
+   *  virtual balance more than one fee away from amountIn minus this fee is not this deposit (another
+   *  deposit of the wallet was credited meanwhile): the swap stops before dex_swap. */
+  creditFee?: bigint
+  /** Filled in for the caller's recovery: pylon balances before our deposit, the credited amount,
+   *  the swap output, whether an earlier swap on this pair had already left a marker, whether
+   *  dex_swap was sent (it may have run even when its answer is lost) or answered with an error,
+   *  and whether the withdraw answered with a refusal (unset when its answer was lost). */
+  track?: { before?: { sell: bigint; buy: bigint }; credited?: bigint; swappedOut?: bigint; hadMarker?: boolean; swapSent?: boolean; swapRefused?: boolean; withdrawRefused?: boolean }
   /** A run's own agent and principal; default: the cached session. */
   agent?: HttpAgent
   owner?: Principal
 }
 
 /** The swap stopped before its deposit transfer: nothing left the wallet. `held`: the pylon
- *  already held more than dust of the sell token for the wallet. */
+ *  already held more than dust of the sell token for the wallet, or an earlier swap of the pair
+ *  had not settled (its marker is saved). */
 export class NeutriniteNotStarted extends Error {
   readonly notStarted = true
   constructor(message: string, readonly journal = false, readonly held = false) { super(message); this.name = 'NeutriniteNotStarted' }
 }
+
+/** The pylon credited an amount that is not this deposit: nothing was swapped, the deposit (and
+ *  whatever else was credited) stays on the pylon for the Recover page. */
+export class NeutriniteCreditMismatch extends Error {
+  readonly creditMismatch = true
+  constructor(message = 'Neutrinite received a different amount than this deposit, so it was not swapped') { super(message); this.name = 'NeutriniteCreditMismatch' }
+}
+
 
 /**
  * Execute a synchronous Neutrinite swap: deposit -> (poll credit) -> dex_swap -> withdraw.
@@ -385,6 +402,9 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   const balanceBefore = sellEp.balance
   if (params.maxSellBefore != null && balanceBefore > params.maxSellBefore) {
     throw new NeutriniteNotStarted('Neutrinite still holds some of this token from another swap of yours, so its share was not sent', false, true)
+  }
+  if (params.stopIfPending && getPendingSwaps().some(e => e.sell === params.sell && e.buy === params.buy)) {
+    throw new NeutriniteNotStarted('An earlier Neutrinite swap of this token is still listed on the Recover page, so its share was not sent', false, true)
   }
   const depositAccount = sellEp.account // { owner: pylon, subaccount: [bytes] }
   const tokenActor = Actor.createActor(icrcIDL, { agent, canisterId: params.sell })
@@ -418,24 +438,32 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
 
   // 3. Wait for the pylon's indexer to credit the virtual balance. The pylon
   // credits slightly LESS than the deposited amount (it nets a ledger fee), so
-  // we wait for ANY increase over the prior balance and then swap exactly what
+  // we wait for an increase over the prior balance and then swap exactly what
   // was credited — never the raw amountIn (which would over-quote and could
-  // exceed the virtual balance).
+  // exceed the virtual balance). With creditFee, an increase that is not this
+  // deposit (another deposit of the wallet credited meanwhile) swaps nothing.
   params.onStep?.('Confirming deposit…')
   let creditedDelta = 0n
   const started = Date.now()
   for (let i = 0; i < CREDIT_POLL_TRIES && (Date.now() - started) < CREDIT_POLL_DEADLINE_MS; i++) {
     await new Promise(r => setTimeout(r, CREDIT_POLL_INTERVAL_MS))
+    let balance: bigint | null = null
     try {
       // Bound the (idempotent) poll query so one hung connection can't stall the
       // whole loop indefinitely — on timeout we simply poll again next tick.
       const accts = (await withTimeout(pylon.icrc55_accounts({ owner, subaccount: [] }), 5000, 'pylon-accounts')) as any[]
-      const ep = findEndpoint(accts, params.sell)
-      if (ep && ep.balance > balanceBefore) { creditedDelta = ep.balance - balanceBefore; break }
+      balance = findEndpoint(accts, params.sell)?.balance ?? null
     } catch { /* keep polling */ }
+    if (balance != null && balance > balanceBefore) {
+      const delta = balance - balanceBefore
+      if (params.creditFee != null && !neuCreditMatches(delta, params.amountIn, params.creditFee)) throw new NeutriniteCreditMismatch()
+      creditedDelta = delta
+      break
+    }
     params.onStep?.(`Confirming deposit… (${Math.round((Date.now() - started) / 1000)}s)`)
   }
   if (creditedDelta <= 0n) throw new Error('Neutrinite did not confirm the deposit in time')
+  if (params.track) params.track.credited = creditedDelta
   // Releasing the gate only queues microtasks, so the dex_swap call below starts first.
   if (params.onCredited?.() === false)
     throw new Error('Neutrinite confirmed the deposit too late, so it was not swapped')
@@ -454,7 +482,11 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
     ledger_to: ledgerVar(params.buy),
     min_amount_out: swapMinOut,
   })) as any
-  if (!('ok' in sw)) throw new Error('Neutrinite swap failed: ' + safeStringify(sw.err))
+  if (!('ok' in sw)) {
+    // answered with an error: the swap did not run
+    if (params.track) params.track.swapRefused = true
+    throw new Error('Neutrinite swap failed: ' + safeStringify(sw.err))
+  }
   const amountOut = sw.ok.amount_out as bigint
   if (params.track) params.track.swappedOut = amountOut
 

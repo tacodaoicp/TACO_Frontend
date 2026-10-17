@@ -133,7 +133,7 @@ export function legDetail(l: LegRun, sym: string, amountIn: string, outText: str
       if (l.reason === 'secondCheck') return `${label}: this part could not be checked before its turn, so it stayed in your wallet.`
       if (l.reason === 'journal') return `${label}: not sent because this browser could not save its recovery note. This part stayed in your wallet.`
       if (l.reason === 'rateLimited') return `${label}: not sent because it was busy for your wallet. This part stayed in your wallet.`
-      if (l.reason === 'neuHeld') return `${label}: not sent because it still holds some ${sym} from another swap of yours. This part stayed in your wallet. The Recover page can send that back.`
+      if (l.reason === 'neuHeld') return `${label}: not sent because it may still hold some ${sym} from another swap of yours. This part stayed in your wallet. The Recover page can send that back.`
       return `${label}: not sent. This part stayed in your wallet.`
     case 'deferred': return 'The TACO exchange takes only a few trades per wallet every 90 seconds. The refund starts after the window.'
     case 'tracked': return 'The TACO exchange has not settled this part yet. It is listed on the Recover page.'
@@ -144,6 +144,7 @@ export function legDetail(l: LegRun, sym: string, amountIn: string, outText: str
       if (l.reason === 'admin') return `The TACO exchange could not confirm this part. Do not repeat this sale. Open the Recover page${l.block != null ? `, or contact support with deposit ${l.block}` : ''}.`
       if (l.reason === 'tacoPaused') return 'The TACO exchange is paused right now. Your deposit is safe there. Use the Recover page when it is back.'
       if (l.reason === 'rateLimited') return 'The TACO exchange is busy for your wallet. Use the Recover page in a few minutes.'
+      if (l.reason === 'neuMismatch') return `${label}: not swapped, because the amount it received did not match this part. Use the Recover page to send it back.`
       // some or all of the ICP may already be in the wallet (a lost withdraw answer, or only part came
       // back from a look): the wallet comes first
       if (l.outMaybeSent) return `${subject} sold this part. The ICP may already be in your wallet, check it before using the Recover page.`
