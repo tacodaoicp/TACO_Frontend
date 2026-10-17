@@ -228,6 +228,9 @@ export interface LegDeps {
     }): Promise<{ amountOut: bigint }>
     sweep(p: { token0Principal: string; token1Principal: string }, opts?: { report?: SweepReport }): Promise<boolean>
     sweepWithRetry(p: { token0Principal: string; token1Principal: string }, attempts?: number, delayMs?: number, opts?: { report?: SweepReport }): Promise<boolean>
+    /** The wallet's withdraw records in the pool of the pair (token and status per record), null when
+     *  the pool cannot be read. */
+    withdrawRecords?(p: { token0Principal: string; token1Principal: string }): Promise<Array<{ token: string; status: string }> | null>
     removePendingSwap(sell: string, buy: string): void
   }
   neutrinite: {
@@ -270,6 +273,8 @@ export interface IcpTrack {
   swapRefused?: boolean
   /** The pool answered the withdraw with an error (unset when its answer was lost). */
   withdrawRefused?: boolean
+  /** The withdraw call was sent (set right before it): from here the output may have left the pool. */
+  withdrawSent?: boolean
 }
 
 export interface NeuTrack {
@@ -416,27 +421,41 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
     // credits the pool a few seconds later, so the first look often races
     // it). Only a sweep that actually moved funds clears the marker;
     // otherwise the Recover page row stays visible.
-    let recovered = false
+    let swept = false
     const report: SweepReport = { found: [], moved: [] }
     try {
-      recovered = await deps.icpswap.sweepWithRetry({ token0Principal: sell, token1Principal: buy }, 3, 4000, { report })
-      if (recovered) deps.icpswap.removePendingSwap(sell, buy)
+      swept = await deps.icpswap.sweepWithRetry({ token0Principal: sell, token1Principal: buy }, 3, 4000, { report })
     } catch (e) { report.lastError = e /* marker stays so the Recover page can sweep later */ }
+    const soldBack = report.moved.filter(m => m.token === sell).reduce((a, m) => a + m.amount, 0n)
+    const gotOut = report.moved.filter(m => m.token === buy).reduce((a, m) => a + m.amount, 0n)
+    // Once the swap answered, its deposit was used: a sweep that brought back no ICP recovered nothing
+    // of this part (any sold token that came back is an older swap's). Its ICP left for the wallet with
+    // a lost answer, or the pool still owes it.
+    const recovered = swept && !(track.swappedOut != null && gotOut === 0n)
+    if (recovered) deps.icpswap.removePendingSwap(sell, buy)
     const error = errText(err, 'ICPSwap swap failed')
-    if (!recovered && track.step === 'withdraw' && track.swappedOut != null && report.found.length === 0 && (report.emptyLooks ?? 0) > 0) {
-      // The withdraw ran but its answer was lost: the swap's output already left the pool for
-      // the wallet (a full look finds nothing there). Sold, for an amount the wallet shows.
-      if (!track.hadMarker) deps.icpswap.removePendingSwap(sell, buy)
-      ctx.onStep('Done')
-      return { dex: 'icpswap', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
+    // a pass that read every balance found no ICP: an empty look, or a sweep that moved only the sold token
+    const noOutLook = (report.emptyLooks ?? 0) > 0 || (swept && gotOut === 0n)
+    if (!recovered && track.withdrawSent && track.swappedOut != null && !track.withdrawRefused
+        && !report.found.some(f => f.token === buy) && noOutLook) {
+      // The withdraw's answer was lost and a full look finds nothing in the pool. A pool can also take
+      // a withdraw off the balance and never pay it out (status CreditCompleted, the TACOV2:2134 class),
+      // which reads the same from every balance: only the pool's own records, with no withdraw of the
+      // bought token left unfinished, show that the output left for the wallet. Sold, for an amount the
+      // wallet shows. Otherwise the part keeps its marker (needsRecovery, the wallet first).
+      let recs: Array<{ token: string; status: string }> | null = null
+      try { recs = (await deps.icpswap.withdrawRecords?.({ token0Principal: sell, token1Principal: buy })) ?? null } catch { recs = null }
+      if (recs != null && !recs.some(r => r.token === buy && r.status !== 'Completed')) {
+        if (!track.hadMarker) deps.icpswap.removePendingSwap(sell, buy)
+        ctx.onStep('Done')
+        return { dex: 'icpswap', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
+      }
     }
     if (ctx.sortV1Errors && recovered) {
       // What came back decides whether the swap sold: never when the pool answered the swap
       // with an error or the swap never ran, and never when at least this leg's deposit of the
       // sold token came back. ICP an earlier failed swap left in the same pool can come back
       // with it, so it alone proves nothing.
-      const soldBack = report.moved.filter(m => m.token === sell).reduce((a, m) => a + m.amount, 0n)
-      const gotOut = report.moved.filter(m => m.token === buy).reduce((a, m) => a + m.amount, 0n)
       const sold = !track.swapRefused && (track.step === 'swap' || track.step === 'withdraw') && soldBack < leg.amountIn && gotOut > 0n
       if (sold) {
         ctx.onStep('Done')
@@ -451,12 +470,13 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
       }
     }
     ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
-    // The output may already be in the wallet when the withdraw's answer was lost (not refused) and no
-    // look found it in the pool, or when a look found it and a later look found nothing (that look's
-    // own withdraw lost its answer). A recovery that failed because the session ended says so: the sale
-    // asks to reconnect first.
+    // The output may already be in the wallet when the withdraw was sent and its answer was lost (not
+    // refused) and no look found it in the pool, or when a look found it and a later look found nothing
+    // (that look's own withdraw lost its answer). A withdraw that was never sent (the output fee read
+    // failed first) left the output in the pool. A recovery that failed because the session ended says
+    // so: the sale asks to reconnect first.
     const foundOut = report.found.some(f => f.token === buy)
-    const outMaybeSent = track.step === 'withdraw' && track.swappedOut != null
+    const outMaybeSent = !!track.withdrawSent && track.swappedOut != null
       && ((!track.withdrawRefused && !foundOut) || (foundOut && (report.emptyLooks ?? 0) > 0))
     return recovered
       ? { dex: 'icpswap', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true }

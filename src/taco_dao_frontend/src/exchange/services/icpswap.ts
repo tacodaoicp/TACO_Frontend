@@ -64,6 +64,8 @@ export interface IcpSwapTrack {
   /** The pool answered the withdraw with an error: the output stays in the pool (unset when the
    *  withdraw's answer was lost, so it may have run). */
   withdrawRefused?: boolean
+  /** The withdraw call was sent (set right before it): from here the output may have left the pool. */
+  withdrawSent?: boolean
 }
 
 export interface IcpSwapParams {
@@ -416,6 +418,36 @@ export async function getStuckPoolWithdraws(
   }
 }
 
+/**
+ * The wallet's withdraw records in the pool of a pair (anonymous query): the token and status of
+ * each. A CrossDEX leg reads them before it calls a withdraw whose answer was lost "sold": a pool can
+ * take a withdraw off the balance and never pay it out (CreditCompleted), which every balance read
+ * shows as nothing left in the pool. null = the pool could not be read ("no info").
+ */
+export async function getPoolWithdrawRecords(
+  params: SweepParams,
+  opts: { owner?: Principal } = {},
+): Promise<Array<{ token: string; status: string }> | null> {
+  try {
+    const owner = opts.owner ?? (await getCachedIdentity()).getPrincipal()
+    if (owner.isAnonymous()) return null
+    const poolId = params.poolId ?? (await getPoolCanister(params.token0Principal, params.token1Principal))
+    const agent = await getAnonAgent()
+    const actor = Actor.createActor(poolTxIDL, { agent, canisterId: poolId })
+    const res = (await actor.getTransactionsByOwner(owner)) as any
+    if (!('ok' in res)) return null
+    const out: Array<{ token: string; status: string }> = []
+    for (const [, tx] of res.ok as Array<[bigint, any]>) {
+      const w = tx.action && 'Withdraw' in tx.action ? tx.action.Withdraw : null
+      if (w) out.push({ token: (w.transfer.token as Principal).toText(), status: Object.keys(w.status)[0] })
+    }
+    return out
+  } catch (e) {
+    console.warn('[icpswap.getPoolWithdrawRecords] unreadable pool', e)
+    return null
+  }
+}
+
 // ── Quotes (anonymous) ──
 
 /**
@@ -563,6 +595,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   const outTokenActor = Actor.createActor(icrcIDL, { agent: authedAgent, canisterId: params.buyTokenPrincipal })
   const outFeeResult = (await outTokenActor.icrc1_fee()) as any
   const outTokenFee = typeof outFeeResult === 'bigint' ? outFeeResult : BigInt(outFeeResult)
+  track.withdrawSent = true
   const withdrawResult = (await poolActor.withdraw({
     amount: amountOut,
     fee: outTokenFee,

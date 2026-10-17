@@ -67,6 +67,7 @@ export function buildLegDeps(store: ReturnType<typeof useExchangeStore>, run?: R
       icrc2Swap: (p) => icpswap.icrc2Swap({ ...p, ...auth }),
       sweep: (p, o) => icpswap.sweep(p, { ...o, ...auth }),
       sweepWithRetry: (p, a, d, o) => icpswap.sweepWithRetry(p, a, d, { ...o, ...auth }),
+      withdrawRecords: (p) => icpswap.getPoolWithdrawRecords(p, { owner: run?.principal }),
       removePendingSwap: icpswap.removePendingSwap,
     },
     neutrinite: {
