@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { RouteLocationNormalizedLoaded } from 'vue-router'
+import { loadRouteLocation, type RouteLocationNormalizedLoaded, type Router } from 'vue-router'
 
 export interface NavItem {
   label: string
@@ -40,6 +40,23 @@ export const inBottomBar = (item: NavItem, loggedIn: boolean) =>
 export const navDrawerOpen = ref(false)
 export const openDrawer = () => { navDrawerOpen.value = true }
 export const closeDrawer = () => { navDrawerOpen.value = false }
+
+// pages that draw an <apexchart> (the lazy global component from main.js)
+export const CHART_ROUTES = ['/dao', '/vote', '/vault', '/portfolio_history']
+export const loadApexcharts = () => import('vue3-apexcharts').catch(() => {})
+
+// Pages load their code on the first visit. A pointer down, touch, hover or focus on a link starts that
+// early, through the router's own loaders, so the tap that follows finds the page ready. Not while
+// offline: a failed load reloads the page (main.js), and a hover alone should never do that.
+export function warmRoute(router: Router, to?: string) {
+  if (!to || navigator.onLine === false) return
+  const target = router.resolve(to)
+  loadRouteLocation(target).catch(() => {})
+  if (CHART_ROUTES.includes(target.path)) loadApexcharts()
+}
+
+// warm a nav item's page before its click
+export const warmNavItem = (router: Router, item: NavItem) => warmRoute(router, item.to)
 
 export function isNavActive(item: NavItem, route: RouteLocationNormalizedLoaded) {
   if (!item.to) return false

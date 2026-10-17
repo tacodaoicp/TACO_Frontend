@@ -99,7 +99,8 @@
   import { onMounted, onUnmounted, watch, computed, defineAsyncComponent, ref } from 'vue';
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
-  import { useRoute, useRouter } from 'vue-router'
+  import { useRoute, useRouter, START_LOCATION } from 'vue-router'
+  import { CHART_ROUTES, loadApexcharts, warmRoute } from './components/navItems'
 
   // Lazy load HomeView to reduce initial bundle
   const HomeView = defineAsyncComponent(() => import('./views/HomeView.vue'))
@@ -192,15 +193,28 @@
     if (routePendingTimer) { clearTimeout(routePendingTimer); routePendingTimer = null }
     routePending.value = false
   }
+  // a chart page opened from another page loads apexcharts together with its own code, so its first
+  // chart never shows collapsed while the library loads (main.js registers <apexchart> as a lazy component)
+  let chartLib = null
   router.beforeEach((to, from) => {
     if (to.path !== from.path) {
       if (routePendingTimer) clearTimeout(routePendingTimer)
       routePendingTimer = setTimeout(() => { routePending.value = true }, 120)
     }
+    chartLib = from !== START_LOCATION && CHART_ROUTES.includes(to.path) ? loadApexcharts() : null
     return true
   })
+  router.beforeResolve(async () => { await chartLib })
   router.afterEach(clearRoutePending)
   router.onError(clearRoutePending)
+
+  // the Grand Tour opens its pages with no tap to warm them on
+  watch(grandTourActive, (active) => {
+    if (!active) return
+    import('./components/tour/tourScript')
+      .then(({ tourScript }) => { for (const scene of tourScript) warmRoute(router, scene.route) })
+      .catch(() => {})
+  })
 
   // images
   const astronautLoaderUrl = astronautLoader
@@ -309,21 +323,47 @@
     const idleShims = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
     idleShims(() => { tacoStore.initializeShims() })
 
-    // Deeper idle: warm the chart compute worker + commonly-navigated views.
+    // Deeper idle: download the pages people open next without running them (a first visit, a tap while
+    // offline or in a tab that outlived a deploy then reads them from the HTTP cache). Only a chart page
+    // runs apexcharts now, so its chart does not collapse and reflow while the 574 KB lib loads; other
+    // pages get it with the first chart page (router guard above).
     const idleDeep = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000))
     idleDeep(() => {
-      // Preload commonly-used route components (in navigation, frequently accessed)
-      import('./views/WalletView.vue')
-      import('./views/NachosVaultView.vue')
-      import('./views/BuyTacoView.vue')
-      import('./views/PerformanceView.vue')
-      // Preload apexcharts during idle so the first chart route (vault/dao/vote)
-      // renders its chart immediately instead of collapsing→reflowing while the
-      // 574 KB lib loads. Kept OUT of the boot path (it's idle, post-mount), so
-      // first paint stays fast — this just hides the lazy-load gap.
-      import('vue3-apexcharts')
+      prefetchPages()
+      if (CHART_ROUTES.includes(route.path)) loadApexcharts()
     })
 
+  }
+
+  // the files build/page-prefetch.js lists in index.html: the pages a tab used to load and run at startup
+  const prefetchPages = async () => {
+    let lists = null
+    try { lists = JSON.parse(document.getElementById('taco-prefetch')?.textContent || 'null') } catch { /* no list */ }
+    if (!lists) return
+    const files = [...lists.pages]
+    if (userLoggedIn.value) {
+      files.push(...lists.login)
+      // admin pages for admins, or for a browser that opened them before
+      let admin = false
+      try { admin = localStorage.getItem('hasVisitedAdmin') === 'true' } catch { /* storage blocked */ }
+      if (!admin) {
+        try { admin = (await import('./composables/useAdminCheck')).ADMIN_PRINCIPALS.includes(tacoStore.userPrincipal) } catch { /* offline */ }
+      }
+      if (admin) files.push(...lists.admin)
+    }
+    const fetched = new Set(performance.getEntriesByType('resource').map((e) => e.name))
+    for (const file of files) {
+      const href = `${location.origin}/${file}`
+      if (fetched.has(href)) continue
+      const link = document.createElement('link')
+      link.rel = 'prefetch'
+      // same request mode as the later load (module scripts use CORS); a full URL so Vite's loader
+      // still adds its own modulepreload links as before
+      if (file.endsWith('.js')) { link.as = 'script'; link.crossOrigin = '' } else link.as = 'style'
+      link.href = href
+      link.onload = link.onerror = () => link.remove()
+      document.head.appendChild(link)
+    }
   }
 
   // update robots meta

@@ -7,6 +7,7 @@ import immutableAssets from './build/immutable-assets.js';
 import { vendorChunks, checkVendorChunk } from './build/vendor-chunk.js';
 import latin1Output from './build/latin1-output.js';
 import faSubset from './build/fonts.mjs';
+import pagePrefetch from './build/page-prefetch.js';
 
 // Load base .env first, then environment-specific overrides
 dotenv.config({ path: '../../.env' });
@@ -61,6 +62,8 @@ export default defineConfig({
     immutableAssets(),
     checkVendorChunk(),
     latin1Output(),
+    // the page files App.vue downloads at idle, listed in index.html
+    pagePrefetch(),
   ],
   preview: {
     host: true,
