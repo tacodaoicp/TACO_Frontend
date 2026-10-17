@@ -5,5 +5,6 @@
 $tx-mobile-nav-max: 767px;
 
 // Screens up to this tall (a phone in landscape with its browser bars) are too short for anything to float
-// at the bottom above the nav.
-$tx-short-max: 420px;
+// at the bottom above the nav (with a banner above the card, up to 440 px: a sticky bar cannot rise above
+// its card's top, so it would sit under the nav).
+$tx-short-max: 440px;

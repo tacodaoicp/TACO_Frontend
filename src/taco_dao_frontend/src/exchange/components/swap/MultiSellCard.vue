@@ -301,7 +301,10 @@ const recvInView = ref(false)
 // total is in view while its row is inside the screen and wholly above the bar: the bar is taller
 // with its own total or the wait helper, and where the nav shows it floats over it. Measured, not
 // observed: the card stays mounted under v-show, and its size change when it shows again after
-// Single swap measures both anew, so neither goes stale.
+// Single swap measures both anew, so neither goes stale. The main total counts as in view within
+// RECV_SLACK_PX of those edges (sub pixel layout and the bar's transparent padding): a row 1 or 2 px over
+// an edge never leaves both totals on screen.
+const RECV_SLACK_PX = 2
 let frame = 0
 function measureRecv() {
   frame = 0
@@ -311,10 +314,15 @@ function measureRecv() {
   // a bar that does not float (short landscape screens with the bottom nav) is never stuck
   barStuck.value = !!s && st?.position === 'sticky' && s.getBoundingClientRect().top > window.innerHeight - (Number.isFinite(off) ? off : 12)
   const row = recvRow.value, bar = barEl.value
-  if (!row || !bar) { recvInView.value = false; return }
+  if (!row || !bar || !st) { recvInView.value = false; return }
   const r = row.getBoundingClientRect()
-  const bottom = Math.min(window.innerHeight, bar.getBoundingClientRect().top)
-  recvInView.value = r.height > 0 && r.top >= 0 && r.bottom <= bottom
+  // the bar's visible top: its border box while it draws its box, else its content (wide screens keep a
+  // transparent padding around a bar in place)
+  const br = bar.getBoundingClientRect()
+  const painted = st.backgroundImage !== 'none' || !(st.backgroundColor === 'transparent' || /,\s*0\)$/.test(st.backgroundColor))
+  const barTop = painted ? br.top : br.top + (parseFloat(st.borderTopWidth) || 0) + (parseFloat(st.paddingTop) || 0)
+  const bottom = Math.min(window.innerHeight, barTop)
+  recvInView.value = r.height > 0 && r.top >= -RECV_SLACK_PX && r.bottom <= bottom + RECV_SLACK_PX
 }
 function remeasure() { if (!frame) frame = requestAnimationFrame(measureRecv) }
 let sizes: ResizeObserver | null = null
