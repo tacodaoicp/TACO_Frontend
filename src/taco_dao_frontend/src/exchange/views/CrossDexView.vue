@@ -19,23 +19,33 @@
           </template>
         </ExchangePageTitle>
 
-        <!-- above both modes: Single swap is the default, and a sale's state matters whichever card shows -->
+        <!-- above both modes: Single swap is the default, and a sale's state matters whichever card shows.
+             The sale is named per mode; both names share one grid cell (as the subtitles do), so a
+             banner is as tall in either mode and switching never moves the mode switch below it. -->
         <div v-if="finishing || finished || interrupted" class="crossdex-view__banners">
           <div v-if="finishing" class="crossdex-view__banner">
-            <span v-if="ms.run.value?.phase === 'preparing'">{{ lastSale }} is waiting for its approval. Nothing has been sold yet.</span>
-            <span v-else>{{ lastSale }} is still finishing{{ ms.finishingRoutes.value > 0 ? ` ${ms.finishingRoutes.value === 1 ? '1 route' : `${ms.finishingRoutes.value} routes`}` : '' }}. Keep this page open until it is done.</span>
+            <span class="crossdex-view__alt">
+              <span v-for="s in saleNames" :key="s.mode" :class="{ 'is-off': mode !== s.mode }" :aria-hidden="mode !== s.mode">
+                <template v-if="ms.run.value?.phase === 'preparing'">{{ s.name }} is waiting for its approval. Nothing has been sold yet.</template>
+                <template v-else>{{ s.name }} is still finishing{{ ms.finishingRoutes.value > 0 ? ` ${ms.finishingRoutes.value === 1 ? '1 route' : `${ms.finishingRoutes.value} routes`}` : '' }}. Keep this page open until it is done.</template>
+              </span>
+            </span>
             <span class="crossdex-view__banner-acts">
               <button class="ex-btn ex-btn--sm ex-btn--primary" @click="ms.reopenRun()">View</button>
             </span>
           </div>
           <div v-else-if="finished" class="crossdex-view__banner">
-            <span>{{ lastSale }} {{ ms.run.value?.phase === 'stopped' ? 'did not start.' : 'has finished.' }}</span>
+            <span class="crossdex-view__alt">
+              <span v-for="s in saleNames" :key="s.mode" :class="{ 'is-off': mode !== s.mode }" :aria-hidden="mode !== s.mode">{{ s.name }} {{ ms.run.value?.phase === 'stopped' ? 'did not start.' : 'has finished.' }}</span>
+            </span>
             <span class="crossdex-view__banner-acts">
               <button class="ex-btn ex-btn--sm ex-btn--primary" @click="ms.reopenRun()">View the result</button>
             </span>
           </div>
           <div v-if="interrupted" class="crossdex-view__banner crossdex-view__banner--warn">
-            <strong>{{ lastSale }} did not finish</strong>
+            <strong class="crossdex-view__alt">
+              <span v-for="s in saleNames" :key="s.mode" :class="{ 'is-off': mode !== s.mode }" :aria-hidden="mode !== s.mode">{{ s.name }} did not finish</span>
+            </strong>
             <span>It stopped {{ interruptedAgo }} ago, before every part was done. Open the Recover page to get back anything left on a DEX.</span>
             <span class="crossdex-view__banner-acts">
               <router-link to="/recover" class="ex-btn ex-btn--sm ex-btn--primary">Open Recover page</router-link>
@@ -132,7 +142,10 @@ function setMode(m: 'swap' | 'many') {
 }
 const switchLocked = computed(() => ms.isBusy.value)
 /** The banners sit above both modes: in Single swap they name the mode the sale came from. */
-const lastSale = computed(() => (mode.value === 'many' ? 'Your last sale' : 'Your last Sell many sale'))
+const saleNames = [
+  { mode: 'swap', name: 'Your last Sell many sale' },
+  { mode: 'many', name: 'Your last sale' },
+] as const
 /** A result closed while a route was still running, and that result once every route settled. */
 const finishing = computed(() => !!ms.run.value?.dismissed && !ms.run.value.settled)
 const finished = computed(() => !!ms.run.value?.dismissed && !!ms.run.value.settled)
@@ -211,7 +224,7 @@ function reconnect() { void ms.done(); void auth.connect() }
   &__main { display: flex; justify-content: center; }
   &__card { width: 100%; }
 
-  &__subs {
+  &__subs, &__alt {
     display: grid;
     > span { grid-area: 1 / 1; }
     .is-off { visibility: hidden; }

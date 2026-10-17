@@ -291,24 +291,17 @@ const barSentinel = ref<HTMLElement | null>(null)
 const recvRow = ref<HTMLElement | null>(null)
 const barStuck = ref(false)
 const recvInView = ref(false)
-const hasIo = typeof IntersectionObserver !== 'undefined'
-let stuckIo: IntersectionObserver | null = null
-watch(barSentinel, (el) => {
-  stuckIo?.disconnect(); stuckIo = null
-  barStuck.value = false
-  if (!el || !hasIo) return
-  stuckIo = new IntersectionObserver(([e]) => {
-    barStuck.value = !e.isIntersecting && e.boundingClientRect.top > (e.rootBounds?.bottom ?? window.innerHeight)
-  }, { rootMargin: '0px 0px -12px 0px' })
-  stuckIo.observe(el)
-}, { flush: 'post' })
-// The main total is in view while its row is inside the screen and wholly above the bar, measured
-// against the bar's live box: the bar is taller with its own total or the wait helper, and on phones
-// it floats over the bottom nav. Measured again on scroll, resize and any size change of the page,
-// the card or the bar (no fixed margins, so the total never shows twice or not at all).
+// Both are measured from live boxes on scroll, resize and any size change of the page, the card or
+// the bar (no fixed margins). The bar floats while its place in the card (the sentinel) is more than
+// 12 px below the screen's bottom. The main total is in view while its row is inside the screen and
+// wholly above the bar: the bar is taller with its own total or the wait helper, and on phones it
+// floats over the bottom nav. Measured, not observed: the card stays mounted under v-show, and its
+// size change when it shows again after Single swap measures both anew, so neither goes stale.
 let frame = 0
 function measureRecv() {
   frame = 0
+  const s = barSentinel.value
+  barStuck.value = !!s && s.getBoundingClientRect().top > window.innerHeight - 12
   const row = recvRow.value, bar = barEl.value
   if (!row || !bar) { recvInView.value = false; return }
   const r = row.getBoundingClientRect()
@@ -331,7 +324,6 @@ onMounted(() => {
 })
 watch(recvRow, remeasure, { flush: 'post' })
 onBeforeUnmount(() => {
-  stuckIo?.disconnect()
   sizes?.disconnect()
   window.removeEventListener('scroll', remeasure, { capture: true })
   window.removeEventListener('resize', remeasure)

@@ -22,7 +22,8 @@
     b { font-size: 13px; font-weight: 500; color: var(--tx-ink); }
     &--big b { font-size: 16px; }
   }
-  &__hr { height: 1px; background: var(--tx-line); border: 0; margin: 2px 0; }
+  // a flex child of the scrolling column: without flex-shrink 0 a long sheet squeezes it to 0 px
+  &__hr { height: 1px; flex-shrink: 0; background: var(--tx-line); border: 0; margin: 2px 0; }
   &__note { font-size: 12px; color: var(--tx-ink-3); line-height: 1.45; margin: 0; }
   // The buttons stay in view at the bottom of a long sheet (8 or 10 tokens): a footer that the
   // list scrolls under, out to the sheet's edges (negative margins and offset = the padding).
