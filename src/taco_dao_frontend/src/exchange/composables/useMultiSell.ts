@@ -592,6 +592,7 @@ export function useMultiSell() {
       // with the run's own agent: the pinned fee feeds the legs' start checks and deposit windows
       liveFee: (t, run) => runLedgerFee(run as RunAgent, t, 10_000),
       assertCanTrade: () => store.assertCanTrade(),
+      certifiedTreasury: () => store.certifiedTreasury(),
       tradingFeeBps: () => store.tradingFeeBps,
       dedupLedgers: () => dedupLedgers(),
       useV2Deposit: (t) => v2Of(t),

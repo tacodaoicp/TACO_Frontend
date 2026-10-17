@@ -177,7 +177,8 @@ export async function getCachedAgent(): Promise<HttpAgent> {
  * reply carries the answering node's signature and a fresh timestamp, so a
  * boundary node cannot alter what the run's checks and recovery looks read.
  * That is still one node's word, not consensus: a value that picks where funds
- * go is read with an update call or pinned.
+ * go is read with an update call or pinned. Not on the local network: an older
+ * local replica does not sign query replies, and every run would fail.
  */
 export async function createAgentFor(identity: Identity): Promise<HttpAgent> {
   const { createAgent } = await getUtilsModule()
@@ -185,7 +186,7 @@ export async function createAgentFor(identity: Identity): Promise<HttpAgent> {
     identity,
     host: getNetworkHost(),
     fetchRootKey: shouldFetchRootKey(),
-    verifyQuerySignatures: true,
+    verifyQuerySignatures: getEffectiveNetwork() !== 'local',
   })
 }
 

@@ -436,6 +436,19 @@ export function useCrossDexSwap() {
       return
     }
 
+    // A V1 TACO deposit sends only to the certified treasury (update calls, once per session): when it
+    // cannot be read, no leg starts, so the other routes do not run alone.
+    if (v1Taco) {
+      try {
+        await store.certifiedTreasury()
+      } catch {
+        phase.value = 'ready'
+        errorMsg.value = "Can't confirm the exchange address right now. No funds were moved."
+        toast.error('Swap not started', errorMsg.value)
+        return
+      }
+    }
+
     // Pinned once for the whole swap (store contract: decide once per user
     // action, never re-read mid-flow): the V2 path, the trading fee and the fee.
     const v2 = store.useV2Deposit(fromAddr)

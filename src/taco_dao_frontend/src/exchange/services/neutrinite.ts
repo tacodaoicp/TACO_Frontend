@@ -441,10 +441,11 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
 
   // 1. Register (idempotent) so the pylon indexes this account, then resolve the
   // pylon-owned deposit account for the sell ledger (+ current virtual balance). The certified deposit
-  // account (an update call, once per session) is read alongside.
+  // account (an update call, once per session) is read first, so nothing is awaited from the start checks
+  // below to the marker write and the transfer.
   params.onStep?.('Preparing deposit…')
   await ensureRegistered(pylon, userAccount, owner)
-  const certified = verifiedDepositSub(agent, owner).then(sub => ({ sub }), (e: unknown) => ({ err: e }))
+  const cert = await verifiedDepositSub(agent, owner).then(sub => ({ sub }), (e: unknown) => ({ err: e }))
   const accounts = (await pylon.icrc55_accounts({ owner, subaccount: [] })) as any[]
   const sellEp = findEndpoint(accounts, params.sell)
   if (!sellEp) throw new Error('Neutrinite: no deposit endpoint for this token')
@@ -468,7 +469,6 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   const depositAccount = sellEp.account // { owner: pylon, subaccount: [bytes] }
   // The tokens go to this account by a plain transfer that cannot be undone: it must be the pylon's own
   // account, with the subaccount the certified read names; anything else sends nothing.
-  const cert = await certified
   if (depositAccount?.owner?.toText?.() !== NEUTRINITE_PYLON || !('sub' in cert) || !sameBytes(depositAccount.subaccount?.[0], cert.sub)) {
     throw new NeutriniteNotStarted('Neutrinite: its deposit account could not be confirmed, so its share was not sent')
   }

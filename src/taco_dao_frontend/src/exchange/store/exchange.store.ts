@@ -539,8 +539,6 @@ export const useExchangeStore = defineStore('exchange', () => {
     // First paint from the saved boot entries. The fetches below replace these
     // on screen when they land (onSuccess on each boot query).
     seedFromSaved()
-    // the certified treasury for deposits, read once per session (an update call takes a few seconds)
-    void certifiedTreasury().catch((e) => console.warn('[Exchange] certified treasury read failed; deposits read it again:', e))
     try {
       const cPrices = readCache<Array<[string, number]>>('prices', CACHE_TTL.prices)
       if (cPrices && tokenPricesUSD.value.size === 0) {
@@ -1719,7 +1717,7 @@ export const useExchangeStore = defineStore('exchange', () => {
   // A V1 deposit sends tokens to the treasury by a plain transfer that cannot be undone. The boot reads below
   // (p2acannister, returncontractprincipal) are anonymous queries without signature checks, saved for a day:
   // every deposit takes the treasury from update calls instead (certified by the subnet), once per session,
-  // started at boot (initExchange) so that in practice no deposit waits for it. A certified value that differs
+  // started at login (ExchangeApp) so that in practice no deposit waits for it. A certified value that differs
   // from the saved one replaces it on screen and in the saved copy.
   const treasuryUpdateIdl = ({ IDL }: any) => IDL.Service({
     p2acannister: IDL.Func([], [IDL.Text], []),

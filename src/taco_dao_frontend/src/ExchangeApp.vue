@@ -98,8 +98,12 @@ watch(() => tacoStore.exchangeTheme, (v) => {
 // Pre-register the user's account with the Neutrinite pylon in the background as
 // soon as they're authenticated (login or restored session), so the first
 // CrossDEX swap doesn't pay the registration round-trip. Idempotent + cached.
+// The certified treasury read (two update calls, once per session) starts here
+// too, so anonymous visitors send none; a deposit reads it lazily otherwise.
 watch(() => exchangeStore.isAuthenticated, (authed) => {
-  if (authed) void neutrinite.register()
+  if (!authed) return
+  void neutrinite.register()
+  void exchangeStore.certifiedTreasury().catch((e) => console.warn('[Exchange] certified treasury read failed; deposits read it again:', e))
 }, { immediate: true })
 
 onUnmounted(() => {

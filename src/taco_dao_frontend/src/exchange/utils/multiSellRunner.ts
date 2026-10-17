@@ -117,6 +117,9 @@ export interface SaleDeps {
   liveFee(token: string, run: RunAgentLike): Promise<bigint>
   /** Exchange frozen check, fresh trading fee and treasury (throws the user message). */
   assertCanTrade(): Promise<void>
+  /** The treasury from the certified read (update calls, once per session); a V1 TACO deposit sends only
+   *  there, so a sale with a V1 TACO part stops before anything moves when it cannot be read. */
+  certifiedTreasury(): Promise<unknown>
   tradingFeeBps(): bigint
   dedupLedgers(): Promise<Set<string>>
   useV2Deposit(token: string): boolean
@@ -212,6 +215,8 @@ export function startSale(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): SaleHa
   return { prepared: prepared.p, ui: ui.p, all: all.p }
 }
 
+/** The certified treasury read's own cap (store.certifiedTreasury). */
+const TREASURY_READ_MS = 30_000
 async function withRead<T>(clock: Clock, p: Promise<T>, label: string): Promise<T> {
   return clockTimeout(clock, p, READ_TIMEOUT_MS, label)
 }
@@ -260,6 +265,8 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
       // an unreadable dedup list only means no resends (the deposits go without created_at_time), never a stop
       anyV1Taco ? withRead(deps.clock, deps.dedupLedgers(), 'dedup').catch(() => new Set<string>()) : Promise.resolve(new Set<string>()),
       Promise.all(assets.map(x => withRead(deps.clock, verifyLegs(x.a, x.input.token, ctx.target, deps.quotes), 'verify'))),
+      // the read started at login and has its own 30 s cap: a slow one is waited for (nothing has moved yet)
+      anyV1Taco ? clockTimeout(deps.clock, deps.certifiedTreasury(), TREASURY_READ_MS, 'treasury').catch((e: any) => { throw Object.assign(new Error(e?.message ?? ''), { exchange: true }) }) : Promise.resolve(),
     ])
     balances = b; fees = f; dedupSet = d as Set<string>; verified = v
   } catch (e: any) {
