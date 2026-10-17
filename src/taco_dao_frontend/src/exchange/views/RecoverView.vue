@@ -29,7 +29,7 @@
           Anything found is returned to your wallet. A full run can take a few minutes; you can watch it work below.
         </p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <!-- a swap or sale still running in any tab: the run waits for it (never past the lock's cap) -->
+          <!-- a swap, sale or recovery still running in any tab: the run waits for it (never past the lock's cap) -->
           <button class="ex-btn ex-btn--primary" :disabled="!store.isAuthenticated || raRunning || raWaiting" @click="recoverAll()">
             {{ raLabel('all', 'Recover All') }}
           </button>
@@ -41,12 +41,12 @@
           </button>
         </div>
         <p class="recover-view__desc" style="margin:0">The two smaller buttons run just that exchange's checks, same scan, same recovery.</p>
-        <div v-if="raWaiting" class="recover-view__ra-wait" role="status">
-          <span>{{ RECOVERY_WAITS_TEXT }}</span>
+        <div v-if="raWaiting && waitIn('ra')" class="recover-view__ra-wait" role="status">
+          <span>{{ recoveryWaitsText(holder) }}</span>
           <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="stopWaiting">Stop waiting</button>
         </div>
-        <div v-else-if="saleRunning" class="ex-warning-box">A sale is running in this browser. Recover All waits for it, and the other recovery buttons work again when it ends.</div>
-        <div v-else-if="lockNote" class="ex-error-box">{{ SALE_RUNNING_RECOVERY_TEXT }}</div>
+        <div v-else-if="swapOrSaleRunning && !raRunning && !raWaiting" class="recover-view__ra-busy" role="status">{{ SWAP_OR_SALE_RUNNING_TEXT }}</div>
+        <div v-else-if="lockNote" class="ex-error-box">{{ LOCK_BUSY_RECOVERY_TEXT }}</div>
         <div v-if="!store.isAuthenticated" class="recover-view__desc">Connect your wallet to run this.</div>
         <div v-if="raRows.length > 0" class="recover-view__stuck-list">
           <div v-for="row in raRows" :key="row.id" class="recover-view__stuck-item">
@@ -221,16 +221,19 @@
           <div v-for="p in pendingSwaps" :key="p.sell + p.buy" class="recover-view__stuck-item">
             <div class="recover-view__stuck-info">
               <span>{{ getTokenSymbol(p.sell) }} → {{ getTokenSymbol(p.buy) }}</span>
-              <span class="recover-view__stuck-reason">Interrupted {{ formatDepositAge(p.timestamp) }}</span>
+              <!-- the marker of a swap that may still be running: it needs its marker and its pool balances -->
+              <span v-if="rowRunning(p, 'icpswap')" class="recover-view__ra-detail">{{ ROW_RUNNING_TEXT }}</span>
+              <span v-else class="recover-view__stuck-reason">Interrupted {{ formatDepositAge(p.timestamp) }}</span>
             </div>
             <div style="display:flex;gap:4px">
               <button
                 class="ex-btn ex-btn--sm ex-btn--primary"
                 @click="sweepPending(p)"
-                :disabled="sweeping === p.sell + p.buy || raRunning || saleRunning"
-              >{{ sweeping === (p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
+                :disabled="sweeping === p.sell + p.buy || raRunning || raWaiting || saleRunning || rowRunning(p, 'icpswap')"
+              >{{ sweeping === (p.sell + p.buy) ? 'Sweeping...' : raWaiting && waitFor === 'ix:' + p.sell + p.buy ? 'Waiting...' : 'Sweep' }}</button>
               <button
                 class="ex-btn ex-btn--sm ex-btn--outline"
+                :disabled="raRunning || raWaiting || rowRunning(p, 'icpswap')"
                 @click="dismissPendingSwap(p)"
               >Dismiss</button>
             </div>
@@ -246,10 +249,14 @@
           <label class="recover-view__label">Token B Canister ID</label>
           <input v-model="sweepTokenB" type="text" class="ex-input" placeholder="The other token in the pair" />
         </div>
+        <div v-if="raWaiting && waitIn('ix')" class="recover-view__ra-wait" role="status">
+          <span>{{ recoveryWaitsText(holder) }}</span>
+          <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="stopWaiting">Stop waiting</button>
+        </div>
         <div v-if="sweepError" class="ex-error-box">{{ sweepError }}</div>
         <div v-if="sweepSuccess" class="ex-success-box">Sweep complete. Any stranded funds were returned to your wallet.</div>
         <button class="ex-btn ex-btn--outline" :disabled="!canSweepManual" @click="sweepManual">
-          {{ sweeping === 'manual' ? 'Sweeping...' : 'Sweep ICPSwap Pool' }}
+          {{ sweeping === 'manual' ? 'Sweeping...' : raWaiting && waitFor === 'manual' ? 'Waiting...' : 'Sweep ICPSwap Pool' }}
         </button>
       </section>
 
@@ -265,24 +272,30 @@
           <div v-for="p in pendingNeu" :key="p.sell + p.buy" class="recover-view__stuck-item">
             <div class="recover-view__stuck-info">
               <span>{{ getTokenSymbol(p.sell) }} → {{ getTokenSymbol(p.buy) }}</span>
-              <span class="recover-view__stuck-reason">Interrupted {{ formatDepositAge(p.timestamp) }}</span>
+              <span v-if="rowRunning(p, 'neutrinite')" class="recover-view__ra-detail">{{ ROW_RUNNING_TEXT }}</span>
+              <span v-else class="recover-view__stuck-reason">Interrupted {{ formatDepositAge(p.timestamp) }}</span>
             </div>
             <div style="display:flex;gap:4px">
               <button
                 class="ex-btn ex-btn--sm ex-btn--primary"
                 @click="sweepNeuPending(p)"
-                :disabled="sweeping === ('neu:' + p.sell + p.buy) || raRunning || saleRunning"
-              >{{ sweeping === ('neu:' + p.sell + p.buy) ? 'Sweeping...' : 'Sweep' }}</button>
+                :disabled="sweeping === ('neu:' + p.sell + p.buy) || raRunning || raWaiting || saleRunning || rowRunning(p, 'neutrinite')"
+              >{{ sweeping === ('neu:' + p.sell + p.buy) ? 'Sweeping...' : raWaiting && waitFor === 'neu:' + p.sell + p.buy ? 'Waiting...' : 'Sweep' }}</button>
               <button
                 class="ex-btn ex-btn--sm ex-btn--outline"
+                :disabled="raRunning || raWaiting || rowRunning(p, 'neutrinite')"
                 @click="dismissPendingNeu(p)"
               >Dismiss</button>
             </div>
           </div>
         </div>
 
+        <div v-if="raWaiting && waitIn('neu')" class="recover-view__ra-wait" role="status">
+          <span>{{ recoveryWaitsText(holder) }}</span>
+          <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="stopWaiting">Stop waiting</button>
+        </div>
         <button class="ex-btn ex-btn--outline" :disabled="!canSweepManual" @click="sweepNeuManual">
-          {{ sweeping === 'neu-manual' ? 'Sweeping...' : 'Sweep Neutrinite (uses the two token IDs above)' }}
+          {{ sweeping === 'neu-manual' ? 'Sweeping...' : raWaiting && waitFor === 'neu-manual' ? 'Waiting...' : 'Sweep Neutrinite (uses the two token IDs above)' }}
         </button>
       </section>
 
@@ -333,8 +346,9 @@
 // evicted mid Recover All run. The promises keep running; a re-entered
 // instance must not double-start, so the flag lives outside the component.
 let raActive = false
-/** A Recover All waiting for the funds lock (aborting it stops the wait). */
+/** A recovery waiting for the funds lock (aborting it stops the wait), and which one (its key). */
 let raWait: AbortController | null = null
+let raWaitKey = ''
 </script>
 
 <script setup lang="ts">
@@ -346,7 +360,11 @@ import ExchangePageTitle from '../components/common/ExchangePageTitle.vue'
 import { useExchangeStore } from '../store/exchange.store'
 import { getDepositHistory, removeDepositFromCache } from '../utils/deposit'
 import { runJournal } from '../utils/runJournalStore'
-import { withFundsLock, isSaleRunning, BUSY, SALE_RUNNING_RECOVERY_TEXT, RECOVERY_WAITS_TEXT, FUNDS_LOCK_CAP_MS } from '../utils/saleLock'
+import {
+  withFundsLock, isSaleRunning, isFundsLockHeld, fundsHolder, recoveryWaitsText, BUSY, FUNDS_LOCK_CAP_MS,
+  RECOVERY_NOT_STARTED, LOCK_BUSY_RECOVERY_TEXT, SWAP_OR_SALE_RUNNING_TEXT, type FundsHoldKind,
+} from '../utils/saleLock'
+import type { RunRecord } from '../utils/crossDexJournal'
 import { useInterruptedSale } from '../composables/useInterruptedSale'
 import { mergeDepositRows, isOtherWallet as isOtherWalletRow, batchItemRecovered, batchRefused, type DepositRow, type MaySentRow } from '../utils/recoverRows'
 import { useExchangeToast } from '../composables/useExchangeToast'
@@ -359,20 +377,37 @@ const store = useExchangeStore()
 const toast = useExchangeToast()
 const { interrupted, interruptedAgo, interruptedTokens, check: checkInterrupted, dismissInterrupted } = useInterruptedSale()
 
-// ── Funds lock: every recovery action takes it shared, so none runs while a
-// Sell many sale (exclusive) is moving funds in any tab. The 2 s poll only
-// drives the disabled look; the lock itself decides.
+// ── Funds lock ──
+// The TACO deposit recoveries take it shared (guarded): none runs while a Sell many sale (exclusive) moves
+// funds in any tab. Every recovery that sweeps a pool or the pylon, or removes a pair marker, takes it
+// exclusive and waits for it (exclusiveRecovery). The 2 s poll only drives the look; the lock itself decides.
 const saleRunning = ref(false)
+/** What holds the lock in this browser (a sale, a single swap, a recovery), from the poll. */
+const holder = ref<FundsHoldKind | null>(null)
+const swapOrSaleRunning = computed(() => holder.value === 'sale' || holder.value === 'swap')
 const lockNote = ref(false)
 async function guarded<T>(fn: () => Promise<T>): Promise<T | undefined> {
-  const r = await withFundsLock('shared', fn)
+  const r = await withFundsLock('shared', fn, { kind: 'recovery' })
   if (r === BUSY) {
     lockNote.value = true
-    toast.warning('Sale in progress', SALE_RUNNING_RECOVERY_TEXT)
+    toast.warning(RECOVERY_NOT_STARTED, LOCK_BUSY_RECOVERY_TEXT)
     return undefined
   }
   lockNote.value = false
   return r as T
+}
+
+/** A pair marker row whose swap may still be running: its swap needs the marker and the pool's or the pylon's
+ *  balances. Young markers while a swap or sale holds the lock, or a run of the journal still running for
+ *  the pair (no swap holds funds past the lock's cap). */
+const ROW_RUNNING_TEXT = 'A swap of this pair may still be running'
+const nowTick = ref(Date.now())
+const runningRuns = ref<RunRecord[]>([])
+function rowRunning(p: { sell: string; buy: string; timestamp: number }, venue: 'icpswap' | 'neutrinite'): boolean {
+  const now = nowTick.value
+  if (now - p.timestamp < FUNDS_LOCK_CAP_MS && swapOrSaleRunning.value) return true
+  return runningRuns.value.some(r => now - r.startedAt < FUNDS_LOCK_CAP_MS && r.target === p.buy
+    && r.assets.some(a => a.token === p.sell && a.legs.some(l => l.dex === venue)))
 }
 
 // ── Cached Deposits ──
@@ -692,13 +727,23 @@ function loadPendingSwaps() {
 }
 
 const canSweepManual = computed(() =>
-  store.isAuthenticated && !!sweepTokenA.value.trim() && !!sweepTokenB.value.trim() && !sweeping.value && !raRunning.value,
+  store.isAuthenticated && !!sweepTokenA.value.trim() && !!sweepTokenB.value.trim() && !sweeping.value && !raRunning.value && !raWaiting.value,
 )
+
+const NOT_DISMISSED = 'Not dismissed'
+const DISMISS_BUSY_TEXT = 'A swap, sale or recovery is running in this browser. Dismiss this row when it ends.'
+const STUCK_ROW_TEXT = 'ICPSwap still lists a withdraw of this pair that it has not finished, so the row stays.'
+/** The pool of the pair lists an unfinished withdraw of the wallet (of any age): its funds may be stuck there. */
+async function unfinishedWithdraw(sell: string, buy: string): Promise<boolean> {
+  try {
+    const recs = await icpswap.getPoolWithdrawRecords({ token0Principal: sell, token1Principal: buy })
+    return !!recs?.some(r => r.status !== 'Completed')
+  } catch { return false }
+}
 
 function sweepPending(p: icpswap.PendingIcpSwap) {
   if (sweeping.value) return
-  sweeping.value = p.sell + p.buy
-  return guarded(() => sweepPendingInner(p)).finally(() => { sweeping.value = '' })
+  return exclusiveRecovery('ix:' + p.sell + p.buy, () => sweepPendingInner(p))
 }
 async function sweepPendingInner(p: icpswap.PendingIcpSwap) {
   if (!store.isAuthenticated) { sweepError.value = 'Connect your wallet first'; return }
@@ -708,10 +753,16 @@ async function sweepPendingInner(p: icpswap.PendingIcpSwap) {
   try {
     const recovered = await icpswap.sweep({ token0Principal: p.sell, token1Principal: p.buy })
     if (recovered) {
-      icpswap.removePendingSwap(p.sell, p.buy)
-      pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
       sweepSuccess.value = true
-      toast.success('Sweep Complete')
+      // a withdraw of the pair that ICPSwap has not finished (taken off the balance, never paid) shows on no
+      // balance: the row stays while the pool lists one
+      if (await unfinishedWithdraw(p.sell, p.buy)) {
+        toast.success('Sweep Complete', STUCK_ROW_TEXT)
+      } else {
+        icpswap.removePendingSwap(p.sell, p.buy)
+        pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
+        toast.success('Sweep Complete')
+      }
     } else {
       sweepError.value = 'Nothing to recover yet. If you just swapped, the deposit may still be crediting. Try again in a few seconds, or dismiss this entry if it stays empty.'
       toast.warning('Nothing to sweep yet', sweepError.value)
@@ -724,15 +775,16 @@ async function sweepPendingInner(p: icpswap.PendingIcpSwap) {
   }
 }
 
-function dismissPendingSwap(p: icpswap.PendingIcpSwap) {
+async function dismissPendingSwap(p: icpswap.PendingIcpSwap) {
+  // a marker a running swap still needs is never dismissed: any holder of the lock refuses it
+  if (await isFundsLockHeld()) { toast.warning(NOT_DISMISSED, DISMISS_BUSY_TEXT); return }
   icpswap.removePendingSwap(p.sell, p.buy)
   pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
 }
 
 function sweepManual() {
   if (!canSweepManual.value) return
-  sweeping.value = 'manual'
-  return guarded(() => sweepManualInner()).finally(() => { sweeping.value = '' })
+  return exclusiveRecovery('manual', () => sweepManualInner())
 }
 async function sweepManualInner() {
   sweeping.value = 'manual'
@@ -761,15 +813,15 @@ function loadPendingNeu() {
   pendingNeu.value = neutrinite.getPendingSwaps()
 }
 
-function dismissPendingNeu(p: neutrinite.PendingNeutrinite) {
+async function dismissPendingNeu(p: neutrinite.PendingNeutrinite) {
+  if (await isFundsLockHeld()) { toast.warning(NOT_DISMISSED, DISMISS_BUSY_TEXT); return }
   neutrinite.removePendingSwap(p.sell, p.buy)
   pendingNeu.value = pendingNeu.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
 }
 
 function sweepNeuPending(p: neutrinite.PendingNeutrinite) {
   if (sweeping.value) return
-  sweeping.value = 'neu:' + p.sell + p.buy
-  return guarded(() => sweepNeuPendingInner(p)).finally(() => { sweeping.value = '' })
+  return exclusiveRecovery('neu:' + p.sell + p.buy, () => sweepNeuPendingInner(p))
 }
 async function sweepNeuPendingInner(p: neutrinite.PendingNeutrinite) {
   if (!store.isAuthenticated) { sweepError.value = 'Connect your wallet first'; return }
@@ -798,8 +850,7 @@ async function sweepNeuPendingInner(p: neutrinite.PendingNeutrinite) {
 
 function sweepNeuManual() {
   if (!canSweepManual.value) return
-  sweeping.value = 'neu-manual'
-  return guarded(() => sweepNeuManualInner()).finally(() => { sweeping.value = '' })
+  return exclusiveRecovery('neu-manual', () => sweepNeuManualInner())
 }
 async function sweepNeuManualInner() {
   sweeping.value = 'neu-manual'
@@ -932,19 +983,23 @@ async function raMarkers(): Promise<number> {
   const markers = [...pendingSwaps.value]
   if (markers.length === 0) { raSet(id, 'Interrupted CrossDEX swaps', 'done', 'No interrupted swaps saved'); return 0 }
   raSet(id, 'Interrupted CrossDEX swaps', 'running', `Sweeping ${markers.length} saved pairs...`)
-  let swept = 0
+  let swept = 0, kept = 0
   await mapWithConcurrency(markers, 10, async (p) => {
     try {
       const ok = await icpswap.sweepWithRetry({ token0Principal: p.sell, token1Principal: p.buy }, 5)
       if (ok) {
         swept++
+        // a withdraw of the pair that ICPSwap has not finished shows on no balance: the marker stays while the
+        // pool lists one, of any age
+        if (await unfinishedWithdraw(p.sell, p.buy)) { kept++; return }
         icpswap.removePendingSwap(p.sell, p.buy)
         pendingSwaps.value = pendingSwaps.value.filter(e => !(e.sell === p.sell && e.buy === p.buy))
       }
     } catch (e) { console.error('[RecoverAll] marker sweep failed', p, e) }
   })
   raSet(id, 'Interrupted CrossDEX swaps', 'done',
-    swept > 0 ? `Recovered funds from ${swept} of ${markers.length} pairs` : 'Nothing left stranded for those pairs')
+    (swept > 0 ? `Recovered funds from ${swept} of ${markers.length} pairs.` : 'Nothing left stranded for those pairs.')
+    + (kept > 0 ? ` ${kept === 1 ? 'One pair stays listed' : `${kept} pairs stay listed`}: ICPSwap has a withdraw of it that is not finished.` : ''))
   return swept
 }
 
@@ -1114,33 +1169,51 @@ async function raPulls(): Promise<void> {
 type RaScope = 'all' | 'icpswap' | 'neutrinite'
 const raScope = ref<RaScope>('all')
 const raWaiting = ref(false)
+/** Which recovery waits for the lock: a Recover All scope, 'ix:<pair>' / 'neu:<pair>' (a row), 'manual',
+ *  'neu-manual'. */
+const waitFor = ref('')
+function waitIn(section: 'ra' | 'ix' | 'neu'): boolean {
+  const k = waitFor.value
+  if (section === 'ra') return k === 'all' || k === 'icpswap' || k === 'neutrinite'
+  if (section === 'ix') return k.startsWith('ix:') || k === 'manual'
+  return k.startsWith('neu:') || k === 'neu-manual'
+}
 
 function raLabel(scope: RaScope, idle: string): string {
   if (raRunning.value && raScope.value === scope) return `Running... ${raElapsed.value}s`
-  if (raWaiting.value && raScope.value === scope) return 'Starts when the swap ends'
+  if (raWaiting.value && waitFor.value === scope) return holder.value === 'recovery' ? 'Starts when it ends' : 'Starts when the swap ends'
   return idle
 }
 
-// Recover All and its scope buttons take the funds lock exclusive, waiting for it: a single swap or a sale
-// of any tab keeps its pair markers and its balances in the pools and on the pylon until it ends (a marker
-// this run removed, or a balance it swept, would leave that swap reading its own funds wrong). Every holder
-// lets go by the lock's cap, so the wait never goes past it; a new swap meanwhile is refused (it queues
-// behind this run). The run itself is unchanged: the full scan and every sweep.
-function recoverAll(scope: RaScope = 'all') {
+// Every recovery that sweeps a pool or the pylon, or removes a pair marker (Recover All, its scope buttons,
+// the per row and manual sweeps), takes the funds lock exclusive, waiting for it: a single swap or a sale of
+// any tab keeps its pair markers and its balances in the pools and on the pylon until it ends (a marker a
+// recovery removed, or a balance it swept, would leave that swap reading its own funds wrong). One recovery
+// at a time. Every holder lets go by the lock's cap, so the wait never goes past it; a new swap meanwhile is
+// refused (it queues behind). The runs themselves are unchanged.
+function exclusiveRecovery(key: string, fn: () => Promise<unknown>): Promise<void> | undefined {
   if (raActive || raWait || !store.isAuthenticated) return
-  raScope.value = scope
   const ctl = new AbortController()
-  raWait = ctl
-  const done = () => { if (raWait === ctl) raWait = null; raWaiting.value = false }
-  return withFundsLock('exclusive', () => { done(); return recoverAllInner(scope) }, {
+  raWait = ctl; raWaitKey = key; waitFor.value = key
+  let timedOut = false
+  const done = () => { if (raWait === ctl) { raWait = null; raWaitKey = '' } raWaiting.value = false; waitFor.value = '' }
+  return withFundsLock('exclusive', async () => { done(); await fn() }, {
+    kind: 'recovery',
     waitMs: FUNDS_LOCK_CAP_MS,
     signal: ctl.signal,
     onWait: () => { raWaiting.value = true },
+    onTimeout: () => { timedOut = true },
   }).then((r) => {
     if (r !== BUSY) return
     done()
-    if (!ctl.signal.aborted) toast.warning('Recovery did not start', 'A swap was still running after 10 minutes. Try again when it ends.')
+    // the 10 minutes only when it really waited that long; Stop waiting says nothing
+    if (!ctl.signal.aborted) toast.warning(RECOVERY_NOT_STARTED, timedOut ? 'A swap or sale was still running after 10 minutes. Try again when it ends.' : LOCK_BUSY_RECOVERY_TEXT)
   })
+}
+function recoverAll(scope: RaScope = 'all') {
+  if (raActive || raWait || !store.isAuthenticated) return
+  raScope.value = scope
+  return exclusiveRecovery(scope, () => recoverAllInner(scope))
 }
 function stopWaiting() { raWait?.abort() }
 async function recoverAllInner(scope: RaScope) {
@@ -1194,7 +1267,16 @@ async function recoverAllInner(scope: RaScope) {
 
 let salePoll: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
-  const pollSale = async () => { if (!document.hidden) saleRunning.value = await isSaleRunning() }
+  const pollSale = async () => {
+    if (document.hidden) return
+    nowTick.value = Date.now()
+    const [h, sale] = await Promise.all([fundsHolder(), isSaleRunning()])
+    holder.value = h
+    saleRunning.value = sale
+    // the refusal note goes once nothing holds the lock
+    if (!h) lockNote.value = false
+    try { runningRuns.value = runJournal.list().filter(r => r.phase === 'running') } catch { runningRuns.value = [] }
+  }
   void pollSale()
   salePoll = setInterval(pollSale, 2000)
   loadCachedDeposits()
@@ -1209,6 +1291,7 @@ onMounted(() => {
     const t = setInterval(() => { if (!raActive) { raRunning.value = false; clearInterval(t) } }, 2000)
   } else if (raWait) {
     raWaiting.value = true
+    waitFor.value = raWaitKey
     const t = setInterval(() => {
       if (raActive) raRunning.value = true
       if (!raWait) raWaiting.value = false
@@ -1322,9 +1405,10 @@ onVisible(() => {
     color: var(--text-secondary);
   }
 
+  // the small row texts use the text inks (at least 4.5:1 in both themes)
   &__stuck-reason {
     font-size: var(--text-xs);
-    color: var(--color-warning);
+    color: var(--tx-warning-ink);
   }
 
   &__no-stuck {
@@ -1357,7 +1441,14 @@ onVisible(() => {
     font-size: var(--text-sm); line-height: 1.45; color: var(--text-primary);
     background: var(--tx-warning-dim); border-radius: 8px; padding: 8px 10px;
   }
-  // Recover All waits for a running swap: says so plainly, with a way to stop waiting
+  // a swap or sale holds the lock: the amber note in the warning ink (at least 4.5:1 on its fill in both
+  // themes; the shared .ex-warning-box of easy mode keeps its own colour)
+  &__ra-busy {
+    font-size: 13px; line-height: 1.45; color: var(--tx-warning-ink);
+    background: var(--tx-warning-dim); border-left: 3px solid var(--tx-warning);
+    border-radius: var(--tx-r-sm); padding: 8px;
+  }
+  // a recovery waits for a running swap: says so plainly, with a way to stop waiting
   &__ra-wait {
     display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
     font-size: var(--text-sm); line-height: 1.45; color: var(--text-primary);
@@ -1366,7 +1457,7 @@ onVisible(() => {
 
   &__ra-detail {
     font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    color: var(--tx-muted-ink);
   }
 
   &__ra-state {
