@@ -13,7 +13,6 @@ import { workerBridge, fetchAndWait } from './worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/transfer'
 import { getEffectiveNetwork, getICHost } from '../config/network-config'
 import { getCanisterId } from '../constants/canisterIds'
-import { getFrontendIdentity } from '../utils/frontend-identity'
 import { clearUserCache, clearAllUserCache } from '../utils/userScopedCache'
 import { yieldToMain } from '../utils/yieldToMain'
 
@@ -41,8 +40,10 @@ import type { _SERVICE as NeuronSnapshotService } from "../../../declarations/ne
 import type { _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import type { _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
 
-// Canister ID import (small, needed early)
-import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
+// Internet Identity canister id (local logins), read from the build env like
+// declarations/internet_identity does. Importing that module pulled
+// @dfinity/agent and the II interface into the boot bundle.
+const iiCanisterId = process.env.CANISTER_ID_INTERNET_IDENTITY
 
 // ============================================================================
 // Lazy Module Loaders - Heavy @dfinity packages loaded on demand
@@ -55,6 +56,7 @@ let _identityModule: typeof import('@dfinity/identity') | null = null
 let _ledgerIcpModule: typeof import('@dfinity/ledger-icp') | null = null
 let _snsModule: typeof import('@dfinity/sns') | null = null
 let _candidModule: typeof import('@dfinity/candid') | null = null
+let _frontendIdentityModule: typeof import('../utils/frontend-identity') | null = null
 
 // IDL factory modules (lazy loaded)
 let _ledgerIDL: any = null
@@ -157,6 +159,13 @@ async function getCandidModule() {
     return _candidModule
 }
 
+async function getFrontendIdentityModule() {
+    if (!_frontendIdentityModule) {
+        _frontendIdentityModule = await import('../utils/frontend-identity')
+    }
+    return _frontendIdentityModule
+}
+
 // IDL factory loaders
 async function getLedgerIDL() {
     if (!_ledgerIDL) {
@@ -238,6 +247,7 @@ let AccountIdentifier: typeof import('@dfinity/ledger-icp').AccountIdentifier
 let SnsGovernanceCanister: typeof import('@dfinity/sns').SnsGovernanceCanister
 let SnsNeuronPermissionType: typeof import('@dfinity/sns').SnsNeuronPermissionType
 let IDL: typeof import('@dfinity/candid').IDL
+let getFrontendIdentity: typeof import('../utils/frontend-identity').getFrontendIdentity
 
 // IDL factories (populated lazily)
 let idlFactory: any
@@ -264,6 +274,7 @@ async function initializeShims() {
         ledgerIcpMod,
         snsMod,
         candidMod,
+        frontendIdentityMod,
         ledgerIdl,
         daoIdl,
         treasuryIdl,
@@ -280,6 +291,7 @@ async function initializeShims() {
         getLedgerIcpModule(),
         getSnsModule(),
         getCandidModule(),
+        getFrontendIdentityModule(),
         getLedgerIDL(),
         getDaoBackendIDL(),
         getTreasuryIDL(),
@@ -301,6 +313,7 @@ async function initializeShims() {
     SnsGovernanceCanister = snsMod.SnsGovernanceCanister
     SnsNeuronPermissionType = snsMod.SnsNeuronPermissionType
     IDL = candidMod.IDL
+    getFrontendIdentity = frontendIdentityMod.getFrontendIdentity
 
     // IDL factories
     idlFactory = ledgerIdl
