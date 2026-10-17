@@ -134,6 +134,7 @@ export function legDetail(l: LegRun, sym: string, amountIn: string, outText: str
       if (l.reason === 'journal') return `${label}: not sent because this browser could not save its recovery note. This part stayed in your wallet.`
       if (l.reason === 'rateLimited') return `${label}: not sent because it was busy for your wallet. This part stayed in your wallet.`
       if (l.reason === 'neuHeld') return `${label}: not sent because it may still hold some ${sym} from another swap of yours. This part stayed in your wallet. The Recover page can send that back.`
+      if (l.reason === 'icpHeld') return `${label}: not sent because it may still hold funds from another swap of yours. This part stayed in your wallet. The Recover page can send them back.`
       return `${label}: not sent. This part stayed in your wallet.`
     case 'deferred': return 'The TACO exchange takes only a few trades per wallet every 90 seconds. The refund starts after the window.'
     case 'tracked': return 'The TACO exchange has not settled this part yet. It is listed on the Recover page.'
@@ -144,7 +145,7 @@ export function legDetail(l: LegRun, sym: string, amountIn: string, outText: str
       if (l.reason === 'admin') return `The TACO exchange could not confirm this part. Do not repeat this sale. Open the Recover page${l.block != null ? `, or contact support with deposit ${l.block}` : ''}.`
       if (l.reason === 'tacoPaused') return 'The TACO exchange is paused right now. Your deposit is safe there. Use the Recover page when it is back.'
       if (l.reason === 'rateLimited') return 'The TACO exchange is busy for your wallet. Use the Recover page in a few minutes.'
-      if (l.reason === 'neuMismatch') return `${label}: not swapped, because the amount it received did not match this part. Use the Recover page to send it back.`
+      if (l.reason === 'neuMismatch') return `${label}: not swapped, because the amount it received did not match this part. Check your wallet first. ${NOT_IN_WALLET}`
       // some or all of the ICP may already be in the wallet (a lost withdraw answer, or only part came
       // back from a look): the wallet comes first
       if (l.outMaybeSent) return `${subject} sold this part. The ICP may already be in your wallet. Check it before using the Recover page.`
@@ -165,14 +166,29 @@ export function onlyMaybeSent(legs: ReadonlyArray<{ state: string; outMaybeSent?
 }
 /** The sheet's title and the toast title when nothing is confirmed sold but a part may have sold. */
 export const CHECK_WALLET = 'Check your wallet'
+/** Where funds that are not in the wallet are: one wording for every note, summary and toast. */
+export const NOT_IN_WALLET = 'Anything not in your wallet is on the Recover page.'
 /** The closing note (and toast line) when every part that needs the Recover page may already be in
  *  the wallet. */
-export const CHECK_WALLET_NOTE = 'Check your wallet first. Anything that is not there is on the Recover page.'
-/** The single swap summary when a route that failed may still have sold (its ICP may be in the wallet). */
-export function swapMaybeSentSummary(received?: string): string {
-  return received != null
-    ? `Partial: received ${received}. Another route may have sold too. Check your wallet before you swap again. Anything not there is on the Recover page.`
-    : 'A route may have sold. Check your wallet before you swap again. Anything not there is on the Recover page.'
+export const CHECK_WALLET_NOTE = `Check your wallet first. ${NOT_IN_WALLET}`
+/** The same closing note when the session expired during the sale (one note, the wallet first). */
+export const CHECK_WALLET_SESSION_NOTE = 'Check your wallet first. For anything that is not there, reconnect and open the Recover page.'
+/** A part or route that sold while its output may already be in the wallet: the sale is sure, only
+ *  where its output is is not. `whole`: the swap had one route; `also`: other routes sold for sure. */
+export function soldMaybeInWallet(n: number, sym: string, opts: { noun?: 'route' | 'part'; whole?: boolean; also?: boolean } = {}): string {
+  const noun = opts.noun ?? 'route'
+  if (opts.whole) return `The swap sold, and its ${sym} may already be in your wallet.`
+  if (opts.also) return n === 1 ? `Another ${noun} sold too, and its ${sym} may already be in your wallet.` : `Other ${noun}s sold too, and their ${sym} may already be in your wallet.`
+  return n === 1 ? `A ${noun} sold, and its ${sym} may already be in your wallet.` : `Some ${noun}s sold, and their ${sym} may already be in your wallet.`
+}
+/** The single swap summary when a route that failed sold while its output may already be in the wallet.
+ *  received: what the routes that sold for sure brought (a partial fill); routes: how many the swap had;
+ *  hedged: how many may have sent their output already. */
+export function swapMaybeSentSummary(opts: { received?: string; sym: string; routes: number; hedged: number }): string {
+  const lead = opts.received != null
+    ? `Partial: received ${opts.received}. ${soldMaybeInWallet(opts.hedged, opts.sym, { also: true })}`
+    : soldMaybeInWallet(opts.hedged, opts.sym, { whole: opts.routes === 1 })
+  return `${lead} Check your wallet before you swap again. ${NOT_IN_WALLET}`
 }
 
 /** Refunds and recovery list: what the user should do about one leg that needs recovery. */

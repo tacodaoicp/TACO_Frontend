@@ -364,7 +364,14 @@ const summaryLine = computed(() => {
   const unknown = cx.outcomes.value.some(o => o.success && o.state === 'doneUnknown')
   const totalStr = formatTo(total) + (unknown ? ', plus a route whose amount shows in your wallet' : '')
   if (cx.phase.value === 'success') return `Received ${totalStr}`
-  if (maybeSent.value) return swapMaybeSentSummary(cx.phase.value === 'partial' ? totalStr : undefined)
+  if (maybeSent.value) {
+    return swapMaybeSentSummary({
+      received: cx.phase.value === 'partial' ? totalStr : undefined,
+      sym: cx.tokenTo.value?.symbol ?? 'output',
+      routes: legViews.value.length,
+      hedged: cx.outcomes.value.filter(o => !o.success && o.outMaybeSent).length,
+    })
+  }
   if (cx.phase.value === 'partial') return `Partial: received ${totalStr}. Check each route's status above; anything not recovered automatically is on the Recover page.`
   if (cx.phase.value === 'error') return `All routes failed. Check each route's status above; anything not recovered automatically is on the Recover page.`
   return ''
