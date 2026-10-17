@@ -133,6 +133,7 @@ export function legDetail(l: LegRun, sym: string, amountIn: string, outText: str
       if (l.reason === 'secondCheck') return `${label}: this part could not be checked before its turn, so it stayed in your wallet.`
       if (l.reason === 'journal') return `${label}: not sent because this browser could not save its recovery note. This part stayed in your wallet.`
       if (l.reason === 'rateLimited') return `${label}: not sent because it was busy for your wallet. This part stayed in your wallet.`
+      if (l.reason === 'neuHeld') return `${label}: not sent because it still holds some ${sym} from another swap of yours. This part stayed in your wallet. The Recover page can send that back.`
       return `${label}: not sent. This part stayed in your wallet.`
     case 'deferred': return 'The TACO exchange takes only a few trades per wallet every 90 seconds. The refund starts after the window.'
     case 'tracked': return 'The TACO exchange has not settled this part yet. It is listed on the Recover page.'

@@ -112,7 +112,7 @@ export const isNeuFirst = (legs: ReadonlyArray<{ dex: CrossDexVenue }>) =>
 export type LegState = 'waiting' | 'running' | 'recovering' | 'deferred' | 'slow'
   | 'done' | 'doneUnknown' | 'belowMin' | 'refunded' | 'notSent' | 'needsRecovery' | 'tracked'
 export type LegReason = 'maySent' | 'unconfirmed' | 'admin' | 'afterSwap' | 'rateLimited' | 'tacoPaused'
-  | 'secondLate' | 'secondMoved' | 'secondCheck' | 'gateLate' | 'journal' | 'session' | 'slippage' | 'timeout' | string
+  | 'secondLate' | 'secondMoved' | 'secondCheck' | 'gateLate' | 'journal' | 'session' | 'slippage' | 'timeout' | 'neuHeld' | string
 export type AssetType = { ICP: null } | { ICRC12: null } | { ICRC3: null }
 
 export interface LegOutcome {
@@ -230,6 +230,7 @@ export interface LegDeps {
       sell: string; buy: string; amountIn: bigint; minAmountOut: bigint
       onStep?: (s: string) => void; canDeposit?: () => boolean; beforeTransfer?: () => boolean; requireMarker?: boolean
       onCredited?: () => boolean
+      maxSellBefore?: bigint
       track?: NeuTrack
     }): Promise<{ amountOut: bigint }>
     sweep(sell: string, buy: string, before?: { sell: bigint; buy: bigint }, opts?: { report?: SweepReport }): Promise<boolean>
@@ -462,6 +463,10 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
       amountIn: leg.amountIn,
       minAmountOut: minOut,
       onStep: ctx.onStep,
+      // the pylon already holding more than dust of the sold token for the wallet (an earlier swap's
+      // leftover, or another swap's deposit) stops the part before its deposit: neither the credit
+      // check nor a recovery look could tell this part's tokens from that balance
+      maxSellBefore: ctx.fee,
       canDeposit: gate && (() => !gate.isOpen()),
       beforeTransfer: () => {
         if (!ctx.journal.beforeMove('neuTransfer') && ctx.strictJournal) { journalRefused = true; return false }
@@ -481,7 +486,7 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
       // Failed before the deposit, or the transfer was refused: nothing to sweep.
       ctx.onStep('Failed, nothing left your wallet')
       return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'notSent',
-        reason: journalRefused || err?.journal ? 'journal' : undefined, error, notStarted: true }
+        reason: journalRefused || err?.journal ? 'journal' : err?.held ? 'neuHeld' : undefined, error, notStarted: true }
     }
     ctx.onStep('Recovering funds…')
     // Sweep only what this swap added on the pylon, retried because a deposit

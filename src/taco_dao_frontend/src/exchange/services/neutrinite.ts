@@ -343,6 +343,10 @@ export interface NeutriniteSwapParams {
   requireMarker?: boolean
   /** Called once the deposit is credited; false refuses the swap. */
   onCredited?: () => boolean
+  /** Stop before the deposit when the pylon already holds more than this of the sell token for
+   *  the wallet (an earlier swap's leftover, or another swap's deposit): the credit check and a
+   *  recovery look could not tell this swap's tokens from that balance. */
+  maxSellBefore?: bigint
   /** Filled in for the caller's recovery: pylon balances before our deposit, the swap output,
    *  whether an earlier swap on this pair had already left a marker, and whether dex_swap was sent
    *  (it may have run even when its answer is lost). */
@@ -352,10 +356,11 @@ export interface NeutriniteSwapParams {
   owner?: Principal
 }
 
-/** The swap stopped before its deposit transfer: nothing left the wallet. */
+/** The swap stopped before its deposit transfer: nothing left the wallet. `held`: the pylon
+ *  already held more than dust of the sell token for the wallet. */
 export class NeutriniteNotStarted extends Error {
   readonly notStarted = true
-  constructor(message: string, readonly journal = false) { super(message); this.name = 'NeutriniteNotStarted' }
+  constructor(message: string, readonly journal = false, readonly held = false) { super(message); this.name = 'NeutriniteNotStarted' }
 }
 
 /**
@@ -377,6 +382,9 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   const sellEp = findEndpoint(accounts, params.sell)
   if (!sellEp) throw new Error('Neutrinite: no deposit endpoint for this token')
   const balanceBefore = sellEp.balance
+  if (params.maxSellBefore != null && balanceBefore > params.maxSellBefore) {
+    throw new NeutriniteNotStarted('Neutrinite still holds some of this token from another swap of yours, so its share was not sent', false, true)
+  }
   const depositAccount = sellEp.account // { owner: pylon, subaccount: [bytes] }
   const tokenActor = Actor.createActor(icrcIDL, { agent, canisterId: params.sell })
 
