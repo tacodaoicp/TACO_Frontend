@@ -172,6 +172,12 @@ export async function getCachedAgent(): Promise<HttpAgent> {
  * rules as getCachedAgent. A CrossDEX run builds its own agent this way and
  * takes the principal from the same identity object, so a login or logout in
  * another tab can never pair one principal with another principal's agent.
+ *
+ * Its queries are verified (createAgent leaves that off by default): every
+ * reply carries the answering node's signature and a fresh timestamp, so a
+ * boundary node cannot alter what the run's checks and recovery looks read.
+ * That is still one node's word, not consensus: a value that picks where funds
+ * go is read with an update call or pinned.
  */
 export async function createAgentFor(identity: Identity): Promise<HttpAgent> {
   const { createAgent } = await getUtilsModule()
@@ -179,6 +185,7 @@ export async function createAgentFor(identity: Identity): Promise<HttpAgent> {
     identity,
     host: getNetworkHost(),
     fetchRootKey: shouldFetchRootKey(),
+    verifyQuerySignatures: true,
   })
 }
 

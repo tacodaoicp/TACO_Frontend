@@ -102,6 +102,19 @@ const pylonIDL = ({ IDL }: any) => {
   })
 }
 
+/** icrc55_accounts called as an UPDATE call (no 'query' annotation): its answer is certified by the subnet,
+ *  so the deposit account it names (where a swap's tokens are sent) is the pylon's own, not a reply a node
+ *  or a boundary node could alter. Only the deposit account is read this way; balances stay on the query. */
+const pylonAccountsVerifiedIDL = ({ IDL }: any) => {
+  const Account = IDL.Record({ owner: IDL.Principal, subaccount: IDL.Opt(IDL.Vec(IDL.Nat8)) })
+  const AccountsRequest = IDL.Record({ owner: IDL.Principal, subaccount: IDL.Opt(IDL.Vec(IDL.Nat8)) })
+  const EndpointIC = IDL.Record({ account: Account, ledger: IDL.Principal })
+  const EndpointOther = IDL.Record({ account: IDL.Vec(IDL.Nat8), ledger: IDL.Vec(IDL.Nat8), platform: IDL.Nat64 })
+  const Endpoint = IDL.Variant({ ic: EndpointIC, other: EndpointOther })
+  const AccountEndpoint = IDL.Record({ balance: IDL.Nat, endpoint: Endpoint })
+  return IDL.Service({ icrc55_accounts: IDL.Func([AccountsRequest], [IDL.Vec(AccountEndpoint)], []) })
+}
+
 // ── Agents ──
 let _anonAgent: HttpAgent | null = null
 async function anonActor(): Promise<any> {
@@ -144,13 +157,43 @@ export async function register(): Promise<void> {
     const identity = await getCachedIdentity()
     const owner = identity.getPrincipal()
     if (owner.isAnonymous()) return
-    if (_registered.has(owner.toText())) return
-    const pylon = await authedPylon()
-    await ensureRegistered(pylon, { owner, subaccount: [] as [] }, owner)
+    const agent = await getCachedAgent()
+    if (!_registered.has(owner.toText())) {
+      const pylon = await authedPylon(agent)
+      await ensureRegistered(pylon, { owner, subaccount: [] as [] }, owner)
+    }
+    // the certified deposit account, read once per session before the first swap needs it
+    await verifiedDepositSub(agent, owner)
   } catch (e) {
     console.warn('[neutrinite] background register skipped:', e)
   }
 }
+
+/** The wallet's deposit subaccount at the pylon (the same on every ledger's row), from a certified read: an
+ *  update call, once per principal and session (a failed read is tried again next time). */
+const _depositSub = new Map<string, Promise<Uint8Array>>()
+export function verifiedDepositSub(agent: HttpAgent, owner: Principal): Promise<Uint8Array> {
+  const key = owner.toText()
+  const hit = _depositSub.get(key)
+  if (hit) return hit
+  const p = (async () => {
+    const actor = Actor.createActor(pylonAccountsVerifiedIDL, { agent, canisterId: NEUTRINITE_PYLON })
+    const rows = (await withTimeout(actor.icrc55_accounts({ owner, subaccount: [] }) as Promise<any[]>, 30_000, 'pylon-accounts-certified')) as any[]
+    for (const ae of rows) {
+      const ep = ae?.endpoint
+      if (ep && 'ic' in ep && ep.ic.account.owner.toText() === NEUTRINITE_PYLON && ep.ic.account.subaccount?.length) {
+        return Uint8Array.from(ep.ic.account.subaccount[0] as number[])
+      }
+    }
+    throw new Error('Neutrinite: no deposit account for this wallet yet')
+  })()
+  _depositSub.set(key, p)
+  p.catch(() => { if (_depositSub.get(key) === p) _depositSub.delete(key) })
+  return p
+}
+
+const sameBytes = (a: ArrayLike<number> | undefined, b: ArrayLike<number> | undefined) =>
+  !!a && !!b && a.length === b.length && Array.prototype.every.call(a, (x: number, i: number) => x === b[i])
 
 // Register the caller's account with the pylon once per session. Registration is
 // idempotent and cheap; doing it before the first deposit makes sure the pylon's
@@ -370,10 +413,11 @@ export interface NeutriniteSwapParams {
 
 /** The swap stopped before its deposit transfer: nothing left the wallet. `held`: the pylon
  *  already held more than dust of the sell token for the wallet, or an earlier swap of the pair
- *  had not settled (its marker is saved). */
+ *  had not settled (its marker is saved); `heldOther`: the earlier swap that has not settled sells
+ *  this swap's buy token. */
 export class NeutriniteNotStarted extends Error {
   readonly notStarted = true
-  constructor(message: string, readonly journal = false, readonly held = false) { super(message); this.name = 'NeutriniteNotStarted' }
+  constructor(message: string, readonly journal = false, readonly held = false, readonly heldOther = false) { super(message); this.name = 'NeutriniteNotStarted' }
 }
 
 /** The pylon credited an amount that is not this deposit: nothing was swapped, the deposit (and
@@ -396,9 +440,11 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   const pylon = await authedPylon(agent)
 
   // 1. Register (idempotent) so the pylon indexes this account, then resolve the
-  // pylon-owned deposit account for the sell ledger (+ current virtual balance).
+  // pylon-owned deposit account for the sell ledger (+ current virtual balance). The certified deposit
+  // account (an update call, once per session) is read alongside.
   params.onStep?.('Preparing deposit…')
   await ensureRegistered(pylon, userAccount, owner)
+  const certified = verifiedDepositSub(agent, owner).then(sub => ({ sub }), (e: unknown) => ({ err: e }))
   const accounts = (await pylon.icrc55_accounts({ owner, subaccount: [] })) as any[]
   const sellEp = findEndpoint(accounts, params.sell)
   if (!sellEp) throw new Error('Neutrinite: no deposit endpoint for this token')
@@ -410,10 +456,22 @@ export async function executeSwap(params: NeutriniteSwapParams): Promise<{ amoun
   // any buy token whose deposit may still be credited stops this one too, and so does an earlier swap that
   // sells this part's buy token (its late credit would land above the start balances, where this part's
   // recovery looks count it as this part's output)
-  if (params.stopIfPending && getPendingSwaps().some(e => e.sell === params.sell || e.sell === params.buy)) {
-    throw new NeutriniteNotStarted('An earlier Neutrinite swap of this token is still listed on the Recover page, so its share was not sent', false, true)
+  if (params.stopIfPending) {
+    const pending = getPendingSwaps()
+    if (pending.some(e => e.sell === params.sell)) {
+      throw new NeutriniteNotStarted('An earlier Neutrinite swap of this token is still listed on the Recover page, so its share was not sent', false, true)
+    }
+    if (pending.some(e => e.sell === params.buy)) {
+      throw new NeutriniteNotStarted('An earlier Neutrinite swap is still listed on the Recover page, so its share was not sent', false, true, true)
+    }
   }
   const depositAccount = sellEp.account // { owner: pylon, subaccount: [bytes] }
+  // The tokens go to this account by a plain transfer that cannot be undone: it must be the pylon's own
+  // account, with the subaccount the certified read names; anything else sends nothing.
+  const cert = await certified
+  if (depositAccount?.owner?.toText?.() !== NEUTRINITE_PYLON || !('sub' in cert) || !sameBytes(depositAccount.subaccount?.[0], cert.sub)) {
+    throw new NeutriniteNotStarted('Neutrinite: its deposit account could not be confirmed, so its share was not sent')
+  }
   const tokenActor = Actor.createActor(icrcIDL, { agent, canisterId: params.sell })
 
   // 2. Fund the swap: plain icrc1_transfer of the input token into the pylon account.

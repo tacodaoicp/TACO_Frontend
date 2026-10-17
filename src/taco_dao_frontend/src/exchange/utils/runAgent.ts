@@ -19,6 +19,10 @@ export interface RunAgent {
   expiresAtMs: number | null
   /** agent.syncTime() succeeded: created_at_time can use the replica clock. */
   timeSynced: boolean
+  /** With timeSynced: the replica's time (ms) right after the sync. The agent never syncs again, so a device
+   *  clock that jumps later moves every conversion; a window that must not miss this run's own records starts
+   *  no later than this. */
+  replicaAtSyncMs?: number
 }
 
 export class RunAgentError extends Error {
@@ -68,11 +72,13 @@ export async function createRunAgent(opts: {
     throw new RunAgentError('Your wallet changed in another tab, so nothing was sent.', 'walletChanged')
   }
   let timeSynced = false
+  let replicaAtSyncMs: number | undefined
   if (opts.syncTime) {
     // syncTime can resolve without syncing (no replica time came back): ask the agent itself
     try { await withTimeout(agent.syncTime(), 5_000, 'syncTime'); timeSynced = agent.hasSyncedTime() }
     catch (e) { console.warn('[CrossDEX] time sync failed; deposits go without created_at_time:', e) }
     if (!timeSynced) console.warn('[CrossDEX] the replica time is unknown; deposits go without created_at_time')
+    else replicaAtSyncMs = Date.now() + (Number(agent.getTimeDiffMsecs?.() ?? 0) || 0)
   }
-  return { agent, principal, principalText, expiresAtMs, timeSynced }
+  return { agent, principal, principalText, expiresAtMs, timeSynced, replicaAtSyncMs }
 }

@@ -223,7 +223,15 @@ const factoryVerifiedIDL = ({ IDL }: any) => {
     tickSpacing: IDL.Int,
     canisterId: IDL.Principal,
   })
-  const PoolResult = IDL.Variant({ ok: PoolData, err: IDL.Text })
+  // the factory's own error variant: a tier without a pool answers err { CommonError } (a Text here would make
+  // that answer throw like a network or session error)
+  const FactoryError = IDL.Variant({
+    CommonError: IDL.Null,
+    InternalError: IDL.Text,
+    UnsupportedToken: IDL.Text,
+    InsufficientFunds: IDL.Null,
+  })
+  const PoolResult = IDL.Variant({ ok: PoolData, err: FactoryError })
   return IDL.Service({ getPool: IDL.Func([GetPoolArgs], [PoolResult], []) })
 }
 
@@ -297,21 +305,26 @@ async function getPoolData(token0Principal: string, token1Principal: string, opt
       token1: { address: token1Principal, standard: standardOf(token1Principal) },
       fee,
     }
+    let result: any
     try {
-      const result = (await factoryActor.getPool(poolArgs)) as any
-      if ('ok' in result) {
-        const poolData: PoolData = { ...result.ok, canisterId: result.ok.canisterId.toText() }
-        ;(verified ? verifiedPoolCache : poolCache).set(cacheKey, poolData)
-        return poolData
-      }
-      lastErr = result.err
+      result = (await factoryActor.getPool(poolArgs)) as any
     } catch (e) {
+      // a verified lookup stops at a call that failed (network, session, timeout): only the factory's own
+      // answer that this tier has no pool moves it to the next tier, so a transient failure never picks
+      // another pool of the pair than the one quoted
+      if (verified) throw e
       lastErr = e
+      continue
     }
+    if ('ok' in result) {
+      const poolData: PoolData = { ...result.ok, canisterId: result.ok.canisterId.toText() }
+      ;(verified ? verifiedPoolCache : poolCache).set(cacheKey, poolData)
+      return poolData
+    }
+    lastErr = result.err
   }
-  throw new Error(
-    `No ICPSwap pool for token pair across fee tiers (${ICPSWAP_FEE_TIERS.join(', ')}): ${safeStringify(lastErr)}`,
-  )
+  const why = lastErr instanceof Error ? lastErr.message : safeStringify(lastErr)
+  throw new Error(`No ICPSwap pool for token pair across fee tiers (${ICPSWAP_FEE_TIERS.join(', ')}): ${why}`)
 }
 
 /** The pool canister of a pair. With `opts.agent` a verified lookup (every call that moves or reads funds);
@@ -494,8 +507,9 @@ export async function getPoolWithdrawRecords(
   try {
     const owner = opts.owner ?? (await getCachedIdentity()).getPrincipal()
     if (owner.isAnonymous()) return null
-    // this answer decides whether a part reads sold and drops its marker: the run's own agent, else the
-    // session's, never the shared anonymous agent, and the pool id from the verified lookup
+    // this answer decides whether a part reads sold and drops its marker: the run's own agent (its queries
+    // are node signed), else the session's, never the shared anonymous agent; the pool id from the verified
+    // lookup
     const agent = opts.agent ?? (await getCachedAgent())
     if (!agent) return null
     const poolId = params.poolId ?? (await getPoolCanister(params.token0Principal, params.token1Principal, { agent }))

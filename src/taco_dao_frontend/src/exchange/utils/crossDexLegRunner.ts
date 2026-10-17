@@ -113,10 +113,11 @@ export type LegState = 'waiting' | 'running' | 'recovering' | 'deferred' | 'slow
   | 'done' | 'doneUnknown' | 'belowMin' | 'refunded' | 'notSent' | 'needsRecovery' | 'tracked'
 export type LegReason = 'maySent' | 'unconfirmed' | 'admin' | 'afterSwap' | 'rateLimited' | 'tacoPaused'
   | 'secondLate' | 'secondMoved' | 'secondCheck' | 'gateLate' | 'journal' | 'session' | 'slippage' | 'timeout' | 'neuHeld'
-  | 'icpHeld' | 'neuMismatch' | string
+  | 'icpHeld' | 'neuHeldOther' | 'neuMismatch' | string
 
-/** A part not sent because the DEX may still hold funds of an earlier swap of the wallet (the Recover page). */
-export const isHeldReason = (r: unknown) => r === 'neuHeld' || r === 'icpHeld'
+/** A part not sent because the DEX may still hold funds of an earlier swap of the wallet (the Recover page).
+ *  neuHeldOther: the earlier Neutrinite swap that has not settled sells this part's buy token. */
+export const isHeldReason = (r: unknown) => r === 'neuHeld' || r === 'icpHeld' || r === 'neuHeldOther'
 export type AssetType = { ICP: null } | { ICRC12: null } | { ICRC3: null }
 
 export interface LegOutcome {
@@ -361,7 +362,8 @@ export function depositNothingMoved(err: unknown): boolean {
   const e = err as Record<string, unknown>
   if ('InsufficientFunds' in e || 'UnsupportedToken' in e) return true
   const t = typeof e.InternalError === 'string' ? e.InternalError : ''
-  return /^#(InsufficientAllowance|InsufficientFunds|BadFee|BadBurn|TooOld|CreatedInFuture|Duplicate|TemporarilyUnavailable|GenericError)\b/.test(t)
+  // (never Duplicate: that answer means the same transfer already ran, so tokens moved)
+  return /^#(InsufficientAllowance|InsufficientFunds|BadFee|BadBurn|TooOld|CreatedInFuture|TemporarilyUnavailable|GenericError)\b/.test(t)
     || /^Input amount should be greater than/.test(t)
     || /Unsupport(ed)? method 'transferFrom'/.test(t)
 }
@@ -615,9 +617,11 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
     // refused) and no look found it, when a look found it and a later look found nothing (that look's own
     // withdraw lost its answer), when only part of it came back, or when ICP came back while a withdraw may
     // be stuck in the pool. With the swap's answer lost, ICP that came back may be this part's: the swap may
-    // have run, and the sale itself is not sure (less than its minimum, or a look that could not finish).
-    // A recovery that failed because the session ended says so: the sale asks to reconnect first.
-    const icpBackUnsure = track.swappedOut == null && swapMayHaveRun && gotOut > 0n
+    // have run, and the sale itself is not sure (less than its minimum, or a look that could not finish). So
+    // does ICP a look found that a later look no longer finds (that look's own withdraw lost its answer: the
+    // ICP left the pool, for the wallet). A recovery that failed because the session ended says so: the sale
+    // asks to reconnect first.
+    const icpBackUnsure = track.swappedOut == null && swapMayHaveRun && (gotOut > 0n || (foundOut && (report.emptyLooks ?? 0) > 0))
     const outMaybeSent = icpBackUnsure || (track.swappedOut != null && (
       (foundOut && (report.emptyLooks ?? 0) > 0) || (gotOut > 0n && gotOut < track.swappedOut)
       || (!!track.withdrawSent && (stuckMaybe || (!track.withdrawRefused && !foundOut)))))
@@ -669,7 +673,7 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
       // Failed before the deposit, or the transfer was refused: nothing to sweep.
       ctx.onStep('Failed, nothing left your wallet')
       return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'notSent',
-        reason: journalRefused || err?.journal ? 'journal' : err?.held ? 'neuHeld' : undefined, error, notStarted: true }
+        reason: journalRefused || err?.journal ? 'journal' : err?.held ? (err?.heldOther ? 'neuHeldOther' : 'neuHeld') : undefined, error, notStarted: true }
     }
     if (err?.creditMismatch) {
       // The pylon credited an amount that is not this deposit: another deposit of the wallet was

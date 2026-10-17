@@ -39,7 +39,7 @@ import { withTimeout } from '../utils/withTimeout'
 import { runJournal } from '../utils/runJournalStore'
 import { newRunId, type RunRecord } from '../utils/crossDexJournal'
 import {
-  runCrossDexSwap, realClock, isNeuFirst,
+  runCrossDexSwap, realClock, isNeuFirst, RECORDS_SKEW_MS,
   type LegDeps, type LegOutcome as RunnerLegOutcome,
 } from '../utils/crossDexLegRunner'
 import * as icpswap from '../services/icpswap'
@@ -58,19 +58,25 @@ export type LegOutcome = RunnerLegOutcome
 const GRID_BPS = CROSSDEX_GRID_BPS
 const MAX_ROUTES_PER_FRACTION = CROSSDEX_MAX_ROUTES
 
-/** A token's ledger fee read with a run's own agent: the fee a run pins feeds the start checks and the
- *  deposit windows of its legs, so it is not the shared anonymous read the amount fields use. */
+/** A token's ledger fee read with a run's own agent (its queries are node signed, see createAgentFor): the
+ *  fee a run pins feeds the start checks and the deposit windows of its legs, so it is not the shared
+ *  anonymous read the amount fields use. */
 export async function runLedgerFee(run: RunAgent, token: string, ms: number): Promise<bigint> {
   const f = await withTimeout(Actor.createActor(icrcIDL, { agent: run.agent, canisterId: token }).icrc1_fee() as Promise<any>, ms, 'icrc1_fee')
   return typeof f === 'bigint' ? f : BigInt(f)
 }
 
-/** A device time (ms) on the replica's clock, in ns: only with the run's clock synced (the offset is then
- *  known); else null, and a caller keeps every record. */
-function replicaNs(run: RunAgent | undefined, ms: number | undefined): bigint | undefined {
-  if (!run?.timeSynced || ms == null) return undefined
+/** The start (ns, the replica's clock) of the records window of a part: the part's start converted with the
+ *  run agent's offset, but never later than the replica time seen at the agent's sync minus the margin (the
+ *  agent never syncs again, so a device clock that jumped forward since would move the window past the part's
+ *  own records; records of earlier parts of the sale then count, the safe direction). Only with the run's
+ *  clock synced; else undefined, and every record counts. */
+export function recordsSinceNs(run: Pick<RunAgent, 'timeSynced' | 'replicaAtSyncMs' | 'agent'> | undefined, sinceMs: number | undefined): bigint | undefined {
+  if (!run?.timeSynced || sinceMs == null) return undefined
   const diff = Number((run.agent as any).getTimeDiffMsecs?.() ?? 0) || 0
-  return BigInt(Math.round(ms + diff)) * 1_000_000n
+  const fromStart = sinceMs + diff
+  const anchored = run.replicaAtSyncMs != null ? Math.min(fromStart, run.replicaAtSyncMs - RECORDS_SKEW_MS) : fromStart
+  return BigInt(Math.round(anchored)) * 1_000_000n
 }
 
 /**
@@ -86,7 +92,7 @@ export function buildLegDeps(store: ReturnType<typeof useExchangeStore>, run?: R
       sweep: (p, o) => icpswap.sweep(p, { ...o, ...auth }),
       sweepWithRetry: (p, a, d, o) => icpswap.sweepWithRetry(p, a, d, { ...o, ...auth }),
       // records from the part's start on (the replica's clock), every record when the run's clock is not synced
-      withdrawRecords: (p, sinceMs) => icpswap.getPoolWithdrawRecords(p, { owner: run?.principal, agent: run?.agent, sinceNs: replicaNs(run, sinceMs) }),
+      withdrawRecords: (p, sinceMs) => icpswap.getPoolWithdrawRecords(p, { owner: run?.principal, agent: run?.agent, sinceNs: recordsSinceNs(run, sinceMs) }),
       removePendingSwap: icpswap.removePendingSwap,
     },
     neutrinite: {
