@@ -22,7 +22,7 @@ let zoneCheckedAt = 0
 
 function dateFormat(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
   const now = Date.now()
-  if (now - zoneCheckedAt >= 1000) {
+  if (Math.abs(now - zoneCheckedAt) >= 1000) {
     zoneCheckedAt = now
     const date = new Date(now)
     const current = `${new Intl.DateTimeFormat().resolvedOptions().timeZone} ${date.getTimezoneOffset()} ${new Date(date.getFullYear(), 0, 1).getTimezoneOffset()}`
