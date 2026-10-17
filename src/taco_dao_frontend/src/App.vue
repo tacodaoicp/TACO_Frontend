@@ -100,7 +100,7 @@
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
   import { useRoute, useRouter, START_LOCATION } from 'vue-router'
-  import { CHART_ROUTES, loadApexcharts, warmRoute, warmWizard } from './components/navItems'
+  import { CHART_ROUTES, loadApexcharts, warmRoute, warmWizard, loadWizard, navItems, inBottomBar, queueIdleLoads, holdIdleLoads } from './components/navItems'
 
   // Lazy load HomeView to reduce initial bundle
   const HomeView = defineAsyncComponent(() => import('./views/HomeView.vue'))
@@ -202,21 +202,31 @@
       routePendingTimer = setTimeout(() => { routePending.value = true }, 120)
     }
     chartLib = from !== START_LOCATION && CHART_ROUTES.includes(to.path) ? loadApexcharts() : null
+    // the idle downloads wait while a page opens
+    holdIdleLoads(true)
     return true
   })
-  router.beforeResolve(async () => { await chartLib })
-  router.afterEach(clearRoutePending)
-  router.onError(clearRoutePending)
+  // at most 1 s: past that the page opens and its chart shows once the library is there
+  router.beforeResolve(async () => { if (chartLib) await Promise.race([chartLib, new Promise((r) => setTimeout(r, 1000))]) })
+  const routeSettled = () => { clearRoutePending(); holdIdleLoads(false) }
+  router.afterEach(routeSettled)
+  router.onError(routeSettled)
 
-  // the Grand Tour opens its pages (and offers the wizard at the end) with no tap to warm them on;
-  // they are warmed once the tour itself has loaded (a tour that fails to load recovers as before)
+  // the Grand Tour opens its pages (and offers the wizard at the end) with no tap to warm them on.
+  // Once the tour itself has loaded (a tour that fails to load recovers as before) they are warmed one
+  // at a time in tour order, each when the page is idle, so the first scene stays smooth.
+  const idle = (cb) => (window.requestIdleCallback || ((f) => setTimeout(f, 200)))(cb)
+  const warmTourPages = async (paths) => {
+    for (const path of paths) {
+      await new Promise(idle)
+      await warmRoute(router, path)
+    }
+    warmWizard()
+  }
   watch(grandTourActive, (active) => {
     if (!active) return
     Promise.all([import('./components/tour/GrandTour.vue'), import('./components/tour/tourScript')])
-      .then(([, { tourScript }]) => {
-        for (const scene of tourScript) warmRoute(router, scene.route)
-        warmWizard()
-      })
+      .then(([, { tourScript }]) => warmTourPages([...new Set(tourScript.map((scene) => scene.route))].filter((path) => path !== '/')))
       .catch(() => {})
   })
 
@@ -335,40 +345,37 @@
     idleDeep(() => {
       prefetchPages()
       if (CHART_ROUTES.includes(route.path)) loadApexcharts()
-      warmWizard()
     })
 
   }
 
-  // the files build/page-prefetch.js lists in index.html: the pages a tab used to load and run at startup
+  // the files build/page-prefetch.js lists in index.html: the pages a tab used to load and run at startup,
+  // in the order of the menu with the bottom bar's pages first (Vote for a signed in visitor, DAO otherwise),
+  // then the wizard, the other pages and the signed in and admin pages
   const prefetchPages = async () => {
     let lists = null
     try { lists = JSON.parse(document.getElementById('taco-prefetch')?.textContent || 'null') } catch { /* no list */ }
-    if (!lists) return
-    const files = [...lists.pages]
-    if (userLoggedIn.value) {
-      files.push(...lists.login)
-      // admin pages for admins, or for a browser that opened them before
-      let admin = false
-      try { admin = localStorage.getItem('hasVisitedAdmin') === 'true' } catch { /* storage blocked */ }
-      if (!admin) {
-        try { admin = (await import('./composables/useAdminCheck')).ADMIN_PRINCIPALS.includes(tacoStore.userPrincipal) } catch { /* offline */ }
-      }
-      if (admin) files.push(...lists.admin)
+    if (!lists) { queueIdleLoads([loadWizard]); return }
+    const signedIn = userLoggedIn.value || tacoStore.sessionLikely
+    const filesOf = (items) => items.flatMap((item) => (item.to && lists.pages[router.resolve(item.to).path]) || [])
+    // file URLs, leaving out what this page already loaded or what is queued already
+    const queued = new Set(performance.getEntriesByType('resource').map((e) => e.name))
+    const hrefs = (indexes) => indexes.map((i) => `${location.origin}/${lists.files[i]}`).filter((href) => !queued.has(href) && queued.add(href))
+    queueIdleLoads([
+      ...hrefs(filesOf(navItems.filter((item) => inBottomBar(item, signedIn)))),
+      loadWizard,
+      ...hrefs(filesOf(navItems.filter((item) => !inBottomBar(item, signedIn)))),
+      ...hrefs(Object.values(lists.pages).flat()),
+    ])
+    if (!userLoggedIn.value) return
+    queueIdleLoads(hrefs(lists.login))
+    // admin pages for admins, or for a browser that opened them before
+    let admin = false
+    try { admin = localStorage.getItem('hasVisitedAdmin') === 'true' } catch { /* storage blocked */ }
+    if (!admin) {
+      try { admin = (await import('./composables/useAdminCheck')).ADMIN_PRINCIPALS.includes(tacoStore.userPrincipal) } catch { /* offline */ }
     }
-    const fetched = new Set(performance.getEntriesByType('resource').map((e) => e.name))
-    for (const file of files) {
-      const href = `${location.origin}/${file}`
-      if (fetched.has(href)) continue
-      const link = document.createElement('link')
-      link.rel = 'prefetch'
-      // same request mode as the later load (module scripts use CORS); a full URL so Vite's loader
-      // still adds its own modulepreload links as before
-      if (file.endsWith('.js')) { link.as = 'script'; link.crossOrigin = '' } else link.as = 'style'
-      link.href = href
-      link.onload = link.onerror = () => link.remove()
-      document.head.appendChild(link)
-    }
+    if (admin) queueIdleLoads(hrefs(lists.admin))
   }
 
   // update robots meta

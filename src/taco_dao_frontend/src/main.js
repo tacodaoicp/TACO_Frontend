@@ -24,11 +24,17 @@ function clearChunkReloadGuard() {
   try { sessionStorage.removeItem('taco_chunk_reloaded') } catch { /* ignore */ }
 }
 // Vite emits this on the window when a dynamically-imported chunk fails to load.
-// Not while a page is only loading early because a link was pointed at (warmRoute in
-// components/navItems.ts): the navigation that needs the chunk recovers through router.onError.
+// While a page is loading early because a link was pointed at (warmRoute in
+// components/navItems.ts), decide a moment later: warmRoute lists its own errors, which
+// reload nothing (the navigation that needs the chunk recovers through router.onError).
 window.addEventListener('vite:preloadError', (e) => {
-  if (window.tacoWarmLoads > 0) return
-  if (recoverFromChunkError(e && e.payload)) e.preventDefault()
+  const err = e && e.payload
+  const warm = window.tacoWarm
+  if (warm && warm.loads > 0) {
+    setTimeout(() => { if (!warm.errors.has(err)) recoverFromChunkError(err) }, 0)
+    return
+  }
+  if (recoverFromChunkError(err)) e.preventDefault()
 })
 
 // ─── App routing ─────────────────────────────────────────────────────

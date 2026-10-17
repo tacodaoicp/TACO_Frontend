@@ -5,8 +5,9 @@ import path from 'path'
 // first visit, a tap while offline or a tap in a tab that outlived a deploy
 // reads them from the HTTP cache as before. The hashed file names exist only
 // after bundling, so this plugin writes them into index.html (always fetched
-// fresh, so it matches the build that serves it) as JSON: per group, the JS
-// and CSS its pages load on top of what every page loads at startup.
+// fresh, so it matches the build that serves it) as JSON: per page (by the path
+// that opens it) and per group, the JS and CSS it loads on top of what every
+// page loads at startup, as indexes into one list of file names.
 
 // read by prefetchPages in App.vue
 const ID = 'taco-prefetch'
@@ -15,13 +16,22 @@ const ID = 'taco-prefetch'
 // mounted) and the router and click-away chunks main.js loads with App
 const STARTUP = ['src/App.vue', 'src/views/HomeView.vue', 'vue-router', 'vue3-click-away']
 
-// the pages startup used to run (HomeView and App.vue) and the chart library
+// the pages startup used to run (HomeView and App.vue), with the chart library
+// on the pages that draw a chart; App.vue downloads them in the order of the menu
+const APEX = 'vue3-apexcharts'
+const PAGES = {
+  '/dao': ['src/views/DaoView.vue', APEX],
+  '/vote': ['src/views/VoteView.vue', APEX],
+  '/performance': ['src/views/PerformanceView.vue'],
+  '/chat/oc': ['src/views/ChatView.vue'],
+  '/chat/forum': ['src/views/ChatView.vue'],
+  '/reports': ['src/views/ReportsView.vue'],
+  '/info': ['src/views/InfoView.vue'],
+  '/wallet': ['src/views/WalletView.vue'],
+  '/buy': ['src/views/BuyTacoView.vue'],
+  '/vault': ['src/views/NachosVaultView.vue', APEX],
+}
 const GROUPS = {
-  pages: [
-    'src/views/VoteView.vue', 'src/views/DaoView.vue', 'src/views/InfoView.vue', 'src/views/ChatView.vue',
-    'src/views/ReportsView.vue', 'src/views/WalletView.vue', 'src/views/NachosVaultView.vue',
-    'src/views/BuyTacoView.vue', 'src/views/PerformanceView.vue', 'vue3-apexcharts',
-  ],
   // logged in
   login: ['src/views/RewardsView.vue'],
   // logged in admins, or a browser that opened the admin pages before
@@ -62,16 +72,22 @@ export default function pagePrefetch() {
           chunk.viteMetadata?.importedCss.forEach((css) => files.add(css))
           chunk.imports.forEach((name) => addClosure(bundle[name], files))
         }
-        const seen = new Set()
-        chunks.filter((chunk) => chunk.isEntry).forEach((chunk) => addClosure(chunk, seen))
-        STARTUP.forEach((key) => addClosure(chunkOf(key), seen))
-        const lists = {}
-        for (const [group, keys] of Object.entries(GROUPS)) {
+        const startup = new Set()
+        chunks.filter((chunk) => chunk.isEntry).forEach((chunk) => addClosure(chunk, startup))
+        STARTUP.forEach((key) => addClosure(chunkOf(key), startup))
+        const lists = { files: [], pages: {} }
+        const index = new Map()
+        const indexOf = (file) => {
+          if (!index.has(file)) { index.set(file, lists.files.length); lists.files.push(file) }
+          return index.get(file)
+        }
+        const listOf = (keys) => {
           const files = new Set()
           keys.forEach((key) => addClosure(chunkOf(key), files))
-          lists[group] = [...files].filter((file) => !seen.has(file))
-          lists[group].forEach((file) => seen.add(file))
+          return [...files].filter((file) => !startup.has(file)).map(indexOf)
         }
+        for (const [page, keys] of Object.entries(PAGES)) lists.pages[page] = listOf(keys)
+        for (const [group, keys] of Object.entries(GROUPS)) lists[group] = listOf(keys)
         return [{
           tag: 'script',
           attrs: { type: 'application/json', id: ID },
