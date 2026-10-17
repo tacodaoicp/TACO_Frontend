@@ -135,6 +135,10 @@ export interface LegOutcome {
    *  a look brought back only part of it. The total leaves it out; the text says to check the wallet
    *  before the Recover page. */
   outMaybeSent?: boolean
+  /** With outMaybeSent: the swap's own answer was lost, so the sale itself is not sure either (ICP came
+   *  back that may be another swap's of the wallet, or less than the swap's own minimum). The text says
+   *  the part may not have sold, never that it sold. */
+  saleUnsure?: boolean
   /** TACO V1 deposit block, when one was made. */
   block?: bigint
   /** V1 deposit to refund after the exchange's call window (Sell many). */
@@ -513,7 +517,11 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
     const depositSeen = found.some(f => f.token === sell && isDeposit(f.amount) && !f.refused)
     const swapMayHaveRun = track.swappedOut != null || (track.step === 'swap' && !track.swapRefused && !depositSeen)
     const outBack = track.swappedOut != null && gotOut >= track.swappedOut
-    let soldOwn = outBack || (swept && track.swappedOut == null && swapMayHaveRun && gotOut > 0n)
+    // With the swap's answer lost, the pool fills at least the swap's minimum (amountOutMinimum) or nothing:
+    // less ICP back than that is not this part's sale (another swap's ICP of the wallet in the pool, while
+    // this part's own deposit went home through another sweep, or part of its own output taken by another
+    // look), so the part stays unsure, keeps its marker and never counts that ICP.
+    let soldOwn = outBack || (swept && track.swappedOut == null && swapMayHaveRun && gotOut > 0n && gotOut >= minOut)
     // with the deposit's answer lost and an earlier swap's marker on the pair, a deposit's worth that came
     // back may be that swap's while this one lands later
     let refundedOwn = !swapMayHaveRun && depositBack && !(track.step === 'deposit' && !!track.hadMarker)
@@ -571,13 +579,15 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
     // refused) and no look found it, when a look found it and a later look found nothing (that look's own
     // withdraw lost its answer), when only part of it came back, or when ICP came back while a withdraw may
     // be stuck in the pool. With the swap's answer lost, ICP that came back may be this part's: the swap may
-    // have run. A recovery that failed because the session ended says so: the sale asks to reconnect first.
+    // have run, and the sale itself is not sure (less than its minimum, or a look that could not finish).
+    // A recovery that failed because the session ended says so: the sale asks to reconnect first.
     const icpBackUnsure = track.swappedOut == null && swapMayHaveRun && gotOut > 0n
     const outMaybeSent = icpBackUnsure || (track.swappedOut != null && (
       (foundOut && (report.emptyLooks ?? 0) > 0) || (gotOut > 0n && gotOut < track.swappedOut)
       || (!!track.withdrawSent && (stuckMaybe || (!track.withdrawRefused && !foundOut)))))
     return { dex: 'icpswap', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
-      failedAfterSwap: track.swappedOut != null || icpBackUnsure, outMaybeSent, reason: isSessionError(report.lastError) ? 'session' : undefined }
+      failedAfterSwap: track.swappedOut != null || icpBackUnsure, outMaybeSent, saleUnsure: icpBackUnsure || undefined,
+      reason: isSessionError(report.lastError) ? 'session' : undefined }
   }
 }
 
@@ -701,18 +711,21 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // with the swap's answer lost there is no amount to check the ICP against: from a start balance
     // above dust the marker stays, so the Recover page can still find any rest
     const unchecked = !startClean && track.swappedOut == null && swapMayHaveRun && !depositBack
-    if (own && !partOnly && !unchecked && !track.hadMarker && track.markerAt != null) deps.neutrinite.removePendingSwap(sell, buy, track.markerAt)
+    // The swap cannot fill below its minimum scaled to the credit (dex_swap's min_amount_out). With its
+    // answer lost, less ICP back than that is not its sale: another swap's ICP of the wallet can land on the
+    // pylon during the part (from a clean start too) while this part's credit went home through another
+    // look, or from a start balance above dust another swap moving its own balance left the rest of this
+    // part's ICP inside the baseline. The part keeps its marker and stays unsure (the sale too).
+    const scaledMin = track.credited != null && leg.amountIn > 0n ? (minOut * track.credited) / leg.amountIn : minOut
+    const belowMin = track.swappedOut == null && swapMayHaveRun && !depositBack && gotOut > 0n && gotOut < scaledMin
+    if (own && !partOnly && !unchecked && !belowMin && !track.hadMarker && track.markerAt != null) deps.neutrinite.removePendingSwap(sell, buy, track.markerAt)
     if (own && !partOnly && track.swappedOut == null && swapMayHaveRun && !depositBack && gotOut > 0n) {
-      // The swap's answer was lost and a look brought ICP back: it sold. The swap cannot fill below its
-      // minimum scaled to the credit, so from a start balance above dust, less than that is only part of
-      // its ICP (another swap moving its own balance meanwhile left the rest inside the baseline): the
-      // part keeps its marker, and the rest may already be in the wallet. More ICP than the plan's output
-      // holds another swap's ICP too: the wallet shows the amount.
-      const scaledMin = track.credited != null && leg.amountIn > 0n ? (minOut * track.credited) / leg.amountIn : minOut
-      if (!startClean && gotOut < scaledMin) {
+      // The swap's answer was lost and a look brought at least its minimum of ICP back: it sold. More ICP
+      // than the plan's output holds another swap's ICP too: the wallet shows the amount.
+      if (belowMin) {
         ctx.onStep('Failed, recover on the Recover page')
         return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
-          failedAfterSwap: true, outMaybeSent: true, reason: isSessionError(lastErr) ? 'session' : undefined }
+          failedAfterSwap: true, outMaybeSent: true, saleUnsure: true, reason: isSessionError(lastErr) ? 'session' : undefined }
       }
       ctx.onStep('Done')
       return gotOut > leg.expectedOut
@@ -736,11 +749,13 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // later step of that look failed) or found ICP that a later look no longer finds says the same:
     // the swap ran.
     ctx.onStep('Failed, recover on the Recover page')
+    // with the swap's own answer lost, ICP that came back (or left) does not prove a sale either
     const icpBackUnsure = track.swappedOut == null && swapMayHaveRun && (gotOut > 0n || emptyAfterFound)
     const outMaybeSent = partOnly || icpBackUnsure || (track.swappedOut != null
       && ((!track.withdrawRefused && !report.found.some(f => f.token === buy)) || emptyAfterFound))
     return { dex: 'neutrinite', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
-      failedAfterSwap: track.swappedOut != null || icpBackUnsure, outMaybeSent, reason: isSessionError(lastErr) ? 'session' : undefined }
+      failedAfterSwap: track.swappedOut != null || icpBackUnsure, outMaybeSent, saleUnsure: icpBackUnsure || undefined,
+      reason: isSessionError(lastErr) ? 'session' : undefined }
   }
 }
 

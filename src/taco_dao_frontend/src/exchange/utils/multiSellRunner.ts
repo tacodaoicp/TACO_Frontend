@@ -61,6 +61,8 @@ export interface LegRun {
   failedAfterSwap?: boolean
   /** The swap's output may already be in the wallet (its withdraw answer was lost): see LegOutcome. */
   outMaybeSent?: boolean
+  /** With outMaybeSent: the swap's own answer was lost, so the sale is not sure either: see LegOutcome. */
+  saleUnsure?: boolean
   block?: bigint
   deferUntil?: number
   waitsFor?: string[]
@@ -415,7 +417,7 @@ function makeTurns(prep: Prepared, clock: Clock, capMs: number, quotes: QuoteDep
 
 function legRunOf(o: LegOutcome): Partial<LegRun> {
   return { state: o.state, reason: o.reason, amountOut: o.success ? o.amountOut : undefined, error: o.error, refundedBy: o.refundedBy,
-    failedAfterSwap: o.failedAfterSwap, outMaybeSent: o.outMaybeSent, block: o.block }
+    failedAfterSwap: o.failedAfterSwap, outMaybeSent: o.outMaybeSent, saleUnsure: o.saleUnsure, block: o.block }
 }
 
 function launch(ctx: SaleCtx, prep: Prepared, deps: SaleDeps, hooks: RunHooks): { ui: Promise<SaleResult>; all: Promise<SaleResult> } {
