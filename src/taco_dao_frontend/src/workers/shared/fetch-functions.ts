@@ -1081,9 +1081,10 @@ export async function fetchUserPerformanceData(
       lastAllocationChange: nd.checkpoints?.length > 0
         ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
         : BigInt(0),
-      // forward the raw checkpoints so PerformanceChart can render the line —
-      // it expects neuron.checkpoints[] with timestamp + totalPortfolioValue
-      checkpoints: nd.checkpoints ?? [],
+      // Not sent: nothing reads the raw history here (PerformanceChart loads its
+      // own graph in its worker), and it made this payload megabytes to clone
+      // to every tab and rewrite to IndexedDB on each refresh.
+      checkpoints: [],
       performanceScoreUSD: nd.performanceScoreUSD,
       performanceScoreICP: nd.performanceScoreICP,
       performance: {
