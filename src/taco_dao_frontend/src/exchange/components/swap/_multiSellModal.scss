@@ -14,8 +14,9 @@
   &--wide { max-width: 500px; }
   h3 { margin: 0; font-size: 17px; font-weight: 600; }
   &__head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  &__sub { margin: -6px 0 0; font-size: 12px; color: var(--tx-ink-3); }
-  &__sec { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--tx-ink-3); }
+  // the small muted texts use the muted ink (at least 4.5:1 on the sheet in both themes)
+  &__sub { margin: -6px 0 0; font-size: 12px; color: var(--tx-muted-ink); }
+  &__sec { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--tx-muted-ink); }
   &__rows { display: flex; flex-direction: column; gap: 7px; }
   &__row {
     display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--tx-ink-2);
@@ -24,7 +25,7 @@
   }
   // a flex child of the scrolling column: without flex-shrink 0 a long sheet squeezes it to 0 px
   &__hr { height: 1px; flex-shrink: 0; background: var(--tx-line); border: 0; margin: 2px 0; }
-  &__note { font-size: 12px; color: var(--tx-ink-3); line-height: 1.45; margin: 0; }
+  &__note { font-size: 12px; color: var(--tx-muted-ink); line-height: 1.45; margin: 0; }
   // The buttons stay in view at the bottom of a long sheet (8 or 10 tokens): a footer that the
   // list scrolls under, out to the sheet's edges (negative margins and offset = the padding).
   &__acts {
@@ -34,8 +35,8 @@
     background: var(--tx-panel-bg); border-top: 1px solid var(--tx-line);
     .ex-btn { flex: 1; height: 38px; }
   }
-  &__wallet { font-size: 11px; color: var(--tx-ink-4); text-align: center; }
-  &__foot { font-size: 11.5px; color: var(--tx-ink-3); text-align: center; line-height: 1.4; }
+  &__wallet { font-size: 11px; color: var(--tx-muted-ink); text-align: center; }
+  &__foot { font-size: 11.5px; color: var(--tx-muted-ink); text-align: center; line-height: 1.4; }
 }
 @media (max-width: 600px) {
   .ms-modal-overlay { padding: 0; align-items: flex-end; }
