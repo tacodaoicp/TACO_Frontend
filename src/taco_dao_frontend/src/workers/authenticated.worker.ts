@@ -101,7 +101,10 @@ import {
   ADMIN_PRELOAD_KEYS,
   getInitialLoadKeys,
   CHANGE_ONLY_KEYS,
+  REFRESH_ONLY_ON,
+  refreshShownOn,
 } from './types'
+import { ADMIN_PRINCIPALS } from '../constants/adminPrincipals'
 
 declare const self: SharedWorkerGlobalScope
 
@@ -1055,12 +1058,18 @@ function triggerDeferredLoad(): void {
       // (PUBLIC_ADMIN keys never require auth), fetching all 12 keys anywhere.
       const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
         ? currentRoute.startsWith('/admin')
-        : (!requiresAuth || isAuthenticated)
+        : (!requiresAuth || isAuthenticated) && prefetchAllowed(key)
       if (canFetch) {
         queue.enqueue(key, 'low')
       }
     }
   }
+}
+
+// NNS admin data (AUTH_REQUIRED_KEYS) is prefetched only for the admins listed
+// in ADMIN_PRINCIPALS. Anyone else who opens /admin/nns loads it there.
+function prefetchAllowed(key: DataKey): boolean {
+  return !AUTH_REQUIRED_KEYS.includes(key) || (currentPrincipal !== null && ADMIN_PRINCIPALS.includes(currentPrincipal))
 }
 
 function handleSetAdmin(message: WorkerRequest): void {
@@ -1217,7 +1226,7 @@ function handleSubscribe(port: MessagePort, message: WorkerRequest): void {
     const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
     const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
       ? currentRoute.startsWith('/admin')
-      : (!requiresAuth || isAuthenticated)
+      : (!requiresAuth || isAuthenticated) && prefetchAllowed(key)
 
     if (canFetch && (!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
       queue.enqueue(key, 'high')
@@ -2196,6 +2205,15 @@ function isBackground(): boolean {
   return true
 }
 
+// See REFRESH_ONLY_ON: such keys refresh only while an open tab shows them
+function refreshWanted(dataKey: DataKey): boolean {
+  if (!REFRESH_ONLY_ON[dataKey]) return true
+  for (const route of portRoutes.size ? portRoutes.values() : [currentRoute]) {
+    if (refreshShownOn(dataKey, route)) return true
+  }
+  return false
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -2248,6 +2266,7 @@ async function autoRefreshLoop(): Promise<void> {
         // route change refreshes them on arrival). Elsewhere every 30 s refresh
         // sent ~1.3 MB to the page that nothing on it used.
         if (HEAVY_CACHE_KEYS.includes(dataKey) && !routeKeys.has(dataKey)) continue
+        if (!refreshWanted(dataKey)) continue
         if (dataKey === 'nachosVaultAnalytics' && !analyticsWanted(routeKeys)) continue
         const state = dataStates.get(dataKey)
         if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
@@ -2282,6 +2301,7 @@ async function autoRefreshLoop(): Promise<void> {
       // Refresh user data only if authenticated
       if (isAuthenticated) {
         for (const dataKey of USER_KEYS) {
+          if (!refreshWanted(dataKey)) continue
           const state = dataStates.get(dataKey)
           if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
             queue.enqueue(dataKey, 'medium')

@@ -92,7 +92,9 @@ import {
   createInitialState,
   getInitialLoadKeys,
   CHANGE_ONLY_KEYS,
+  refreshShownOn,
 } from './types'
+import { ADMIN_PRINCIPALS } from '../constants/adminPrincipals'
 
 declare const self: DedicatedWorkerGlobalScope
 
@@ -927,11 +929,17 @@ function handleSubscribe(message: WorkerRequest): void {
     const requiresAuth = USER_KEYS.includes(key) || AUTH_REQUIRED_KEYS.includes(key)
     const canFetch = PUBLIC_ADMIN_KEYS.includes(key)
       ? currentRoute.startsWith('/admin')
-      : (!requiresAuth || isAuthenticated)
+      : (!requiresAuth || isAuthenticated) && prefetchAllowed(key)
     if (canFetch && (!state?.data || isStale(key, state.lastUpdated)) && !queue.has(key)) {
       queue.enqueue(key, 'high')
     }
   }
+}
+
+// NNS admin data (AUTH_REQUIRED_KEYS) is prefetched only for the admins listed
+// in ADMIN_PRINCIPALS. Anyone else who opens /admin/nns loads it there.
+function prefetchAllowed(key: DataKey): boolean {
+  return !AUTH_REQUIRED_KEYS.includes(key) || (currentPrincipal !== null && ADMIN_PRINCIPALS.includes(currentPrincipal))
 }
 
 function handleUnsubscribe(message: WorkerRequest): void {
@@ -1678,6 +1686,11 @@ const unsaved = new Set<DataKey>()
 // Auto-refresh Loop
 // ============================================================================
 
+// See REFRESH_ONLY_ON: such keys refresh only while the page shows them
+function refreshWanted(dataKey: DataKey): boolean {
+  return refreshShownOn(dataKey, currentRoute)
+}
+
 async function autoRefreshLoop(): Promise<void> {
   let publicRefreshCounter = 0
   let authRefreshCounter = 0
@@ -1702,6 +1715,7 @@ async function autoRefreshLoop(): Promise<void> {
         // route change refreshes them on arrival). Elsewhere every 30 s refresh
         // sent ~1.3 MB to the page that nothing on it used.
         if (HEAVY_CACHE_KEYS.includes(dataKey) && !routeKeys.includes(dataKey)) continue
+        if (!refreshWanted(dataKey)) continue
         // Vault analytics only while the page is on the vault route, the one that
         // shows them (its vault store stays subscribed after the user moves on)
         if (dataKey === 'nachosVaultAnalytics' && !routeKeys.includes(dataKey)) continue
@@ -1738,6 +1752,7 @@ async function autoRefreshLoop(): Promise<void> {
       // Refresh user data only if authenticated
       if (isAuthenticated) {
         for (const dataKey of USER_KEYS) {
+          if (!refreshWanted(dataKey)) continue
           const state = dataStates.get(dataKey)
           if (state && isStale(dataKey, state.lastUpdated) && !queue.has(dataKey)) {
             queue.enqueue(dataKey, 'medium')

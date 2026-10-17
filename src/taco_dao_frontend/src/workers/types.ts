@@ -256,6 +256,21 @@ export const CHANGE_ONLY_KEYS: DataKey[] = [
   'proposalsThreads',
 ]
 
+// Heavy keys refresh in the background only while an open tab is on a page
+// that shows them (a route or one below it): the trade history on /dao and
+// the admin pages, the signed in user's performance on /performance.
+// Arriving on such a page refetches them when stale (the route's keys, see
+// ROUTE_PRIORITIES).
+export const REFRESH_ONLY_ON: Partial<Record<DataKey, string[]>> = {
+  tradingStatus: ['/dao', '/admin'],
+  userPerformance: ['/performance'],
+}
+
+export function refreshShownOn(dataKey: DataKey, route: string): boolean {
+  const routes = REFRESH_ONLY_ON[dataKey]
+  return !routes || routes.some((r) => route === r || route.startsWith(r + '/'))
+}
+
 // Idle timeout - stop refreshes after 5 minutes of inactivity
 export const IDLE_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
 
