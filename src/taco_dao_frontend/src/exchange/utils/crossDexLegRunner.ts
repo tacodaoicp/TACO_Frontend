@@ -451,7 +451,7 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
         return { dex: 'icpswap', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
       }
     }
-    if (ctx.sortV1Errors && recovered) {
+    if (recovered) {
       // What came back decides whether the swap sold: never when the pool answered the swap
       // with an error or the swap never ran, and never when at least this leg's deposit of the
       // sold token came back. ICP an earlier failed swap left in the same pool can come back
@@ -575,10 +575,10 @@ async function runNeutrinite(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOu
     // above dust the marker stays, so the Recover page can still find any rest
     const unchecked = !startClean && track.swappedOut == null && swapMayHaveRun && !depositBack
     if (own && !partOnly && !unchecked && !track.hadMarker) deps.neutrinite.removePendingSwap(sell, buy)
-    if (own && !partOnly && (track.swappedOut != null || (ctx.sortV1Errors && swapMayHaveRun && !depositBack && gotOut > 0n))) {
+    if (own && !partOnly && (track.swappedOut != null || (swapMayHaveRun && !depositBack && gotOut > 0n))) {
       // The swap filled and the retry delivered its output (never counted above what the swap gave).
       ctx.onStep('Done')
-      const amountOut = !(ctx.sortV1Errors && gotOut > 0n) ? track.swappedOut!
+      const amountOut = !(gotOut > 0n) ? track.swappedOut!
         : track.swappedOut != null && track.swappedOut < gotOut ? track.swappedOut : gotOut
       return { dex: 'neutrinite', success: true, amountOut, state: 'done', reason: 'afterSwap' }
     }
