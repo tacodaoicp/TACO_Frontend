@@ -235,6 +235,13 @@ function memoNat64(b: Uint8Array): bigint {
   return v
 }
 
+/** The treasury every deposit sends to: the store's certified read (update calls, once per session), never
+ *  the saved or the anonymous query copy. Throws when it cannot be read (nothing is sent). */
+async function confirmedTreasury(store: ReturnType<typeof useExchangeStore>): Promise<{ accountId: string; principal: string }> {
+  try { return await store.certifiedTreasury() }
+  catch (e: any) { throw Object.assign(new Error("Can't confirm the exchange address right now. No funds were moved."), { cause: e }) }
+}
+
 /** One ICP ledger transfer to the treasury account, mapped to a send result. */
 async function sendIcpTransfer(
   agent: HttpAgent, treasuryAccountIdHex: string, required: bigint, createdAtNs?: bigint, memo?: Uint8Array,
@@ -291,6 +298,7 @@ export async function depositICP(
   pinnedAgent?: HttpAgent,
 ): Promise<bigint> {
   const required = calculateRequiredDeposit(tradeAmount, tradingFeeBps, ICP_TRANSFER_FEE)
+  treasuryAccountIdHex = (await confirmedTreasury(useExchangeStore())).accountId
   const agent = pinnedAgent ?? await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
   const r = await sendIcpTransfer(agent, treasuryAccountIdHex, required)
@@ -314,6 +322,7 @@ export async function depositICRC(
   pinnedAgent?: HttpAgent,
 ): Promise<bigint> {
   const required = calculateRequiredDeposit(tradeAmount, tradingFeeBps, transferFee)
+  treasuryPrincipalText = (await confirmedTreasury(useExchangeStore())).principal
   const agent = pinnedAgent ?? await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
   const r = await sendIcrcTransfer(agent, tokenCanisterId, treasuryPrincipalText, required)
@@ -382,9 +391,10 @@ export async function depositTokenForLiquidity(
 ): Promise<bigint> {
   const store = useExchangeStore()
   if (!tradeChecked) await store.assertCanTrade()
-  // The treasury as read by the check above (never an old saved copy).
-  treasuryAccountIdHex = store.treasuryAccountId || treasuryAccountIdHex
-  treasuryPrincipalText = store.treasuryPrincipal || treasuryPrincipalText
+  // The treasury from the certified read (never a saved or an unverified query copy).
+  const treasury = await confirmedTreasury(store)
+  treasuryAccountIdHex = treasury.accountId
+  treasuryPrincipalText = treasury.principal
   const principal = await currentPrincipalText()
   const agent = await getCachedAgent()
   if (!agent) throw new Error('Not authenticated')
@@ -480,8 +490,15 @@ export async function depositToken(
   if (store.tradingFeeBps !== tradingFeeBps) {
     throw new DepositError('The trading fee changed. Check the amounts and try again. No funds were moved.', 'notSent', 'refused')
   }
-  treasuryAccountIdHex = store.treasuryAccountId || treasuryAccountIdHex
-  treasuryPrincipalText = store.treasuryPrincipal || treasuryPrincipalText
+  // The treasury from the certified read (never a saved or an unverified query copy): nothing is sent when it
+  // cannot be read.
+  try {
+    const treasury = await confirmedTreasury(store)
+    treasuryAccountIdHex = treasury.accountId
+    treasuryPrincipalText = treasury.principal
+  } catch (e: any) {
+    throw new DepositError(e?.message || "Can't confirm the exchange address right now. No funds were moved.", 'notSent', 'refused', e)
+  }
   const principal = opts.owner ? opts.owner.toText() : await currentPrincipalText()
   const isIcp = 'ICP' in assetType
   const typeStr = isIcp ? 'ICP' : 'ICRC3' in assetType ? 'ICRC3' : 'ICRC12'

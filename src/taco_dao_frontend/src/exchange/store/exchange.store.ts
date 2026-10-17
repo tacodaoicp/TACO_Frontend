@@ -539,6 +539,8 @@ export const useExchangeStore = defineStore('exchange', () => {
     // First paint from the saved boot entries. The fetches below replace these
     // on screen when they land (onSuccess on each boot query).
     seedFromSaved()
+    // the certified treasury for deposits, read once per session (an update call takes a few seconds)
+    void certifiedTreasury().catch((e) => console.warn('[Exchange] certified treasury read failed; deposits read it again:', e))
     try {
       const cPrices = readCache<Array<[string, number]>>('prices', CACHE_TTL.prices)
       if (cPrices && tokenPricesUSD.value.size === 0) {
@@ -1713,6 +1715,49 @@ export const useExchangeStore = defineStore('exchange', () => {
     onSuccess: applyPaused,
   })
 
+  // ── Certified treasury ──
+  // A V1 deposit sends tokens to the treasury by a plain transfer that cannot be undone. The boot reads below
+  // (p2acannister, returncontractprincipal) are anonymous queries without signature checks, saved for a day:
+  // every deposit takes the treasury from update calls instead (certified by the subnet), once per session,
+  // started at boot (initExchange) so that in practice no deposit waits for it. A certified value that differs
+  // from the saved one replaces it on screen and in the saved copy.
+  const treasuryUpdateIdl = ({ IDL }: any) => IDL.Service({
+    p2acannister: IDL.Func([], [IDL.Text], []),
+    returncontractprincipal: IDL.Func([], [IDL.Text], []),
+  })
+  let certifiedTreasuryP: Promise<{ accountId: string; principal: string }> | null = null
+  function certifiedTreasury(): Promise<{ accountId: string; principal: string }> {
+    if (certifiedTreasuryP) return certifiedTreasuryP
+    const p = (async () => {
+      const { HttpAgent } = await import('@dfinity/agent')
+      // anonymous: an update call's answer is certified whatever the agent's query settings
+      const agent = new HttpAgent({ host: getNetworkHost() })
+      if (getEffectiveNetwork() === 'local') await agent.fetchRootKey()
+      const actor = Actor.createActor(treasuryUpdateIdl, { agent, canisterId: getExchangeCanisterId() }) as any
+      const [acct, princ] = await Promise.all([
+        withTimeout(actor.p2acannister() as Promise<string>, 30_000, 'p2acannister (certified)'),
+        withTimeout(actor.returncontractprincipal() as Promise<string>, 30_000, 'returncontractprincipal (certified)'),
+      ])
+      if (!acct || !/^[0-9a-f]{64}$/i.test(acct)) throw new Error('The exchange returned no treasury account')
+      Principal.fromText(princ) // throws on a malformed principal
+      if (treasuryAccountId.value !== acct || treasuryAcctQuery.data.value !== acct) {
+        if (treasuryAcctQuery.data.value && treasuryAcctQuery.data.value !== acct) console.warn('[Exchange] the saved treasury account differs from the certified one; using the certified one')
+        treasuryAccountId.value = acct
+        treasuryAcctQuery.set(acct)
+      }
+      if (treasuryPrincipal.value !== princ || treasuryPrincQuery.data.value !== princ) {
+        if (treasuryPrincQuery.data.value && treasuryPrincQuery.data.value !== princ) console.warn('[Exchange] the saved treasury principal differs from the certified one; using the certified one')
+        treasuryPrincipal.value = princ
+        treasuryPrincQuery.set(princ)
+      }
+      return { accountId: acct, principal: princ }
+    })()
+    certifiedTreasuryP = p
+    // a failed read is tried again by the next deposit
+    p.catch(() => { if (certifiedTreasuryP === p) certifiedTreasuryP = null })
+    return p
+  }
+
   const treasuryAcctQuery: CachedQuery<string> = createCachedQuery({
     key: 'boot.treasuryAcct',
     fetcher: async () => (await getQueryActor()).p2acannister(),
@@ -2617,6 +2662,7 @@ export const useExchangeStore = defineStore('exchange', () => {
     exchangeInfoData,
     treasuryAccountId,
     treasuryPrincipal,
+    certifiedTreasury,
     tradingFeeBps,
     revokeFeeDivisor,
     referralFeePct,
