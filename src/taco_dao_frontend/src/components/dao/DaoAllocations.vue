@@ -841,6 +841,10 @@ LOCAL METHODS
     //////////////
     // HANDLERS //
 
+    // the svg width the last crop was measured at, and whether a slice was selected then
+    // (a selected slice draws the pie a little differently); read by keepChartForSameHoldings
+    let croppedAt = { svgWidth: '', selected: false }
+
     // The apexchart is a TOP semicircle (startAngle -90 → endAngle 90), but apexcharts
     // still reserves a FULL-circle-tall svg — so ~half the container is empty space
     // below the visible pie, which pushed the token-info card off-screen. Crop the
@@ -852,7 +856,11 @@ LOCAL METHODS
         const element = tacoChartContainer.value
         if (!element) return
         const pie = element.querySelector('.apexcharts-pie') as SVGGraphicsElement | null
-        if (!pie) { element.style.maxHeight = ''; return }
+        if (!pie) { element.style.maxHeight = ''; croppedAt = { svgWidth: '', selected: false }; return }
+        croppedAt = {
+            svgWidth: element.querySelector('svg.apexcharts-svg')?.getAttribute('width') ?? '',
+            selected: !!element.querySelector('.apexcharts-pie-area[selected="true"]'),
+        }
         const top = element.getBoundingClientRect().top
         const pieBottom = pie.getBoundingClientRect().bottom
         const cropH = Math.round(pieBottom - top + 12) // 12px breathing room below the pie/labels
@@ -1024,7 +1032,7 @@ LOCAL METHODS
     // A refresh that brings the numbers the chart already shows keeps the chart as it is,
     // instead of the remount in the data watcher below. The info card is refreshed as after
     // a remount (first slice), or for the slice the user tapped, which then stays selected,
-    // and the container is cropped again, as the remount did.
+    // and the container is cropped again if the pie was redrawn at another width since.
     // Everything else remounts as before: changed numbers, a hovered slice or open tooltip,
     // a chart drawn at a width its box no longer has, and label boxes that no longer fit their
     // text (a font that loaded after the last draw). With a tapped slice those last two are
@@ -1051,8 +1059,11 @@ LOCAL METHODS
                 return !text || !box || Math.abs(Number(box.getAttribute('width')) - (text.getBBox().width + labelPadding)) <= 1
             })
 
-            // crop to the pie as drawn now (it may have been redrawn after a resize since the last crop)
-            const recrop = () => {
+            // crop again when the pie was redrawn at another width since the last crop (rotation,
+            // resize, zoom, a late scrollbar), and with nothing selected also when the last crop
+            // was measured on a selected slice; a tap alone keeps the crop, as the remount did
+            const recrop = (selectedNow: boolean) => {
+                if (svg.getAttribute('width') === croppedAt.svgWidth && (selectedNow || !croppedAt.selected)) return
                 handleSetTacoChartMaxHeight()
                 setTimeout(handleSetTacoChartMaxHeight, 350)
             }
@@ -1065,7 +1076,7 @@ LOCAL METHODS
                 if (!Number.isInteger(index) || index < 0 || index >= seriesNames.value.length) return false
                 handleChartSegmentClick(null, null, { dataPointIndex: index })
                 if (!sized || !labelsFit) refitChart() // redraws in place, apexcharts keeps the selection
-                else recrop()
+                else recrop(true)
                 componentLoading.value = false
                 return true
             }
@@ -1079,7 +1090,7 @@ LOCAL METHODS
             handleChartSegmentClick(null, null, {
                 dataPointIndex: firstNonZeroIndex >= 0 ? firstNonZeroIndex : 0
             })
-            recrop()
+            recrop(false)
             componentLoading.value = false
             return true
         } catch {
