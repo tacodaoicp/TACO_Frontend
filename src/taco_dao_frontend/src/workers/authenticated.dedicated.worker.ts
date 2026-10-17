@@ -577,6 +577,9 @@ function applyRestoredCache(cached: Map<DataKey, CachedEntry>, announce: boolean
     // A live fetch already landed; never replace newer data with the cache
     const current = dataStates.get(key)
     if (current?.data && (current.lastUpdated ?? 0) >= (entry.lastUpdated ?? 0)) continue
+    // Saved while names went out as Maps (sent as {}): no names at all, and the
+    // page receiving it emptied the names it had. Treated as missing.
+    if (key === 'allNames' && noNames(entry.data)) continue
 
     // Migration: this worker used to cache the whole DataState instead of the
     // raw data, so old entries come back double-wrapped and every field read
@@ -605,6 +608,10 @@ function applyRestoredCache(cached: Map<DataKey, CachedEntry>, announce: boolean
       })
     }
   }
+}
+
+function noNames(data: any): boolean {
+  return !data || (Object.keys(data.principalNames ?? {}).length === 0 && Object.keys(data.neuronNames ?? {}).length === 0)
 }
 
 // ============================================================================

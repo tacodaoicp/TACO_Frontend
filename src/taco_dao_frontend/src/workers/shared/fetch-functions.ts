@@ -567,10 +567,12 @@ export async function fetchProposalsThreadsData(agent: HttpAgent): Promise<any[]
 
 /**
  * Fetch all names from AppSneedDAO
+ * Plain objects, not Maps: serializeForTransfer turns a Map into {}, so the
+ * store used to receive no names at all and emptied the ones it had.
  */
 export async function fetchAllNamesData(agent: HttpAgent): Promise<{
-  principalNames: Map<string, { name: string; verified: boolean }>
-  neuronNames: Map<string, { name: string; verified: boolean }>
+  principalNames: Record<string, { name: string; verified: boolean }>
+  neuronNames: Record<string, { name: string; verified: boolean }>
 }> {
   const actor = getAppSneedDaoActor(agent)
 
@@ -580,16 +582,16 @@ export async function fetchAllNamesData(agent: HttpAgent): Promise<{
   ])
 
   // Process principal names
-  const principalNames = new Map<string, { name: string; verified: boolean }>()
+  const principalNames: Record<string, { name: string; verified: boolean }> = {}
   ;(principalNamesRaw as any[]).forEach(([principal, [name, verified]]) => {
-    principalNames.set(principal.toString(), { name, verified })
+    principalNames[principal.toString()] = { name, verified }
   })
 
   // Process neuron names
-  const neuronNames = new Map<string, { name: string; verified: boolean }>()
+  const neuronNames: Record<string, { name: string; verified: boolean }> = {}
   ;(neuronNamesRaw as any[]).forEach(([neuronKey, [name, verified]]) => {
     const mapKey = `${neuronKey.sns_root_canister_id.toString()}:${uint8ArrayToHex(neuronKey.neuron_id.id)}`
-    neuronNames.set(mapKey, { name, verified })
+    neuronNames[mapKey] = { name, verified }
   })
 
   return { principalNames, neuronNames }
