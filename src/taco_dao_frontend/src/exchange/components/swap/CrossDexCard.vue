@@ -628,11 +628,12 @@ onMounted(() => {
   &__exec-status {
     font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
     padding: 3px 8px; border-radius: 999px;
-    &.is-executing { background: rgba(196, 90, 10, 0.15); color: var(--accent-primary); }
-    &.is-success { background: rgba(60, 180, 90, 0.18); color: #3cb45a; }
-    // theme tokens: the amber ink keeps at least 4.5:1 on its dim fill in both themes (CHECK YOUR WALLET)
+    // theme tokens: each ink keeps at least 4.5:1 on its dim fill in both themes (RUNNING, COMPLETE,
+    // CHECK YOUR WALLET, PARTIAL FILL, FAILED)
+    &.is-executing { background: var(--tx-orange-dim); color: var(--tx-orange-ink); }
+    &.is-success { background: var(--tx-buy-dim); color: var(--tx-buy-ink); }
     &.is-partial { background: var(--tx-warning-dim); color: var(--tx-warning-ink); }
-    &.is-error { background: rgba(220, 70, 70, 0.18); color: #d65b5b; }
+    &.is-error { background: var(--tx-sell-dim); color: var(--tx-sell-ink); }
   }
   &__exec-sub { margin: 0; font-size: var(--text-xs); color: var(--text-tertiary); }
 
@@ -640,14 +641,19 @@ onMounted(() => {
   &__exec-leg {
     padding: 12px; border-radius: 10px; background: var(--tx-surface-1); border: 1px solid var(--card-border);
     display: flex; flex-direction: column; gap: 6px;
-    &.is-success { border-color: rgba(60, 180, 90, 0.4); }
-    &.is-failed { border-color: rgba(220, 70, 70, 0.4); }
+    &.is-success { border-color: color-mix(in srgb, var(--tx-buy) 40%, transparent); }
+    &.is-failed { border-color: color-mix(in srgb, var(--tx-sell) 40%, transparent); }
     &.is-unsure { border-color: color-mix(in srgb, var(--tx-warning) 55%, transparent); }
+    // not sent (nothing left the wallet) and came back: neither is a failure
+    &.is-skipped { border-color: var(--tx-line-2); }
+    &.is-refunded { border-color: var(--tx-line-hi); }
   }
   &__exec-leg-head { display: flex; align-items: center; gap: 8px; }
   &__exec-leg-icon { margin-left: auto; display: inline-flex; align-items: center; }
-  &__check { color: #3cb45a; font-weight: 700; }
-  &__cross { color: #d65b5b; font-weight: 700; }
+  &__check { color: var(--tx-buy-ink); font-weight: 700; }
+  &__cross { color: var(--tx-sell-ink); font-weight: 700; }
+  &__skip { color: var(--tx-ink-3); font-weight: 700; }
+  &__ref { color: var(--tx-ink-2); font-weight: 700; }
   &__warn {
     width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 800; line-height: 1; color: var(--tx-warning-ink);
@@ -658,13 +664,15 @@ onMounted(() => {
   &__exec-leg-step { font-size: var(--text-xs); color: var(--text-secondary); }
   &__exec-leg-err { display: flex; flex-direction: column; gap: 3px; }
   &__exec-err-msg {
-    font-size: var(--text-xs); color: #d65b5b; word-break: break-word; line-height: 1.4;
-    background: rgba(220, 70, 70, 0.08); border-radius: 6px; padding: 6px 8px;
+    font-size: var(--text-xs); color: var(--tx-sell-ink); word-break: break-word; line-height: 1.4;
+    background: var(--tx-sell-dim); border-radius: 6px; padding: 6px 8px;
   }
   &__exec-err-note {
-    font-size: 11px; color: var(--text-tertiary);
-    // the note of a route whose output may already be in the wallet says what to do: amber, a size up
-    &.is-warn { font-size: 12px; color: var(--tx-warning-ink); line-height: 1.4; }
+    font-size: 11px; color: var(--tx-muted-ink); line-height: 1.4;
+    // a note that says what happened or what to do is the only message of its route: the readable size
+    &.is-unsure, &.is-skipped, &.is-refunded { font-size: 12px; }
+    &.is-unsure { color: var(--tx-warning-ink); }
+    &.is-skipped, &.is-refunded { color: var(--tx-ink-2); }
   }
 
   &__exec-summary {

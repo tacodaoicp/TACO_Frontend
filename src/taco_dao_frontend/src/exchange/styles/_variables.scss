@@ -47,6 +47,12 @@
   --tx-warning-dim: rgba(216, 138, 63, 0.14);
   /* amber text on its dim fill (verdict pills, unsure rows): at least 4.5:1 on the panel */
   --tx-warning-ink: #e0954c;
+  /* text inks for small type on the dim fills and panels (verdict pills, result cells, recovery lines, notes):
+     a little lighter than the base colours, at least 4.5:1 on both ends of the panel gradient */
+  --tx-orange-ink:  #f59a52;
+  --tx-buy-ink:     #4cbb8b;
+  --tx-sell-ink:    #f07a70;
+  --tx-muted-ink:   #9a8f7f;
   --tx-info:        #7aa7d7;
   --tx-info-dim:    rgba(122, 167, 215, 0.14);
 
@@ -103,6 +109,12 @@
   --tx-warning-dim: rgba(180, 92, 23, 0.10);
   /* amber text on its dim fill (verdict pills, unsure rows): at least 4.5:1 on the panel */
   --tx-warning-ink: #8f4510;
+  /* text inks for small type on the dim fills and panels: darker than the base colours, at least 4.5:1 on
+     both ends of the panel gradient */
+  --tx-orange-ink:  #9c490c;
+  --tx-buy-ink:     #196a43;
+  --tx-sell-ink:    #a8322a;
+  --tx-muted-ink:   #6b6155;
   --tx-info:        #3f6a9c;
   --tx-info-dim:    rgba(63, 106, 156, 0.08);
 

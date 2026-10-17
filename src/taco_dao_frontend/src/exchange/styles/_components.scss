@@ -789,7 +789,8 @@
 
     &__message {
       font-size: 11px;
-      color: var(--tx-ink-3);
+      // the muted text ink: at least 4.5:1 on the toast in both themes
+      color: var(--tx-muted-ink);
       margin-top: 2px;
       line-height: 1.4;
     }

@@ -378,11 +378,12 @@ const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !show
 @use './multiSellModal' as *;
 .ms-pill {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 999px; white-space: nowrap;
-  &--run { background: var(--tx-orange-dim); color: var(--tx-orange); }
-  &--ok { background: var(--tx-buy-dim); color: var(--tx-buy); }
-  // the amber ink keeps at least 4.5:1 on its dim fill in both themes (UNCONFIRMED, PARTLY DONE)
+  // the inks keep at least 4.5:1 on their dim fills in both themes (RUNNING, COMPLETE, PARTLY DONE,
+  // UNCONFIRMED, FAILED)
+  &--run { background: var(--tx-orange-dim); color: var(--tx-orange-ink); }
+  &--ok { background: var(--tx-buy-dim); color: var(--tx-buy-ink); }
   &--part { background: var(--tx-warning-dim); color: var(--tx-warning-ink); }
-  &--fail { background: var(--tx-sell-dim); color: var(--tx-sell); }
+  &--fail { background: var(--tx-sell-dim); color: var(--tx-sell-ink); }
   &--stop { background: var(--tx-surface-3); color: var(--tx-ink-2); }
 }
 .ms-ov {
@@ -403,7 +404,7 @@ const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !show
   b { font-size: 26px; font-weight: 500; letter-spacing: -0.01em; }
   &__usd { font-size: 12px; color: var(--tx-ink-3); }
 }
-.ms-box-err { font-size: 12.5px; color: var(--tx-sell); background: var(--tx-sell-dim); padding: 8px 10px; border-radius: 6px; line-height: 1.45; }
+.ms-box-err { font-size: 12.5px; color: var(--tx-sell-ink); background: var(--tx-sell-dim); padding: 8px 10px; border-radius: 6px; line-height: 1.45; }
 .ms-ar-list { background: var(--tx-surface-1); border: 1px solid var(--tx-line); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
 .ms-ar {
   display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 10px; row-gap: 6px; padding: 4px 12px 10px;
@@ -427,11 +428,11 @@ const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !show
   &__state {
     display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--tx-ink-2); white-space: nowrap;
     b { font-size: 13px; font-weight: 600; }
-    &.is-ok { color: var(--tx-buy); }
-    &.is-part, &.is-ref { color: var(--tx-warning); }
-    &.is-warn { color: var(--tx-warning-ink); }
-    &.is-fail { color: var(--tx-sell); }
-    &.is-skip { color: var(--tx-ink-3); }
+    // text inks: at least 4.5:1 on the list in both themes
+    &.is-ok { color: var(--tx-buy-ink); }
+    &.is-part, &.is-ref, &.is-warn { color: var(--tx-warning-ink); }
+    &.is-fail { color: var(--tx-sell-ink); }
+    &.is-skip { color: var(--tx-muted-ink); }
   }
   &__tag {
     font-size: 10px; font-weight: 700; letter-spacing: 0.02em; color: var(--tx-warning);
@@ -443,7 +444,7 @@ const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !show
     grid-column: 2 / -1; font-size: 12px; color: var(--tx-ink-2); line-height: 1.45; background: var(--tx-surface-2);
     border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px;
   }
-  &__err { color: var(--tx-sell); font-size: 11.5px; word-break: break-word; }
+  &__err { color: var(--tx-sell-ink); font-size: 11.5px; word-break: break-word; }
 }
 .ms-spin {
   width: 12px; height: 12px; border: 2px solid var(--tx-line-2); border-top-color: var(--tx-orange); border-radius: 50%;
@@ -454,7 +455,7 @@ const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !show
 .ms-rf__row {
   display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; font-size: 12.5px; color: var(--tx-ink-2); line-height: 1.4;
 }
-.ms-rf__where { text-align: right; color: var(--tx-ink-3); font-size: 12px; &.is-bad { color: var(--tx-sell); } &.is-warn { color: var(--tx-warning-ink); } }
+.ms-rf__where { text-align: right; color: var(--tx-muted-ink); font-size: 12px; &.is-bad { color: var(--tx-sell-ink); } &.is-warn { color: var(--tx-warning-ink); } }
 .ms-rf__more {
   // a 28 px tall target around a text link (the negative margin keeps the line height)
   background: none; border: 0; padding: 7px 4px; margin: -7px -4px; color: var(--tx-ink-2); font-size: 12px; font-weight: 600; cursor: pointer;
@@ -462,6 +463,6 @@ const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !show
   &:hover { color: var(--tx-ink); }
   &--less { align-self: flex-start; }
 }
-.ms-note-warn { color: var(--tx-warning); }
-.ms-note-bad { color: var(--tx-sell); }
+.ms-note-warn { color: var(--tx-warning-ink); }
+.ms-note-bad { color: var(--tx-sell-ink); }
 </style>

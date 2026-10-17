@@ -444,7 +444,7 @@ onBeforeUnmount(() => {
   }
 }
 .ms-box-err {
-  font-size: 12.5px; color: var(--tx-sell); background: var(--tx-sell-dim); padding: 8px 10px; border-radius: 6px; line-height: 1.45;
+  font-size: 12.5px; color: var(--tx-sell-ink); background: var(--tx-sell-dim); padding: 8px 10px; border-radius: 6px; line-height: 1.45;
   label { display: flex; gap: 8px; align-items: flex-start; margin-top: 6px; color: var(--tx-ink); cursor: pointer; }
 }
 .ms-link { background: none; border: 0; padding: 0; margin-left: 4px; color: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-size: inherit; }
