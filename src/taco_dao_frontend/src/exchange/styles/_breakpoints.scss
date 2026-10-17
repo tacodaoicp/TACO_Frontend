@@ -1,0 +1,5 @@
+// Widths shared by components that must agree on them.
+
+// The bottom nav (MobileNav) shows up to this width and hides above it. Anything that floats at the
+// bottom of the page sits above the nav at every width where the nav shows.
+$tx-mobile-nav-max: 767px;

@@ -282,9 +282,10 @@ function onPicked(addrs: string[]) {
 }
 
 // The total and the Sell button stay in view when the card is taller than the screen (8 to 10
-// tokens): the bar is sticky. On wider screens it draws its box only while it floats (a sentinel
-// at its place in the card is below the screen); phones always float it above the bottom nav. Its
-// own total shows only while the main total is out of view, so the total never shows twice.
+// tokens): the bar is sticky, above the bottom nav wherever the nav shows. Above 600 px it draws its
+// box only while it floats (a sentinel at its place in the card is below that line); phones always
+// draw it. Its own total shows only while the main total is out of view, so the total never shows
+// twice.
 const cardEl = ref<HTMLElement | null>(null)
 const barEl = ref<HTMLElement | null>(null)
 const barSentinel = ref<HTMLElement | null>(null)
@@ -292,16 +293,19 @@ const recvRow = ref<HTMLElement | null>(null)
 const barStuck = ref(false)
 const recvInView = ref(false)
 // Both are measured from live boxes on scroll, resize and any size change of the page, the card or
-// the bar (no fixed margins). The bar floats while its place in the card (the sentinel) is more than
-// 12 px below the screen's bottom. The main total is in view while its row is inside the screen and
-// wholly above the bar: the bar is taller with its own total or the wait helper, and on phones it
-// floats over the bottom nav. Measured, not observed: the card stays mounted under v-show, and its
-// size change when it shows again after Single swap measures both anew, so neither goes stale.
+// the bar (no fixed margins). The bar floats while its place in the card (the sentinel) is below the
+// line its sticky bottom keeps: 12 px above the screen's bottom on wide screens, above the bottom nav
+// wherever the nav shows (read from the bar's own style, so it follows the breakpoint). The main
+// total is in view while its row is inside the screen and wholly above the bar: the bar is taller
+// with its own total or the wait helper, and where the nav shows it floats over it. Measured, not
+// observed: the card stays mounted under v-show, and its size change when it shows again after
+// Single swap measures both anew, so neither goes stale.
 let frame = 0
 function measureRecv() {
   frame = 0
   const s = barSentinel.value
-  barStuck.value = !!s && s.getBoundingClientRect().top > window.innerHeight - 12
+  const off = barEl.value ? parseFloat(getComputedStyle(barEl.value).bottom) : NaN
+  barStuck.value = !!s && s.getBoundingClientRect().top > window.innerHeight - (Number.isFinite(off) ? off : 12)
   const row = recvRow.value, bar = barEl.value
   if (!row || !bar) { recvInView.value = false; return }
   const r = row.getBoundingClientRect()
@@ -332,6 +336,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped lang="scss">
+@use '../../styles/breakpoints' as bp;
 .ms-card {
   background: var(--tx-panel-bg);
   border: var(--tx-panel-border);
@@ -369,10 +374,12 @@ onBeforeUnmount(() => {
       &:not(.is-stuck) .ms-card__bar-total { display: none; }
     }
   }
+  // the total and the button stay visible above the bottom nav at every width where it shows
+  @media (max-width: bp.$tx-mobile-nav-max) {
+    &__bar { bottom: calc(var(--tx-mobile-nav-h) + 8px); }
+  }
   @media (max-width: 600px) {
-    // the total and the button stay visible above the bottom nav
     &__bar {
-      bottom: calc(var(--tx-mobile-nav-h) + 8px);
       background: var(--tx-panel-bg); border: 1px solid var(--tx-line-2); border-radius: 12px;
       padding: 10px; box-shadow: var(--tx-shadow-2); margin: 4px -6px 0;
     }

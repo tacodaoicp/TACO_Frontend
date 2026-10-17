@@ -27,7 +27,7 @@
             <span class="crossdex-view__alt">
               <span v-for="s in saleNames" :key="s.mode" :class="{ 'is-off': mode !== s.mode }" :aria-hidden="mode !== s.mode">
                 <template v-if="ms.run.value?.phase === 'preparing'">{{ s.name }} is waiting for its approval. Nothing has been sold yet.</template>
-                <template v-else>{{ s.name }} is still finishing{{ ms.finishingRoutes.value > 0 ? ` ${ms.finishingRoutes.value === 1 ? '1 route' : `${ms.finishingRoutes.value} routes`}` : '' }}. Keep this page open until it is done.</template>
+                <template v-else>{{ s.name }} is still finishing{{ ms.finishingRoutes.value > 0 ? ` ${ms.finishingRoutes.value === 1 ? '1 route' : `${ms.finishingRoutes.value} routes`}` : '' }}. Keep this page open.</template>
               </span>
             </span>
             <span class="crossdex-view__banner-acts">

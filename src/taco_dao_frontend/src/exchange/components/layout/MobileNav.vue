@@ -59,6 +59,7 @@ function isActive(path: string): boolean {
 </script>
 
 <style scoped lang="scss">
+@use '../../styles/breakpoints' as bp;
 .mobile-nav {
   display: flex;
   position: fixed;
@@ -73,7 +74,7 @@ function isActive(path: string): boolean {
   padding-bottom: env(safe-area-inset-bottom, 0);
 
   /* Desktop has ExchangeTopNav at the top — MobileNav is redundant there. */
-  @media (min-width: 768px) {
+  @media (min-width: bp.$tx-mobile-nav-max + 1px) {
     display: none;
   }
 
