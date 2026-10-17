@@ -46,7 +46,6 @@
           <button class="ex-btn ex-btn--sm ex-btn--ghost" @click="stopWaiting">Stop waiting</button>
         </div>
         <div v-else-if="swapOrSaleRunning && !raRunning && !raWaiting" class="recover-view__ra-busy" role="status">{{ SWAP_OR_SALE_RUNNING_TEXT }}</div>
-        <div v-else-if="lockNote" class="ex-error-box">{{ LOCK_BUSY_RECOVERY_TEXT }}</div>
         <div v-if="!store.isAuthenticated" class="recover-view__desc">Connect your wallet to run this.</div>
         <div v-if="raRows.length > 0" class="recover-view__stuck-list">
           <div v-for="row in raRows" :key="row.id" class="recover-view__stuck-item">
@@ -386,15 +385,13 @@ const saleRunning = ref(false)
 /** What holds the lock in this browser (a sale, a single swap, a recovery), from the poll. */
 const holder = ref<FundsHoldKind | null>(null)
 const swapOrSaleRunning = computed(() => holder.value === 'sale' || holder.value === 'swap')
-const lockNote = ref(false)
 async function guarded<T>(fn: () => Promise<T>): Promise<T | undefined> {
   const r = await withFundsLock('shared', fn, { kind: 'recovery' })
+  // refused: the toast says so (a note in the Recover All block would sit far from the tapped button)
   if (r === BUSY) {
-    lockNote.value = true
     toast.warning(RECOVERY_NOT_STARTED, LOCK_BUSY_RECOVERY_TEXT)
     return undefined
   }
-  lockNote.value = false
   return r as T
 }
 
@@ -1209,7 +1206,7 @@ function waitIn(section: 'ra' | 'ix' | 'neu'): boolean {
 
 function raLabel(scope: RaScope, idle: string): string {
   if (raRunning.value && raScope.value === scope) return `Running... ${raElapsed.value}s`
-  if (raWaiting.value && waitFor.value === scope) return holder.value === 'recovery' ? 'Starts when it ends' : 'Starts when the swap ends'
+  if (raWaiting.value && waitFor.value === scope) return 'Starts when it ends'
   return idle
 }
 
@@ -1301,8 +1298,6 @@ onMounted(() => {
     const [h, sale] = await Promise.all([fundsHolder(), isSaleRunning()])
     holder.value = h
     saleRunning.value = sale
-    // the refusal note goes once nothing holds the lock
-    if (!h) lockNote.value = false
     try { runningRuns.value = runJournal.list().filter(r => r.phase === 'running') } catch { runningRuns.value = [] }
   }
   void pollSale()
@@ -1342,6 +1337,8 @@ onVisible(() => {
 </script>
 
 <style scoped lang="scss">
+// the outline buttons of this page use the text ink (the accent itself is 2.8:1 on the light page)
+.ex-btn--outline { color: var(--tx-orange-ink); }
 .recover-view {
   min-height: 100vh;
   background: var(--tx-bg);
