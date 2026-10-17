@@ -27,7 +27,7 @@ import { createRunAgent, type RunAgent } from '../utils/runAgent'
 import { withFundsLock, BUSY } from '../utils/saleLock'
 import { approveExchangeDeposit } from '../utils/deposit'
 import { buildLegDeps, runLedgerFee } from './useCrossDexSwap'
-import { stopText, maybeSentLeg, onlyMaybeSent, soldMaybeInWallet, CHECK_WALLET, CHECK_WALLET_NOTE, NOT_IN_WALLET } from '../components/swap/multiSellCopy'
+import { stopText, maybeSentLeg, onlyMaybeSent, unsureKinds, unsureText, CHECK_WALLET, CHECK_WALLET_NOTE, NOT_IN_WALLET } from '../components/swap/multiSellCopy'
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
@@ -754,14 +754,16 @@ export function useMultiSell() {
     const tokensFully = res.assets.filter(a => a.legs.every(l => ['done', 'doneUnknown', 'belowMin'].includes(l.state))).length
     const anyRecover = legs.some(l => ['needsRecovery', 'tracked'].includes(l.state))
     const anyRefund = legs.some(l => l.state === 'refunded')
+    // a part may already be settled in the wallet (its ICP, or its tokens when its sale is not sure): the wallet
+    // first, never "partly done" or "failed" alone (the message does not repeat the title)
+    const unsure = legs.some(maybeSentLeg)
+    const after = onlyMaybeSent(legs) ? NOT_IN_WALLET : 'Some funds need the Recover page.'
     if (res.phase === 'complete') toast.success('Sale complete', receivedText(res))
-    else if (res.phase === 'partial') toast.warning('Partly done', `${tokensFully} of ${res.assets.length} tokens fully sold. Details are in the summary.`)
-    // nothing confirmed sold, but a part sold while its ICP may already be in the wallet (the message
-    // does not repeat the title)
-    else if (legs.some(maybeSentLeg)) {
-      const lead = soldMaybeInWallet(legs.filter(maybeSentLeg).length, 'ICP', { noun: 'part' })
-      toast.warning(CHECK_WALLET, `${lead} ${onlyMaybeSent(legs) ? NOT_IN_WALLET : 'Some funds need the Recover page.'}`)
+    else if (res.phase === 'partial' && unsure) {
+      toast.warning(CHECK_WALLET, `${tokensFully} of ${res.assets.length} tokens are fully sold. ${unsureText(unsureKinds(legs), 'ICP', { noun: 'part', also: true })} ${after}`)
     }
+    else if (res.phase === 'partial') toast.warning('Partly done', `${tokensFully} of ${res.assets.length} tokens fully sold. Details are in the summary.`)
+    else if (unsure) toast.warning(CHECK_WALLET, `${unsureText(unsureKinds(legs), 'ICP', { noun: 'part' })} ${after}`)
     else if (anyRecover) toast.error('Sale failed', 'Some funds need the Recover page.')
     else toast.info('Nothing was sold', anyRefund ? 'Refunds are on their way to your wallet, minus network fees.' : 'Your tokens stayed in your wallet.')
   }

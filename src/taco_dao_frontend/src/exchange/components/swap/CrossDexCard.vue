@@ -146,7 +146,7 @@
           Neutrinite goes first. The other routes start as soon as it confirms your deposit, usually within seconds, so the swaps land close together. If one fails, its funds are refunded automatically, and the others still complete.
         </p>
         <p v-else class="crossdex-card__confirm-note">
-          All legs run in parallel. If one fails, its funds are refunded automatically, and the others still complete.
+          All routes run in parallel. If one fails, its funds are refunded automatically, and the others still complete.
         </p>
         <div class="crossdex-card__confirm-actions">
           <button class="ex-btn ex-btn--ghost" @click="cx.cancelConfirm()">Cancel</button>
@@ -175,8 +175,11 @@
               <span class="crossdex-card__exec-leg-icon">
                 <span v-if="lv.status === 'running'" class="crossdex-card__spinner"></span>
                 <span v-else-if="lv.status === 'success'" class="crossdex-card__check">✓</span>
-                <!-- it sold, and its output may already be in the wallet: a warning, not a failure -->
-                <span v-else-if="lv.status === 'unsure'" class="crossdex-card__warn" role="img" aria-label="May already be in your wallet">!</span>
+                <!-- it may already be settled in the wallet: a warning, not a failure -->
+                <span v-else-if="lv.status === 'unsure'" class="crossdex-card__warn" role="img" :aria-label="unsureAria(lv.outcome)">!</span>
+                <!-- nothing left the wallet for this route: not sent, as Sell many draws it -->
+                <span v-else-if="lv.status === 'skipped'" class="crossdex-card__skip" role="img" aria-label="Not sent, stayed in your wallet">○</span>
+                <span v-else-if="lv.status === 'refunded'" class="crossdex-card__ref" role="img" aria-label="Refunded to your wallet">↩</span>
                 <span v-else class="crossdex-card__cross">✕</span>
               </span>
             </div>
@@ -191,24 +194,12 @@
             <div v-if="lv.status === 'running'" class="crossdex-card__exec-leg-step">
               {{ lv.step || 'Starting…' }}
             </div>
-            <div v-else-if="lv.status === 'failed' || lv.status === 'unsure'" class="crossdex-card__exec-leg-err">
-              <!-- a route whose output may already be in the wallet: its raw error ("Failed to fetch") would
-                   read as a hard failure, and the note below says what to do; a route not sent because the DEX
-                   may still hold an earlier swap's funds: the note says it -->
-              <div v-if="!lv.outcome?.outMaybeSent && !isHeldReason(lv.outcome?.reason)" class="crossdex-card__exec-err-msg">{{ lv.outcome?.error || 'Failed' }}</div>
-              <div class="crossdex-card__exec-err-note" :class="{ 'is-warn': lv.status === 'unsure' }">
-                {{ lv.outcome?.notStarted
-                    ? (isHeldReason(lv.outcome.reason)
-                      ? `Your funds for this route stayed in your wallet. ${lv.label} may still hold funds from another swap of yours, and the Recover page can send them back.`
-                      : 'Your funds for this route stayed in your wallet.')
-                    : lv.outcome?.recovered
-                      ? 'Funds were refunded to your wallet.'
-                      : lv.outcome?.outMaybeSent
-                        ? maybeSentNote(lv.outcome.reason)
-                        : lv.outcome?.reason === 'session'
-                          ? 'Your session expired before the funds could be recovered. Reconnect your wallet, then use the Recover page.'
-                          : 'Funds were not recovered automatically. Use the Recover page to sweep them.' }}
-              </div>
+            <div v-else-if="lv.status !== 'success'" class="crossdex-card__exec-leg-err">
+              <!-- only a real failure shows the DEX's raw error: a route that may already be settled in the wallet
+                   (a raw "Failed to fetch" would read as a hard failure), one that was not sent and one that came
+                   back say what happened in the note -->
+              <div v-if="lv.status === 'failed'" class="crossdex-card__exec-err-msg">{{ lv.outcome?.error || 'Failed' }}</div>
+              <div class="crossdex-card__exec-err-note" :class="`is-${lv.status}`">{{ routeNote(lv) }}</div>
             </div>
           </div>
         </div>
@@ -241,11 +232,11 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ICP_LEDGER_ID, FEE_HEADROOM_LEDGERS } from '../../constants/tokens'
 import { crossDexMax } from '../../utils/crossDexCosts'
-import { useCrossDexSwap } from '../../composables/useCrossDexSwap'
+import { useCrossDexSwap, type LegOutcome } from '../../composables/useCrossDexSwap'
 import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { formatTokenAmount } from '../../utils/format'
-import { CHECK_WALLET, swapMaybeSentSummary } from './multiSellCopy'
+import { CHECK_WALLET, NOT_IN_WALLET, swapMaybeSentSummary, unsureKind, unsureKinds, maybeSentLeg } from './multiSellCopy'
 import { isHeldReason } from '../../utils/crossDexLegRunner'
 import { getTokenIcon } from '../../utils/token-icons'
 import TokenSelector from './TokenSelector.vue'
@@ -322,20 +313,56 @@ function formatTo(amt: bigint): string {
   return t ? formatTokenAmount(amt, Number(t.decimals), t.symbol) : amt.toString()
 }
 
-/** A route whose withdraw answer was lost: its output may already be in the wallet. */
-function maybeSentNote(reason?: string): string {
+/** A route that may already be settled in the wallet, by kind (multiSellCopy unsureKind): the wallet first. */
+function maybeSentNote(o: LegOutcome): string {
   const sym = cx.tokenTo.value?.symbol ?? 'output'
-  return `The swap went through. The ${sym} may already be in your wallet. Check it before using the Recover page.`
-    + (reason === 'session' ? ' If it is not there, reconnect your wallet first.' : '')
+  const kind = unsureKind(o)
+  const lead = kind === 'back'
+    ? `Not swapped, because the amount Neutrinite received did not match this route. Check your wallet first. ${NOT_IN_WALLET}`
+    : kind === 'sale'
+      ? `This route may not have sold. Check your wallet first. ${NOT_IN_WALLET}`
+      : `The swap went through. The ${sym} may already be in your wallet. Check it before using the Recover page.`
+  return lead + (o.reason === 'session' ? ' If it is not there, reconnect your wallet first.' : '')
+}
+function unsureAria(o?: LegOutcome): string {
+  const kind = o ? unsureKind(o) : null
+  return kind === 'sale' ? 'May not have sold, check your wallet'
+    : kind === 'back' ? 'Not swapped, your tokens may already be back in your wallet'
+    : 'Sold, the output may already be in your wallet'
+}
+/** The note under a route that did not sell for sure. */
+function routeNote(lv: { status: LegStatus; label: string; outcome?: LegOutcome }): string {
+  const o = lv.outcome
+  if (!o) return ''
+  if (lv.status === 'unsure') return maybeSentNote(o)
+  if (lv.status === 'skipped') {
+    return isHeldReason(o.reason)
+      ? `Your funds for this route stayed in your wallet. ${lv.label} may still hold funds from another swap of yours, and the Recover page can send them back.`
+      : 'Your funds for this route stayed in your wallet.'
+  }
+  if (lv.status === 'refunded') {
+    // TACO V2 settles a missed minimum on chain (the classified message says what came back)
+    return o.refundedBy === 'exchange' && o.error ? o.error : 'Its funds went back to your wallet, minus network fees.'
+  }
+  return o.reason === 'session'
+    ? 'Your session expired before the funds could be recovered. Reconnect your wallet, then use the Recover page.'
+    : 'Funds were not recovered automatically. Use the Recover page to sweep them.'
 }
 
-type LegStatus = 'running' | 'success' | 'failed' | 'unsure'
+// running, sold, may already be settled in the wallet (unsure), not sent (nothing left the wallet), came back
+// (refunded), or failed (the Recover page)
+type LegStatus = 'running' | 'success' | 'failed' | 'unsure' | 'skipped' | 'refunded'
+const statusOf = (o?: LegOutcome): LegStatus => !o ? 'running'
+  : o.success ? 'success'
+  : maybeSentLeg(o) ? 'unsure'
+  : o.state === 'notSent' ? 'skipped'
+  : o.state === 'refunded' ? 'refunded'
+  : 'failed'
 const legViews = computed(() => {
   const legs = cx.plan.value?.legs ?? []
   return legs.map(leg => {
     const outcome = cx.outcomes.value.find(o => o.dex === leg.dex)
-    // a route that sold while its output may already be in the wallet reads unsure, not failed
-    const status: LegStatus = outcome ? (outcome.success ? 'success' : outcome.outMaybeSent ? 'unsure' : 'failed') : 'running'
+    const status: LegStatus = statusOf(outcome)
     return {
       dex: leg.dex,
       label: dexLabel(leg.dex),
@@ -349,9 +376,9 @@ const legViews = computed(() => {
   })
 })
 
-// a failed route whose output may already be in the wallet (its withdraw answer was lost): the
-// verdict says to check the wallet, never that everything failed
-const maybeSent = computed(() => ['partial', 'error'].includes(cx.phase.value) && cx.outcomes.value.some(o => !o.success && o.outMaybeSent))
+// a failed route that may already be settled in the wallet: the verdict says to check the wallet, never that
+// everything failed or that only some routes filled
+const maybeSent = computed(() => ['partial', 'error'].includes(cx.phase.value) && cx.outcomes.value.some(o => !o.success && maybeSentLeg(o)))
 const verdictCls = computed(() => (maybeSent.value ? 'partial' : cx.phase.value))
 
 const execStatusLabel = computed(() => {
@@ -379,11 +406,12 @@ const summaryLine = computed(() => {
       received: cx.phase.value === 'partial' ? totalStr : undefined,
       sym: cx.tokenTo.value?.symbol ?? 'output',
       routes: legViews.value.length,
-      hedged: cx.outcomes.value.filter(o => !o.success && o.outMaybeSent).length,
+      confirmed: cx.outcomes.value.filter(o => o.success).length,
+      kinds: unsureKinds(cx.outcomes.value.filter(o => !o.success)),
     })
   }
-  if (cx.phase.value === 'partial') return `Partial: received ${totalStr}. Check each route's status above; anything not recovered automatically is on the Recover page.`
-  if (cx.phase.value === 'error') return `All routes failed. Check each route's status above; anything not recovered automatically is on the Recover page.`
+  if (cx.phase.value === 'partial') return `Partial fill: received ${totalStr}. Check each route's status above. Anything not recovered automatically is on the Recover page.`
+  if (cx.phase.value === 'error') return `No route went through. Check each route's status above. Anything not recovered automatically is on the Recover page.`
   return ''
 })
 

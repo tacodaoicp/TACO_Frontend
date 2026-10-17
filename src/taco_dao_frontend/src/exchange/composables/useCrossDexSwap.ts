@@ -45,7 +45,7 @@ import {
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
 import { icrcIDL } from '../../shared/icrc-idl'
-import { CHECK_WALLET, NOT_IN_WALLET, soldMaybeInWallet } from '../components/swap/multiSellCopy'
+import { CHECK_WALLET, NOT_IN_WALLET, unsureKinds, unsureText, confirmedText, maybeSentLeg } from '../components/swap/multiSellCopy'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
 export type CrossDexPhase =
@@ -529,9 +529,10 @@ export function useCrossDexSwap() {
 
     const successes = results.filter(r => r.success)
     const totalOut = results.reduce((sum, r) => sum + r.amountOut, 0n)
-    // routes that sold while their output may already be in the wallet (a withdraw answer was lost)
-    const hedged = results.filter(r => !r.success && r.outMaybeSent).length
-    const maybeSent = hedged > 0
+    // routes that may already be settled in the wallet (a lost withdraw or swap answer, or Neutrinite sent a
+    // mismatched credit home): the wallet comes first, by kind
+    const kinds = unsureKinds(results.filter(r => !r.success))
+    const maybeSent = results.some(r => !r.success && maybeSentLeg(r))
     if (successes.length === results.length) {
       phase.value = 'success'
       toast.success('CrossDEX Swap Complete',
@@ -539,8 +540,12 @@ export function useCrossDexSwap() {
           + (results.some(r => r.state === 'doneUnknown') ? ' received, plus a route whose amount shows in your wallet.' : ' received.'))
     } else if (successes.length > 0) {
       phase.value = 'partial'
-      toast.warning('Partial Fill', `${successes.length}/${results.length} legs filled. `
-        + (maybeSent ? `${soldMaybeInWallet(hedged, buyToken.symbol, { also: true })} Check your wallet before you swap again.` : "Check each route's status; anything not recovered automatically is on the Recover page."))
+      // "2 of 3 routes are confirmed. The third sold too, and its ICP may already be in your wallet."
+      if (maybeSent) {
+        toast.warning(CHECK_WALLET, `${confirmedText(successes.length, results.length)} ${unsureText(kinds, buyToken.symbol, { also: true, total: results.length, confirmed: successes.length })} Check your wallet before you swap again.`)
+      } else {
+        toast.warning('Partial fill', `${confirmedText(successes.length, results.length)} Check each route's status. Anything not recovered automatically is on the Recover page.`)
+      }
     } else {
       // A dead session fails every leg the same way; reset auth once instead of
       // showing raw signature/expiry text.
@@ -551,10 +556,10 @@ export function useCrossDexSwap() {
         return
       }
       phase.value = 'error'
-      errorMsg.value = results.map(r => r.error).filter(Boolean).join('; ') || 'All legs failed'
-      // a route sold while its withdraw answer was lost: never "failed" without the wallet first (the
-      // message does not repeat the title)
-      if (maybeSent) toast.warning(CHECK_WALLET, `${soldMaybeInWallet(hedged, buyToken.symbol, { whole: results.length === 1 })} ${NOT_IN_WALLET}`)
+      errorMsg.value = results.map(r => r.error).filter(Boolean).join('; ') || 'All routes failed'
+      // a route may already be settled in the wallet: never "failed" without the wallet first (the message
+      // does not repeat the title)
+      if (maybeSent) toast.warning(CHECK_WALLET, `${unsureText(kinds, buyToken.symbol, { whole: results.length === 1 })} ${NOT_IN_WALLET}`)
       else toast.error('CrossDEX Swap Failed', errorMsg.value)
     }
   }

@@ -146,6 +146,8 @@ export function legDetail(l: LegRun, sym: string, amountIn: string, outText: str
       if (l.reason === 'tacoPaused') return 'The TACO exchange is paused right now. Your deposit is safe there. Use the Recover page when it is back.'
       if (l.reason === 'rateLimited') return 'The TACO exchange is busy for your wallet. Use the Recover page in a few minutes.'
       if (l.reason === 'neuMismatch') return `${label}: not swapped, because the amount it received did not match this part. Check your wallet first. ${NOT_IN_WALLET}`
+      // the swap's own answer was lost: it may not have sold, and whatever it sold or kept may be back
+      if (l.outMaybeSent && l.saleUnsure) return `${subject} may not have sold this part. Check your wallet first. ${NOT_IN_WALLET}`
       // some or all of the ICP may already be in the wallet (a lost withdraw answer, or only part came
       // back from a look): the wallet comes first
       if (l.outMaybeSent) return `${subject} sold this part. The ICP may already be in your wallet. Check it before using the Recover page.`
@@ -156,15 +158,35 @@ export function legDetail(l: LegRun, sym: string, amountIn: string, outText: str
   }
 }
 
-/** A part that needs the Recover page while its ICP may already be in the wallet (its withdraw
- *  answer was lost, or a look brought back only part of it). */
-export const maybeSentLeg = (l: { state: string; outMaybeSent?: boolean }) => l.state === 'needsRecovery' && !!l.outMaybeSent
-/** Every part that needs the Recover page may already have sent its ICP: the wallet comes first. */
-export function onlyMaybeSent(legs: ReadonlyArray<{ state: string; outMaybeSent?: boolean }>): boolean {
+/** How a part (or route) that needs the Recover page may already be settled in the wallet, so the wallet
+ *  comes first:
+ *   'icp'   its swap sold, and its ICP may already be in the wallet (a lost withdraw answer, or a look brought
+ *           back only part of it)
+ *   'sale'  its swap's own answer was lost: it may not have sold, and what it sold or kept may be back
+ *   'back'  Neutrinite received a different amount and did not swap; one look sent the wallet's balance home
+ *  null for any other part. */
+export type UnsureKind = 'icp' | 'sale' | 'back'
+type UnsureLeg = { state: string; outMaybeSent?: boolean; saleUnsure?: boolean; reason?: string }
+export function unsureKind(l: UnsureLeg): UnsureKind | null {
+  if (l.state !== 'needsRecovery') return null
+  if (l.reason === 'neuMismatch') return 'back'
+  if (!l.outMaybeSent) return null
+  return l.saleUnsure ? 'sale' : 'icp'
+}
+/** A part that needs the Recover page while its funds may already be in the wallet (any unsure kind). */
+export const maybeSentLeg = (l: UnsureLeg) => unsureKind(l) != null
+/** Every part that needs the Recover page may already be settled in the wallet: the wallet comes first. */
+export function onlyMaybeSent(legs: ReadonlyArray<UnsureLeg>): boolean {
   const rec = legs.filter(l => l.state === 'needsRecovery' || l.state === 'tracked')
   return rec.length > 0 && rec.every(maybeSentLeg)
 }
-/** The sheet's title and the toast title when nothing is confirmed sold but a part may have sold. */
+/** How many parts of each unsure kind. */
+export function unsureKinds(legs: ReadonlyArray<UnsureLeg>): Record<UnsureKind, number> {
+  const k: Record<UnsureKind, number> = { icp: 0, sale: 0, back: 0 }
+  for (const l of legs) { const u = unsureKind(l); if (u) k[u]++ }
+  return k
+}
+/** The sheet's title and the toast title when a part may already be settled in the wallet. */
 export const CHECK_WALLET = 'Check your wallet'
 /** Where funds that are not in the wallet are: one wording for every note, summary and toast. */
 export const NOT_IN_WALLET = 'Anything not in your wallet is on the Recover page.'
@@ -172,22 +194,59 @@ export const NOT_IN_WALLET = 'Anything not in your wallet is on the Recover page
  *  the wallet. */
 export const CHECK_WALLET_NOTE = `Check your wallet first. ${NOT_IN_WALLET}`
 /** The same closing note when the session expired during the sale (one note, the wallet first). */
-export const CHECK_WALLET_SESSION_NOTE = 'Check your wallet first. For anything that is not there, reconnect and open the Recover page.'
+export const CHECK_WALLET_SESSION_NOTE = 'Check your wallet first. Reconnect, then open the Recover page for anything not in your wallet.'
 /** A part or route that sold while its output may already be in the wallet: the sale is sure, only
  *  where its output is is not. `whole`: the swap had one route; `also`: other routes sold for sure. */
-export function soldMaybeInWallet(n: number, sym: string, opts: { noun?: 'route' | 'part'; whole?: boolean; also?: boolean } = {}): string {
+export function soldMaybeInWallet(n: number, sym: string, opts: { noun?: 'route' | 'part'; whole?: boolean; also?: boolean; others?: string } = {}): string {
   const noun = opts.noun ?? 'route'
   if (opts.whole) return `The swap sold, and its ${sym} may already be in your wallet.`
-  if (opts.also) return n === 1 ? `Another ${noun} sold too, and its ${sym} may already be in your wallet.` : `Other ${noun}s sold too, and their ${sym} may already be in your wallet.`
+  if (opts.also) return n === 1 ? `${opts.others ?? `Another ${noun}`} sold too, and its ${sym} may already be in your wallet.` : `${opts.others ?? `Other ${noun}s`} sold too, and their ${sym} may already be in your wallet.`
   return n === 1 ? `A ${noun} sold, and its ${sym} may already be in your wallet.` : `Some ${noun}s sold, and their ${sym} may already be in your wallet.`
 }
-/** The single swap summary when a route that failed sold while its output may already be in the wallet.
+/** A part or route whose swap's own answer was lost: it may not have sold (never "it sold"). */
+export function maybeNotSold(n: number, opts: { noun?: 'route' | 'part'; whole?: boolean; also?: boolean; others?: string } = {}): string {
+  const noun = opts.noun ?? 'route'
+  if (opts.whole) return 'The swap may not have sold.'
+  if (opts.also) return `${opts.others ?? (n === 1 ? `Another ${noun}` : `Other ${noun}s`)} may not have sold.`
+  return n === 1 ? `A ${noun} may not have sold.` : `Some ${noun}s may not have sold.`
+}
+/** Neutrinite received a different amount and did not swap: the tokens may already be back. */
+export function notSwappedMaybeBack(n: number, opts: { noun?: 'route' | 'part'; whole?: boolean; also?: boolean; others?: string } = {}): string {
+  const noun = opts.noun ?? 'route'
+  if (opts.whole) return 'Neutrinite did not swap, and your tokens may already be back in your wallet.'
+  if (opts.also) return n === 1 ? `${opts.others ?? `Another ${noun}`} was not swapped, and its tokens may already be back in your wallet.` : `${opts.others ?? `Other ${noun}s`} were not swapped, and their tokens may already be back in your wallet.`
+  return n === 1 ? `A ${noun} was not swapped, and its tokens may already be back in your wallet.` : `Some ${noun}s were not swapped, and their tokens may already be back in your wallet.`
+}
+/** The other routes or parts, named when they are all of one kind: "the other route" (2), "the third route"
+ *  (3 with 2 confirmed), "the other two routes"; else "another route" or "other routes". */
+function othersName(n: number, noun: string, total?: number, confirmed?: number): string | undefined {
+  if (total == null || confirmed == null || n !== total - confirmed) return undefined
+  if (n === 1) return total === 2 ? `The other ${noun}` : total === 3 ? `The third ${noun}` : `The last ${noun}`
+  return n === 2 ? `The other two ${noun}s` : `The other ${noun}s`
+}
+/** The sentences for every part or route that may already be settled in the wallet, by kind. `also`: other
+ *  parts or routes are confirmed (`total` and `confirmed` name the rest when one kind covers it). */
+export function unsureText(kinds: Record<UnsureKind, number>, sym: string, opts: { noun?: 'route' | 'part'; whole?: boolean; also?: boolean; total?: number; confirmed?: number } = {}): string {
+  const kindsUsed = (Object.keys(kinds) as UnsureKind[]).filter(k => kinds[k] > 0)
+  const name = (n: number) => (kindsUsed.length === 1 ? othersName(n, opts.noun ?? 'route', opts.total, opts.confirmed) : undefined)
+  const o = (n: number) => ({ noun: opts.noun, whole: opts.whole && kindsUsed.length === 1 && n === 1, also: opts.also, others: opts.also ? name(n) : undefined })
+  const out: string[] = []
+  if (kinds.icp) out.push(soldMaybeInWallet(kinds.icp, sym, o(kinds.icp)))
+  if (kinds.sale) out.push(maybeNotSold(kinds.sale, o(kinds.sale)))
+  if (kinds.back) out.push(notSwappedMaybeBack(kinds.back, o(kinds.back)))
+  return out.join(' ')
+}
+/** "2 of 3 routes are confirmed." */
+export function confirmedText(confirmed: number, total: number, noun: 'route' | 'token' = 'route'): string {
+  return `${confirmed} of ${plural(total, noun, `${noun}s`)} ${confirmed === 1 ? 'is' : 'are'} confirmed.`
+}
+/** The single swap summary when a route that failed may already be settled in the wallet.
  *  received: what the routes that sold for sure brought (a partial fill); routes: how many the swap had;
- *  hedged: how many may have sent their output already. */
-export function swapMaybeSentSummary(opts: { received?: string; sym: string; routes: number; hedged: number }): string {
+ *  confirmed: how many sold for sure; kinds: the unsure routes by kind. */
+export function swapMaybeSentSummary(opts: { received?: string; sym: string; routes: number; confirmed?: number; kinds: Record<UnsureKind, number> }): string {
   const lead = opts.received != null
-    ? `Partial: received ${opts.received}. ${soldMaybeInWallet(opts.hedged, opts.sym, { also: true })}`
-    : soldMaybeInWallet(opts.hedged, opts.sym, { whole: opts.routes === 1 })
+    ? `Received ${opts.received} so far. ${unsureText(opts.kinds, opts.sym, { also: true, total: opts.routes, confirmed: opts.confirmed })}`
+    : unsureText(opts.kinds, opts.sym, { whole: opts.routes === 1 })
   return `${lead} Check your wallet before you swap again. ${NOT_IN_WALLET}`
 }
 
@@ -198,7 +257,10 @@ export function recoverWhere(l: LegRun): string {
   if (l.reason === 'admin') return 'Outcome unknown. Do not repeat the sale.'
   if (l.reason === 'tacoPaused') return 'Safe on the TACO exchange. Recover when it is back.'
   if (l.reason === 'rateLimited') return 'Recover in a few minutes.'
-  if (l.outMaybeSent) return 'May be in your wallet already. Check it before using the Recover page.'
+  // Neutrinite sent the wallet's balance home in one look: the wallet first
+  if (l.reason === 'neuMismatch') return 'May already be in your wallet. Check it before using the Recover page.'
+  if (l.outMaybeSent && l.saleUnsure) return 'May not have sold. Check your wallet before using the Recover page.'
+  if (l.outMaybeSent) return 'May already be in your wallet. Check it before using the Recover page.'
   if (l.failedAfterSwap) return 'Not sent yet. Use the Recover page.'
   return 'Not refunded yet. Use the Recover page.'
 }

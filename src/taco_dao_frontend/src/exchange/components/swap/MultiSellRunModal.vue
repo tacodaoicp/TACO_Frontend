@@ -51,7 +51,7 @@
               <span v-if="canToggle" class="ms-ar__chev" aria-hidden="true">{{ isOpen(ai) ? '▴' : '▾' }}</span>
             </component>
             <div class="ms-ar__chips">
-              <DexLegChip v-for="(l, li) in a.legs" :key="li" :dex="l.venue" :state="run.phase === 'stopped' ? 'notSent' : l.state" :unsure="maybeSentLeg(l)" />
+              <DexLegChip v-for="(l, li) in a.legs" :key="li" :dex="l.venue" :state="run.phase === 'stopped' ? 'notSent' : l.state" :unsure="unsureKind(l)" />
               <span v-if="cell(a).tag" class="ms-ar__tag">{{ cell(a).tag }}</span>
             </div>
             <div v-if="isOpen(ai)" class="ms-ar__detail">
@@ -133,7 +133,7 @@ import { useExchangeStore } from '../../store/exchange.store'
 import { formatTokenAmount } from '../../utils/format'
 import type { MultiSellRun } from '../../composables/useMultiSell'
 import type { LegRun } from '../../utils/multiSellRunner'
-import { plural, legDetail, stopText, routeHopToken, venueLabel, venueIn, recoverWhere, aboutUsd, maybeSentLeg, onlyMaybeSent, CHECK_WALLET, CHECK_WALLET_NOTE, CHECK_WALLET_SESSION_NOTE } from './multiSellCopy'
+import { plural, legDetail, stopText, routeHopToken, venueLabel, venueIn, recoverWhere, aboutUsd, maybeSentLeg, onlyMaybeSent, unsureKind, CHECK_WALLET, CHECK_WALLET_NOTE, CHECK_WALLET_SESSION_NOTE } from './multiSellCopy'
 import { isHeldReason } from '../../utils/crossDexLegRunner'
 import { joinNames } from '../../utils/multiSellPlanner'
 import TokenCoin from './TokenCoin.vue'
@@ -156,8 +156,11 @@ const running = computed(() => !!props.run && ['preparing', 'selling', 'settling
 const final = computed(() => !!props.run && ['complete', 'partial', 'failed'].includes(props.run.phase))
 const legs = computed(() => props.run?.assets.flatMap(a => a.legs) ?? [])
 const anyRecover = computed(() => legs.value.some(l => ['needsRecovery', 'tracked'].includes(l.state)))
-// a part whose ICP may already be in the wallet: the verdict never says failed without the wallet first
+// a part that may already be settled in the wallet: the verdict never says failed or partly done without the
+// wallet first
 const anyMaybeSent = computed(() => legs.value.some(maybeSentLeg))
+// every part that did not sell for sure may already be settled in the wallet (nothing else is missing)
+const restUnsure = computed(() => legs.value.filter(l => !SOLD.includes(l.state)).every(maybeSentLeg))
 const hedgedOnly = computed(() => onlyMaybeSent(legs.value))
 const anyRefund = computed(() => legs.value.some(l => l.state === 'refunded'))
 // a part not sent because the DEX may still hold funds of an earlier swap of the wallet (the Recover page)
@@ -183,7 +186,7 @@ const title = computed(() => {
   if (!r) return ''
   if (running.value) return n.value === 1 ? `Selling ${r.assets[0].symbol}` : `Selling ${n.value} tokens`
   if (r.phase === 'complete') return 'Sale complete'
-  if (r.phase === 'partial') return 'Partly done'
+  if (r.phase === 'partial') return anyMaybeSent.value ? CHECK_WALLET : 'Partly done'
   if (r.phase === 'stopped') return r.stop === 'notAuthenticated' ? 'Session expired' : 'Nothing was sold'
   return anyMaybeSent.value ? CHECK_WALLET : anyRecover.value ? 'Sale failed' : 'Nothing was sold'
 })
@@ -191,7 +194,7 @@ const pill = computed(() => {
   const p = props.run?.phase
   if (running.value) return { text: 'Running', cls: 'run' }
   if (p === 'complete') return { text: 'Complete', cls: 'ok' }
-  if (p === 'partial') return { text: 'Partly done', cls: 'part' }
+  if (p === 'partial') return { text: anyMaybeSent.value && restUnsure.value ? 'Unconfirmed' : 'Partly done', cls: 'part' }
   if (p === 'stopped') return { text: 'Stopped', cls: 'stop' }
   return anyMaybeSent.value ? { text: 'Unconfirmed', cls: 'part' } : { text: 'Failed', cls: 'fail' }
 })
@@ -270,8 +273,11 @@ function cell(a: MultiSellRun['assets'][number]): { text: string; cls: string; s
     if (sold.every(l => l.state === 'doneUnknown')) return { text: 'Sold', cls: 'ok', glyph: '✓', tag }
     return { text: '', cls: 'ok', glyph: '✓', out, tag }
   }
+  // the rest of the token's parts may already be settled in the wallet: the wallet first, not partly sold
+  // and not a failure
+  const restMaybe = ls.filter(l => !SOLD.includes(l.state)).every(maybeSentLeg)
+  if (sold.length > 0 && restMaybe) return { text: 'Check wallet', cls: 'warn', glyph: '!', tag }
   if (sold.length > 0) return { text: 'Partly sold', cls: 'part', out, tag }
-  // it sold, and its ICP may already be in the wallet: the wallet first, not a failure
   if (bad && onlyMaybeSent(ls)) return { text: 'Check wallet', cls: 'warn', glyph: '!' }
   if (bad) return { text: 'Needs recovery', cls: 'fail' }
   if (ls.some(l => l.state === 'refunded')) return { text: 'Refunded', cls: 'ref', glyph: '↩' }
@@ -354,7 +360,8 @@ const refunds = computed(() => {
     if (mid != null) out.push({ what: `${a.symbol} route on the TACO exchange`, where: mid && tokenOf(mid) ? `Came back as ${tokenOf(mid)!.symbol}.` : 'Came back as another token.', bad: false, other: true })
     else if (l.state === 'refunded') out.push({ what: `${amt} from ${venueIn(l.venue)}`, where: 'Sent back to your wallet.', bad: false })
     else if (l.state === 'tracked' || (l.state === 'needsRecovery' && l.reason === 'maySent')) out.push({ what: `${a.symbol} deposit on the TACO exchange`, where: recoverWhere(l), bad: true })
-    else if (l.state === 'needsRecovery' && l.failedAfterSwap) out.push({ what: `ICP from your ${a.symbol} sale on ${venueIn(l.venue)}`, where: recoverWhere(l), bad: true, unsure: maybeSentLeg(l) })
+    // a part whose sale is not sure is not "ICP from your sale": what it put in, wherever it is now
+    else if (l.state === 'needsRecovery' && l.failedAfterSwap && !l.saleUnsure) out.push({ what: `ICP from your ${a.symbol} sale on ${venueIn(l.venue)}`, where: recoverWhere(l), bad: true, unsure: maybeSentLeg(l) })
     else if (l.state === 'needsRecovery') out.push({ what: `${amt} on ${venueIn(l.venue)}`, where: recoverWhere(l), bad: true, unsure: maybeSentLeg(l) })
   }
   return out

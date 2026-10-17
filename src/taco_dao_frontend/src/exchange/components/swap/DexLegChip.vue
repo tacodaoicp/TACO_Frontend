@@ -11,9 +11,11 @@
 import { computed } from 'vue'
 import type { CrossDexVenue } from '../../utils/crossDexOptimizer'
 import type { LegState } from '../../utils/crossDexLegRunner'
+import type { UnsureKind } from './multiSellCopy'
 
-// unsure: the part sold while its output may already be in the wallet (outMaybeSent): the wallet first
-const props = defineProps<{ dex: CrossDexVenue; state: LegState; unsure?: boolean }>()
+// unsure: the part may already be settled in the wallet (multiSellCopy unsureKind): its ICP ('icp'), its sale
+// is not sure ('sale'), or Neutrinite sent its tokens back unswapped ('back'). The wallet first.
+const props = defineProps<{ dex: CrossDexVenue; state: LegState; unsure?: UnsureKind | null }>()
 
 const name = computed(() => (props.dex === 'icpswap' ? 'ICPSwap' : props.dex === 'neutrinite' ? 'Neutrinite' : 'TACO'))
 const look = computed(() => {
@@ -29,9 +31,14 @@ const look = computed(() => {
     default: return 'wait'
   }
 })
-const glyph = computed(() => ({ done: '✓', low: '✓', ref: '↩', defer: '···', skip: '○', fail: props.state === 'tracked' ? '!' : '✕', unsure: '!', wait: '···', run: '' } as Record<string, string>)[look.value])
+// the unsure chip's ? is never the tracked chip's ! (the two are not told apart by colour alone)
+const glyph = computed(() => ({ done: '✓', low: '✓', ref: '↩', defer: '···', skip: '○', fail: props.state === 'tracked' ? '!' : '✕', unsure: '?', wait: '···', run: '' } as Record<string, string>)[look.value])
 const meaning = computed(() => {
-  if (look.value === 'unsure') return 'may already be in your wallet'
+  if (look.value === 'unsure') {
+    return props.unsure === 'sale' ? 'may not have sold, check your wallet'
+      : props.unsure === 'back' ? 'not swapped, its tokens may already be back in your wallet'
+      : 'sold, its ICP may already be in your wallet'
+  }
   switch (props.state) {
     case 'running': case 'recovering': return 'running'
     case 'slow': return 'taking longer than usual'
