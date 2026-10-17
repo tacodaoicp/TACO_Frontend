@@ -160,7 +160,7 @@
       <div class="crossdex-card__exec">
         <div class="crossdex-card__exec-head">
           <h3>CrossDEX Swap</h3>
-          <span class="crossdex-card__exec-status" :class="`is-${cx.phase.value}`">{{ execStatusLabel }}</span>
+          <span class="crossdex-card__exec-status" :class="`is-${verdictCls}`">{{ execStatusLabel }}</span>
         </div>
         <p class="crossdex-card__exec-sub">
           {{ legViews.length }} route{{ legViews.length === 1 ? '' : 's' }}{{ cx.neuFirst.value ? ', Neutrinite first' : ' running in parallel' }} · {{ cx.tokenFrom.value?.symbol }} → {{ cx.tokenTo.value?.symbol }}
@@ -190,7 +190,9 @@
               {{ lv.step || 'Starting…' }}
             </div>
             <div v-else-if="lv.status === 'failed'" class="crossdex-card__exec-leg-err">
-              <div class="crossdex-card__exec-err-msg">{{ lv.outcome?.error || 'Failed' }}</div>
+              <!-- a route whose output may already be in the wallet: its raw error ("Failed to fetch") would
+                   read as a hard failure, and the note below says what to do -->
+              <div v-if="!lv.outcome?.outMaybeSent" class="crossdex-card__exec-err-msg">{{ lv.outcome?.error || 'Failed' }}</div>
               <div class="crossdex-card__exec-err-note">
                 {{ lv.outcome?.notStarted
                     ? 'Your funds for this route stayed in your wallet.'
@@ -207,7 +209,7 @@
         </div>
 
         <!-- aggregate result -->
-        <div v-if="cx.phase.value !== 'executing'" class="crossdex-card__exec-summary" :class="`is-${cx.phase.value}`">
+        <div v-if="cx.phase.value !== 'executing'" class="crossdex-card__exec-summary" :class="`is-${verdictCls}`">
           {{ summaryLine }}
         </div>
 
@@ -238,6 +240,7 @@ import { useCrossDexSwap } from '../../composables/useCrossDexSwap'
 import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { formatTokenAmount } from '../../utils/format'
+import { CHECK_WALLET, swapMaybeSentSummary } from './multiSellCopy'
 import { getTokenIcon } from '../../utils/token-icons'
 import TokenSelector from './TokenSelector.vue'
 import SlippageSelector from '../shared/SlippageSelector.vue'
@@ -339,7 +342,13 @@ const legViews = computed(() => {
   })
 })
 
+// a failed route whose output may already be in the wallet (its withdraw answer was lost): the
+// verdict says to check the wallet, never that everything failed
+const maybeSent = computed(() => ['partial', 'error'].includes(cx.phase.value) && cx.outcomes.value.some(o => !o.success && o.outMaybeSent))
+const verdictCls = computed(() => (maybeSent.value ? 'partial' : cx.phase.value))
+
 const execStatusLabel = computed(() => {
+  if (maybeSent.value) return CHECK_WALLET
   switch (cx.phase.value) {
     case 'executing': return 'Running'
     case 'success': return 'Complete'
@@ -355,6 +364,7 @@ const summaryLine = computed(() => {
   const unknown = cx.outcomes.value.some(o => o.success && o.state === 'doneUnknown')
   const totalStr = formatTo(total) + (unknown ? ', plus a route whose amount shows in your wallet' : '')
   if (cx.phase.value === 'success') return `Received ${totalStr}`
+  if (maybeSent.value) return swapMaybeSentSummary(cx.phase.value === 'partial' ? totalStr : undefined)
   if (cx.phase.value === 'partial') return `Partial: received ${totalStr}. Check each route's status above; anything not recovered automatically is on the Recover page.`
   if (cx.phase.value === 'error') return `All routes failed. Check each route's status above; anything not recovered automatically is on the Recover page.`
   return ''

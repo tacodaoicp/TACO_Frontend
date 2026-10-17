@@ -43,6 +43,7 @@ import {
 } from '../utils/crossDexLegRunner'
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
+import { CHECK_WALLET, swapMaybeSentSummary } from '../components/swap/multiSellCopy'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
 
 export type CrossDexPhase =
@@ -503,6 +504,7 @@ export function useCrossDexSwap() {
 
     const successes = results.filter(r => r.success)
     const totalOut = results.reduce((sum, r) => sum + r.amountOut, 0n)
+    const maybeSent = results.some(r => !r.success && r.outMaybeSent)
     if (successes.length === results.length) {
       phase.value = 'success'
       toast.success('CrossDEX Swap Complete',
@@ -510,7 +512,8 @@ export function useCrossDexSwap() {
           + (results.some(r => r.state === 'doneUnknown') ? ' received, plus a route whose amount shows in your wallet.' : ' received.'))
     } else if (successes.length > 0) {
       phase.value = 'partial'
-      toast.warning('Partial Fill', `${successes.length}/${results.length} legs filled. Check each route's status; anything not recovered automatically is on the Recover page.`)
+      toast.warning('Partial Fill', `${successes.length}/${results.length} legs filled. `
+        + (maybeSent ? 'Another route may have sold too. Check your wallet before you swap again.' : "Check each route's status; anything not recovered automatically is on the Recover page."))
     } else {
       // A dead session fails every leg the same way; reset auth once instead of
       // showing raw signature/expiry text.
@@ -522,7 +525,9 @@ export function useCrossDexSwap() {
       }
       phase.value = 'error'
       errorMsg.value = results.map(r => r.error).filter(Boolean).join('; ') || 'All legs failed'
-      toast.error('CrossDEX Swap Failed', errorMsg.value)
+      // a route whose withdraw answer was lost may have sold: never "failed" without the wallet first
+      if (maybeSent) toast.warning(CHECK_WALLET, swapMaybeSentSummary())
+      else toast.error('CrossDEX Swap Failed', errorMsg.value)
     }
   }
 

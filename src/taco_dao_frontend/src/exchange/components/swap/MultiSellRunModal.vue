@@ -94,7 +94,8 @@
         <p v-if="final && slowCount > 0" class="ms-md__note ms-note-warn">{{ slowCount === 1 ? '1 route is still finishing. Keep this page open until it does.' : `${slowCount} routes are still finishing. Keep this page open until they do.` }}</p>
         <p v-if="final && run.sessionExpired" class="ms-md__note ms-note-warn">Your session expired during the sale. Reconnect, then open the Recover page for anything that was not refunded.</p>
         <p v-if="final && !anyRecover && anyRefund" class="ms-md__note">Refunds are on their way to your wallet, minus network fees.</p>
-        <p v-if="final && anyRecover" class="ms-md__note ms-note-bad">Some funds were not refunded automatically. Open the Recover page to get them back.</p>
+        <p v-if="final && anyRecover && hedgedOnly" class="ms-md__note ms-note-warn">{{ CHECK_WALLET_NOTE }}</p>
+        <p v-else-if="final && anyRecover" class="ms-md__note ms-note-bad">Some funds were not refunded automatically. Open the Recover page to get them back.</p>
 
         <p v-if="running" class="ms-md__foot">Keep this page open until it finishes. Anything that cannot finish goes back to your wallet, minus network fees.</p>
         <p v-if="run.phase === 'stopped'" class="ms-md__foot">Your tokens are still in your wallet.{{ run.approvalSpent ? ' Only the approval fee was spent.' : '' }}</p>
@@ -128,7 +129,7 @@ import { useExchangeStore } from '../../store/exchange.store'
 import { formatTokenAmount } from '../../utils/format'
 import type { MultiSellRun } from '../../composables/useMultiSell'
 import type { LegRun } from '../../utils/multiSellRunner'
-import { plural, legDetail, stopText, routeHopToken, venueLabel, venueIn, recoverWhere, aboutUsd } from './multiSellCopy'
+import { plural, legDetail, stopText, routeHopToken, venueLabel, venueIn, recoverWhere, aboutUsd, maybeSentLeg, onlyMaybeSent, CHECK_WALLET, CHECK_WALLET_NOTE } from './multiSellCopy'
 import { joinNames } from '../../utils/multiSellPlanner'
 import TokenCoin from './TokenCoin.vue'
 import DexLegChip from './DexLegChip.vue'
@@ -150,6 +151,9 @@ const running = computed(() => !!props.run && ['preparing', 'selling', 'settling
 const final = computed(() => !!props.run && ['complete', 'partial', 'failed'].includes(props.run.phase))
 const legs = computed(() => props.run?.assets.flatMap(a => a.legs) ?? [])
 const anyRecover = computed(() => legs.value.some(l => ['needsRecovery', 'tracked'].includes(l.state)))
+// a part whose ICP may already be in the wallet: the verdict never says failed without the wallet first
+const anyMaybeSent = computed(() => legs.value.some(maybeSentLeg))
+const hedgedOnly = computed(() => onlyMaybeSent(legs.value))
 const anyRefund = computed(() => legs.value.some(l => l.state === 'refunded'))
 const soldAny = computed(() => legs.value.some(l => SOLD.includes(l.state)))
 const slowCount = computed(() => legs.value.filter(l => l.state === 'slow' || (!isFinal(l) && l.state !== 'deferred')).length)
@@ -174,7 +178,7 @@ const title = computed(() => {
   if (r.phase === 'complete') return 'Sale complete'
   if (r.phase === 'partial') return 'Partly done'
   if (r.phase === 'stopped') return r.stop === 'notAuthenticated' ? 'Session expired' : 'Nothing was sold'
-  return anyRecover.value ? 'Sale failed' : 'Nothing was sold'
+  return anyMaybeSent.value ? CHECK_WALLET : anyRecover.value ? 'Sale failed' : 'Nothing was sold'
 })
 const pill = computed(() => {
   const p = props.run?.phase
@@ -182,7 +186,7 @@ const pill = computed(() => {
   if (p === 'complete') return { text: 'Complete', cls: 'ok' }
   if (p === 'partial') return { text: 'Partly done', cls: 'part' }
   if (p === 'stopped') return { text: 'Stopped', cls: 'stop' }
-  return { text: 'Failed', cls: 'fail' }
+  return anyMaybeSent.value ? { text: 'Unconfirmed', cls: 'part' } : { text: 'Failed', cls: 'fail' }
 })
 const routes = computed(() => legs.value.length)
 const subLine = computed(() => `${plural(n.value, 'token', 'tokens')} to ICP, ${plural(routes.value, 'route', 'routes')}`)
@@ -194,7 +198,9 @@ const fillPct = computed(() => {
 })
 const fillCls = computed(() => {
   const p = props.run?.phase
-  return { 'is-prep': p === 'preparing', 'is-ok': p === 'complete', 'is-part': p === 'partial', 'is-fail': p === 'failed', 'is-stop': p === 'stopped' }
+  // nothing confirmed sold, but a part may have sold: the bar matches the pill, not a failure
+  const unsure = p === 'failed' && anyMaybeSent.value
+  return { 'is-prep': p === 'preparing', 'is-ok': p === 'complete', 'is-part': p === 'partial' || unsure, 'is-fail': p === 'failed' && !unsure, 'is-stop': p === 'stopped' }
 })
 
 const now = ref(Date.now())
@@ -264,7 +270,8 @@ function cell(a: MultiSellRun['assets'][number]): { text: string; cls: string; s
 }
 
 // row detail: open on tap; on the result, rows that need the user open by themselves (needs
-// recovery, tracked, sold below the minimum, a route that came back as another token). Other
+// recovery, tracked, sold below the minimum, a route that came back as another token, a Neutrinite
+// part not sent because the pylon may still hold some of the token for the Recover page). Other
 // refunded rows stay closed: the list below has them.
 const opened = ref<Set<number>>(new Set())
 const canToggle = computed(() => props.run?.phase !== 'stopped')
@@ -276,6 +283,7 @@ function toggle(ai: number) {
 }
 const ATTENTION = ['needsRecovery', 'tracked', 'belowMin']
 const needsLook = (l: LegRun) => ATTENTION.includes(l.state) || (l.state === 'refunded' && routeHopToken(l) != null)
+  || (l.state === 'notSent' && l.reason === 'neuHeld')
 const attentionRows = computed(() => (final.value && props.run
   ? props.run.assets.map((a: MultiSellRun['assets'][number], ai: number) => (a.legs.some(needsLook) ? ai : -1)).filter((ai: number) => ai >= 0)
   : []))
@@ -319,9 +327,11 @@ watch(() => !!props.run, async (open, was) => {
 }, { immediate: true })
 onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 
-// the raw message adds something only when it is the DEX's own words (the runner's notes repeat the row)
-const showRawError = (l: LegRun) => ['needsRecovery', 'tracked'].includes(l.state) && !!l.error
-  && !['maySent', 'tacoPaused', 'rateLimited'].includes(l.reason ?? '') && !/may have been sent|TACO takes only/i.test(l.error)
+// the raw message adds something only when it is the DEX's own words (the runner's notes repeat the
+// row); under a part whose ICP may already be in the wallet a raw transport error ("Failed to fetch")
+// would read as a hard failure, and the row already says what to do
+const showRawError = (l: LegRun) => ['needsRecovery', 'tracked'].includes(l.state) && !!l.error && !l.outMaybeSent
+  && !['maySent', 'tacoPaused', 'rateLimited', 'neuMismatch'].includes(l.reason ?? '') && !/may have been sent|TACO takes only/i.test(l.error)
 
 // Refunds and recovery: what needs the user first (each with what to do for its reason), then what
 // came back as another token, then what came back by itself; more than FOLD_AFTER of those fold

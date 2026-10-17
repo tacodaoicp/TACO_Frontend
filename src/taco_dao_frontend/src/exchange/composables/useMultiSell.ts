@@ -27,7 +27,7 @@ import { createRunAgent, type RunAgent } from '../utils/runAgent'
 import { withFundsLock, BUSY } from '../utils/saleLock'
 import { approveExchangeDeposit } from '../utils/deposit'
 import { buildLegDeps } from './useCrossDexSwap'
-import { stopText } from '../components/swap/multiSellCopy'
+import { stopText, maybeSentLeg, onlyMaybeSent, CHECK_WALLET, CHECK_WALLET_NOTE } from '../components/swap/multiSellCopy'
 import * as icpswap from '../services/icpswap'
 import * as neutrinite from '../services/neutrinite'
 import type { TokenInfo } from 'declarations/OTC_backend/OTC_backend.did.d.ts'
@@ -738,19 +738,25 @@ export function useMultiSell() {
   }
 
   function announceLate(res: SaleResult) {
-    const anyRecover = res.assets.some(a => a.legs.some(l => ['needsRecovery', 'tracked'].includes(l.state)))
-    const anyRefund = res.assets.some(a => a.legs.some(l => l.state === 'refunded'))
-    if (anyRecover) toast.error('Your last sale has finished', 'Some funds need the Recover page. The result is on the CrossDEX page.')
+    const legs = res.assets.flatMap(a => a.legs)
+    const anyRecover = legs.some(l => ['needsRecovery', 'tracked'].includes(l.state))
+    const anyRefund = legs.some(l => l.state === 'refunded')
+    // every part that needs the Recover page may already be in the wallet: the wallet comes first
+    if (anyRecover && onlyMaybeSent(legs)) toast.warning('Your last sale has finished', `${CHECK_WALLET_NOTE} The result is on the CrossDEX page.`)
+    else if (anyRecover) toast.error('Your last sale has finished', 'Some funds need the Recover page. The result is on the CrossDEX page.')
     else if (res.phase === 'complete') toast.success('Your last sale has finished', icp.value ? receivedText(res, ' in total') : undefined)
     else toast.info('Your last sale has finished', anyRefund ? 'Some parts were refunded. The result is on the CrossDEX page.' : 'The result is on the CrossDEX page.')
   }
 
   function announce(res: SaleResult) {
+    const legs = res.assets.flatMap(a => a.legs)
     const tokensFully = res.assets.filter(a => a.legs.every(l => ['done', 'doneUnknown', 'belowMin'].includes(l.state))).length
-    const anyRecover = res.assets.some(a => a.legs.some(l => ['needsRecovery', 'tracked'].includes(l.state)))
-    const anyRefund = res.assets.some(a => a.legs.some(l => l.state === 'refunded'))
+    const anyRecover = legs.some(l => ['needsRecovery', 'tracked'].includes(l.state))
+    const anyRefund = legs.some(l => l.state === 'refunded')
     if (res.phase === 'complete') toast.success('Sale complete', receivedText(res))
     else if (res.phase === 'partial') toast.warning('Partly done', `${tokensFully} of ${res.assets.length} tokens fully sold. Details are in the summary.`)
+    // nothing confirmed sold, but a part may have sold (its ICP may already be in the wallet)
+    else if (legs.some(maybeSentLeg)) toast.warning(CHECK_WALLET, onlyMaybeSent(legs) ? CHECK_WALLET_NOTE : 'A part may have sold. Some funds need the Recover page.')
     else if (anyRecover) toast.error('Sale failed', 'Some funds need the Recover page.')
     else toast.info('Nothing was sold', anyRefund ? 'Refunds are on their way to your wallet, minus network fees.' : 'Your tokens stayed in your wallet.')
   }

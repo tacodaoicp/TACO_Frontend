@@ -155,6 +155,26 @@ export function legDetail(l: LegRun, sym: string, amountIn: string, outText: str
   }
 }
 
+/** A part that needs the Recover page while its ICP may already be in the wallet (its withdraw
+ *  answer was lost, or a look brought back only part of it). */
+export const maybeSentLeg = (l: { state: string; outMaybeSent?: boolean }) => l.state === 'needsRecovery' && !!l.outMaybeSent
+/** Every part that needs the Recover page may already have sent its ICP: the wallet comes first. */
+export function onlyMaybeSent(legs: ReadonlyArray<{ state: string; outMaybeSent?: boolean }>): boolean {
+  const rec = legs.filter(l => l.state === 'needsRecovery' || l.state === 'tracked')
+  return rec.length > 0 && rec.every(maybeSentLeg)
+}
+/** The sheet's title and the toast title when nothing is confirmed sold but a part may have sold. */
+export const CHECK_WALLET = 'Check your wallet'
+/** The closing note (and toast line) when every part that needs the Recover page may already be in
+ *  the wallet. */
+export const CHECK_WALLET_NOTE = 'Check your wallet first. Anything that is not there is on the Recover page.'
+/** The single swap summary when a route that failed may still have sold (its ICP may be in the wallet). */
+export function swapMaybeSentSummary(received?: string): string {
+  return received != null
+    ? `Partial: received ${received}. Another route may have sold too. Check your wallet before you swap again. Anything not there is on the Recover page.`
+    : 'A route may have sold. Check your wallet before you swap again. Anything not there is on the Recover page.'
+}
+
 /** Refunds and recovery list: what the user should do about one leg that needs recovery. */
 export function recoverWhere(l: LegRun): string {
   if (l.state === 'tracked' || l.reason === 'maySent') return 'Use the Recover page.'
