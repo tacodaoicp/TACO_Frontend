@@ -175,6 +175,8 @@
               <span class="crossdex-card__exec-leg-icon">
                 <span v-if="lv.status === 'running'" class="crossdex-card__spinner"></span>
                 <span v-else-if="lv.status === 'success'" class="crossdex-card__check">✓</span>
+                <!-- it sold, and its output may already be in the wallet: a warning, not a failure -->
+                <span v-else-if="lv.status === 'unsure'" class="crossdex-card__warn" role="img" aria-label="May already be in your wallet">!</span>
                 <span v-else class="crossdex-card__cross">✕</span>
               </span>
             </div>
@@ -189,13 +191,16 @@
             <div v-if="lv.status === 'running'" class="crossdex-card__exec-leg-step">
               {{ lv.step || 'Starting…' }}
             </div>
-            <div v-else-if="lv.status === 'failed'" class="crossdex-card__exec-leg-err">
+            <div v-else-if="lv.status === 'failed' || lv.status === 'unsure'" class="crossdex-card__exec-leg-err">
               <!-- a route whose output may already be in the wallet: its raw error ("Failed to fetch") would
-                   read as a hard failure, and the note below says what to do -->
-              <div v-if="!lv.outcome?.outMaybeSent" class="crossdex-card__exec-err-msg">{{ lv.outcome?.error || 'Failed' }}</div>
-              <div class="crossdex-card__exec-err-note">
+                   read as a hard failure, and the note below says what to do; a route not sent because the DEX
+                   may still hold an earlier swap's funds: the note says it -->
+              <div v-if="!lv.outcome?.outMaybeSent && !isHeldReason(lv.outcome?.reason)" class="crossdex-card__exec-err-msg">{{ lv.outcome?.error || 'Failed' }}</div>
+              <div class="crossdex-card__exec-err-note" :class="{ 'is-warn': lv.status === 'unsure' }">
                 {{ lv.outcome?.notStarted
-                    ? 'Your funds for this route stayed in your wallet.'
+                    ? (isHeldReason(lv.outcome.reason)
+                      ? `Your funds for this route stayed in your wallet. ${lv.label} may still hold funds from another swap of yours, and the Recover page can send them back.`
+                      : 'Your funds for this route stayed in your wallet.')
                     : lv.outcome?.recovered
                       ? 'Funds were refunded to your wallet.'
                       : lv.outcome?.outMaybeSent
@@ -241,6 +246,7 @@ import { useExchangeStore } from '../../store/exchange.store'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { formatTokenAmount } from '../../utils/format'
 import { CHECK_WALLET, swapMaybeSentSummary } from './multiSellCopy'
+import { isHeldReason } from '../../utils/crossDexLegRunner'
 import { getTokenIcon } from '../../utils/token-icons'
 import TokenSelector from './TokenSelector.vue'
 import SlippageSelector from '../shared/SlippageSelector.vue'
@@ -323,12 +329,13 @@ function maybeSentNote(reason?: string): string {
     + (reason === 'session' ? ' If it is not there, reconnect your wallet first.' : '')
 }
 
-type LegStatus = 'running' | 'success' | 'failed'
+type LegStatus = 'running' | 'success' | 'failed' | 'unsure'
 const legViews = computed(() => {
   const legs = cx.plan.value?.legs ?? []
   return legs.map(leg => {
     const outcome = cx.outcomes.value.find(o => o.dex === leg.dex)
-    const status: LegStatus = outcome ? (outcome.success ? 'success' : 'failed') : 'running'
+    // a route that sold while its output may already be in the wallet reads unsure, not failed
+    const status: LegStatus = outcome ? (outcome.success ? 'success' : outcome.outMaybeSent ? 'unsure' : 'failed') : 'running'
     return {
       dex: leg.dex,
       label: dexLabel(leg.dex),
@@ -592,7 +599,8 @@ onMounted(() => {
     padding: 3px 8px; border-radius: 999px;
     &.is-executing { background: rgba(196, 90, 10, 0.15); color: var(--accent-primary); }
     &.is-success { background: rgba(60, 180, 90, 0.18); color: #3cb45a; }
-    &.is-partial { background: rgba(220, 160, 40, 0.18); color: #d8a83f; }
+    // theme tokens: the amber ink keeps at least 4.5:1 on its dim fill in both themes (CHECK YOUR WALLET)
+    &.is-partial { background: var(--tx-warning-dim); color: var(--tx-warning-ink); }
     &.is-error { background: rgba(220, 70, 70, 0.18); color: #d65b5b; }
   }
   &__exec-sub { margin: 0; font-size: var(--text-xs); color: var(--text-tertiary); }
@@ -603,11 +611,17 @@ onMounted(() => {
     display: flex; flex-direction: column; gap: 6px;
     &.is-success { border-color: rgba(60, 180, 90, 0.4); }
     &.is-failed { border-color: rgba(220, 70, 70, 0.4); }
+    &.is-unsure { border-color: color-mix(in srgb, var(--tx-warning) 55%, transparent); }
   }
   &__exec-leg-head { display: flex; align-items: center; gap: 8px; }
   &__exec-leg-icon { margin-left: auto; display: inline-flex; align-items: center; }
   &__check { color: #3cb45a; font-weight: 700; }
   &__cross { color: #d65b5b; font-weight: 700; }
+  &__warn {
+    width: 18px; height: 18px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; line-height: 1; color: var(--tx-warning-ink);
+    background: var(--tx-warning-dim); border: 1.5px solid var(--tx-warning-ink);
+  }
   &__exec-leg-amt { font-size: var(--text-sm); color: var(--text-primary); }
   &__exec-arrow { color: var(--text-tertiary); margin: 0 4px; }
   &__exec-leg-step { font-size: var(--text-xs); color: var(--text-secondary); }
@@ -616,7 +630,11 @@ onMounted(() => {
     font-size: var(--text-xs); color: #d65b5b; word-break: break-word; line-height: 1.4;
     background: rgba(220, 70, 70, 0.08); border-radius: 6px; padding: 6px 8px;
   }
-  &__exec-err-note { font-size: 11px; color: var(--text-tertiary); }
+  &__exec-err-note {
+    font-size: 11px; color: var(--text-tertiary);
+    // the note of a route whose output may already be in the wallet says what to do: amber, a size up
+    &.is-warn { font-size: 12px; color: var(--tx-warning-ink); line-height: 1.4; }
+  }
 
   &__exec-summary {
     font-size: var(--text-sm); padding: 10px 12px; border-radius: 10px; line-height: 1.4;

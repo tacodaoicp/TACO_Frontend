@@ -45,6 +45,8 @@
   --tx-warn:        #d88a3f;
   --tx-warning:     #d88a3f;
   --tx-warning-dim: rgba(216, 138, 63, 0.14);
+  /* amber text on its dim fill (verdict pills, unsure rows): at least 4.5:1 on the panel */
+  --tx-warning-ink: #e0954c;
   --tx-info:        #7aa7d7;
   --tx-info-dim:    rgba(122, 167, 215, 0.14);
 
@@ -99,6 +101,8 @@
   --tx-warn:        #b45c17;
   --tx-warning:     #b45c17;
   --tx-warning-dim: rgba(180, 92, 23, 0.10);
+  /* amber text on its dim fill (verdict pills, unsure rows): at least 4.5:1 on the panel */
+  --tx-warning-ink: #8f4510;
   --tx-info:        #3f6a9c;
   --tx-info-dim:    rgba(63, 106, 156, 0.08);
 

@@ -51,7 +51,7 @@
               <span v-if="canToggle" class="ms-ar__chev" aria-hidden="true">{{ isOpen(ai) ? '▴' : '▾' }}</span>
             </component>
             <div class="ms-ar__chips">
-              <DexLegChip v-for="(l, li) in a.legs" :key="li" :dex="l.venue" :state="run.phase === 'stopped' ? 'notSent' : l.state" />
+              <DexLegChip v-for="(l, li) in a.legs" :key="li" :dex="l.venue" :state="run.phase === 'stopped' ? 'notSent' : l.state" :unsure="maybeSentLeg(l)" />
               <span v-if="cell(a).tag" class="ms-ar__tag">{{ cell(a).tag }}</span>
             </div>
             <div v-if="isOpen(ai)" class="ms-ar__detail">
@@ -69,7 +69,8 @@
           <div class="ms-rf">
             <div v-for="(r, i) in recoverRows" :key="'r' + i" class="ms-rf__row">
               <span>{{ r.what }}</span>
-              <span class="ms-rf__where is-bad">{{ r.where }}</span>
+              <!-- a part whose ICP may already be in the wallet: amber, the wallet first -->
+              <span class="ms-rf__where" :class="r.unsure ? 'is-warn' : 'is-bad'">{{ r.where }}</span>
             </div>
             <!-- a route that came back as another token never folds: the wallet now holds a token
                  that was not sold -->
@@ -92,10 +93,11 @@
         </template>
 
         <p v-if="final && slowCount > 0" class="ms-md__note ms-note-warn">{{ slowCount === 1 ? '1 route is still finishing. Keep this page open until it does.' : `${slowCount} routes are still finishing. Keep this page open until they do.` }}</p>
-        <p v-if="final && run.sessionExpired" class="ms-md__note ms-note-warn">Your session expired during the sale. Reconnect, then open the Recover page for anything that was not refunded.</p>
+        <!-- every part that needs the Recover page may already be in the wallet: one note, the wallet first -->
+        <p v-if="final && anyRecover && hedgedOnly" class="ms-md__note ms-note-warn">{{ run.sessionExpired ? CHECK_WALLET_SESSION_NOTE : CHECK_WALLET_NOTE }}</p>
+        <p v-else-if="final && run.sessionExpired" class="ms-md__note ms-note-warn">Your session expired during the sale. Reconnect, then open the Recover page for anything that was not refunded.</p>
         <p v-if="final && !anyRecover && anyRefund" class="ms-md__note">Refunds are on their way to your wallet, minus network fees.</p>
-        <p v-if="final && anyRecover && hedgedOnly" class="ms-md__note ms-note-warn">{{ CHECK_WALLET_NOTE }}</p>
-        <p v-else-if="final && anyRecover" class="ms-md__note ms-note-bad">Some funds were not refunded automatically. Open the Recover page to get them back.</p>
+        <p v-if="final && anyRecover && !hedgedOnly" class="ms-md__note ms-note-bad">Some funds were not refunded automatically. Open the Recover page to get them back.</p>
 
         <p v-if="running" class="ms-md__foot">Keep this page open until it finishes. Anything that cannot finish goes back to your wallet, minus network fees.</p>
         <p v-if="run.phase === 'stopped'" class="ms-md__foot">Your tokens are still in your wallet.{{ run.approvalSpent ? ' Only the approval fee was spent.' : '' }}</p>
@@ -114,7 +116,9 @@
             <button class="ex-btn ex-btn--primary" @click="$emit('recover')">Open Recover page</button>
           </template>
           <template v-else>
-            <button v-if="soldAny" class="ex-btn ex-btn--ghost" @click="$emit('portfolio')">View in Portfolio</button>
+            <button v-if="soldAny && !anyHeld" class="ex-btn ex-btn--ghost" @click="$emit('portfolio')">View in Portfolio</button>
+            <!-- a part not sent because the DEX may still hold an earlier swap's funds: its row points here -->
+            <button v-if="anyHeld" class="ex-btn ex-btn--ghost" @click="$emit('recover')">Open Recover page</button>
             <button class="ex-btn ex-btn--primary" @click="$emit('done')">Done</button>
           </template>
         </div>
@@ -129,7 +133,8 @@ import { useExchangeStore } from '../../store/exchange.store'
 import { formatTokenAmount } from '../../utils/format'
 import type { MultiSellRun } from '../../composables/useMultiSell'
 import type { LegRun } from '../../utils/multiSellRunner'
-import { plural, legDetail, stopText, routeHopToken, venueLabel, venueIn, recoverWhere, aboutUsd, maybeSentLeg, onlyMaybeSent, CHECK_WALLET, CHECK_WALLET_NOTE } from './multiSellCopy'
+import { plural, legDetail, stopText, routeHopToken, venueLabel, venueIn, recoverWhere, aboutUsd, maybeSentLeg, onlyMaybeSent, CHECK_WALLET, CHECK_WALLET_NOTE, CHECK_WALLET_SESSION_NOTE } from './multiSellCopy'
+import { isHeldReason } from '../../utils/crossDexLegRunner'
 import { joinNames } from '../../utils/multiSellPlanner'
 import TokenCoin from './TokenCoin.vue'
 import DexLegChip from './DexLegChip.vue'
@@ -155,6 +160,8 @@ const anyRecover = computed(() => legs.value.some(l => ['needsRecovery', 'tracke
 const anyMaybeSent = computed(() => legs.value.some(maybeSentLeg))
 const hedgedOnly = computed(() => onlyMaybeSent(legs.value))
 const anyRefund = computed(() => legs.value.some(l => l.state === 'refunded'))
+// a part not sent because the DEX may still hold funds of an earlier swap of the wallet (the Recover page)
+const anyHeld = computed(() => legs.value.some(l => l.state === 'notSent' && isHeldReason(l.reason)))
 const soldAny = computed(() => legs.value.some(l => SOLD.includes(l.state)))
 const slowCount = computed(() => legs.value.filter(l => l.state === 'slow' || (!isFinal(l) && l.state !== 'deferred')).length)
 const unknownParts = computed(() => legs.value.filter(l => l.state === 'doneUnknown').length)
@@ -264,6 +271,8 @@ function cell(a: MultiSellRun['assets'][number]): { text: string; cls: string; s
     return { text: '', cls: 'ok', glyph: '✓', out, tag }
   }
   if (sold.length > 0) return { text: 'Partly sold', cls: 'part', out, tag }
+  // it sold, and its ICP may already be in the wallet: the wallet first, not a failure
+  if (bad && onlyMaybeSent(ls)) return { text: 'Check wallet', cls: 'warn', glyph: '!' }
   if (bad) return { text: 'Needs recovery', cls: 'fail' }
   if (ls.some(l => l.state === 'refunded')) return { text: 'Refunded', cls: 'ref', glyph: '↩' }
   return { text: 'Not sent', cls: 'skip' }
@@ -283,7 +292,7 @@ function toggle(ai: number) {
 }
 const ATTENTION = ['needsRecovery', 'tracked', 'belowMin']
 const needsLook = (l: LegRun) => ATTENTION.includes(l.state) || (l.state === 'refunded' && routeHopToken(l) != null)
-  || (l.state === 'notSent' && l.reason === 'neuHeld')
+  || (l.state === 'notSent' && isHeldReason(l.reason))
 const attentionRows = computed(() => (final.value && props.run
   ? props.run.assets.map((a: MultiSellRun['assets'][number], ai: number) => (a.legs.some(needsLook) ? ai : -1)).filter((ai: number) => ai >= 0)
   : []))
@@ -338,15 +347,15 @@ const showRawError = (l: LegRun) => ['needsRecovery', 'tracked'].includes(l.stat
 // into one line.
 const FOLD_AFTER = 4
 const refunds = computed(() => {
-  const out: Array<{ what: string; where: string; bad: boolean; other?: boolean }> = []
+  const out: Array<{ what: string; where: string; bad: boolean; other?: boolean; unsure?: boolean }> = []
   for (const a of props.run?.assets ?? []) for (const l of a.legs) {
     const amt = `≈ ${fmtTok(a.address, l.amountIn)} ${a.symbol}`
     const mid = l.state === 'refunded' ? routeHopToken(l) : null
     if (mid != null) out.push({ what: `${a.symbol} route on the TACO exchange`, where: mid && tokenOf(mid) ? `Came back as ${tokenOf(mid)!.symbol}.` : 'Came back as another token.', bad: false, other: true })
     else if (l.state === 'refunded') out.push({ what: `${amt} from ${venueIn(l.venue)}`, where: 'Sent back to your wallet.', bad: false })
     else if (l.state === 'tracked' || (l.state === 'needsRecovery' && l.reason === 'maySent')) out.push({ what: `${a.symbol} deposit on the TACO exchange`, where: recoverWhere(l), bad: true })
-    else if (l.state === 'needsRecovery' && l.failedAfterSwap) out.push({ what: `ICP from your ${a.symbol} sale on ${venueIn(l.venue)}`, where: recoverWhere(l), bad: true })
-    else if (l.state === 'needsRecovery') out.push({ what: `${amt} on ${venueIn(l.venue)}`, where: recoverWhere(l), bad: true })
+    else if (l.state === 'needsRecovery' && l.failedAfterSwap) out.push({ what: `ICP from your ${a.symbol} sale on ${venueIn(l.venue)}`, where: recoverWhere(l), bad: true, unsure: maybeSentLeg(l) })
+    else if (l.state === 'needsRecovery') out.push({ what: `${amt} on ${venueIn(l.venue)}`, where: recoverWhere(l), bad: true, unsure: maybeSentLeg(l) })
   }
   return out
 })
@@ -364,7 +373,8 @@ const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !show
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 999px; white-space: nowrap;
   &--run { background: var(--tx-orange-dim); color: var(--tx-orange); }
   &--ok { background: var(--tx-buy-dim); color: var(--tx-buy); }
-  &--part { background: var(--tx-warning-dim); color: var(--tx-warning); }
+  // the amber ink keeps at least 4.5:1 on its dim fill in both themes (UNCONFIRMED, PARTLY DONE)
+  &--part { background: var(--tx-warning-dim); color: var(--tx-warning-ink); }
   &--fail { background: var(--tx-sell-dim); color: var(--tx-sell); }
   &--stop { background: var(--tx-surface-3); color: var(--tx-ink-2); }
 }
@@ -412,6 +422,7 @@ const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !show
     b { font-size: 13px; font-weight: 600; }
     &.is-ok { color: var(--tx-buy); }
     &.is-part, &.is-ref { color: var(--tx-warning); }
+    &.is-warn { color: var(--tx-warning-ink); }
     &.is-fail { color: var(--tx-sell); }
     &.is-skip { color: var(--tx-ink-3); }
   }
@@ -436,7 +447,7 @@ const foldReturns = computed(() => returnRows.value.length > FOLD_AFTER && !show
 .ms-rf__row {
   display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; font-size: 12.5px; color: var(--tx-ink-2); line-height: 1.4;
 }
-.ms-rf__where { text-align: right; color: var(--tx-ink-3); font-size: 12px; &.is-bad { color: var(--tx-sell); } }
+.ms-rf__where { text-align: right; color: var(--tx-ink-3); font-size: 12px; &.is-bad { color: var(--tx-sell); } &.is-warn { color: var(--tx-warning-ink); } }
 .ms-rf__more {
   // a 28 px tall target around a text link (the negative margin keeps the line height)
   background: none; border: 0; padding: 7px 4px; margin: -7px -4px; color: var(--tx-ink-2); font-size: 12px; font-weight: 600; cursor: pointer;

@@ -12,10 +12,12 @@ import { computed } from 'vue'
 import type { CrossDexVenue } from '../../utils/crossDexOptimizer'
 import type { LegState } from '../../utils/crossDexLegRunner'
 
-const props = defineProps<{ dex: CrossDexVenue; state: LegState }>()
+// unsure: the part sold while its output may already be in the wallet (outMaybeSent): the wallet first
+const props = defineProps<{ dex: CrossDexVenue; state: LegState; unsure?: boolean }>()
 
 const name = computed(() => (props.dex === 'icpswap' ? 'ICPSwap' : props.dex === 'neutrinite' ? 'Neutrinite' : 'TACO'))
 const look = computed(() => {
+  if (props.unsure && props.state === 'needsRecovery') return 'unsure'
   switch (props.state) {
     case 'running': case 'recovering': case 'slow': return 'run'
     case 'done': case 'doneUnknown': return 'done'
@@ -27,8 +29,9 @@ const look = computed(() => {
     default: return 'wait'
   }
 })
-const glyph = computed(() => ({ done: '✓', low: '✓', ref: '↩', defer: '···', skip: '○', fail: props.state === 'tracked' ? '!' : '✕', wait: '···', run: '' } as Record<string, string>)[look.value])
+const glyph = computed(() => ({ done: '✓', low: '✓', ref: '↩', defer: '···', skip: '○', fail: props.state === 'tracked' ? '!' : '✕', unsure: '!', wait: '···', run: '' } as Record<string, string>)[look.value])
 const meaning = computed(() => {
+  if (look.value === 'unsure') return 'may already be in your wallet'
   switch (props.state) {
     case 'running': case 'recovering': return 'running'
     case 'slow': return 'taking longer than usual'
@@ -78,6 +81,7 @@ const meaning = computed(() => {
   &--ref { border-color: color-mix(in srgb, var(--tx-warning) 45%, transparent); .dex-chip__g { color: var(--tx-warning); } }
   &--defer { .dex-chip__g { color: var(--tx-warning); } }
   &--fail { border-color: color-mix(in srgb, var(--tx-sell) 45%, transparent); .dex-chip__g { color: var(--tx-sell); } }
+  &--unsure { border-color: color-mix(in srgb, var(--tx-warning) 55%, transparent); .dex-chip__g { color: var(--tx-warning-ink); font-weight: 800; } }
   &--skip { color: var(--tx-ink-3); .dex-chip__g { color: var(--tx-ink-4); } }
   &--wait .dex-chip__g { color: var(--tx-ink-3); }
 }
