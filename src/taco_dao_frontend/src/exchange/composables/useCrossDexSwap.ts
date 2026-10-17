@@ -506,7 +506,7 @@ export function useCrossDexSwap() {
       phase.value = 'success'
       toast.success('CrossDEX Swap Complete',
         formatTokenAmount(totalOut, Number(buyToken.decimals), buyToken.symbol)
-          + (results.some(r => r.state === 'doneUnknown') ? ' received, plus a route whose amount shows in your wallet' : ' received'))
+          + (results.some(r => r.state === 'doneUnknown') ? ' received, plus a route whose amount shows in your wallet.' : ' received.'))
     } else if (successes.length > 0) {
       phase.value = 'partial'
       toast.warning('Partial Fill', `${successes.length}/${results.length} legs filled. Check each route's status; anything not recovered automatically is on the Recover page.`)

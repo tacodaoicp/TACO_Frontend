@@ -17,7 +17,7 @@
           </div>
         </div>
 
-        <p v-if="approvalSlow" class="ms-md__note ms-note-warn" aria-live="polite">Still waiting for the approval. You can close this summary, the sale goes on by itself while this page stays open.</p>
+        <p v-if="approvalSlow" class="ms-md__note ms-note-warn" aria-live="polite">Still waiting for the approval. You can close this summary while this page stays open. If it has no answer within 2 minutes, the sale stops and nothing is sold.</p>
 
         <div v-if="final && (receivedSoFar > 0n || unknownParts > 0)" class="ms-res-total">
           <div><small>You received</small><b class="num">{{ fmtIcp(receivedSoFar) }}</b></div>

@@ -725,21 +725,23 @@ export function useMultiSell() {
     })
   }
 
-  /** What a complete sale received: the known total, plus the parts whose amount only the wallet shows. */
+  /** What a complete sale received, as a toast sentence: the known total, plus the parts whose
+   *  amount only the wallet shows. */
   function receivedText(res: SaleResult, inTotal = ''): string {
     const t = icp.value
     const got = t ? formatTokenAmount(res.received, Number(t.decimals), t.symbol) : res.received.toString()
     const k = res.unknownParts
-    if (k === 0) return `${got} received${inTotal}`
-    if (res.received <= 0n) return 'Sold. The ICP shows in your wallet'
-    return `${got} received${inTotal}, plus ${k === 1 ? '1 part' : `${k} parts`} whose amount shows in your wallet`
+    if (k === 0) return `${got} received${inTotal}.`
+    // no part has a known amount (the title already says the sale is complete)
+    if (res.received <= 0n) return 'The ICP shows in your wallet.'
+    return `${got} received${inTotal}, plus ${k === 1 ? '1 part' : `${k} parts`} whose amount shows in your wallet.`
   }
 
   function announceLate(res: SaleResult) {
     const anyRecover = res.assets.some(a => a.legs.some(l => ['needsRecovery', 'tracked'].includes(l.state)))
     const anyRefund = res.assets.some(a => a.legs.some(l => l.state === 'refunded'))
     if (anyRecover) toast.error('Your last sale has finished', 'Some funds need the Recover page. The result is on the CrossDEX page.')
-    else if (res.phase === 'complete') toast.success('Your last sale has finished', icp.value ? `${receivedText(res, ' in total')}.` : undefined)
+    else if (res.phase === 'complete') toast.success('Your last sale has finished', icp.value ? receivedText(res, ' in total') : undefined)
     else toast.info('Your last sale has finished', anyRefund ? 'Some parts were refunded. The result is on the CrossDEX page.' : 'The result is on the CrossDEX page.')
   }
 
