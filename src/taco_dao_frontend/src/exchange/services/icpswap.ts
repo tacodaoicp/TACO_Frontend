@@ -66,6 +66,8 @@ export interface IcpSwapTrack {
   withdrawRefused?: boolean
   /** The withdraw call was sent (set right before it): from here the output may have left the pool. */
   withdrawSent?: boolean
+  /** The timestamp of the pair marker this swap wrote: it removes only that marker. */
+  markerAt?: number
 }
 
 export interface IcpSwapParams {
@@ -79,16 +81,26 @@ export interface IcpSwapParams {
   beforeDeposit?: () => Promise<void | boolean>
   /** Stop before the deposit when the pair marker could not be written. */
   requireMarker?: boolean
+  /** Stop before the approve (and again right before the marker is written) when the pair marker is
+   *  already saved: an earlier swap of this pair has not settled, and its funds may be in the pool. */
+  stopIfPending?: boolean
+  /** Stop before the approve when the pool already holds more than this (or the token's ledger fee,
+   *  whichever is larger) of either token for the wallet, in its unused balance or its pool subaccount.
+   *  The pool keeps one balance per wallet and token, and a recovery sweep moves all of it: neither the
+   *  sweep nor the part could tell this swap's funds from that balance. */
+  maxUnusedBefore?: { sell: bigint; buy: bigint }
   track?: IcpSwapTrack
   /** A run's own agent and principal (one identity object); default: the cached session. */
   agent?: HttpAgent
   owner?: Principal
 }
 
-/** Error for a swap that stopped before any funds moved (only the approve fee was spent). */
+/** Error for a swap that stopped before any funds moved (only the approve fee was spent). `held`: the
+ *  pool already held funds of the wallet for this pair, or an earlier swap of the pair had not settled
+ *  (its marker is saved). */
 export class IcpSwapNotStarted extends Error {
   readonly notStarted = true
-  constructor(message = 'Not started, your funds stayed in your wallet', readonly journal = false) { super(message); this.name = 'IcpSwapNotStarted' }
+  constructor(message = 'Not started, your funds stayed in your wallet', readonly journal = false, readonly held = false) { super(message); this.name = 'IcpSwapNotStarted' }
 }
 /** depositFrom refused: the pool did not take the funds (the caller still checks with one sweep). */
 export class IcpSwapDepositRefused extends Error {
@@ -113,14 +125,14 @@ const PENDING_MAX_AGE_MS = 21 * 86_400_000 // 21 days
 
 export interface PendingIcpSwap { sell: string; buy: string; timestamp: number }
 
-/** Save the pair marker. Returns whether it was written (a full or blocked
+/** Save the pair marker (dated `at`). Returns whether it was written (a full or blocked
  *  storage returns false, so a strict caller can stop before funds move). */
-export function savePendingSwap(sell: string, buy: string): boolean {
+export function savePendingSwap(sell: string, buy: string, at: number = Date.now()): boolean {
   try {
     const raw = localStorage.getItem(PENDING_KEY)
     const list: PendingIcpSwap[] = raw ? JSON.parse(raw) : []
     const deduped = list.filter((e) => !(e.sell === sell && e.buy === buy))
-    deduped.unshift({ sell, buy, timestamp: Date.now() })
+    deduped.unshift({ sell, buy, timestamp: at })
     const now = Date.now()
     const pruned = deduped.filter((e) => now - e.timestamp < PENDING_MAX_AGE_MS).slice(0, PENDING_MAX)
     // Recovery record: on a full storage, free exchange cache space and retry.
@@ -140,12 +152,14 @@ export function getPendingSwaps(): PendingIcpSwap[] {
   } catch { return [] }
 }
 
-export function removePendingSwap(sell: string, buy: string): void {
+/** Remove the pair marker. With `at`, only the marker dated `at` (the one a swap wrote itself): a marker
+ *  another tab saved for the pair since then stays. */
+export function removePendingSwap(sell: string, buy: string, at?: number): void {
   try {
     const raw = localStorage.getItem(PENDING_KEY)
     if (!raw) return
     const list = JSON.parse(raw) as PendingIcpSwap[]
-    localStorage.setItem(PENDING_KEY, JSON.stringify(list.filter((e) => !(e.sell === sell && e.buy === buy))))
+    localStorage.setItem(PENDING_KEY, JSON.stringify(list.filter((e) => !(e.sell === sell && e.buy === buy && (at == null || e.timestamp === at)))))
   } catch { /* ignore */ }
 }
 
@@ -419,20 +433,23 @@ export async function getStuckPoolWithdraws(
 }
 
 /**
- * The wallet's withdraw records in the pool of a pair (anonymous query): the token and status of
- * each. A CrossDEX leg reads them before it calls a withdraw whose answer was lost "sold": a pool can
- * take a withdraw off the balance and never pay it out (CreditCompleted), which every balance read
- * shows as nothing left in the pool. null = the pool could not be read ("no info").
+ * The wallet's withdraw records in the pool of a pair: the token and status of each. A CrossDEX leg
+ * reads them before it calls a withdraw whose answer was lost "sold": a pool can take a withdraw off
+ * the balance and never pay it out (CreditCompleted), which every balance read shows as nothing left
+ * in the pool. null = the pool could not be read ("no info").
  */
 export async function getPoolWithdrawRecords(
   params: SweepParams,
-  opts: { owner?: Principal } = {},
+  opts: { owner?: Principal; agent?: HttpAgent } = {},
 ): Promise<Array<{ token: string; status: string }> | null> {
   try {
     const owner = opts.owner ?? (await getCachedIdentity()).getPrincipal()
     if (owner.isAnonymous()) return null
     const poolId = params.poolId ?? (await getPoolCanister(params.token0Principal, params.token1Principal))
-    const agent = await getAnonAgent()
+    // this answer decides whether a part reads sold and drops its marker: a verified read (the run's own
+    // agent, else the session's), never the shared anonymous agent that skips query signature checks
+    const agent = opts.agent ?? (await getCachedAgent())
+    if (!agent) return null
     const actor = Actor.createActor(poolTxIDL, { agent, canisterId: poolId })
     const res = (await actor.getTransactionsByOwner(owner)) as any
     if (!('ok' in res)) return null
@@ -514,22 +531,59 @@ async function resolveAuth(agent?: HttpAgent, owner?: Principal): Promise<{ agen
   return { agent: authedAgent, owner: ownerPrincipal }
 }
 
+/** The start check's error when the pool, or this browser, still has an earlier swap of the pair. */
+const HELD_MARKER = 'An earlier ICPSwap swap of this pair is still listed on the Recover page, so its share was not sent'
+const HELD_POOL = 'ICPSwap still holds funds from another swap of yours in this pool, so its share was not sent'
+
 export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: bigint }> {
-  const { agent: authedAgent } = await resolveAuth(params.agent, params.owner)
+  const { agent: authedAgent, owner } = await resolveAuth(params.agent, params.owner)
   const track = params.track ?? {}
+  const sell = params.sellTokenPrincipal, buy = params.buyTokenPrincipal
 
   params.onStep?.('Finding the pool…')
-  const poolId = await getPoolCanister(params.sellTokenPrincipal, params.buyTokenPrincipal)
-  const poolData = poolCache.get(`${params.sellTokenPrincipal}-${params.buyTokenPrincipal}`)!
-  const zeroForOne = isZeroForOne(params.sellTokenPrincipal, poolData)
+  const poolId = await getPoolCanister(sell, buy)
+  const poolData = poolCache.get(`${sell}-${buy}`)!
+  const zeroForOne = isZeroForOne(sell, poolData)
 
-  const sellTokenActor = Actor.createActor(icrcIDL, { agent: authedAgent, canisterId: params.sellTokenPrincipal })
+  const sellTokenActor = Actor.createActor(icrcIDL, { agent: authedAgent, canisterId: sell })
   const poolActor = Actor.createActor(poolIDL, { agent: authedAgent, canisterId: poolId })
 
-  // 1. Token fee
+  // 0. An earlier swap of this pair that has not settled (its marker is saved in this browser): its
+  //    funds may still be in the pool or on their way, and a recovery sweep of this swap would take them
+  //    for its own. Checked before anything is spent.
+  if (params.stopIfPending && hasPendingSwap(sell, buy)) throw new IcpSwapNotStarted(HELD_MARKER, false, true)
+
+  // 1. Token fee; with maxUnusedBefore, in the same round trip, what the pool already holds for the wallet
+  //    (its unused balances and its pool subaccount, as a recovery sweep reads them) and the buy token's
+  //    fee (dust at or below a ledger fee cannot be paid out, and a sweep skips it too)
   params.onStep?.('Reading the fee…')
-  const feeResult = (await sellTokenActor.icrc1_fee()) as any
-  const tokenFee = typeof feeResult === 'bigint' ? feeResult : BigInt(feeResult)
+  const asBig = (v: any): bigint => (typeof v === 'bigint' ? v : BigInt(v))
+  const held = params.maxUnusedBefore
+  const sub = held ? [Array.from(principalToSubAccount(owner))] : []
+  const buyTokenActor = held ? Actor.createActor(icrcIDL, { agent: authedAgent, canisterId: buy }) : null
+  const [feeResult, start] = await Promise.all([
+    sellTokenActor.icrc1_fee() as Promise<any>,
+    held && buyTokenActor
+      ? Promise.all([
+        buyTokenActor.icrc1_fee() as Promise<any>,
+        poolActor.getUserUnusedBalance(owner) as Promise<any>,
+        sellTokenActor.icrc1_balance_of({ owner: Principal.fromText(poolId), subaccount: sub }) as Promise<any>,
+        buyTokenActor.icrc1_balance_of({ owner: Principal.fromText(poolId), subaccount: sub }) as Promise<any>,
+      ])
+      : Promise.resolve(null),
+  ])
+  const tokenFee = asBig(feeResult)
+  if (held && start) {
+    const [buyFeeRaw, unused, subSell, subBuy] = start
+    if (!('ok' in unused)) throw new Error(`getUserUnusedBalance failed: ${safeStringify(unused.err)}`)
+    const limit = { [sell]: tokenFee > held.sell ? tokenFee : held.sell, [buy]: asBig(buyFeeRaw) > held.buy ? asBig(buyFeeRaw) : held.buy }
+    // the unused balance slots are in the pool's own token order
+    const slots: Array<[string, bigint]> = [
+      [poolData.token0.address, asBig(unused.ok.balance0)], [poolData.token1.address, asBig(unused.ok.balance1)],
+      [sell, asBig(subSell)], [buy, asBig(subBuy)],
+    ]
+    if (slots.some(([tok, amt]) => amt > (limit[tok] ?? 0n))) throw new IcpSwapNotStarted(HELD_POOL, false, true)
+  }
 
   // 2. Approve pool for amountIn + fee. It expires after 30 minutes, so an
   //    approval left by a swap that stopped before its deposit lapses on its own.
@@ -556,9 +610,14 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   // 3. depositFrom (pool pulls via icrc2_transfer_from)
   // Persist the pair NOW (funds are about to move) so a tab-close mid-swap is
   // recoverable via the Recover page. A marker an earlier failed swap on this
-  // pair left behind stays until its funds come back.
-  track.hadMarker = hasPendingSwap(params.sellTokenPrincipal, params.buyTokenPrincipal)
-  track.markerWritten = savePendingSwap(params.sellTokenPrincipal, params.buyTokenPrincipal)
+  // pair left behind stays until its funds come back. With stopIfPending, a
+  // marker another tab saved for the pair since the check above stops this one
+  // (nothing awaited from this check to the write).
+  track.hadMarker = hasPendingSwap(sell, buy)
+  if (params.stopIfPending && track.hadMarker) throw new IcpSwapNotStarted(HELD_MARKER, false, true)
+  const markerAt = Date.now()
+  track.markerWritten = savePendingSwap(sell, buy, markerAt)
+  if (track.markerWritten) track.markerAt = markerAt
   if (!track.markerWritten && params.requireMarker) {
     throw new IcpSwapNotStarted('ICPSwap: the recovery note could not be saved, so this part was not sent', true)
   }
@@ -567,7 +626,7 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
   const depositResult = (await poolActor.depositFrom({
     amount: params.amountIn,
     fee: tokenFee,
-    token: params.sellTokenPrincipal,
+    token: sell,
   })) as any
   if ('err' in depositResult) throw new IcpSwapDepositRefused(`DepositFrom failed: ${safeStringify(depositResult.err)}`)
 
@@ -606,9 +665,10 @@ export async function icrc2Swap(params: IcpSwapParams): Promise<{ amountOut: big
     throw new Error(`Withdraw failed: ${safeStringify(withdrawResult.err)}`)
   }
 
-  // Funds delivered: clear the pair marker, unless an earlier failed swap on
-  // this pair left it (those funds may still sit in the pool).
-  if (!track.hadMarker) removePendingSwap(params.sellTokenPrincipal, params.buyTokenPrincipal)
+  // Funds delivered: clear the pair marker this swap wrote, unless an earlier
+  // failed swap on this pair left one (those funds may still sit in the pool).
+  // A marker another tab saved for the pair since then is not this swap's, and stays.
+  if (!track.hadMarker && track.markerAt != null) removePendingSwap(sell, buy, track.markerAt)
   return { amountOut }
 }
 
@@ -620,9 +680,11 @@ export interface SweepParams {
   poolId?: string
 }
 
-/** What a sweep found and moved, per token (amounts as found, before the ledger fee). */
+/** What a sweep found and moved, per token (amounts as found, before the ledger fee). A found entry
+ *  is tagged `sub` for a balance of the pool subaccount (deposited first: the balance read finds it
+ *  again) and `refused` when its withdraw answered with an error. */
 export interface SweepReport {
-  found: Array<{ token: string; amount: bigint }>
+  found: Array<{ token: string; amount: bigint; sub?: boolean; refused?: boolean }>
   moved: Array<{ token: string; amount: bigint }>
   /** Passes that read every balance and found nothing (a pass that threw does not count). */
   emptyLooks?: number
@@ -691,7 +753,7 @@ export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promi
       const fee = await ledgerFee(tokenPrincipal)
       if (bal > fee) {
         foundAny = true
-        report?.found.push({ token: tokenPrincipal, amount: bal })
+        report?.found.push({ token: tokenPrincipal, amount: bal, sub: true })
         const r = (await poolActor.deposit({ amount: bal, fee, token: tokenPrincipal })) as any
         if (!('ok' in r)) {
           allAttemptedOk = false
@@ -719,10 +781,12 @@ export async function sweep(params: SweepParams, opts: SweepOptions = {}): Promi
       // Dust at or below the ledger fee cannot be paid out; treat as zero.
       if (slot.amount <= fee) continue
       foundAny = true
-      report?.found.push({ token: slot.token, amount: slot.amount })
+      const entry: { token: string; amount: bigint; refused?: boolean } = { token: slot.token, amount: slot.amount }
+      report?.found.push(entry)
       const r = (await poolActor.withdraw({ amount: slot.amount, fee, token: slot.token })) as any
       if (!('ok' in r)) {
         allAttemptedOk = false
+        entry.refused = true
         console.error('[icpswap.sweep] withdraw refused for', slot.token, safeStringify(r.err))
       } else {
         report?.moved.push({ token: slot.token, amount: slot.amount })

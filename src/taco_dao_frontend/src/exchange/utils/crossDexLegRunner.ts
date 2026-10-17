@@ -113,7 +113,10 @@ export type LegState = 'waiting' | 'running' | 'recovering' | 'deferred' | 'slow
   | 'done' | 'doneUnknown' | 'belowMin' | 'refunded' | 'notSent' | 'needsRecovery' | 'tracked'
 export type LegReason = 'maySent' | 'unconfirmed' | 'admin' | 'afterSwap' | 'rateLimited' | 'tacoPaused'
   | 'secondLate' | 'secondMoved' | 'secondCheck' | 'gateLate' | 'journal' | 'session' | 'slippage' | 'timeout' | 'neuHeld'
-  | 'neuMismatch' | string
+  | 'icpHeld' | 'neuMismatch' | string
+
+/** A part not sent because the DEX may still hold funds of an earlier swap of the wallet (the Recover page). */
+export const isHeldReason = (r: unknown) => r === 'neuHeld' || r === 'icpHeld'
 export type AssetType = { ICP: null } | { ICRC12: null } | { ICRC3: null }
 
 export interface LegOutcome {
@@ -225,6 +228,8 @@ export interface LegDeps {
     icrc2Swap(p: {
       sellTokenPrincipal: string; buyTokenPrincipal: string; amountIn: bigint; minAmountOut: bigint
       onStep?: (s: string) => void; beforeDeposit?: () => Promise<void | boolean>; requireMarker?: boolean
+      stopIfPending?: boolean
+      maxUnusedBefore?: { sell: bigint; buy: bigint }
       track?: IcpTrack
     }): Promise<{ amountOut: bigint }>
     sweep(p: { token0Principal: string; token1Principal: string }, opts?: { report?: SweepReport }): Promise<boolean>
@@ -232,7 +237,8 @@ export interface LegDeps {
     /** The wallet's withdraw records in the pool of the pair (token and status per record), null when
      *  the pool cannot be read. */
     withdrawRecords?(p: { token0Principal: string; token1Principal: string }): Promise<Array<{ token: string; status: string }> | null>
-    removePendingSwap(sell: string, buy: string): void
+    /** With `at`, only the pair marker dated `at` (the one this route wrote). */
+    removePendingSwap(sell: string, buy: string, at?: number): void
   }
   neutrinite: {
     executeSwap(p: {
@@ -278,6 +284,8 @@ export interface IcpTrack {
   withdrawRefused?: boolean
   /** The withdraw call was sent (set right before it): from here the output may have left the pool. */
   withdrawSent?: boolean
+  /** The timestamp of the pair marker this route wrote (it removes only that one). */
+  markerAt?: number
 }
 
 export interface NeuTrack {
@@ -296,7 +304,9 @@ export interface NeuTrack {
 }
 
 export interface SweepReport {
-  found: Array<{ token: string; amount: bigint }>
+  /** ICPSwap tags a pool subaccount balance (`sub`: the balance read finds it again once deposited) and a
+   *  balance whose withdraw answered with an error (`refused`). */
+  found: Array<{ token: string; amount: bigint; sub?: boolean; refused?: boolean }>
   moved: Array<{ token: string; amount: bigint }>
   /** Passes that read every balance and found nothing (a pass that threw does not count). */
   emptyLooks?: number
@@ -370,7 +380,7 @@ export async function runCrossDexLeg(leg: CrossDexLeg, ctx: LegCtx, deps: LegDep
   return out
 }
 
-// ICPSwap: approve, gate, marker, depositFrom, swap, withdraw.
+// ICPSwap: start check, approve, gate, marker, depositFrom, swap, withdraw.
 async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: bigint): Promise<LegOutcome> {
   const sell = ctx.sell.address, buy = ctx.buy.address
   const track: IcpTrack = {}
@@ -382,6 +392,12 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
       amountIn: leg.amountIn,
       minAmountOut: minOut,
       onStep: ctx.onStep,
+      // The pool keeps one balance per wallet and token, and a recovery sweep moves all of it: funds of
+      // an earlier swap of the wallet already in the pool, or one of this browser's that has not settled
+      // (its marker is saved), could not be told from this part's. Either stops the part before its
+      // approve, with its share in the wallet; the Recover page sends those funds back.
+      stopIfPending: true,
+      maxUnusedBefore: { sell: ctx.fee, buy: ctx.buy.transfer_fee },
       beforeDeposit: async () => {
         if (ctx.gate && !(await ctx.gate.wait(() => ctx.onStep(ctx.gateWaitText ?? NEU_WAIT_STEP)))) return false
         if (!ctx.journal.beforeMove('depositFrom') && ctx.strictJournal) { journalRefused = true; return false }
@@ -394,10 +410,13 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
     return { dex: 'icpswap', success: true, amountOut: r.amountOut, state: 'done' }
   } catch (err: any) {
     if (err?.notStarted) {
-      // Released too late, or the recovery note could not be saved: only the
-      // approve ran, no funds moved, nothing to sweep.
+      // Released too late, the recovery note could not be saved, or the pool still holds an earlier
+      // swap's funds: at most the approve ran, no funds moved, nothing to sweep.
       const journal = journalRefused || !!err?.journal
       ctx.onStep(NOT_STARTED)
+      if (!journal && err?.held) {
+        return { dex: 'icpswap', success: false, amountOut: 0n, state: 'notSent', reason: 'icpHeld', error: errText(err, NOT_STARTED), notStarted: true }
+      }
       return { dex: 'icpswap', success: false, amountOut: 0n, state: 'notSent', reason: journal ? 'journal' : 'gateLate',
         error: NOT_STARTED, notStarted: true }
     }
@@ -411,93 +430,149 @@ async function runIcpswap(leg: CrossDexLeg, ctx: LegCtx, deps: LegDeps, minOut: 
       return { dex: 'icpswap', success: false, amountOut: 0n, state: 'notSent', reason: journalRefused || err?.journal ? 'journal' : undefined,
         error: errText(err, 'ICPSwap approval failed'), notStarted: true }
     }
+    const sum = (list: ReadonlyArray<{ token: string; amount: bigint }>, tok: string) => list.filter(m => m.token === tok).reduce((a, m) => a + m.amount, 0n)
+    // The pool's records of the wallet's withdraws (read once): true when none of the pair is left
+    // unfinished, false when one is, null when the pool could not be read.
+    let recs: boolean | null | undefined
+    const recordsClean = async (): Promise<boolean | null> => {
+      if (recs === undefined) {
+        try {
+          const list = (await deps.icpswap.withdrawRecords?.({ token0Principal: sell, token1Principal: buy })) ?? null
+          recs = list == null ? null : !list.some(r => r.status !== 'Completed' && (r.token === buy || r.token === sell))
+        } catch { recs = null }
+      }
+      return recs
+    }
+    // Only the marker this route wrote goes (a marker another tab saved for the pair since then is dated
+    // otherwise), and a marker an earlier swap of the pair had saved only when the pool's records show no
+    // withdraw of the pair left unfinished (its funds may be stuck in the pool, which no balance shows).
+    const dropMarker = async () => {
+      if (track.markerAt == null) return
+      if (!track.hadMarker || (await recordsClean()) === true) deps.icpswap.removePendingSwap(sell, buy, track.markerAt)
+    }
     if (err?.depositRefused) {
-      // The pool refused the deposit, so normally nothing moved. One sweep
-      // makes sure; when it finds nothing, this route never started.
+      // The pool refused the deposit, so normally nothing moved. One sweep makes sure. It is this part's
+      // refund only when at least its deposit came back: a look that found less of the sold token than the
+      // deposit found another swap's balance of the wallet (sent to the wallet too), and this route never
+      // started.
       const report: SweepReport = { found: [], moved: [] }
       let swept = false, sweepThrew = false, sweepErr: unknown = null
       try { swept = await deps.icpswap.sweep({ token0Principal: sell, token1Principal: buy }, { report }) }
       catch (e) { sweepThrew = true; sweepErr = e }
-      if (!sweepThrew && report.found.length === 0) {
-        if (!track.hadMarker) deps.icpswap.removePendingSwap(sell, buy)
+      if (!sweepThrew && !report.found.some(f => !f.sub && f.token === sell && f.amount >= leg.amountIn)) {
+        await dropMarker()
         ctx.onStep(NOT_STARTED)
         return { dex: 'icpswap', success: false, amountOut: 0n, state: 'notSent',
           error: errText(err, 'ICPSwap refused the deposit'), notStarted: true }
       }
-      if (swept) deps.icpswap.removePendingSwap(sell, buy)
-      ctx.onStep(swept ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
-      return swept
+      const back = swept && sum(report.moved, sell) >= leg.amountIn
+      if (back) await dropMarker()
+      ctx.onStep(back ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
+      return back
         ? { dex: 'icpswap', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error: errText(err, 'ICPSwap swap failed'), recovered: true }
         : { dex: 'icpswap', success: false, amountOut: 0n, state: 'needsRecovery', error: errText(err, 'ICPSwap swap failed'), recovered: false,
             reason: isSessionError(sweepErr) ? 'session' : undefined }
     }
     ctx.log?.('[CrossDEX] ICPSwap leg failed:', err?.message || err)
     ctx.onStep('Recovering funds…')
-    // Automatic recovery: sweep with retries (a lost-response depositFrom
-    // credits the pool a few seconds later, so the first look often races
-    // it). Only a sweep that actually moved funds clears the marker;
+    // Automatic recovery: sweep with retries (a lost-response depositFrom credits the pool a few seconds
+    // later, so the first look often races it). The marker goes only when this part's own funds came back;
     // otherwise the Recover page row stays visible.
     let swept = false
     const report: SweepReport = { found: [], moved: [] }
     try {
       swept = await deps.icpswap.sweepWithRetry({ token0Principal: sell, token1Principal: buy }, 3, 4000, { report })
     } catch (e) { report.lastError = e /* marker stays so the Recover page can sweep later */ }
-    const soldBack = report.moved.filter(m => m.token === sell).reduce((a, m) => a + m.amount, 0n)
-    const gotOut = report.moved.filter(m => m.token === buy).reduce((a, m) => a + m.amount, 0n)
-    // Once the swap answered, its deposit was used: a sweep that brought back no ICP recovered nothing
-    // of this part (any sold token that came back is an older swap's). Its ICP left for the wallet with
-    // a lost answer, or the pool still owes it.
-    const recovered = swept && !(track.swappedOut != null && gotOut === 0n)
-    if (recovered) deps.icpswap.removePendingSwap(sell, buy)
     const error = errText(err, 'ICPSwap swap failed')
-    // a pass that read every balance found no ICP: an empty look, or a sweep that moved only the sold token
-    const noOutLook = (report.emptyLooks ?? 0) > 0 || (swept && gotOut === 0n)
-    if (!recovered && track.withdrawSent && track.swappedOut != null && !track.withdrawRefused
-        && !report.found.some(f => f.token === buy) && noOutLook) {
-      // The withdraw's answer was lost and a full look finds nothing in the pool. A pool can also take
-      // a withdraw off the balance and never pay it out (status CreditCompleted, the TACOV2:2134 class),
-      // which reads the same from every balance: only the pool's own records, with no withdraw of the
-      // bought token left unfinished, show that the output left for the wallet. Sold, for an amount the
-      // wallet shows. Otherwise the part keeps its marker (needsRecovery, the wallet first).
-      let recs: Array<{ token: string; status: string }> | null = null
-      try { recs = (await deps.icpswap.withdrawRecords?.({ token0Principal: sell, token1Principal: buy })) ?? null } catch { recs = null }
-      if (recs != null && !recs.some(r => r.token === buy && r.status !== 'Completed')) {
-        if (!track.hadMarker) deps.icpswap.removePendingSwap(sell, buy)
-        ctx.onStep('Done')
-        return { dex: 'icpswap', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
+    const soldBack = sum(report.moved, sell), gotOut = sum(report.moved, buy)
+    // what the looks found in the pool's balances (a subaccount balance is found again once deposited)
+    const found = report.found.filter(f => !f.sub)
+    const foundOut = found.some(f => f.token === buy)
+    // The pool keeps one balance per wallet and token, and a sweep moves all of it: another swap of the
+    // wallet in this pool during the part (another tab or device) can come back with this part's funds, or
+    // in their place. What came back is this part's only when it covers them: the pool credits a deposit
+    // in full (at least amountIn of the sold token), and once the swap answered, its output (at least
+    // swappedOut of the bought token). The pool held no more than dust of the pair as the part started (its
+    // start check), so the deposit itself is within one fee of amountIn: where the deposit's own arrival is
+    // not sure (its answer was lost), only a balance of that size is it.
+    const isDeposit = (a: bigint) => a >= leg.amountIn && a <= leg.amountIn + ctx.fee
+    // A refused swap left the deposit in the pool for sure: whatever came back with it, it came back. With the
+    // swap's answer lost, the swap may also have run after a look read the deposit (another swap's sold token
+    // that comes back then is not this part's refund): only a withdraw of the deposit's own size is it.
+    const depositBack = track.step === 'deposit' ? isDeposit(soldBack)
+      : track.swapRefused ? soldBack >= leg.amountIn
+      : report.moved.some(m => m.token === sell && isDeposit(m.amount))
+    // A look that found the deposit in the pool means the swap had not run then, so ICP that comes back
+    // later is not this part's sale (unless that look's withdraw of it was refused: the swap may have taken
+    // the deposit between the look's read and its withdraw).
+    const depositSeen = found.some(f => f.token === sell && isDeposit(f.amount) && !f.refused)
+    const swapMayHaveRun = track.swappedOut != null || (track.step === 'swap' && !track.swapRefused && !depositSeen)
+    const outBack = track.swappedOut != null && gotOut >= track.swappedOut
+    let soldOwn = outBack || (swept && track.swappedOut == null && swapMayHaveRun && gotOut > 0n)
+    // with the deposit's answer lost and an earlier swap's marker on the pair, a deposit's worth that came
+    // back may be that swap's while this one lands later
+    let refundedOwn = !swapMayHaveRun && depositBack && !(track.step === 'deposit' && !!track.hadMarker)
+    // A withdraw that did not answer cleanly (this part's own, or one a look sent) can be stuck in the
+    // pool: taken off the balance and never paid (CreditCompleted, the TACOV2:2134 class), which no balance
+    // shows, while another balance comes back in its place. Then the part reads sold or refunded only when
+    // the pool's records show no withdraw of the pair left unfinished; with the records unreadable, only
+    // when exactly the swap's output (or a withdraw of exactly the deposit) came back.
+    const unmoved = found.length > report.moved.length
+    let stuckMaybe = false
+    if ((soldOwn || refundedOwn) && ((track.swappedOut != null && !!track.withdrawSent) || unmoved)) {
+      const clean = await recordsClean()
+      const exactBack = soldOwn
+        ? track.swappedOut != null && gotOut === track.swappedOut
+        : report.moved.some(m => m.token === sell && isDeposit(m.amount))
+      if (!(clean ?? exactBack)) {
+        soldOwn = false; refundedOwn = false; stuckMaybe = true
       }
     }
-    if (recovered) {
-      // What came back decides whether the swap sold: never when the pool answered the swap
-      // with an error or the swap never ran, and never when at least this leg's deposit of the
-      // sold token came back. ICP an earlier failed swap left in the same pool can come back
-      // with it, so it alone proves nothing.
-      const sold = !track.swapRefused && (track.step === 'swap' || track.step === 'withdraw') && soldBack < leg.amountIn && gotOut > 0n
-      if (sold) {
-        ctx.onStep('Done')
-        if (track.swappedOut != null) {
-          return { dex: 'icpswap', success: true, amountOut: track.swappedOut < gotOut ? track.swappedOut : gotOut, state: 'done', reason: 'afterSwap' }
-        }
-        // the swap's answer was lost: with an earlier swap's marker on this pair, old ICP may be
-        // mixed in, so the amount is the wallet's to show
-        return track.hadMarker
-          ? { dex: 'icpswap', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
-          : { dex: 'icpswap', success: true, amountOut: gotOut, state: 'done', reason: 'afterSwap' }
-      }
+    if (soldOwn) {
+      // a balance a look found and could not move stays in the pool: so does the marker
+      if (swept) await dropMarker()
+      ctx.onStep('Done')
+      // every withdraw pays its own ledger fee, and the total takes one off a part: output that came back in
+      // more than one withdraw counts the extra fees off too (never more than the wallet got)
+      const extraFees = BigInt(Math.max(0, report.moved.filter(m => m.token === buy).length - 1)) * ctx.buy.transfer_fee
+      const net = (v: bigint) => (v > extraFees ? v - extraFees : 0n)
+      if (track.swappedOut != null) return { dex: 'icpswap', success: true, amountOut: net(track.swappedOut), state: 'done', reason: 'afterSwap' }
+      // The swap's answer was lost: another swap's ICP may have come back with this part's. Above the plan's
+      // output (a quote net of the withdraw fee: a slippage band and two fees of headroom), or with an earlier
+      // swap's marker on the pair, the amount is the wallet's to show.
+      const cap = leg.expectedOut + leg.expectedOut / 200n + 2n * ctx.buy.transfer_fee
+      return track.hadMarker || gotOut > cap
+        ? { dex: 'icpswap', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
+        : { dex: 'icpswap', success: true, amountOut: net(gotOut), state: 'done', reason: 'afterSwap' }
     }
-    ctx.onStep(recovered ? 'Failed, funds recovered' : 'Failed, recover on the Recover page')
+    if (refundedOwn) {
+      if (swept) await dropMarker()
+      ctx.onStep('Failed, funds recovered')
+      return { dex: 'icpswap', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true }
+    }
+    // The withdraw was sent and its answer was lost (not refused), and no look brought the output back. A
+    // pool can also take a withdraw off the balance and never pay it out (CreditCompleted, the TACOV2:2134
+    // class), which reads the same from every balance: only the pool's own records, with no withdraw of the
+    // pair left unfinished, show that the output left for the wallet. Sold, for an amount the wallet shows.
+    // Otherwise the part keeps its marker (needsRecovery, the wallet first).
+    if (!stuckMaybe && track.withdrawSent && track.swappedOut != null && !track.withdrawRefused
+        && (swept || (!foundOut && (report.emptyLooks ?? 0) > 0)) && (await recordsClean()) === true) {
+      await dropMarker()
+      ctx.onStep('Done')
+      return { dex: 'icpswap', success: true, amountOut: 0n, state: 'doneUnknown', reason: 'afterSwap' }
+    }
+    ctx.onStep('Failed, recover on the Recover page')
     // The output may already be in the wallet when the withdraw was sent and its answer was lost (not
-    // refused) and no look found it in the pool, or when a look found it and a later look found nothing
-    // (that look's own withdraw lost its answer). A withdraw that was never sent (the output fee read
-    // failed first) left the output in the pool. A recovery that failed because the session ended says
-    // so: the sale asks to reconnect first.
-    const foundOut = report.found.some(f => f.token === buy)
-    const outMaybeSent = !!track.withdrawSent && track.swappedOut != null
-      && ((!track.withdrawRefused && !foundOut) || (foundOut && (report.emptyLooks ?? 0) > 0))
-    return recovered
-      ? { dex: 'icpswap', success: false, amountOut: 0n, state: 'refunded', refundedBy: 'us', error, recovered: true }
-      : { dex: 'icpswap', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
-          failedAfterSwap: track.swappedOut != null, outMaybeSent, reason: isSessionError(report.lastError) ? 'session' : undefined }
+    // refused) and no look found it, when a look found it and a later look found nothing (that look's own
+    // withdraw lost its answer), when only part of it came back, or when ICP came back while a withdraw may
+    // be stuck in the pool. With the swap's answer lost, ICP that came back may be this part's: the swap may
+    // have run. A recovery that failed because the session ended says so: the sale asks to reconnect first.
+    const icpBackUnsure = track.swappedOut == null && swapMayHaveRun && gotOut > 0n
+    const outMaybeSent = icpBackUnsure || (track.swappedOut != null && (
+      (foundOut && (report.emptyLooks ?? 0) > 0) || (gotOut > 0n && gotOut < track.swappedOut)
+      || (!!track.withdrawSent && (stuckMaybe || (!track.withdrawRefused && !foundOut)))))
+    return { dex: 'icpswap', success: false, amountOut: 0n, state: 'needsRecovery', error, recovered: false,
+      failedAfterSwap: track.swappedOut != null || icpBackUnsure, outMaybeSent, reason: isSessionError(report.lastError) ? 'session' : undefined }
   }
 }
 
