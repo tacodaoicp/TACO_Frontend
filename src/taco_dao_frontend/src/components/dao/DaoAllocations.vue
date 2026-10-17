@@ -1375,10 +1375,7 @@ LOCAL METHODS
         // re-fit the chart when returning to a backgrounded tab (fixes oversize/overlap)
         document.addEventListener('visibilitychange', handleVisibilityRefit)
 
-        // init bootstrap tooltips
-        new Tooltip(document.body, {
-            selector: "[data-bs-toggle='tooltip']",
-        })
+        // bootstrap tooltips: HeaderBar's body delegate (same selector) already serves them
 
         // refresh every minute - NO loading spinner, just silent update
         refreshTimer.value = window.setInterval(async () => {
