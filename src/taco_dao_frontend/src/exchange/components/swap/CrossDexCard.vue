@@ -163,7 +163,7 @@
           <span class="crossdex-card__exec-status" :class="`is-${verdictCls}`">{{ execStatusLabel }}</span>
         </div>
         <p class="crossdex-card__exec-sub">
-          {{ legViews.length }} route{{ legViews.length === 1 ? '' : 's' }}{{ cx.neuFirst.value ? ', Neutrinite first' : ' running in parallel' }} · {{ cx.tokenFrom.value?.symbol }} → {{ cx.tokenTo.value?.symbol }}
+          {{ legViews.length }} route{{ legViews.length === 1 ? '' : 's' }}{{ routesNote }} · {{ cx.tokenFrom.value?.symbol }} → {{ cx.tokenTo.value?.symbol }}
         </p>
 
         <!-- one card per leg, live -->
@@ -364,6 +364,9 @@ const execStatusLabel = computed(() => {
     default: return ''
   }
 })
+
+// the routes run in parallel while the swap runs (Neutrinite first when it is part of a split)
+const routesNote = computed(() => (cx.neuFirst.value ? ', Neutrinite first' : legViews.value.length > 1 && cx.phase.value === 'executing' ? ' running in parallel' : ''))
 
 const summaryLine = computed(() => {
   const total = cx.outcomes.value.reduce((s, o) => s + o.amountOut, 0n)

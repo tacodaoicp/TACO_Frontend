@@ -3,3 +3,7 @@
 // The bottom nav (MobileNav) shows up to this width and hides above it. Anything that floats at the
 // bottom of the page sits above the nav at every width where the nav shows.
 $tx-mobile-nav-max: 767px;
+
+// Screens up to this tall (a phone in landscape with its browser bars) are too short for anything to float
+// at the bottom above the nav.
+$tx-short-max: 420px;

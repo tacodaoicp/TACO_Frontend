@@ -284,8 +284,10 @@ function onPicked(addrs: string[]) {
 // The total and the Sell button stay in view when the card is taller than the screen (8 to 10
 // tokens): the bar is sticky, above the bottom nav wherever the nav shows. Above 600 px it draws its
 // box only while it floats (a sentinel at its place in the card is below that line); phones always
-// draw it. Its own total shows only while the main total is out of view, so the total never shows
-// twice.
+// draw it. Its own total shows whenever the main total is out of view, floating or in place, so the
+// total never shows twice and the button never shows without one. On short landscape screens with the
+// bottom nav the bar does not float (a sticky bar cannot rise above its card's top, so it would sit
+// under the nav): it stays at the end of the card, which scrolls above the nav.
 const cardEl = ref<HTMLElement | null>(null)
 const barEl = ref<HTMLElement | null>(null)
 const barSentinel = ref<HTMLElement | null>(null)
@@ -304,8 +306,10 @@ let frame = 0
 function measureRecv() {
   frame = 0
   const s = barSentinel.value
-  const off = barEl.value ? parseFloat(getComputedStyle(barEl.value).bottom) : NaN
-  barStuck.value = !!s && s.getBoundingClientRect().top > window.innerHeight - (Number.isFinite(off) ? off : 12)
+  const st = barEl.value ? getComputedStyle(barEl.value) : null
+  const off = st ? parseFloat(st.bottom) : NaN
+  // a bar that does not float (short landscape screens with the bottom nav) is never stuck
+  barStuck.value = !!s && st?.position === 'sticky' && s.getBoundingClientRect().top > window.innerHeight - (Number.isFinite(off) ? off : 12)
   const row = recvRow.value, bar = barEl.value
   if (!row || !bar) { recvInView.value = false; return }
   const r = row.getBoundingClientRect()
@@ -371,12 +375,15 @@ onBeforeUnmount(() => {
       padding: 9px; margin: -6px -10px -10px; border: 1px solid transparent; border-radius: 12px;
       transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
       &.is-stuck { background: var(--tx-panel-bg); border-color: var(--tx-line-2); box-shadow: var(--tx-shadow-2); }
-      &:not(.is-stuck) .ms-card__bar-total { display: none; }
     }
   }
   // the total and the button stay visible above the bottom nav at every width where it shows
   @media (max-width: bp.$tx-mobile-nav-max) {
     &__bar { bottom: calc(var(--tx-mobile-nav-h) + 8px); }
+  }
+  // short landscape screens with the bottom nav: the bar stays in place at the end of the card
+  @media (max-width: bp.$tx-mobile-nav-max) and (max-height: bp.$tx-short-max) {
+    &__bar { position: static; }
   }
   @media (max-width: 600px) {
     &__bar {
