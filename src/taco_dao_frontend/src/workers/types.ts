@@ -410,6 +410,12 @@ export const ROUTE_PRIORITIES: Record<string, RouteDataConfig> = {
     high: ['tacoProposals'],
     preloadRoutes: ['/vote'],
   },
+  // the forum users reach (/forum is the old page)
+  '/chat/forum': {
+    critical: ['proposalsThreads', 'allNames'],
+    high: ['tacoProposals'],
+    preloadRoutes: ['/vote'],
+  },
   '/proposals': {
     critical: ['tacoProposals', 'allNames'],
     high: ['proposalsThreads'],
