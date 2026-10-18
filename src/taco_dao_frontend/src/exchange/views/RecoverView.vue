@@ -849,7 +849,7 @@ async function sweepNeuPendingInner(p: neutrinite.PendingNeutrinite) {
       sweepSuccess.value = true
       // a deposit of the pair the pylon has not credited yet sits on its deposit account on the ledger, where
       // no sweep reaches it: the row stays while the sold token is there (read after the sweep)
-      if (await neutrinite.sellStillHeld(p.sell)) {
+      if (await recordsReader().then(r => neutrinite.sellStillHeld(p.sell, r), () => true)) {
         toast.success('Sweep Complete', NEU_HELD_ROW_TEXT)
       } else {
         neutrinite.removePendingSwap(p.sell, p.buy)
@@ -1166,7 +1166,7 @@ async function raNeutrinite(): Promise<number> {
     let kept = 0
     for (const m of [...pendingNeu.value]) {
       if (details.some(d => d.ok && (d.ledger === m.sell || d.ledger === m.buy))) {
-        if (await neutrinite.sellStillHeld(m.sell)) { kept++; continue }
+        if (await recordsReader().then(r => neutrinite.sellStillHeld(m.sell, r), () => true)) { kept++; continue }
         neutrinite.removePendingSwap(m.sell, m.buy)
         pendingNeu.value = pendingNeu.value.filter(e => !(e.sell === m.sell && e.buy === m.buy))
       }
