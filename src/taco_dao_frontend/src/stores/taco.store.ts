@@ -3,7 +3,7 @@
 /////////////
 
 // vue
-import { ref, computed, watch } from 'vue'
+import { ref, shallowRef, computed, watch, toRaw } from 'vue'
 import { defineStore } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useStorage } from "@vueuse/core"
@@ -13,8 +13,8 @@ import { workerBridge, fetchAndWait } from './worker-bridge'
 import { deserializeFromTransfer } from '../workers/shared/transfer'
 import { getEffectiveNetwork, getICHost } from '../config/network-config'
 import { getCanisterId } from '../constants/canisterIds'
-import { getFrontendIdentity } from '../utils/frontend-identity'
 import { clearUserCache, clearAllUserCache } from '../utils/userScopedCache'
+import { yieldToMain } from '../utils/yieldToMain'
 
 // Only import Principal synchronously - it's small and used everywhere
 import { Principal } from '@dfinity/principal'
@@ -40,8 +40,10 @@ import type { _SERVICE as NeuronSnapshotService } from "../../../declarations/ne
 import type { _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import type { _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
 
-// Canister ID import (small, needed early)
-import { canisterId as iiCanisterId } from "../../../declarations/internet_identity/index.js"
+// Internet Identity canister id (local logins), read from the build env like
+// declarations/internet_identity does. Importing that module pulled
+// @dfinity/agent and the II interface into the boot bundle.
+const iiCanisterId = process.env.CANISTER_ID_INTERNET_IDENTITY
 
 // ============================================================================
 // Lazy Module Loaders - Heavy @dfinity packages loaded on demand
@@ -54,6 +56,7 @@ let _identityModule: typeof import('@dfinity/identity') | null = null
 let _ledgerIcpModule: typeof import('@dfinity/ledger-icp') | null = null
 let _snsModule: typeof import('@dfinity/sns') | null = null
 let _candidModule: typeof import('@dfinity/candid') | null = null
+let _frontendIdentityModule: typeof import('../utils/frontend-identity') | null = null
 
 // IDL factory modules (lazy loaded)
 let _ledgerIDL: any = null
@@ -156,6 +159,13 @@ async function getCandidModule() {
     return _candidModule
 }
 
+async function getFrontendIdentityModule() {
+    if (!_frontendIdentityModule) {
+        _frontendIdentityModule = await import('../utils/frontend-identity')
+    }
+    return _frontendIdentityModule
+}
+
 // IDL factory loaders
 async function getLedgerIDL() {
     if (!_ledgerIDL) {
@@ -237,6 +247,7 @@ let AccountIdentifier: typeof import('@dfinity/ledger-icp').AccountIdentifier
 let SnsGovernanceCanister: typeof import('@dfinity/sns').SnsGovernanceCanister
 let SnsNeuronPermissionType: typeof import('@dfinity/sns').SnsNeuronPermissionType
 let IDL: typeof import('@dfinity/candid').IDL
+let getFrontendIdentity: typeof import('../utils/frontend-identity').getFrontendIdentity
 
 // IDL factories (populated lazily)
 let idlFactory: any
@@ -263,6 +274,7 @@ async function initializeShims() {
         ledgerIcpMod,
         snsMod,
         candidMod,
+        frontendIdentityMod,
         ledgerIdl,
         daoIdl,
         treasuryIdl,
@@ -279,6 +291,7 @@ async function initializeShims() {
         getLedgerIcpModule(),
         getSnsModule(),
         getCandidModule(),
+        getFrontendIdentityModule(),
         getLedgerIDL(),
         getDaoBackendIDL(),
         getTreasuryIDL(),
@@ -300,6 +313,7 @@ async function initializeShims() {
     SnsGovernanceCanister = snsMod.SnsGovernanceCanister
     SnsNeuronPermissionType = snsMod.SnsNeuronPermissionType
     IDL = candidMod.IDL
+    getFrontendIdentity = frontendIdentityMod.getFrontendIdentity
 
     // IDL factories
     idlFactory = ledgerIdl
@@ -1741,7 +1755,76 @@ export const useTacoStore = defineStore('taco', () => {
     
     // logs
     const systemLogs = ref<SystemLog[]>([])
-    const tradingLogs = ref<TradingLog[]>([])
+    // Executed trades of the last trading status that had any (set by the tradingStatus
+    // subscription and refreshTimerStatus). The admin trading log (TradingLogs.vue) is built
+    // from them only when a page reads it, instead of in every tab on every update.
+    const tradingLogTrades = shallowRef<TradeRecord[]>([])
+    const tradingLogs = computed<TradingLog[]>(() => {
+        const executedTrades = tradingLogTrades.value
+        if (executedTrades.length === 0) return []
+
+        // Look tokens up by principal text. Principal.toText is costly, and
+        // searching the token list for each of ~2000 trades ran it twice per
+        // token per trade: seconds of main thread on phones, on every load.
+        // The decoder reuses one Principal object per id, so with this memo
+        // each id is converted once.
+        const principalText = new Map<Principal, string>()
+        const textOf = (p: Principal): string => {
+            let text = principalText.get(p)
+            if (text === undefined) {
+                text = p.toText()
+                principalText.set(p, text)
+            }
+            return text
+        }
+        const tokenByText = new Map<string, any>()
+        // raw entries: the list is only ever replaced whole, and for worker data its raw
+        // Principals are the decoder's shared objects, the same ones the trades hold
+        for (const t of toRaw(fetchedTokenDetails.value)) {
+            try {
+                const text = textOf(t[0] as Principal)
+                if (!tokenByText.has(text)) tokenByText.set(text, t[1])
+            } catch { /* skip a malformed entry */ }
+        }
+
+        return executedTrades.map((trade: TradeRecord) => {
+            if (trade.error && trade.error.length > 0) {
+                return {
+                    timestamp: trade.timestamp,
+                    message: `Failed: ${trade.error[0]}`
+                };
+            }
+
+            // Find token details from our trusted tokens list
+            let soldText = ''
+            let boughtText = ''
+            try {
+                soldText = textOf(trade.tokenSold as Principal)
+                boughtText = textOf(trade.tokenBought as Principal)
+            } catch { /* reported as unknown below */ }
+            const soldToken = tokenByText.get(soldText);
+            const boughtToken = tokenByText.get(boughtText);
+
+            if (!soldToken || !boughtToken) {
+                return {
+                    timestamp: trade.timestamp,
+                    message: `Trade with unknown tokens: ${soldText} -> ${boughtText}`
+                };
+            }
+
+            // Format amounts using token decimals from our trusted tokens
+            const formattedSoldAmount = Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals));
+            const formattedBoughtAmount = Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals));
+
+            // Extract exchange name from the variant
+            const exchangeName = Object.keys(trade.exchange)[0];
+
+            return {
+                timestamp: trade.timestamp,
+                message: `${formattedSoldAmount} ${soldToken.tokenSymbol} → ${formattedBoughtAmount} ${boughtToken.tokenSymbol} on ${exchangeName}`
+            };
+        });
+    })
 
     // other
     const tokenMetadataCache = new Map<string, TokenMetadata>();
@@ -1864,111 +1947,57 @@ export const useTacoStore = defineStore('taco', () => {
             })
         )
 
-        // tradingStatus
+        // tradingStatus - also the treasury part of timerHealth (the admin timer panel)
         workerUnsubscribers.push(
             workerBridge.subscribe('tradingStatus', (data: unknown) => {
                 if (data) {
                     // Deserialize BigInt values from worker
-                    fetchedTradingStatus.value = deserializeFromTransfer(data)
+                    const status = deserializeFromTransfer(data) as any
+                    fetchedTradingStatus.value = status
+                    try {
+                        const ts = status?.ok
+                        if (ts) {
+                            timerHealth.value.treasury = {
+                                shortSync: {
+                                    active: true,
+                                    lastSync: ts.metrics?.lastUpdate || null
+                                },
+                                longSync: {
+                                    active: true,
+                                    lastSync: ts.metrics?.lastUpdate || null
+                                },
+                                rebalanceStatus: ts.rebalanceStatus?.Idle !== undefined ? 'Idle' :
+                                    ts.rebalanceStatus?.Trading !== undefined ? 'Trading' : 'Failed',
+                                rebalanceError: ts.rebalanceStatus?.Failed,
+                                tradingMetrics: ts.metrics,
+                                // the same array as fetchedTradingStatus, not a second copy
+                                recentTrades: ts.executedTrades
+                            }
+                            if (ts.executedTrades && ts.executedTrades.length > 0) {
+                                tradingLogTrades.value = ts.executedTrades
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error reading the trading status for the timer health:', error)
+                    }
                 }
             })
         )
 
-        // timerStatus - updates timerHealth ref AND tradingLogs
+        // timerStatus - updates the snapshot part of timerHealth. The payload may also carry a
+        // copy of the trading status and token details; those arrive through their own keys,
+        // so only snapshotInfo is decoded
         workerUnsubscribers.push(
             workerBridge.subscribe('timerStatus', (data: unknown) => {
                 if (data && typeof data === 'object') {
                     // Deserialize BigInt values from worker
-                    const statusData = deserializeFromTransfer(data) as { snapshotInfo: any; tradingStatus: any; tokenDetails: any[] }
-                    // Update timerHealth based on snapshotInfo and tradingStatus
-                    if (statusData.snapshotInfo) {
+                    const snapshotInfo = deserializeFromTransfer((data as { snapshotInfo?: unknown }).snapshotInfo) as any
+                    if (snapshotInfo) {
                         timerHealth.value.snapshot = {
                             active: true,
-                            lastSnapshotTime: statusData.snapshotInfo.lastSnapshotTime,
+                            lastSnapshotTime: snapshotInfo.lastSnapshotTime,
                             nextExpectedSnapshot: null,
                             inProgress: false
-                        }
-                    }
-                    if (statusData.tradingStatus?.ok) {
-                        const ts = statusData.tradingStatus.ok
-                        timerHealth.value.treasury = {
-                            shortSync: {
-                                active: true,
-                                lastSync: ts.metrics?.lastUpdate || null
-                            },
-                            longSync: {
-                                active: true,
-                                lastSync: ts.metrics?.lastUpdate || null
-                            },
-                            rebalanceStatus: ts.rebalanceStatus?.Idle !== undefined ? 'Idle' :
-                                ts.rebalanceStatus?.Trading !== undefined ? 'Trading' : 'Failed',
-                            rebalanceError: ts.rebalanceStatus?.Failed,
-                            tradingMetrics: ts.metrics,
-                            recentTrades: ts.executedTrades
-                        }
-
-                        // Also populate tradingLogs from executedTrades
-                        const executedTrades = ts.executedTrades
-                        if (executedTrades && executedTrades.length > 0) {
-                            // Look tokens up by principal text. Principal.toText is costly, and
-                            // searching the token list for each of ~2000 trades ran it twice per
-                            // token per trade: seconds of main thread on phones, on every load.
-                            // The decoder reuses one Principal object per id, so with this memo
-                            // each id is converted once.
-                            const principalText = new Map<Principal, string>()
-                            const textOf = (p: Principal): string => {
-                                let text = principalText.get(p)
-                                if (text === undefined) {
-                                    text = p.toText()
-                                    principalText.set(p, text)
-                                }
-                                return text
-                            }
-                            const tokenByText = new Map<string, any>()
-                            for (const t of fetchedTokenDetails.value) {
-                                try {
-                                    const text = textOf(t[0] as Principal)
-                                    if (!tokenByText.has(text)) tokenByText.set(text, t[1])
-                                } catch { /* skip a malformed entry */ }
-                            }
-
-                            tradingLogs.value = executedTrades.map((trade: TradeRecord) => {
-                                if (trade.error && trade.error.length > 0) {
-                                    return {
-                                        timestamp: trade.timestamp,
-                                        message: `Failed: ${trade.error[0]}`
-                                    };
-                                }
-
-                                // Find token details from our trusted tokens list
-                                let soldText = ''
-                                let boughtText = ''
-                                try {
-                                    soldText = textOf(trade.tokenSold as Principal)
-                                    boughtText = textOf(trade.tokenBought as Principal)
-                                } catch { /* reported as unknown below */ }
-                                const soldToken = tokenByText.get(soldText);
-                                const boughtToken = tokenByText.get(boughtText);
-
-                                if (!soldToken || !boughtToken) {
-                                    return {
-                                        timestamp: trade.timestamp,
-                                        message: `Trade with unknown tokens: ${soldText} -> ${boughtText}`
-                                    };
-                                }
-
-                                // Format amounts using token decimals from our trusted tokens
-                                const formattedSoldAmount = Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals));
-                                const formattedBoughtAmount = Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals));
-
-                                // Extract exchange name from the variant
-                                const exchangeName = Object.keys(trade.exchange)[0];
-
-                                return {
-                                    timestamp: trade.timestamp,
-                                    message: `${formattedSoldAmount} ${soldToken.tokenSymbol} → ${formattedBoughtAmount} ${boughtToken.tokenSymbol} on ${exchangeName}`
-                                };
-                            });
                         }
                     }
                 }
@@ -2036,6 +2065,10 @@ export const useTacoStore = defineStore('taco', () => {
                         principalNames: Record<string, { name: string; verified: boolean }>
                         neuronNames: Record<string, { name: string; verified: boolean }>
                     }
+                    // A copy without a single name is not a real list (a worker that sends the
+                    // names as Maps delivers them as empty objects): keep the names shown
+                    if (Object.keys(namesData.principalNames ?? {}).length === 0 &&
+                        Object.keys(namesData.neuronNames ?? {}).length === 0) return
                     // Convert from serialized object back to Maps
                     namesCache.value.principals = new Map(Object.entries(namesData.principalNames))
                     namesCache.value.neurons = new Map(Object.entries(namesData.neuronNames))
@@ -3405,6 +3438,31 @@ export const useTacoStore = defineStore('taco', () => {
 
     }
 
+    // One read at a time: calls made while a read runs share it, and a forced call reads
+    // again once it is done. Both header chips ask on mount and again when prices load,
+    // and each ask used to run every read again. When the shared read leaves the value
+    // missing (a query failed), the calls that joined it read once more, as a call of
+    // their own used to; they share that second read.
+    const singleFlight = (read: () => Promise<void>, done: () => boolean) => {
+        let running: Promise<void> | null = null
+        const start = (): Promise<void> => {
+            const previous = running
+            const current: Promise<void> = (async () => {
+                if (previous) await previous.catch(() => {})
+                await read()
+            })().finally(() => {
+                if (running === current) running = null
+            })
+            running = current
+            return current
+        }
+        return async (force: boolean): Promise<void> => {
+            if (!running || force) return start()
+            await running
+            if (!done()) return running ?? start()
+        }
+    }
+
     // sns provided canisters
     const fetchTotalTreasuryValueInUsd = async (forceRefetch = false) => {
 
@@ -3416,9 +3474,14 @@ export const useTacoStore = defineStore('taco', () => {
         // if we've already fetched treasury balances, return (unless forced)
         // (use a balance ref as the signal — totalTreasuryValueInUsd is now reactive and includes Solum, which is non-zero before any on-chain fetch)
         // (a failed NACHO read leaves the supply at 0, so later calls retry it instead of keeping the DAO totals at '…')
-        if (snsTreasuryTacoAmount.value > 0 && nachoTotalSupply.value > 0 && !forceRefetch) {
+        if (treasuryBalancesRead() && !forceRefetch) {
             return true
         }
+
+        return readTreasuryBalances(forceRefetch)
+    }
+    const treasuryBalancesRead = () => snsTreasuryTacoAmount.value > 0 && nachoTotalSupply.value > 0
+    const readTreasuryBalances = singleFlight(async () => {
 
         // first fetch the total ICP in the treasury
         // second fetch the total TACO in the treasury
@@ -3439,6 +3502,19 @@ export const useTacoStore = defineStore('taco', () => {
             return bytes
         }
 
+        // The reads below run at once, each started in a task of its own (building an actor and
+        // signing a query is main thread work, and all of them together held a phone's main
+        // thread for a few hundred ms). Each one catches its own error, and the values are
+        // stored together at the end, as before. A read that failed (it answers false) is
+        // tried once more after a short pause: before the reads were shared, the chips' other
+        // calls read every value again and usually filled in one that had failed.
+        const retryOnce = async (read: () => Promise<any>) => {
+            const first = await read()
+            if (first !== false) return first
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+            return read()
+        }
+
         /////////////////////////////////////
         // fetch total ICP in the treasury //
         /////////////////////////////////////
@@ -3447,14 +3523,12 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchTotalTreasuryValueInUsd()')
 
         // call icrc1 balance of for sns treasury taco balance
-        const snsTreasuryTacoBalance = await icrc1BalanceOf(
+        const snsTreasuryTacoRead = retryOnce(() => icrc1BalanceOf(
             'kknbx-zyaaa-aaaaq-aae4a-cai', 
             Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
             hexToUint8Array('ab5aaa420bfefa4244885e1b59347569bafacb144ecb6578fe3aed5cd772dc78')
-        )
-
-        // log
-        // console.log('treasury taco balance:', snsTreasuryTacoBalance)
+        ))
+        await yieldToMain()
 
         //////////////////////////////////////
         // fetch total TACO in the treasury //
@@ -3464,14 +3538,12 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchTotalTreasuryValueInUsd() - fetching total ICP in the treasury')
 
         // call icp ledger balance for sns treasury icp balance
-        const snsTreasuryIcpBalance = await icrc1BalanceOf(
+        const snsTreasuryIcpRead = retryOnce(() => icrc1BalanceOf(
             'ryjl3-tyaaa-aaaaa-aaaba-cai', // ICP ledger canister ID
             Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
             // hexToUint8Array('df86d44b4cf253518395a3213fbb6b256a27e60fb590c1b27211be9011709fdc')
-        )
-
-        // log
-        // console.log('treasury icp balance:', snsTreasuryIcpBalance)
+        ))
+        await yieldToMain()
 
         /////////////////////////////////////
         // fetch total DKP in the treasury //
@@ -3481,23 +3553,22 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchTotalTreasuryValueInUsd() - fetching total DKP in the treasury')
 
         // call icp ledger balance for sns treasury icp balance
-        const snsTreasuryDkpBalance = await icrc1BalanceOf(
+        const snsTreasuryDkpRead = retryOnce(() => icrc1BalanceOf(
             'zfcdd-tqaaa-aaaaq-aaaga-cai', // ICP ledger canister ID
             Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
             // hexToUint8Array('df86d44b4cf253518395a3213fbb6b256a27e60fb590c1b27211be9011709fdc')
-        )
-
-        // log
-        // console.log('treasury dkp balance:', snsTreasuryDkpBalance)
+        ))
+        await yieldToMain()
 
         /////////////////////////////////////
         // fetch NTN held by holder canister //
         /////////////////////////////////////
 
-        const snsTreasuryNtnBalance = await icrc1BalanceOf(
+        const snsTreasuryNtnRead = retryOnce(() => icrc1BalanceOf(
             NTN_LEDGER_CANISTER_ID,
             Principal.fromText(NTN_HOLDER_PRINCIPAL),
-        )
+        ))
+        await yieldToMain()
 
         //////////////////////////////////////////////
         // fetch NACHO treasury balance + supply     //
@@ -3505,29 +3576,52 @@ export const useTacoStore = defineStore('taco', () => {
 
         // the DAO owns treasuryNacho/totalSupply of the portfolio
         const NACHO_LEDGER_CANISTER_ID = 'o6ncl-lyaaa-aaaan-q6dua-cai'
-        const snsTreasuryNachoBalance = await icrc1BalanceOf(
+        const snsTreasuryNachoRead = retryOnce(() => icrc1BalanceOf(
             NACHO_LEDGER_CANISTER_ID,
             Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
-        )
-        const nachoSupply = await icrc1TotalSupply(NACHO_LEDGER_CANISTER_ID)
+        ))
+        await yieldToMain()
+        const nachoSupplyRead = retryOnce(() => icrc1TotalSupply(NACHO_LEDGER_CANISTER_ID))
 
         // ponytail: DAO's ICPSwap TACO/ICP LP (SNS-treasury positions in pool vhoia). The ICP side counts as backing,
         // the TACO side is DAO held, so it leaves the circulating supply.
         let lpIcp = 0
         let lpTaco = 0
-        try {
-            const poolMod = await import("../../../declarations/icp_swap/icp_swap.did.js")
-            const pool = await getAnonymousActor('vhoia-myaaa-aaaar-qbmja-cai', () => poolMod.idlFactory)
-            const idsRes: any = await pool.getUserPositionIdsByPrincipal(Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'))
-            const ids = new Set<string>((idsRes.ok ?? []).map((n: bigint) => n.toString()))
-            if (ids.size) {
-                const page: any = await pool.getUserPositionWithTokenAmount(0n, 5000n) // ponytail: 5000 cap; paginate if pool grows
-                for (const p of (page.ok?.content ?? [])) if (ids.has(p.id.toString())) {
-                    lpIcp += (Number(p.token1Amount) + Number(p.tokensOwed1)) / 1e8 // token1 = ICP, + uncollected ICP fees
-                    lpTaco += (Number(p.token0Amount) + Number(p.tokensOwed0)) / 1e8 // token0 = TACO, + uncollected TACO fees
+        const lpRead = retryOnce(async () => {
+            lpIcp = 0
+            lpTaco = 0
+            try {
+                const poolMod = await import("../../../declarations/icp_swap/icp_swap.did.js")
+                const pool = await getAnonymousActor('vhoia-myaaa-aaaar-qbmja-cai', () => poolMod.idlFactory)
+                const idsRes: any = await pool.getUserPositionIdsByPrincipal(Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'))
+                const ids = new Set<string>((idsRes.ok ?? []).map((n: bigint) => n.toString()))
+                if (ids.size) {
+                    const page: any = await pool.getUserPositionWithTokenAmount(0n, 5000n) // ponytail: 5000 cap; paginate if pool grows
+                    for (const p of (page.ok?.content ?? [])) if (ids.has(p.id.toString())) {
+                        lpIcp += (Number(p.token1Amount) + Number(p.tokensOwed1)) / 1e8 // token1 = ICP, + uncollected ICP fees
+                        lpTaco += (Number(p.token0Amount) + Number(p.tokensOwed0)) / 1e8 // token0 = TACO, + uncollected TACO fees
+                    }
                 }
-            }
-        } catch (e) { console.error('ICPSwap LP fetch failed', e) }
+                return true
+            } catch (e) { console.error('ICPSwap LP fetch failed', e); return false }
+        })
+
+        const [
+            snsTreasuryTacoBalance,
+            snsTreasuryIcpBalance,
+            snsTreasuryDkpBalance,
+            snsTreasuryNtnBalance,
+            snsTreasuryNachoBalance,
+            nachoSupply,
+        ] = await Promise.all([
+            snsTreasuryTacoRead,
+            snsTreasuryIcpRead,
+            snsTreasuryDkpRead,
+            snsTreasuryNtnRead,
+            snsTreasuryNachoRead,
+            nachoSupplyRead,
+            lpRead,
+        ])
 
         /////////////////
         // store balances; USD rows + total are reactive computeds that follow price refs //
@@ -3549,7 +3643,7 @@ export const useTacoStore = defineStore('taco', () => {
 
         return
 
-    }
+    }, treasuryBalancesRead)
 
     // total TACO supply from the ledger (used for the fair value circulating supply)
     const fetchTacoTotalSupply = async (forceRefetch = false) => {
@@ -3559,14 +3653,16 @@ export const useTacoStore = defineStore('taco', () => {
             return true
         }
 
+        return readTacoTotalSupply(forceRefetch)
+    }
+    const readTacoTotalSupply = singleFlight(async () => {
+
         const supply = await icrc1TotalSupply(TACO_LEDGER_CANISTER_ID)
         if (supply !== false) {
             tacoTotalSupply.value = Number(supply) / Math.pow(10, 8)
         }
 
-        return
-
-    }
+    }, () => tacoTotalSupply.value > 0)
 
     // dao backend
     const fetchTokenDetails = async () => {
@@ -4264,65 +4360,9 @@ export const useTacoStore = defineStore('taco', () => {
                     recentTrades: executedTrades
                 };
                 
-                // Update trading logs from executed trades
+                // Update trading logs from executed trades (built when read, see tradingLogs)
                 if (executedTrades) {
-                    // console.log('refreshTimerStatus: Processing trades with token details:', 
-                    //     fetchedTokenDetails.value.map(t => ({
-                    //         id: (t[0] as Principal).toText(),
-                    //         symbol: t[1]?.tokenSymbol,
-                    //         decimals: t[1]?.tokenDecimals?.toString()
-                    //     }))
-                    // )
-                    tradingLogs.value = executedTrades.map((trade: TradeRecord) => {
-                        if (trade.error && trade.error.length > 0) {
-                            return {
-                                timestamp: trade.timestamp,
-                                message: `Failed: ${trade.error[0]}`
-                            };
-                        }
-                        
-                        // Find token details from our trusted tokens list
-                        const soldToken = fetchedTokenDetails.value.find(t => {
-                            try {
-                                const tradeTokenId = (trade.tokenSold as Principal).toText();
-                                const listTokenId = (t[0] as Principal).toText();
-                                return tradeTokenId === listTokenId;
-                            } catch (error) {
-                                console.error('Error comparing sold token IDs:', error);
-                                return false;
-                            }
-                        })?.[1];
-
-                        const boughtToken = fetchedTokenDetails.value.find(t => {
-                            try {
-                                const tradeTokenId = (trade.tokenBought as Principal).toText();
-                                const listTokenId = (t[0] as Principal).toText();
-                                return tradeTokenId === listTokenId;
-                            } catch (error) {
-                                console.error('Error comparing bought token IDs:', error);
-                                return false;
-                            }
-                        })?.[1];
-
-                        if (!soldToken || !boughtToken) {
-                            return {
-                                timestamp: trade.timestamp,
-                                message: `Trade with unknown tokens: ${(trade.tokenSold as Principal).toText()} -> ${(trade.tokenBought as Principal).toText()}`
-                            };
-                        }
-
-                        // Format amounts using token decimals from our trusted tokens
-                        const formattedSoldAmount = Number(trade.amountSold) / Math.pow(10, Number(soldToken.tokenDecimals));
-                        const formattedBoughtAmount = Number(trade.amountBought) / Math.pow(10, Number(boughtToken.tokenDecimals));
-
-                        // Extract exchange name from the variant
-                        const exchangeName = Object.keys(trade.exchange)[0];
-
-                        return {
-                            timestamp: trade.timestamp,
-                            message: `${formattedSoldAmount} ${soldToken.tokenSymbol} → ${formattedBoughtAmount} ${boughtToken.tokenSymbol} on ${exchangeName}`
-                        };
-                    });
+                    tradingLogTrades.value = toRaw(executedTrades)
                 }
                 
                 //console.log('refreshTimerStatus: Updated treasuryStatus:', timerHealth.value.treasury.shortSync);
@@ -6148,6 +6188,9 @@ export const useTacoStore = defineStore('taco', () => {
                 // Update cache immediately
                 const userPrincipalStr = userPrincipal.value;
                 namesCache.value.principals.set(userPrincipalStr, { name, verified: false });
+
+                // Reload the names the data worker holds, so other pages and tabs show the new name
+                workerBridge.fetch('allNames', true)
                 
                 return result.ok;
             } else {
@@ -6180,6 +6223,9 @@ export const useTacoStore = defineStore('taco', () => {
                 // Update cache immediately
                 const mapKey = createNeuronKey(snsRoot, neuronId);
                 namesCache.value.neurons.set(mapKey, { name, verified: false });
+
+                // Reload the names the data worker holds, so other pages and tabs show the new name
+                workerBridge.fetch('allNames', true)
                 
                 return result.ok;
             } else {
