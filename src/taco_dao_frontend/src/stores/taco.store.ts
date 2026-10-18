@@ -8242,6 +8242,12 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // a ledger's current transfer fee (the cached token metadata can be a day old)
+    const fetchLedgerFee = async (tokenPrincipal: string): Promise<bigint> => {
+        const actor = await getAnonymousActor(tokenPrincipal, () => ({ IDL }: any) => IDL.Service({ icrc1_fee: IDL.Func([], [IDL.Nat], ['query']) })) as any
+        return BigInt(await actor.icrc1_fee())
+    }
+
     const sendToken = async (
         tokenPrincipal: string,
         recipient: string,
@@ -9542,6 +9548,7 @@ export const useTacoStore = defineStore('taco', () => {
         registerUserToken,
         unregisterUserToken,
         sendToken,
+        fetchLedgerFee,
         sendIcpByAccountId,
         fetchUserTokenBalance,
         clearTokenMetadataCache,

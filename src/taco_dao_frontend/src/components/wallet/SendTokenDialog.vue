@@ -434,11 +434,15 @@ const maxAmount = computed(() => {
 })
 
 const amountBigInt = computed(() => {
+  // exact decimal string parse: parseFloat loses precision on 18 decimal tokens
+  // and could put MAX above the balance
   if (!props.token || !amount.value) return 0n
+  const t = amount.value.trim()
+  if (!/^\d*(\.\d*)?$/.test(t) || t === '' || t === '.') return 0n
+  const d = props.token.decimals
+  const [int, frac = ''] = t.split('.')
   try {
-    const amountNum = parseFloat(amount.value)
-    if (isNaN(amountNum) || amountNum <= 0) return 0n
-    return BigInt(Math.floor(amountNum * (10 ** props.token.decimals)))
+    return BigInt(int || '0') * 10n ** BigInt(d) + BigInt(frac.slice(0, d).padEnd(d, '0') || '0')
   } catch {
     return 0n
   }
@@ -487,6 +491,11 @@ const validateSubaccount = () => {
 // Validation watchers
 watch([recipient], () => {
   validateRecipient()
+})
+
+// the wallet reads the ledger's fee after the dialog opens: redo MAX with it
+watch(() => props.token?.fee, () => {
+  if (pctSlider.value === 100) setMaxAmount()
 })
 
 watch([amount, () => props.token], () => {

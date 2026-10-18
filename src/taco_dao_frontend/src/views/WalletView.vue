@@ -1006,6 +1006,12 @@ const openSendDialog = (token: WalletToken) => {
   selectedToken.value = token
   sendDialogSession.value++
   showSendDialog.value = true
+  // the listed fee can be stale (GOLDAO went from 0.001 to 10): use the ledger's
+  tacoStore.fetchLedgerFee(token.principal).then((fee) => {
+    if (selectedToken.value?.principal === token.principal && selectedToken.value.fee !== fee) {
+      selectedToken.value = { ...selectedToken.value, fee }
+    }
+  }).catch(() => { /* keep the listed fee */ })
 }
 
 // close send dialog
