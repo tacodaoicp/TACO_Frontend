@@ -438,10 +438,11 @@ async function refreshAll() {
 }
 
 function openTransfer(row: WalletRow) {
-  // Find transfer fee: exchange token has fee in metadata, DAO token has transferFee
+  // Transfer fee: the exchange's token list first (the DAO's copy can lag a fee
+  // change), then the DAO's. The dialog then reads the ledger's live fee.
   const daoToken = daoTokens.value.find(d => d.address === row.address)
   const exToken = store.tokens.find(t => t.address === row.address)
-  const transferFee = daoToken?.transferFee ?? (exToken ? BigInt(exToken.transfer_fee) : 10_000n)
+  const transferFee = exToken ? BigInt(exToken.transfer_fee) : (daoToken?.transferFee ?? 10_000n)
 
   transferToken.value = {
     address: row.address,

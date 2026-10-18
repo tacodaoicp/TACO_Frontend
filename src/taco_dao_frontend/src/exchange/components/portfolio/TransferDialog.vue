@@ -124,6 +124,7 @@ import { Actor } from '@dfinity/agent'
 import { getCachedAgent, getCachedIdentity } from '../../../shared/auth-cache'
 import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { getTokenIcon } from '../../utils/token-icons'
+import { useExchangeStore } from '../../store/exchange.store'
 
 interface TransferToken {
   address: string
@@ -172,11 +173,26 @@ const detectedType = computed<'principal' | 'accountId'>(() => {
   return 'principal'
 })
 
+// The ledger's live fee once read: the cached one can be stale (GOLDAO went
+// from 0.001 to 10, so MAX left too little for the fee)
+const liveFee = ref<bigint | null>(null)
+const fee = computed(() => liveFee.value ?? props.token?.transferFee ?? 0n)
+
+async function readLiveFee(address: string) {
+  try {
+    const f = await useExchangeStore().fetchLedgerFee(address)
+    if (props.token?.address !== address || f === fee.value) return
+    liveFee.value = f
+    if (pctSlider.value === 100) setMaxAmount()
+    else validateAmount()
+  } catch { /* keep the cached fee */ }
+}
+
 // Amount math
 const maxSendable = computed(() => {
   if (!props.token) return 0n
-  return props.token.balance > props.token.transferFee
-    ? props.token.balance - props.token.transferFee
+  return props.token.balance > fee.value
+    ? props.token.balance - fee.value
     : 0n
 })
 
@@ -195,7 +211,7 @@ const amountBigInt = computed(() => {
 
 const totalDeducted = computed(() => {
   if (!props.token) return 0n
-  return amountBigInt.value + props.token.transferFee
+  return amountBigInt.value + fee.value
 })
 
 const computedPct = computed(() => {
@@ -220,7 +236,7 @@ const balanceFormatted = computed(() => {
 
 const feeFormatted = computed(() => {
   if (!props.token) return '0'
-  return fmt(props.token.transferFee, props.token.decimals)
+  return fmt(fee.value, props.token.decimals)
 })
 
 const totalDeductedFormatted = computed(() => {
@@ -285,7 +301,12 @@ watch(detectedType, (t) => {
     subaccountError.value = ''
   }
 })
-watch(() => props.visible, (v) => { if (v) resetForm() })
+watch(() => props.visible, (v) => {
+  if (!v) return
+  resetForm()
+  liveFee.value = null
+  if (props.token) readLiveFee(props.token.address)
+})
 
 const canSend = computed(() =>
   !recipientError.value &&
@@ -383,7 +404,7 @@ async function handleSend() {
       const actor = Actor.createActor(icpLedgerIdl, { agent, canisterId: ICP_CANISTER })
       await actor.send_dfx({
         to: recipient.value.trim(),
-        fee: { e8s: token.transferFee },
+        fee: { e8s: fee.value },
         memo: 0n,
         from_subaccount: [],
         created_at_time: [],
