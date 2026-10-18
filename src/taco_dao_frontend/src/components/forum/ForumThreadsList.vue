@@ -444,6 +444,7 @@
     import { useTacoStore } from '../../stores/taco.store'
     import astronautLoader from '../../assets/images/astonautLoader.webp'
     import { Principal } from '@dfinity/principal'
+    import { localeDateString } from '../../utils/intlCache'
 
     ///////////
     // store //
@@ -623,7 +624,7 @@
 
     // format date
     const formatDate = (date) => {
-      return date.toLocaleDateString('en-US', {
+      return localeDateString(date, 'en-US', {
         year: 'numeric',
         month: '2-digit',
         day: '2-digit'

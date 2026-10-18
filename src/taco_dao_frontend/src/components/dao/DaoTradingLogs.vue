@@ -166,6 +166,8 @@
     import { useTacoStore } from '../../stores/taco.store'
     import { storeToRefs } from 'pinia'
     import { tokenData } from '../data/TokenData'
+    import { workerBridge } from '../../stores/worker-bridge'
+    import { localeDateString, localeTimeString } from '../../utils/intlCache'
 
     ///////////
     // store //
@@ -197,6 +199,9 @@
     // refresh interval
     let refreshInterval: number | null = null
 
+    // main thread fallback when the data worker never starts
+    let workerFallbackTimer: number | null = null
+
     ///////////////////
     // local methods //
     ///////////////////
@@ -223,7 +228,7 @@
             month: 'numeric',
             day: 'numeric'
         }
-        return `${date.toLocaleTimeString('en-US', timeOptions)} ${date.toLocaleDateString('en-US', dateOptions)}`
+        return `${localeTimeString(date, 'en-US', timeOptions)} ${localeDateString(date, 'en-US', dateOptions)}`
     }
 
     // format amount
@@ -353,8 +358,15 @@
         // ensure token details are loaded
         await ensureTokenDetails()
         
-        // get trading status from treasury backend
-        await getTradingStatus()
+        // get trading status from treasury backend, through the data worker: it decodes the
+        // large treasury reply off the main thread, and the store subscription fills fetchedTradingStatus
+        workerBridge.fetch('tradingStatus', true)
+
+        // a browser where the data worker could not start fetches on the main thread, as before
+        workerFallbackTimer = window.setTimeout(() => {
+            workerFallbackTimer = null
+            if (!workerBridge.isConnected.value) getTradingStatus()
+        }, 3000)
 
         // log
         // console.log('DaoTradingLogs.vue: onMounted() - fetched token details:', fetchedTokenDetails.value)
@@ -370,6 +382,10 @@
         if (refreshInterval) {
             clearInterval(refreshInterval)
             refreshInterval = null
+        }
+        if (workerFallbackTimer) {
+            clearTimeout(workerFallbackTimer)
+            workerFallbackTimer = null
         }
     })
 

@@ -214,7 +214,7 @@
 
                   <!-- value -->
                   <td class="text-end pe-4">
-                    <span>${{ (token.currentHoldings.amount * token.priceInUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                    <span>${{ localeNumberString(token.currentHoldings.amount * token.priceInUSD, 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
                   </td>
 
                   <!-- date added (hidden on mobile) -->
@@ -392,6 +392,7 @@ LOCAL METHODS
   import { storeToRefs } from "pinia"
   import astronautLoader from '../../assets/images/astonautLoader.webp'
   import { tokenData } from "../data/TokenData"
+  import { localeDateString, localeNumberString } from '../../utils/intlCache'
 
   ///////////
   // Store //
@@ -511,7 +512,7 @@ LOCAL METHODS
     }
     // convert epoch timestamp (in nanoseconds) to milliseconds
     const date = new Date(Number(epochTimestamp / BigInt(1_000_000)))
-    return date.toLocaleDateString('en-US', options)
+    return localeDateString(date, 'en-US', options)
   }
 
   // format number to remove trailing zeros and add commas
