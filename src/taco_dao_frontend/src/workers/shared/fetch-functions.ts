@@ -11,7 +11,9 @@ import { idlFactory as daoBackendIDL, type _SERVICE as DaoBackendService } from 
 import { idlFactory as treasuryIDL, type _SERVICE as TreasuryService } from '../../../../declarations/treasury/treasury.did.js'
 import { idlFactory as neuronSnapshotIDL, type _SERVICE as NeuronSnapshotService } from '../../../../declarations/neuronSnapshot/neuronSnapshot.did.js'
 import { idlFactory as sneedForumIDL, type _SERVICE as SneedForumService } from '../../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js'
-import { idlFactory as appSneedDaoIDL, type _SERVICE as AppSneedDaoService } from '../../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js'
+import { idlFactory as sneedPidNamesIDL, type _SERVICE as SneedPidNamesService } from '../../../../declarations/sneed_pid_names/sneed_pid_names.did.js'
+import { idlFactory as sneedNeuronNamesIDL, type _SERVICE as SneedNeuronNamesService } from '../../../../declarations/sneed_neuron_names/sneed_neuron_names.did.js'
+import { fetchPrincipalNames, fetchNeuronNames } from './sneed-names'
 import { idlFactory as snsGovernanceIDL } from '../../../../declarations/sns_governance/sns_governance.did.js'
 
 import {
@@ -19,7 +21,8 @@ import {
   getTreasuryCanisterId,
   getNeuronSnapshotCanisterId,
   getSneedForumCanisterId,
-  getAppSneedDaoCanisterId,
+  getSneedPidNamesCanisterId,
+  getSneedNeuronNamesCanisterId,
   getTacoSnsGovernanceCanisterId,
   getTacoSnsRootCanisterId,
   getRewardsCanisterId,
@@ -77,8 +80,12 @@ function getSneedForumActor(agent: HttpAgent): ActorSubclass<SneedForumService> 
   return getCachedActor<SneedForumService>(agent, getSneedForumCanisterId(), sneedForumIDL)
 }
 
-function getAppSneedDaoActor(agent: HttpAgent): ActorSubclass<AppSneedDaoService> {
-  return getCachedActor<AppSneedDaoService>(agent, getAppSneedDaoCanisterId(), appSneedDaoIDL)
+function getSneedPidNamesActor(agent: HttpAgent): ActorSubclass<SneedPidNamesService> {
+  return getCachedActor<SneedPidNamesService>(agent, getSneedPidNamesCanisterId(), sneedPidNamesIDL)
+}
+
+function getSneedNeuronNamesActor(agent: HttpAgent): ActorSubclass<SneedNeuronNamesService> {
+  return getCachedActor<SneedNeuronNamesService>(agent, getSneedNeuronNamesCanisterId(), sneedNeuronNamesIDL)
 }
 
 function getSnsGovernanceActor(agent: HttpAgent): ActorSubclass<any> {
@@ -590,7 +597,7 @@ export async function fetchProposalsThreadsData(agent: HttpAgent): Promise<any[]
 }
 
 /**
- * Fetch all names from AppSneedDAO
+ * Fetch all names from the Sneed naming service (sneed_pid_names, sneed_neuron_names)
  * Plain objects, not Maps: serializeForTransfer turns a Map into {}, so the
  * store used to receive no names at all and emptied the ones it had.
  */
@@ -598,27 +605,11 @@ export async function fetchAllNamesData(agent: HttpAgent): Promise<{
   principalNames: Record<string, { name: string; verified: boolean }>
   neuronNames: Record<string, { name: string; verified: boolean }>
 }> {
-  const actor = getAppSneedDaoActor(agent)
-
-  const [principalNamesRaw, neuronNamesRaw] = await Promise.all([
-    actor.get_all_principal_names(),
-    actor.get_all_neuron_names(),
+  const [principalNames, neuronNames] = await Promise.all([
+    fetchPrincipalNames(getSneedPidNamesActor(agent)),
+    fetchNeuronNames(getSneedNeuronNamesActor(agent)),
   ])
-
-  // Process principal names
-  const principalNames: Record<string, { name: string; verified: boolean }> = {}
-  ;(principalNamesRaw as any[]).forEach(([principal, [name, verified]]) => {
-    principalNames[principal.toString()] = { name, verified }
-  })
-
-  // Process neuron names
-  const neuronNames: Record<string, { name: string; verified: boolean }> = {}
-  ;(neuronNamesRaw as any[]).forEach(([neuronKey, [name, verified]]) => {
-    const mapKey = `${neuronKey.sns_root_canister_id.toString()}:${uint8ArrayToHex(neuronKey.neuron_id.id)}`
-    neuronNames[mapKey] = { name, verified }
-  })
-
-  return { principalNames, neuronNames }
+  return { principalNames: Object.fromEntries(principalNames), neuronNames: Object.fromEntries(neuronNames) }
 }
 
 /**
@@ -1166,14 +1157,6 @@ function formatRewardsError(err: any): string {
   if ('PriceDataMissing' in err) return 'Price data missing'
   if ('InvalidTimeRange' in err) return 'Invalid time range'
   return 'An error occurred'
-}
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-function uint8ArrayToHex(arr: Uint8Array | number[]): string {
-  return Array.from(arr, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
 // ============================================================================

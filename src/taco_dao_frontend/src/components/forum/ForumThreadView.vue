@@ -997,7 +997,7 @@
 
                                 <!-- edit button -->
                                 <button @click="editingName = !editingName; nameBeingEdited = currentPrincipalName"
-                                        v-show="!editingName"
+                                        v-show="!editingName && !sneedLink.linked"
                                         class="btn taco-text-black-to-white py-0"
                                         style="border: none;">
 
@@ -1030,6 +1030,75 @@
 
                             </span>
                             
+                        </div>
+
+                        <!-- sneed hub link -->
+                        <div class="forum-thread-view__settings__key-value-pair">
+
+                            <!-- key -->
+                            <span class="forum-thread-view__settings__key">
+
+                                <!-- text -->
+                                <span>Sneed Hub</span>
+
+                            </span>
+
+                            <!-- value -->
+                            <span class="forum-thread-view__settings__value forum-thread-view__settings__sneed-hub">
+
+                                <!-- checking -->
+                                <span v-if="sneedLink.loading" class="fst-italic">Checking…</span>
+
+                                <!-- linked: the name comes from the Sneed Hub account -->
+                                <span v-else-if="sneedLink.linked">
+                                    Linked: this principal shows your Sneed Hub name. Change it on
+                                    <a :href="sneedHubMeUrl" target="_blank" rel="noopener">Sneed Hub</a>.
+                                </span>
+
+                                <!-- not linked -->
+                                <template v-else>
+
+                                    <!-- hotkeys given, merge pending -->
+                                    <span v-for="hotkey in sneedLink.hotkeys" :key="hotkey" class="d-flex align-items-center flex-wrap gap-2">
+                                        <span>Hotkey for <code>{{ shortPrincipal(hotkey) }}</code>: to finish, open
+                                            <a :href="sneedHubMeUrl" target="_blank" rel="noopener">Sneed Hub</a>
+                                            signed in as that principal and merge this account on the Me page.</span>
+                                        <button @click="removeSneedHotkey(hotkey)"
+                                                :disabled="sneedLinkBusy"
+                                                class="btn taco-btn cancel-btn py-0">Remove</button>
+                                    </span>
+
+                                    <!-- link button -->
+                                    <button v-if="!linkingSneedHub && sneedLink.hotkeys.length === 0"
+                                            @click="linkingSneedHub = true"
+                                            class="btn taco-btn taco-btn--green py-1">Link to my Sneed Hub account</button>
+
+                                    <!-- link form -->
+                                    <span v-if="linkingSneedHub" class="d-flex flex-column gap-2">
+                                        <span style="font-size: 0.875rem;">
+                                            Enter your Sneed Hub principal (shown on its Me page). It gets a hotkey on this TACO
+                                            principal's name: that is this principal's consent. Then, on Sneed Hub, merge this
+                                            account into yours, and this principal shows your Sneed Hub name. Linked principals
+                                            are public.
+                                        </span>
+                                        <span class="d-flex align-items-center flex-wrap gap-2">
+                                            <input v-model="sneedHubPrincipalInput"
+                                                    type="text"
+                                                    placeholder="Your Sneed Hub principal"
+                                                    class="taco-input rounded"
+                                                    style="min-width: 18rem;">
+                                            <button @click="addSneedHotkey"
+                                                    :disabled="sneedLinkBusy || !sneedHubPrincipalInput.trim()"
+                                                    class="btn taco-btn taco-btn--green py-1">Add hotkey</button>
+                                            <button @click="linkingSneedHub = false; sneedHubPrincipalInput = ''"
+                                                    class="btn taco-btn cancel-btn py-1">Cancel</button>
+                                        </span>
+                                    </span>
+
+                                </template>
+
+                            </span>
+
                         </div>
 
                     </div>
@@ -2417,6 +2486,7 @@
     const { getNeuronDisplayName } = tacoStore // not reactive
     const { setPrincipalName } = tacoStore // not reactive
     const { setNeuronName } = tacoStore // not reactive
+    const { getSneedAccount, addSneedHubHotkey, removeSneedHubHotkey } = tacoStore // not reactive
     const { getUserNeurons } = tacoStore // not reactive
 
     // forum
@@ -2479,6 +2549,14 @@
 
     // name being edited
     const nameBeingEdited = ref('')
+
+    // sneed hub link: the Sneed account this principal is in (linked = merged into a Sneed Hub
+    // account, whose owners manage the name), and the hotkeys it has given
+    const sneedHubMeUrl = 'https://app.sneeddao.com/me'
+    const sneedLink = ref<{ loading: boolean; linked: boolean; accountId: bigint | null; hotkeys: string[] }>({ loading: false, linked: false, accountId: null, hotkeys: [] })
+    const linkingSneedHub = ref(false)
+    const sneedHubPrincipalInput = ref('')
+    const sneedLinkBusy = ref(false)
 
     // user neurons
     const userNeurons = ref<any[]>([])
@@ -3521,6 +3599,65 @@
 
     }
 
+    // short form of a principal
+    const shortPrincipal = (p: string) => p.length > 16 ? `${p.slice(0, 5)}…${p.slice(-3)}` : p
+
+    // load the sneed hub link state
+    const loadSneedLink = async () => {
+        if (!userLoggedIn.value) return
+        sneedLink.value.loading = true
+        try {
+            const account = await getSneedAccount()
+            const me = account?.members.find((m) => m.principal.toText() === userPrincipal.value)
+            sneedLink.value = {
+                loading: false,
+                linked: !!me && 'member' in me.role,
+                accountId: account ? account.id : null,
+                hotkeys: account ? account.hotkeys.map((h) => h.toText()) : [],
+            }
+        } catch (error: any) {
+            console.error('Error loading Sneed Hub link:', error)
+            sneedLink.value.loading = false
+        }
+    }
+
+    // give a sneed hub principal a hotkey on this principal's account
+    const addSneedHotkey = async () => {
+        const text = sneedHubPrincipalInput.value.trim()
+        try {
+            Principal.fromText(text)
+        } catch {
+            tacoStore.addToast({ id: Date.now(), code: 'sneed-hub-link-error', title: 'Not a principal', icon: 'fa-solid fa-exclamation-triangle', message: 'Paste the principal shown on your Sneed Hub Me page.' })
+            return
+        }
+        sneedLinkBusy.value = true
+        try {
+            await addSneedHubHotkey(text)
+            linkingSneedHub.value = false
+            sneedHubPrincipalInput.value = ''
+            tacoStore.addToast({ id: Date.now(), code: 'sneed-hub-link', title: 'Hotkey added', icon: 'fa-solid fa-check', message: 'Now open Sneed Hub signed in as that principal and merge this account on the Me page.' })
+            await loadSneedLink()
+        } catch (error: any) {
+            tacoStore.addToast({ id: Date.now(), code: 'sneed-hub-link-error', title: 'Could not add the hotkey', icon: 'fa-solid fa-exclamation-triangle', message: error.message || 'Unknown error' })
+        } finally {
+            sneedLinkBusy.value = false
+        }
+    }
+
+    // take a hotkey back
+    const removeSneedHotkey = async (hotkey: string) => {
+        if (sneedLink.value.accountId === null) return
+        sneedLinkBusy.value = true
+        try {
+            await removeSneedHubHotkey(sneedLink.value.accountId, hotkey)
+            await loadSneedLink()
+        } catch (error: any) {
+            tacoStore.addToast({ id: Date.now(), code: 'sneed-hub-link-error', title: 'Could not remove the hotkey', icon: 'fa-solid fa-exclamation-triangle', message: error.message || 'Unknown error' })
+        } finally {
+            sneedLinkBusy.value = false
+        }
+    }
+
     // load user neurons
     const loadUserNeurons = async () => {
 
@@ -3887,6 +4024,13 @@
 
     })
 
+    // read the sneed hub link again when the user logs in or out on the settings tab
+    watch(userLoggedIn, async (loggedIn) => {
+        if (threadNavigation.value !== 'settings') return
+        if (loggedIn) await loadSneedLink()
+        else sneedLink.value = { loading: false, linked: false, accountId: null, hotkeys: [] }
+    })
+
     // watch for tab navigation changes
     watch(threadNavigation, async (newTab) => {
         
@@ -3894,6 +4038,9 @@
         if (newTab === 'details' && userLoggedIn.value && proposalId.value && isVotingOpen.value) {
             await refreshVotingData()
         }
+
+        // if navigating to settings, read the sneed hub link
+        if (newTab === 'settings') await loadSneedLink()
         
     })
   

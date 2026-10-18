@@ -144,6 +144,13 @@ export function getTacoSnsGovernanceCanisterId(): string { return 'lhdfz-wqaaa-a
 export function getAppSneedDaoCanisterId(): string {
   return getEnvVar('CANISTER_ID_APP_SNEEDDAO_BACKEND_IC') || 'g7s5u-tqaaa-aaaad-qhktq-cai'
 }
+// Sneed naming service: principal names (accounts, hotkeys) and SNS neuron names
+export function getSneedPidNamesCanisterId(): string {
+  return getEnvVar('CANISTER_ID_SNEED_PID_NAMES_IC') || 'ejz7n-lyaaa-aaaad-qmkzq-cai'
+}
+export function getSneedNeuronNamesCanisterId(): string {
+  return getEnvVar('CANISTER_ID_SNEED_NEURON_NAMES_IC') || 'e46oa-kqaaa-aaaad-qmk2a-cai'
+}
 export function getIcpLedgerCanisterId(): string {
   const network = getNetwork()
   if (network === 'local') {

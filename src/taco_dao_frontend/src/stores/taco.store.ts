@@ -39,6 +39,10 @@ import type { Result_4, UpdateConfig, RebalanceConfigResponse, TradeRecord, _SER
 import type { _SERVICE as NeuronSnapshotService } from "../../../declarations/neuronSnapshot/neuronSnapshot.did.js"
 import type { _SERVICE as SneedForumService } from "../../../declarations/sneed_sns_forum/sneed_sns_forum.did.js"
 import type { _SERVICE as AppSneedDaoService } from "../../../declarations/app_sneeddao_backend/app_sneeddao_backend.did.js"
+import type { _SERVICE as SneedPidNamesService, AccountView as SneedAccountView } from "../../../declarations/sneed_pid_names/sneed_pid_names.did.js"
+import type { _SERVICE as SneedNeuronNamesService } from "../../../declarations/sneed_neuron_names/sneed_neuron_names.did.js"
+import { fetchPrincipalNames, fetchNeuronNames, neuronNameKey } from "../workers/shared/sneed-names"
+import { getSneedPidNamesCanisterId, getSneedNeuronNamesCanisterId } from "../workers/shared/canister-ids"
 
 // Internet Identity canister id (local logins), read from the build env like
 // declarations/internet_identity does. Importing that module pulled
@@ -69,6 +73,24 @@ let _snsGovernanceIDL: any = null
 let _rewardsIDL: any = null
 let _nachosVaultIDL: any = null
 let _tacoSwapIDL: any = null
+let _sneedPidNamesIDL: any = null
+let _sneedNeuronNamesIDL: any = null
+
+async function getSneedPidNamesIDL() {
+    if (!_sneedPidNamesIDL) {
+        const mod = await import("../../../declarations/sneed_pid_names/sneed_pid_names.did.js")
+        _sneedPidNamesIDL = mod.idlFactory
+    }
+    return _sneedPidNamesIDL
+}
+
+async function getSneedNeuronNamesIDL() {
+    if (!_sneedNeuronNamesIDL) {
+        const mod = await import("../../../declarations/sneed_neuron_names/sneed_neuron_names.did.js")
+        _sneedNeuronNamesIDL = mod.idlFactory
+    }
+    return _sneedNeuronNamesIDL
+}
 
 async function getNachosVaultIDL() {
     if (!_nachosVaultIDL) {
@@ -6083,59 +6105,44 @@ export const useTacoStore = defineStore('taco', () => {
     }
 
     // create neuron key
-    const createNeuronKey = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => {
-        return `${snsRoot.toString()}:${uint8ArrayToHex(neuronId)}`;
+    const createNeuronKey = (snsRoot: Principal, neuronId: Uint8Array | number[]): string => neuronNameKey(snsRoot, neuronId)
+
+    // Sneed naming service actors: names live in sneed_pid_names and sneed_neuron_names
+    // (app_sneeddao_backend keeps a read-only copy from before the move)
+    const sneedPidNamesActor = async (authenticated: boolean) => {
+        const idl = await getSneedPidNamesIDL()
+        if (!authenticated) return await getAnonymousActor(getSneedPidNamesCanisterId(), () => idl) as SneedPidNamesService
+        const authClient = await getAuthClient()
+        return await getAuthenticatedActor(authClient, getSneedPidNamesCanisterId(), () => idl) as SneedPidNamesService
+    }
+    const sneedNeuronNamesActor = async (authenticated: boolean) => {
+        const idl = await getSneedNeuronNamesIDL()
+        if (!authenticated) return await getAnonymousActor(getSneedNeuronNamesCanisterId(), () => idl) as SneedNeuronNamesService
+        const authClient = await getAuthClient()
+        return await getAuthenticatedActor(authClient, getSneedNeuronNamesCanisterId(), () => idl) as SneedNeuronNamesService
     }
 
     // load all names
     const loadAllNames = async () => {
-        // console.log('🔍 loadAllNames() called');
-        
-        if (namesLoading.value) {
-            // console.log('⏳ Names already loading, skipping...');
-            return; // Already loading
-        }
-        
+        if (namesLoading.value) return // already loading
+
         try {
-            // console.log('🚀 Starting to load all names...');
-            namesLoading.value = true;
+            namesLoading.value = true
 
-            const canisterId = appSneedDaoCanisterId();
-            // console.log('🔗 Connecting to app_sneeddao_backend canister:', canisterId);
-            // console.log('🌐 DFX_NETWORK:', process.env.DFX_NETWORK);
-
-            const appSneedDaoActor = await getAnonymousActor(canisterId, () => appSneedDaoIDL) as AppSneedDaoService
-
-            // Load all principal names and neuron names in parallel
-            // console.log('📞 Making API calls to get_all_principal_names() and get_all_neuron_names()...');
             const [principalNames, neuronNames] = await Promise.all([
-                appSneedDaoActor.get_all_principal_names(),
-                appSneedDaoActor.get_all_neuron_names()
-            ]);
-            // console.log('📦 Received data - principalNames:', principalNames.length, 'neuronNames:', neuronNames.length);
+                fetchPrincipalNames(await sneedPidNamesActor(false)),
+                fetchNeuronNames(await sneedNeuronNamesActor(false))
+            ])
 
-            // Clear and populate principal names cache
-            namesCache.value.principals.clear();
-            principalNames.forEach(([principal, [name, verified]]) => {
-                namesCache.value.principals.set(principal.toString(), { name, verified });
-            });
+            namesCache.value.principals = principalNames
+            namesCache.value.neurons = neuronNames
+            namesCache.value.lastLoaded = Date.now()
 
-            // Clear and populate neuron names cache
-            namesCache.value.neurons.clear();
-            neuronNames.forEach(([neuronKey, [name, verified]]) => {
-                const mapKey = createNeuronKey(neuronKey.sns_root_canister_id, neuronKey.neuron_id.id);
-                namesCache.value.neurons.set(mapKey, { name, verified });
-            });
-
-            namesCache.value.lastLoaded = Date.now();
-            
-            // console.log(`✅ Loaded ${principalNames.length} principal names and ${neuronNames.length} neuron names`);
-            
         } catch (error: any) {
-            console.error('Error loading names:', error);
+            console.error('Error loading names:', error)
             // Don't throw - this is non-blocking
         } finally {
-            namesLoading.value = false;
+            namesLoading.value = false
         }
     }
 
@@ -6160,8 +6167,6 @@ export const useTacoStore = defineStore('taco', () => {
         const mapKey = createNeuronKey(snsRoot, neuronId);
         const cachedName = namesCache.value.neurons.get(mapKey);
         
-
-        
         if (cachedName) {
             return cachedName.verified ? `✓ ${cachedName.name}` : cachedName.name;
         }
@@ -6170,17 +6175,14 @@ export const useTacoStore = defineStore('taco', () => {
         return '';
     }
 
-    // get principal name
+    // set principal name (the name of the user's Sneed account; "" clears it)
     const setPrincipalName = async (name: string) => {
         try {
             if (!userLoggedIn.value) {
                 throw new Error('User must be logged in to set names');
             }
 
-            const authClient = await getAuthClient();
-            const appSneedDaoActor = await getAuthenticatedActor(authClient, appSneedDaoCanisterId(), () => appSneedDaoIDL) as AppSneedDaoService
-
-            const result = await appSneedDaoActor.set_principal_name(name);
+            const result = await (await sneedPidNamesActor(true)).set_my_name(name);
             
             if ('ok' in result) {
                 // console.log('✅ Principal name set successfully:', result.ok);
@@ -6202,20 +6204,15 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
-    // set neuron name
+    // set neuron name (the caller needs a permission on the neuron)
     const setNeuronName = async (snsRoot: Principal, neuronId: Uint8Array | number[], name: string) => {
         try {
             if (!userLoggedIn.value) {
                 throw new Error('User must be logged in to set names');
             }
 
-            const authClient = await getAuthClient();
-            const appSneedDaoActor = await getAuthenticatedActor(authClient, appSneedDaoCanisterId(), () => appSneedDaoIDL) as AppSneedDaoService
-
-            // Convert number[] to Uint8Array if needed
             const neuronIdUint8 = neuronId instanceof Uint8Array ? neuronId : new Uint8Array(neuronId);
-            
-            const result = await appSneedDaoActor.set_neuron_name(snsRoot, { id: neuronIdUint8 }, name);
+            const result = await (await sneedNeuronNamesActor(true)).set_name({ sns_root: snsRoot, neuron_id: neuronIdUint8 }, name);
             
             if ('ok' in result) {
                 // console.log('✅ Neuron name set successfully:', result.ok);
@@ -6235,6 +6232,34 @@ export const useTacoStore = defineStore('taco', () => {
             console.error('Error setting neuron name:', error);
             throw error;
         }
+    }
+
+    // ---- Sneed Hub link ----
+    // A TACO principal joins the user's Sneed Hub account in two steps: here it gives the user's
+    // Sneed Hub principal a hotkey on its own name account (its consent); then, on Sneed Hub
+    // (Me page), the user merges that account into theirs and this principal shows their name.
+
+    // the Sneed account this principal is in, if any (hotkeys are shown to its owners)
+    const getSneedAccount = async (): Promise<SneedAccountView | null> => {
+        if (!userLoggedIn.value) return null
+        const r = await (await sneedPidNamesActor(true)).get_account_of(Principal.fromText(userPrincipal.value))
+        return r[0] ?? null
+    }
+
+    // give a Sneed Hub principal a hotkey on this principal's account
+    const addSneedHubHotkey = async (sneedHubPrincipal: string) => {
+        const p = Principal.fromText(sneedHubPrincipal.trim())
+        const result = await (await sneedPidNamesActor(true)).add_hotkey(p)
+        if ('err' in result) throw new Error(result.err)
+        return result.ok
+    }
+
+    // take a hotkey back
+    const removeSneedHubHotkey = async (accountId: bigint, hotkey: Principal | string) => {
+        const p = typeof hotkey === 'string' ? Principal.fromText(hotkey) : hotkey
+        const result = await (await sneedPidNamesActor(true)).remove_hotkey(accountId, p)
+        if ('err' in result) throw new Error(result.err)
+        return result.ok
     }
 
     // get user neurons
@@ -9464,6 +9489,9 @@ export const useTacoStore = defineStore('taco', () => {
         getNeuronDisplayName,
         setPrincipalName,
         setNeuronName,
+        getSneedAccount,
+        addSneedHubHotkey,
+        removeSneedHubHotkey,
         getUserNeurons,
         getTacoNeurons,
         preloadTacoNeurons,

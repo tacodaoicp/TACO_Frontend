@@ -1,0 +1,271 @@
+type VerifySource = 
+ variant {
+   admin: principal;
+   dao;
+   "import";
+   sns_governance: principal;
+ };
+type Verification = 
+ record {
+   at: nat64;
+   name: text;
+   source: VerifySource;
+ };
+type Value = 
+ variant {
+   Array: vec Value;
+   Blob: blob;
+   Int: int;
+   Map: vec record {
+              text;
+              Value;
+            };
+   Nat: nat;
+   Text: text;
+ };
+type ValidationResult = 
+ variant {
+   Err: text;
+   Ok: text;
+ };
+type SupportedStandard = 
+ record {
+   name: text;
+   url: text;
+ };
+type Stats = 
+ record {
+   import_closed: bool;
+   last_seq: nat;
+   log_length: nat;
+   names: nat;
+   snses: nat;
+ };
+type SneedNeuronNames = 
+ service {
+   admin_add_admin: (p: principal) -> (Result);
+   admin_clear_avatar: (k: NeuronKey) -> (Result);
+   admin_finish_import: () -> (Result);
+   admin_icrc3_repair_archive_controllers: () ->
+    (vec record {
+           principal;
+           variant {
+             Err: text;
+             Ok;
+           };
+         });
+   admin_icrc3_spill_now: () -> (variant {
+                                   Err: text;
+                                   Ok: nat;
+                                 });
+   /// One-time import from the backend (spec §10).
+   admin_import_names: (items: vec ImportItem) -> (vec ImportResult);
+   admin_remove_admin: (p: principal) -> (Result);
+   admin_set_config: (c: Config) -> (Result);
+   admin_set_icrc3_settings: (u: SettingsUpdate) ->
+    (variant {
+       Err: text;
+       Ok: Settings;
+     });
+   /// Set or remove a neuron's name (no moderation, no SNS check).
+   admin_set_name: (k: NeuronKey, name: text) -> (Result);
+   /// What changed after sequence number `after`, oldest first, each neuron once (null: name removed).
+   changes_since: (args: record {
+                           after: nat;
+                           limit: nat;
+                         }) ->
+    (record {
+       items: vec Change;
+       last_seq: nat;
+     }) query;
+   get_admins: () -> (vec principal) query;
+   get_config: () -> (Config) query;
+   get_log: (start: nat, length: nat) -> (vec LogEntry) query;
+   get_name: (k: NeuronKey) -> (opt NeuronNameView) query;
+   /// Names of up to 500 neurons, in order.
+   get_names: (keys: vec NeuronKey) -> (vec opt NeuronNameInfo) query;
+   icrc10_supported_standards: () -> (vec SupportedStandard) query;
+   icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
+   icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
+   icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
+   icrc3_log_status: () -> (LogStatus) query;
+   icrc3_supported_block_types: () -> (vec BlockType) query;
+   /// One SNS's neuron names in alphabetical (lowercase) order, a page at a time.
+   list_by_sns: (args:
+    record {
+      limit: nat;
+      sns_root: principal;
+      start_after: opt text;
+    }) -> (record {
+             items: vec NeuronNameView;
+             next: opt text;
+           }) query;
+   /// Neurons of one SNS whose name, or a word in it, starts with `prefix`.
+   search: (args: record {
+                    limit: nat;
+                    prefix: text;
+                    sns_root: principal;
+                  }) -> (vec NeuronNameView) query;
+   /// Set or clear a named neuron's avatar.
+   set_avatar: (k: NeuronKey, avatar: opt AvatarRef) -> (Result);
+   /// Name a neuron you have a permission on ("" removes the name). Unique per SNS, any capitals.
+   set_name: (k: NeuronKey, name: text) -> (Result);
+   stats: () -> (Stats) query;
+   unverify: (k: NeuronKey) -> (Result);
+   unverify_by_dao: (k: NeuronKey) -> ();
+   unverify_by_sns: (k: NeuronKey) -> (Result);
+   validate_unverify_by_dao: (k: NeuronKey) -> (ValidationResult) query;
+   validate_verify_by_dao: (k: NeuronKey, expected_name: text) ->
+    (ValidationResult) query;
+   verify: (k: NeuronKey, expected_name: text) -> (Result);
+   verify_by_dao: (k: NeuronKey, expected_name: text) -> ();
+   /// Called by an SNS's governance canister (a proposal of that SNS) for its own neurons.
+   verify_by_sns: (k: NeuronKey, expected_name: text) -> (Result);
+ };
+type SettingsUpdate = 
+ record {
+   archive_initial_cycles: opt nat;
+   archive_max_blocks: opt nat;
+   archive_top_up_amount: opt nat;
+   archive_top_up_threshold: opt nat;
+   max_live_blocks: opt nat;
+   spill_batch_size: opt nat;
+ };
+type Settings = 
+ record {
+   archive_initial_cycles: nat;
+   archive_max_blocks: nat;
+   archive_top_up_amount: nat;
+   archive_top_up_threshold: nat;
+   max_live_blocks: nat;
+   spill_batch_size: nat;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type NeuronNameView = 
+ record {
+   avatar: opt AvatarRef;
+   name: text;
+   neuron_id: blob;
+   set_by: principal;
+   sns_root: principal;
+   updated_at: nat64;
+   verification: opt Verification;
+   verified: bool;
+ };
+type NeuronNameInfo = 
+ record {
+   avatar: opt AvatarRef;
+   name: text;
+   verified: bool;
+ };
+type NeuronKey = 
+ record {
+   neuron_id: blob;
+   sns_root: principal;
+ };
+type LogStatus = 
+ record {
+   archives: vec ArchiveInfo;
+   history_imported: bool;
+   last_block_hash: opt blob;
+   live_blocks: nat;
+   live_first_index: nat;
+   log_length: nat;
+   settings: Settings;
+   spilling: bool;
+ };
+type LogEntry = 
+ record {
+   caller: principal;
+   cid: nat;
+   id: nat;
+   level: variant {
+            error;
+            info;
+          };
+   message: text;
+   ts: int;
+ };
+type ImportResult = 
+ record {
+   key: NeuronKey;
+   result: Result;
+ };
+type ImportItem = 
+ record {
+   name: text;
+   neuron_id: blob;
+   sns_root: principal;
+   verified: bool;
+ };
+type GetBlocksResult = 
+ record {
+   archived_blocks: vec ArchivedBlocks;
+   blocks: vec Block;
+   log_length: nat;
+ };
+type GetBlocksArgs = vec BlockRange;
+type GetArchivesResult = vec ArchiveRange;
+type GetArchivesArgs = record {from: opt principal;};
+type DataCertificate = 
+ record {
+   certificate: blob;
+   hash_tree: blob;
+ };
+type Config = 
+ record {
+   archive_controllers: vec principal;
+   dao_governance: principal;
+   moderator: opt principal;
+   sns_wasm: principal;
+ };
+type Change = 
+ record {
+   key: NeuronKey;
+   seq: nat;
+   state: opt NeuronNameView;
+ };
+type BlockType = 
+ record {
+   block_type: text;
+   url: text;
+ };
+type BlockRange = 
+ record {
+   length: nat;
+   start: nat;
+ };
+type Block = 
+ record {
+   block: Value;
+   id: nat;
+ };
+type AvatarRef = 
+ variant {
+   "blob": blob;
+   url: text;
+ };
+type ArchivedBlocks = 
+ record {
+   args: GetBlocksArgs;
+   callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveRange = 
+ record {
+   canister_id: principal;
+   end: nat;
+   start: nat;
+ };
+type ArchiveInfo = 
+ record {
+   canister_id: principal;
+   length: nat;
+   max_blocks: nat;
+   start: nat;
+ };
+/// Public names of SNS neurons, unique per SNS (spec/sneed_names.md §5).
+service : () -> SneedNeuronNames
