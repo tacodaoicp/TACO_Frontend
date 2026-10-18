@@ -3505,7 +3505,15 @@ export const useTacoStore = defineStore('taco', () => {
         // The reads below run at once, each started in a task of its own (building an actor and
         // signing a query is main thread work, and all of them together held a phone's main
         // thread for a few hundred ms). Each one catches its own error, and the values are
-        // stored together at the end, as before.
+        // stored together at the end, as before. A read that failed (it answers false) is
+        // tried once more after a short pause: before the reads were shared, the chips' other
+        // calls read every value again and usually filled in one that had failed.
+        const retryOnce = async (read: () => Promise<any>) => {
+            const first = await read()
+            if (first !== false) return first
+            await new Promise((resolve) => setTimeout(resolve, 2000))
+            return read()
+        }
 
         /////////////////////////////////////
         // fetch total ICP in the treasury //
@@ -3515,11 +3523,11 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchTotalTreasuryValueInUsd()')
 
         // call icrc1 balance of for sns treasury taco balance
-        const snsTreasuryTacoRead = icrc1BalanceOf(
+        const snsTreasuryTacoRead = retryOnce(() => icrc1BalanceOf(
             'kknbx-zyaaa-aaaaq-aae4a-cai', 
             Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
             hexToUint8Array('ab5aaa420bfefa4244885e1b59347569bafacb144ecb6578fe3aed5cd772dc78')
-        )
+        ))
         await yieldToMain()
 
         //////////////////////////////////////
@@ -3530,11 +3538,11 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchTotalTreasuryValueInUsd() - fetching total ICP in the treasury')
 
         // call icp ledger balance for sns treasury icp balance
-        const snsTreasuryIcpRead = icrc1BalanceOf(
+        const snsTreasuryIcpRead = retryOnce(() => icrc1BalanceOf(
             'ryjl3-tyaaa-aaaaa-aaaba-cai', // ICP ledger canister ID
             Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
             // hexToUint8Array('df86d44b4cf253518395a3213fbb6b256a27e60fb590c1b27211be9011709fdc')
-        )
+        ))
         await yieldToMain()
 
         /////////////////////////////////////
@@ -3545,21 +3553,21 @@ export const useTacoStore = defineStore('taco', () => {
         // console.log('taco.store: fetchTotalTreasuryValueInUsd() - fetching total DKP in the treasury')
 
         // call icp ledger balance for sns treasury icp balance
-        const snsTreasuryDkpRead = icrc1BalanceOf(
+        const snsTreasuryDkpRead = retryOnce(() => icrc1BalanceOf(
             'zfcdd-tqaaa-aaaaq-aaaga-cai', // ICP ledger canister ID
             Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
             // hexToUint8Array('df86d44b4cf253518395a3213fbb6b256a27e60fb590c1b27211be9011709fdc')
-        )
+        ))
         await yieldToMain()
 
         /////////////////////////////////////
         // fetch NTN held by holder canister //
         /////////////////////////////////////
 
-        const snsTreasuryNtnRead = icrc1BalanceOf(
+        const snsTreasuryNtnRead = retryOnce(() => icrc1BalanceOf(
             NTN_LEDGER_CANISTER_ID,
             Principal.fromText(NTN_HOLDER_PRINCIPAL),
-        )
+        ))
         await yieldToMain()
 
         //////////////////////////////////////////////
@@ -3568,18 +3576,20 @@ export const useTacoStore = defineStore('taco', () => {
 
         // the DAO owns treasuryNacho/totalSupply of the portfolio
         const NACHO_LEDGER_CANISTER_ID = 'o6ncl-lyaaa-aaaan-q6dua-cai'
-        const snsTreasuryNachoRead = icrc1BalanceOf(
+        const snsTreasuryNachoRead = retryOnce(() => icrc1BalanceOf(
             NACHO_LEDGER_CANISTER_ID,
             Principal.fromText('lhdfz-wqaaa-aaaaq-aae3q-cai'),
-        )
+        ))
         await yieldToMain()
-        const nachoSupplyRead = icrc1TotalSupply(NACHO_LEDGER_CANISTER_ID)
+        const nachoSupplyRead = retryOnce(() => icrc1TotalSupply(NACHO_LEDGER_CANISTER_ID))
 
         // ponytail: DAO's ICPSwap TACO/ICP LP (SNS-treasury positions in pool vhoia). The ICP side counts as backing,
         // the TACO side is DAO held, so it leaves the circulating supply.
         let lpIcp = 0
         let lpTaco = 0
-        const lpRead = (async () => {
+        const lpRead = retryOnce(async () => {
+            lpIcp = 0
+            lpTaco = 0
             try {
                 const poolMod = await import("../../../declarations/icp_swap/icp_swap.did.js")
                 const pool = await getAnonymousActor('vhoia-myaaa-aaaar-qbmja-cai', () => poolMod.idlFactory)
@@ -3592,8 +3602,9 @@ export const useTacoStore = defineStore('taco', () => {
                         lpTaco += (Number(p.token0Amount) + Number(p.tokensOwed0)) / 1e8 // token0 = TACO, + uncollected TACO fees
                     }
                 }
-            } catch (e) { console.error('ICPSwap LP fetch failed', e) }
-        })()
+                return true
+            } catch (e) { console.error('ICPSwap LP fetch failed', e); return false }
+        })
 
         const [
             snsTreasuryTacoBalance,
