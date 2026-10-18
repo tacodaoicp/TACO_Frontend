@@ -1,0 +1,400 @@
+type VerifySource = 
+ variant {
+   admin: principal;
+   dao;
+   "import";
+   sns_governance: principal;
+ };
+type Verification = 
+ record {
+   at: nat64;
+   name: text;
+   source: VerifySource;
+ };
+type Value = 
+ variant {
+   Array: vec Value;
+   Blob: blob;
+   Int: int;
+   Map: vec record {
+              text;
+              Value;
+            };
+   Nat: nat;
+   Text: text;
+ };
+type ValidationResult = 
+ variant {
+   Err: text;
+   Ok: text;
+ };
+type SupportedStandard = 
+ record {
+   name: text;
+   url: text;
+ };
+type Stats = 
+ record {
+   accounts: nat;
+   canisters: nat;
+   import_closed: bool;
+   last_seq: nat;
+   log_length: nat;
+   named: nat;
+ };
+type SneedPidNames = 
+ service {
+   /// Give a principal a hotkey on your account: it may then manage the account (rename it, change
+   /// its avatar, its principals' labels) and merge it into its own account, which makes your
+   /// principal show that account's name. The hotkey needs to do nothing to accept. It is not shown
+   /// as one of the account's principals.
+   add_hotkey: (hotkey: principal) -> (Result);
+   admin_add_admin: (p: principal) -> (Result);
+   /// Remove an abusive avatar.
+   admin_clear_avatar: ("principal": principal) -> (Result);
+   /// Close the import for good.
+   admin_finish_import: () -> (Result);
+   admin_icrc3_repair_archive_controllers: () ->
+    (vec record {
+           principal;
+           variant {
+             Err: text;
+             Ok;
+           };
+         });
+   admin_icrc3_spill_now: () -> (variant {
+                                   Err: text;
+                                   Ok: nat;
+                                 });
+   /// Import names: self-authenticating principals become one-owner accounts, canister ids become
+   /// canister names. A verified flag becomes an import verification of the name as imported.
+   /// An account may be imported with an avatar and an empty name.
+   admin_import_names: (items: vec ImportItem) -> (vec ImportResult);
+   admin_remove_admin: (p: principal) -> (Result);
+   admin_set_config: (c: Config) -> (Result);
+   admin_set_icrc3_settings: (u: SettingsUpdate) ->
+    (variant {
+       Err: text;
+       Ok: Settings;
+     });
+   /// Set the name of a principal's account (created if needed) or of a canister. No moderation.
+   admin_set_name: ("principal": principal, name: text) -> (Result);
+   /// Pending invites for the caller.
+   /// What changed after sequence number `after`, oldest first: each entity once, with its current
+   /// state (null when deleted). Page through with the last item's seq; empty when caught up.
+   changes_since: (args: record {
+                           after: nat;
+                           limit: nat;
+                         }) ->
+    (record {
+       items: vec Change;
+       last_seq: nat;
+     }) query;
+   get_account: (id: AccountId) -> (opt AccountView) query;
+   get_account_of: (p: principal) -> (opt AccountView) query;
+   get_admins: () -> (vec principal) query;
+   get_canister_name: (p: principal) -> (opt CanisterView) query;
+   get_config: () -> (Config) query;
+   get_log: (start: nat, length: nat) -> (vec LogEntry) query;
+   get_name: (p: principal) -> (opt NameInfo) query;
+   /// Names of up to 500 principals, in order (null: no name or avatar).
+   get_names: (principals: vec principal) -> (vec opt NameInfo) query;
+   icrc10_supported_standards: () -> (vec SupportedStandard) query;
+   icrc3_get_archives: (args: GetArchivesArgs) -> (GetArchivesResult) query;
+   icrc3_get_blocks: (args: GetBlocksArgs) -> (GetBlocksResult) query;
+   icrc3_get_tip_certificate: () -> (opt DataCertificate) query;
+   icrc3_log_status: () -> (LogStatus) query;
+   icrc3_supported_block_types: () -> (vec BlockType) query;
+   /// Link a principal that staked an SNS neuron you have a permission on (it gave you a hotkey).
+   /// The neuron's id must be the staking subaccount of `principal` with `memo`, which proves that
+   /// principal created the neuron; it must still hold ManagePrincipals on it.
+   /// For principals you cannot sign in with here (e.g. your NNS dapp principal).
+   link_by_neuron: (sns_root: principal, neuron_id: blob, memo: nat64,
+    "principal": principal, dapp: opt DappId) -> (Result);
+   /// All names in alphabetical (lowercase) order, a page at a time.
+   list_names: (page: Page) ->
+    (record {
+       items: vec SearchHit;
+       next: opt text;
+     }) query;
+   /// Merge an account you have a hotkey on (or own) into your own: its principals join your account
+   /// as members and show its name from then on. If your account has no name it takes the merged
+   /// account's name (and checkmark); otherwise the merged account's name is freed. The merged
+   /// account and its hotkeys are deleted.
+   merge_account: (from: AccountId) -> (Result);
+   /// The accounts the caller may manage as a hotkey.
+   my_hotkey_accounts: () -> (vec AccountView) query;
+   /// Owners remove a hotkey from their account; a hotkey may remove itself.
+   remove_hotkey: (account: AccountId, hotkey: principal) -> (Result);
+   /// Remove a principal from an account you manage (hotkeys cannot remove owners), or leave it
+   /// (the principal itself). The last owner cannot go while others remain; when the last principal
+   /// goes, the account is deleted.
+   remove_member: ("principal": principal) -> (Result);
+   /// Accounts and canisters whose name, or a word in it, starts with `prefix`.
+   search: (args:
+    record {
+      kind: opt variant {
+                  account;
+                  canister;
+                };
+      limit: nat;
+      prefix: text;
+    }) -> (vec SearchHit) query;
+   /// Set or clear the avatar of an account you own or have a hotkey on.
+   set_account_avatar: (account: AccountId, avatar: opt AvatarRef) ->
+    (Result);
+   /// Rename an account you own or have a hotkey on ("" clears the name).
+   set_account_name: (account: AccountId, name: text) -> (Result);
+   set_canister_avatar: (canister: principal, avatar: opt AvatarRef) ->
+    (Result);
+   /// Name a canister you control ("" clears). An SNS's governance canister may name the canisters its root controls.
+   set_canister_name: (canister: principal, name: text) -> (Result);
+   /// Say which account runs a canister ("Trading Bot · run by Snassy"). The caller controls the
+   /// canister and owns that account; null clears it.
+   set_canister_run_by: (canister: principal, account: opt AccountId) ->
+    (Result);
+   /// Owners set a member's role and dapp label; hotkeys and the member itself may set its dapp label.
+   set_member: ("principal": principal, role: Role, dapp: opt DappId) ->
+    (Result);
+   /// Set or clear your account's avatar.
+   set_my_avatar: (avatar: opt AvatarRef) -> (Result);
+   /// Set the name of your account ("" clears it). Creates the account on first use.
+   set_my_name: (name: text) -> (Result);
+   stats: () -> (Stats) query;
+   unverify: ("principal": principal) -> (Result);
+   unverify_by_dao: ("principal": principal) -> ();
+   validate_unverify_by_dao: ("principal": principal) ->
+    (ValidationResult) query;
+   validate_verify_by_dao: ("principal": principal, expected_name: text) ->
+    (ValidationResult) query;
+   /// Give the checkmark to the name `expected_name` of `principal`'s account or canister.
+   verify: ("principal": principal, expected_name: text) -> (Result);
+   /// Generic nervous system function target: Sneed DAO verifies a name.
+   verify_by_dao: ("principal": principal, expected_name: text) -> ();
+ };
+type SettingsUpdate = 
+ record {
+   archive_initial_cycles: opt nat;
+   archive_max_blocks: opt nat;
+   archive_top_up_amount: opt nat;
+   archive_top_up_threshold: opt nat;
+   max_live_blocks: opt nat;
+   spill_batch_size: opt nat;
+ };
+type Settings = 
+ record {
+   archive_initial_cycles: nat;
+   archive_max_blocks: nat;
+   archive_top_up_amount: nat;
+   archive_top_up_threshold: nat;
+   max_live_blocks: nat;
+   spill_batch_size: nat;
+ };
+type SearchHit = 
+ record {
+   avatar: opt AvatarRef;
+   name: text;
+   target:
+    variant {
+      account:
+       record {
+         id: AccountId;
+         members: vec record {
+                        dapp: opt DappId;
+                        "principal": principal;
+                      };
+       };
+      canister: principal;
+    };
+   verified: bool;
+ };
+type RunBy = 
+ record {
+   account: AccountId;
+   name: opt text;
+ };
+type Role = 
+ variant {
+   member;
+   owner;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok: text;
+ };
+type Page = 
+ record {
+   limit: nat;
+   start_after: opt text;
+ };
+type NameInfo = 
+ record {
+   avatar: opt AvatarRef;
+   dapp: opt DappId;
+   kind: variant {
+           account: AccountId;
+           canister;
+         };
+   name: opt text;
+   run_by: opt RunBy;
+   verified: bool;
+ };
+type Member = 
+ record {
+   dapp: opt DappId;
+   linked_at: nat64;
+   "principal": principal;
+   role: Role;
+   via: LinkProof;
+ };
+type LogStatus = 
+ record {
+   archives: vec ArchiveInfo;
+   history_imported: bool;
+   last_block_hash: opt blob;
+   live_blocks: nat;
+   live_first_index: nat;
+   log_length: nat;
+   settings: Settings;
+   spilling: bool;
+ };
+type LogEntry = 
+ record {
+   caller: principal;
+   cid: nat;
+   id: nat;
+   level: variant {
+            error;
+            info;
+          };
+   message: text;
+   ts: int;
+ };
+type LinkProof = 
+ variant {
+   admin;
+   hotkey;
+   "import";
+   neuron_stake: record {
+                   memo: nat64;
+                   neuron_id: blob;
+                   sns_root: principal;
+                 };
+   self;
+ };
+type ImportResult = 
+ record {
+   "principal": principal;
+   result: Result;
+ };
+type ImportItem = 
+ record {
+   avatar: opt AvatarRef;
+   name: text;
+   "principal": principal;
+   verified: bool;
+ };
+type GetBlocksResult = 
+ record {
+   archived_blocks: vec ArchivedBlocks;
+   blocks: vec Block;
+   log_length: nat;
+ };
+type GetBlocksArgs = vec BlockRange;
+type GetArchivesResult = vec ArchiveRange;
+type GetArchivesArgs = record {from: opt principal;};
+type DataCertificate = 
+ record {
+   certificate: blob;
+   hash_tree: blob;
+ };
+type DappId = nat;
+type Config = 
+ record {
+   archive_controllers: vec principal;
+   dao_governance: principal;
+   max_hotkeys: nat;
+   max_members: nat;
+   moderator: opt principal;
+   sns_wasm: principal;
+ };
+type ChangeRef = 
+ variant {
+   account: AccountId;
+   canister: principal;
+ };
+type Change = 
+ record {
+   ref: ChangeRef;
+   seq: nat;
+   state: opt variant {
+                account: AccountView;
+                canister: CanisterView;
+              };
+ };
+type CanisterView = 
+ record {
+   avatar: opt AvatarRef;
+   canister: principal;
+   name: text;
+   run_by: opt RunBy;
+   set_by: principal;
+   updated_at: nat64;
+   verification: opt Verification;
+   verified: bool;
+ };
+type BlockType = 
+ record {
+   block_type: text;
+   url: text;
+ };
+type BlockRange = 
+ record {
+   length: nat;
+   start: nat;
+ };
+type Block = 
+ record {
+   block: Value;
+   id: nat;
+ };
+type AvatarRef = 
+ variant {
+   "blob": blob;
+   url: text;
+ };
+type ArchivedBlocks = 
+ record {
+   args: GetBlocksArgs;
+   callback: func (GetBlocksArgs) -> (GetBlocksResult) query;
+ };
+type ArchiveRange = 
+ record {
+   canister_id: principal;
+   end: nat;
+   start: nat;
+ };
+type ArchiveInfo = 
+ record {
+   canister_id: principal;
+   length: nat;
+   max_blocks: nat;
+   start: nat;
+ };
+type AccountView = 
+ record {
+   avatar: opt AvatarRef;
+   created_at: nat64;
+   hotkeys: vec principal;
+   id: AccountId;
+   members: vec Member;
+   name: opt text;
+   updated_at: nat64;
+   verification: opt Verification;
+   verified: bool;
+ };
+type AccountId = nat;
+/// Public names of principals: accounts (one name for all of a person's principals) and canister
+/// names. Design: spec/sneed_names.md. The dapp registry the dapp labels refer to is in sneed_profiles.
+service : () -> SneedPidNames
