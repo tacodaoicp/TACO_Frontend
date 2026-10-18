@@ -99,7 +99,8 @@
   import { onMounted, onUnmounted, watch, computed, defineAsyncComponent, ref } from 'vue';
   import { useTacoStore } from "./stores/taco.store";
   import { storeToRefs } from "pinia";
-  import { useRoute, useRouter } from 'vue-router'
+  import { useRoute, useRouter, START_LOCATION } from 'vue-router'
+  import { CHART_ROUTES, loadApexcharts, warmRoute, warmWizard, loadWizard, navItems, inBottomBar, queueIdleLoads, holdIdleLoads } from './components/navItems'
 
   // Lazy load HomeView to reduce initial bundle
   const HomeView = defineAsyncComponent(() => import('./views/HomeView.vue'))
@@ -164,7 +165,7 @@
   const syncThemeColor = () => {
     const colour = getComputedStyle(document.documentElement).getPropertyValue('--card-gradient-from').trim()
     if (!colour) return
-    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    let meta = document.querySelector('meta[name="theme-color"]')
     if (!meta) {
       meta = document.createElement('meta')
       meta.name = 'theme-color'
@@ -192,15 +193,42 @@
     if (routePendingTimer) { clearTimeout(routePendingTimer); routePendingTimer = null }
     routePending.value = false
   }
+  // a chart page opened from another page loads apexcharts together with its own code, so its first
+  // chart never shows collapsed while the library loads (main.js registers <apexchart> as a lazy component)
+  let chartLib = null
   router.beforeEach((to, from) => {
     if (to.path !== from.path) {
       if (routePendingTimer) clearTimeout(routePendingTimer)
       routePendingTimer = setTimeout(() => { routePending.value = true }, 120)
     }
+    chartLib = from !== START_LOCATION && CHART_ROUTES.includes(to.path) ? loadApexcharts() : null
+    // the idle downloads wait while a page opens
+    holdIdleLoads(true)
     return true
   })
-  router.afterEach(clearRoutePending)
-  router.onError(clearRoutePending)
+  // at most 1 s: past that the page opens and its chart shows once the library is there
+  router.beforeResolve(async () => { if (chartLib) await Promise.race([chartLib, new Promise((r) => setTimeout(r, 1000))]) })
+  const routeSettled = () => { clearRoutePending(); holdIdleLoads(false) }
+  router.afterEach(routeSettled)
+  router.onError(routeSettled)
+
+  // the Grand Tour opens its pages (and offers the wizard at the end) with no tap to warm them on.
+  // Once the tour itself has loaded (a tour that fails to load recovers as before) they are warmed one
+  // at a time in tour order, each when the page is idle, so the first scene stays smooth.
+  const idle = (cb) => (window.requestIdleCallback || ((f) => setTimeout(f, 200)))(cb)
+  const warmTourPages = async (paths) => {
+    for (const path of paths) {
+      await new Promise(idle)
+      await warmRoute(router, path)
+    }
+    warmWizard()
+  }
+  watch(grandTourActive, (active) => {
+    if (!active) return
+    Promise.all([import('./components/tour/GrandTour.vue'), import('./components/tour/tourScript')])
+      .then(([, { tourScript }]) => warmTourPages([...new Set(tourScript.map((scene) => scene.route))].filter((path) => path !== '/')))
+      .catch(() => {})
+  })
 
   // images
   const astronautLoaderUrl = astronautLoader
@@ -309,21 +337,48 @@
     const idleShims = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
     idleShims(() => { tacoStore.initializeShims() })
 
-    // Deeper idle: warm the chart compute worker + commonly-navigated views.
+    // Download the pages people open next without running them (a first visit, a tap while offline or
+    // in a tab that outlived a deploy then reads them from the HTTP cache). This starts now, not at idle:
+    // on a busy phone the first idle moment can come after the first tap. The queue (navItems.ts) keeps
+    // it to two low priority downloads at a time and holds it while a page opens.
+    prefetchPages()
+
+    // Deeper idle: only a chart page runs apexcharts now, so its chart does not collapse and reflow while
+    // the 574 KB lib loads; other pages get it with the first chart page (router guard above).
     const idleDeep = window.requestIdleCallback || ((cb) => setTimeout(cb, 1000))
     idleDeep(() => {
-      // Preload commonly-used route components (in navigation, frequently accessed)
-      import('./views/WalletView.vue')
-      import('./views/NachosVaultView.vue')
-      import('./views/BuyTacoView.vue')
-      import('./views/PerformanceView.vue')
-      // Preload apexcharts during idle so the first chart route (vault/dao/vote)
-      // renders its chart immediately instead of collapsing→reflowing while the
-      // 574 KB lib loads. Kept OUT of the boot path (it's idle, post-mount), so
-      // first paint stays fast — this just hides the lazy-load gap.
-      import('vue3-apexcharts')
+      if (CHART_ROUTES.includes(route.path)) loadApexcharts()
     })
 
+  }
+
+  // the files build/page-prefetch.js lists in index.html: the pages a tab used to load and run at startup,
+  // in the order of the menu with the bottom bar's pages first (Vote for a signed in visitor, DAO otherwise),
+  // then the wizard, the other pages and the signed in and admin pages
+  const prefetchPages = async () => {
+    let lists = null
+    try { lists = JSON.parse(document.getElementById('taco-prefetch')?.textContent || 'null') } catch { /* no list */ }
+    if (!lists) { queueIdleLoads([loadWizard]); return }
+    const signedIn = userLoggedIn.value || tacoStore.sessionLikely
+    const filesOf = (items) => items.flatMap((item) => (item.to && lists.pages[router.resolve(item.to).path]) || [])
+    // file URLs, leaving out what this page already loaded or what is queued already
+    const queued = new Set(performance.getEntriesByType('resource').map((e) => e.name))
+    const hrefs = (indexes) => indexes.map((i) => `${location.origin}/${lists.files[i]}`).filter((href) => !queued.has(href) && queued.add(href))
+    queueIdleLoads([
+      ...hrefs(filesOf(navItems.filter((item) => inBottomBar(item, signedIn)))),
+      loadWizard,
+      ...hrefs(filesOf(navItems.filter((item) => !inBottomBar(item, signedIn)))),
+      ...hrefs(Object.values(lists.pages).flat()),
+    ])
+    if (!userLoggedIn.value) return
+    queueIdleLoads(hrefs(lists.login))
+    // admin pages for admins, or for a browser that opened them before
+    let admin = false
+    try { admin = localStorage.getItem('hasVisitedAdmin') === 'true' } catch { /* storage blocked */ }
+    if (!admin) {
+      try { admin = (await import('./composables/useAdminCheck')).ADMIN_PRINCIPALS.includes(tacoStore.userPrincipal) } catch { /* offline */ }
+    }
+    if (admin) queueIdleLoads(hrefs(lists.admin))
   }
 
   // update robots meta

@@ -8,7 +8,11 @@
                  :key="item.label"
                  :to="item.to"
                  class="bottom-nav__item"
-                 :class="{ 'bottom-nav__item--active': isNavActive(item, route) }">
+                 :class="{ 'bottom-nav__item--active': isNavActive(item, route) }"
+                 @pointerdown="warm(item)"
+                 @touchstart.passive="warm(item)"
+                 @mouseenter="warm(item)"
+                 @focus="warm(item)">
       <i :class="item.icon" aria-hidden="true"></i>
       <span class="bottom-nav__label">{{ item.label }}</span>
     </router-link>
@@ -100,12 +104,16 @@
 <script setup lang="ts">
 
   import { computed } from 'vue'
-  import { useRoute } from 'vue-router'
+  import { useRoute, useRouter } from 'vue-router'
   import { storeToRefs } from 'pinia'
-  import { navItems, isNavActive, navDrawerOpen, openDrawer, inBottomBar } from './navItems'
+  import { navItems, isNavActive, navDrawerOpen, openDrawer, inBottomBar, warmNavItem, type NavItem } from './navItems'
   import { useTacoStore } from '../stores/taco.store'
 
   const route = useRoute()
+
+  // warm a page before its tap
+  const router = useRouter()
+  const warm = (item: NavItem) => warmNavItem(router, item)
 
   const { userLoggedIn } = storeToRefs(useTacoStore())
   const bottomItems = computed(() => navItems.filter(i => inBottomBar(i, userLoggedIn.value)))

@@ -22,6 +22,10 @@
                    v-bind="item.to && !item.action ? { to: item.to } : { href: item.href ?? item.to ?? '#' }"
                    class="header-bar__rl"
                    :class="{ 'header-bar__rl--active': isNavActive(item, route) }"
+                   @pointerdown="warm(item)"
+                   @touchstart.passive="warm(item)"
+                   @mouseenter="warm(item)"
+                   @focus="warm(item)"
                    @click="onNavClick($event, item)">
           <span class="header-bar__rl-span">{{ item.label }}</span>
         </component>
@@ -128,7 +132,11 @@
       <div class="list-group">
 
         <!-- wallet - router link -->
-        <router-link to="/wallet" class="list-group-item">
+        <router-link to="/wallet" class="list-group-item"
+                     @pointerdown="warmWallet"
+                     @touchstart.passive="warmWallet"
+                     @mouseenter="warmWallet"
+                     @focus="warmWallet">
 
           <!-- item icon-->
           <i class="fa-solid fa-wallet"></i>
@@ -248,6 +256,10 @@
                    v-bind="item.to && !item.action ? { to: item.to } : { href: item.href ?? item.to ?? '#' }"
                    class="nav-drawer__link"
                    :class="{ 'nav-drawer__link--active': isNavActive(item, route) }"
+                   @pointerdown="warm(item)"
+                   @touchstart.passive="warm(item)"
+                   @mouseenter="warm(item)"
+                   @focus="warm(item)"
                    @click="onNavClick($event, item)">
           <i v-if="item.icon" :class="item.icon" aria-hidden="true"></i>
           <span>{{ item.label }}</span>
@@ -727,9 +739,9 @@
   // Imports //
   /////////////
 
-  import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+  import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick, defineAsyncComponent } from 'vue'
   import { RouterLink, useRouter, useRoute } from 'vue-router'
-  import { navItems, isNavActive, navDrawerOpen, openDrawer, closeDrawer, inBottomBar, type NavItem } from './navItems'
+  import { navItems, isNavActive, navDrawerOpen, openDrawer, closeDrawer, inBottomBar, loadWizard, warmNavItem, warmRoute, type NavItem } from './navItems'
   import { useTacoStore } from "../stores/taco.store"
   import { storeToRefs } from "pinia"
   import TacoDaoLogo from "../assets/images/tacoDaoLogo.vue"
@@ -742,7 +754,9 @@
   import { Tooltip } from 'bootstrap'
   // import EnvironmentIndicator from './misc/EnvironmentIndicator.vue'
   import { getEffectiveNetwork } from '../config/network-config'
-  import WizardModal from "../views/WizardView.vue"
+
+  // the wizard loads at idle (App.vue) and when its link is pointed at, not with the page
+  const WizardModal = defineAsyncComponent(loadWizard)
 
   ////////////
   // Stores //
@@ -840,6 +854,10 @@
 
   // price for the drawer, ellipsis until loaded
   const usd = (v: number, d: number) => v > 0 ? '$' + v.toFixed(d) : '…'
+
+  // warm a link's page (or the wizard) before its click
+  const warm = (item: NavItem) => warmNavItem(router, item)
+  const warmWallet = () => warmRoute(router, '/wallet')
 
   // header and drawer link click: close the drawer, run action items
   const onNavClick = (e: MouseEvent, item: NavItem) => {
