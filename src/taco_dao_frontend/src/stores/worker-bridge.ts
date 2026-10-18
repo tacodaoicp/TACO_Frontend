@@ -62,6 +62,22 @@ const dataStore = new Map<DataKey, DataState>()
 // Subscriptions - callbacks for data updates
 const subscriptions = new Map<DataKey, Set<(data: unknown, state: DataState) => void>>()
 
+// Keys a view asked for with fetch(). Their subscribers get the worker's reply
+// even when the tab holds that payload already, and the last data when the
+// fetch failed: admin views clear their spinners in those calls.
+const awaitingReply = new Set<DataKey>()
+
+// The store keeps the decoded trade history, so this tab's serialized copy of
+// it (~650 KB) is let go once delivered. `released` marks a key whose copy
+// was dropped: its lastUpdated still tells which payload the tab holds.
+const RELEASED_AFTER_DELIVERY: DataKey[] = ['tradingStatus']
+const released = new Set<DataKey>()
+
+function holds(dataKey: DataKey, state: DataState): boolean {
+  const held = dataStore.get(dataKey)
+  return held != null && held.lastUpdated === state.lastUpdated && (held.data != null || released.has(dataKey))
+}
+
 // Current route for priority calculation
 const currentRoute = ref('/')
 
@@ -81,7 +97,8 @@ const workersConnected = ref(false)
 // Increment to force browser to load fresh SharedWorker code
 // v7: nachosNavHistory wire format changed to { icp, usd }
 // v8: nachosVaultAnalytics key, FETCH_STARTED without payload, cache tagged by network and owner
-const WORKER_VERSION = 'v8'
+// v9: timerStatus without trade history, unchanged payloads not resent, visibility per tab
+const WORKER_VERSION = 'v9'
 
 function getMainWorker(): WorkerAdapter {
   if (!mainWorker) {
@@ -180,9 +197,8 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
           console.log(`[WorkerBridge] ${type} received for ${payload.dataKey} from ${workerName}, data=${dataInfo}`)
         }
         // A cache replay of the payload this tab already holds: subscribers
-        // have it, so skip their decode and re-render
-        const held = dataStore.get(payload.dataKey)
-        if (type === 'CACHE_HIT' && held?.data != null && held.lastUpdated === payload.state.lastUpdated) break
+        // have it, so skip their decode and re-render (unless a view asked)
+        if (type === 'CACHE_HIT' && !awaitingReply.has(payload.dataKey) && holds(payload.dataKey, payload.state)) break
         updateDataStore(payload.dataKey, payload.state)
       } else if (WORKER_DEBUG()) {
         console.warn(`[WorkerBridge] ${type} received but missing dataKey or state`, payload)
@@ -206,12 +222,15 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
           data: null, lastUpdated: null, loading: false, error: null, stale: true
         }
         const failed = { ...current, loading: false, error: payload.error || 'Unknown error' }
-        // Subscribers that have data keep showing it while the worker retries.
-        // Only a key with nothing to show is passed on, so its loading state can end.
-        if (current.data == null) {
+        // Subscribers that have data keep showing it while the worker retries
+        // (a released key's data is with its subscribers). Only a key with
+        // nothing to show is passed on, so its loading state can end, or one a
+        // view asked for (it gets its data back, as the answer).
+        if (current.data == null && !released.has(payload.dataKey)) {
           updateDataStore(payload.dataKey, failed)
         } else {
           dataStore.set(payload.dataKey, failed)
+          if (awaitingReply.delete(payload.dataKey)) notifySubscribers(payload.dataKey, failed)
         }
       }
       // Only log unexpected errors (not access denied or backend version mismatch)
@@ -255,10 +274,7 @@ function handleWorkerMessage(response: WorkerResponse, workerName: string): void
 // Pending fetch promises - used by fetchAndWait (declared early for use in updateDataStore)
 const pendingFetches = new Map<DataKey, { resolve: (data: unknown) => void; reject: (err: Error) => void }[]>()
 
-function updateDataStore(dataKey: DataKey, state: DataState): void {
-  dataStore.set(dataKey, state)
-
-  // Notify subscribers FIRST so they can process/deserialize the data
+function notifySubscribers(dataKey: DataKey, state: DataState): number {
   const callbacks = subscriptions.get(dataKey)
   if (WORKER_DEBUG()) {
     console.log(`[WorkerBridge] updateDataStore for ${dataKey}, hasData=${!!state?.data}, subscriberCount=${callbacks?.size || 0}`)
@@ -270,6 +286,23 @@ function updateDataStore(dataKey: DataKey, state: DataState): void {
       } catch (error) {
         console.error(`[WorkerBridge] Subscriber error for ${dataKey}:`, error)
       }
+    }
+  }
+  return callbacks?.size ?? 0
+}
+
+function updateDataStore(dataKey: DataKey, state: DataState): void {
+  dataStore.set(dataKey, state)
+  awaitingReply.delete(dataKey)
+
+  // Notify subscribers FIRST so they can process/deserialize the data
+  const delivered = notifySubscribers(dataKey, state)
+  if (RELEASED_AFTER_DELIVERY.includes(dataKey) && state.data != null) {
+    if (delivered > 0) {
+      dataStore.set(dataKey, { ...state, data: null })
+      released.add(dataKey)
+    } else {
+      released.delete(dataKey)
     }
   }
 
@@ -337,7 +370,7 @@ export function initWorkerBridge(route?: string): void {
     id: generateMessageId(),
     timestamp: Date.now(),
     type: 'INITIAL_LOAD' as const,
-    payload: { route: initialRoute },
+    payload: { route: initialRoute, visible: pageVisible() },
   }
   // Reset cache ready counter for fresh initialization
   workersReportedCacheReady = 0
@@ -378,7 +411,7 @@ export function initWorkerBridge(route?: string): void {
         id: generateMessageId(),
         timestamp: Date.now(),
         type: 'SET_ROUTE',
-        payload: { route: currentRoute.value || '/' },
+        payload: { route: currentRoute.value || '/', visible: pageVisible() },
       })
       if (WORKER_DEBUG()) console.log('[WorkerBridge] Resume kick: SET_ROUTE re-sent after tab became visible')
     } catch { /* worker not up; nothing to kick */ }
@@ -467,6 +500,9 @@ export function subscribe(
   // Immediately call callback with cached data if available
   // This provides instant data on navigation without waiting for worker round-trip
   const cachedState = dataStore.get(dataKey)
+  // The tab let its copy go (see RELEASED_AFTER_DELIVERY) and the worker
+  // knows the tab holds it, so the SUBSCRIBE below gets no replay: ask for it
+  if (!cachedState?.data && released.has(dataKey)) requestFetch(dataKey, false, true)
   if (cachedState?.data) {
     if (WORKER_DEBUG()) {
       console.log(`[WorkerBridge] subscribe: found cached data for ${dataKey}, calling callback`)
@@ -512,7 +548,15 @@ export function subscribe(
  * Trigger a fetch for a specific data key
  */
 export function fetch(dataKey: DataKey, force: boolean = false): void {
+  requestFetch(dataKey, force, true)
+}
+
+// `asked`: a view waits for the answer (see awaitingReply). Otherwise the
+// request is the bridge's own (route prefetch, fetchAndWait): the worker skips
+// a reply with data the tab holds (quiet), and failures keep their usual path.
+function requestFetch(dataKey: DataKey, force: boolean, asked: boolean): void {
   const priority = getRoutePriorities(currentRoute.value, isAdmin.value, true).get(dataKey) || 'medium'
+  if (asked) awaitingReply.add(dataKey)
 
   const worker = getWorkerForKey(dataKey)
   sendToWorker(worker, {
@@ -523,6 +567,7 @@ export function fetch(dataKey: DataKey, force: boolean = false): void {
       dataKey,
       priority,
       force,
+      quiet: !asked,
     },
   })
 }
@@ -563,8 +608,8 @@ export function fetchAndWait<T>(dataKey: DataKey, force: boolean = false, timeou
     }
     pendingFetches.get(dataKey)!.push({ resolve: resolveWrapper, reject: rejectWrapper })
 
-    // Trigger the fetch
-    fetch(dataKey, force)
+    // Trigger the fetch (it resolves on data and times out on failure)
+    requestFetch(dataKey, force, false)
   })
 }
 
@@ -608,9 +653,13 @@ export function setCurrentRoute(route: string): void {
     id: generateMessageId(),
     timestamp: Date.now(),
     type: 'SET_ROUTE',
-    payload: { route },
+    payload: { route, visible: pageVisible() },
   })
   updatePrioritiesForRoute(route)
+}
+
+function pageVisible(): boolean {
+  return typeof document === 'undefined' || document.visibilityState === 'visible'
 }
 
 /**
@@ -800,7 +849,7 @@ function updatePrioritiesForRoute(route: string): void {
   // Also trigger fetches for critical/high priority items on route change
   for (const [dataKey, priority] of priorities) {
     if (priority === 'critical' || priority === 'high') {
-      fetch(dataKey, false)
+      requestFetch(dataKey, false, false)
     }
   }
 }

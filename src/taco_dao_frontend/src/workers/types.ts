@@ -235,6 +235,42 @@ export const STALENESS_THRESHOLDS: Record<DataKey, number> = {
 // Background tab multiplier (3x slower)
 export const BACKGROUND_MULTIPLIER = 3
 
+// Keys whose subscribers only store what they receive. A refresh that returns
+// the payload a tab already holds is not sent to it again (each send is a
+// structured clone plus a decode in every tab; the trade history is ~650 KB).
+// Tabs on /admin pages still get every refresh: the admin timer panel is
+// rebuilt from each one. Not tacoProposals: each delivery also resets the
+// proposals list a "load more" extended.
+export const CHANGE_ONLY_KEYS: DataKey[] = [
+  'tradingStatus',
+  'timerStatus',
+  'leaderboardAllTimeUSD',
+  'leaderboardAllTimeICP',
+  'leaderboardOneYearUSD',
+  'leaderboardOneYearICP',
+  'leaderboardOneMonthUSD',
+  'leaderboardOneMonthICP',
+  'leaderboardOneWeekUSD',
+  'leaderboardOneWeekICP',
+  'leaderboardInfo',
+  'proposalsThreads',
+]
+
+// Heavy keys refresh in the background only while an open tab is on a page
+// that shows them (a route or one below it): the trade history on /dao and
+// the admin pages, the signed in user's performance on /performance.
+// Arriving on such a page refetches them when stale (the route's keys, see
+// ROUTE_PRIORITIES).
+export const REFRESH_ONLY_ON: Partial<Record<DataKey, string[]>> = {
+  tradingStatus: ['/dao', '/admin'],
+  userPerformance: ['/performance'],
+}
+
+export function refreshShownOn(dataKey: DataKey, route: string): boolean {
+  const routes = REFRESH_ONLY_ON[dataKey]
+  return !routes || routes.some((r) => route === r || route.startsWith(r + '/'))
+}
+
 // Idle timeout - stop refreshes after 5 minutes of inactivity
 export const IDLE_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -305,6 +341,7 @@ export interface WorkerRequest extends BaseMessage {
     route?: string // Current route for INITIAL_LOAD
     userPrincipal?: string // Principal text for getVoteDashboard
     enabled?: boolean // SET_DEBUG
+    quiet?: boolean // FETCH from the bridge's own route prefetch: no reply when the tab holds the data
   }
 }
 

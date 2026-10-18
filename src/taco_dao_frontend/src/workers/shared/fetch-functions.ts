@@ -185,6 +185,30 @@ export function serializeForTransfer(obj: unknown): unknown {
 }
 
 /**
+ * Whether two serializeForTransfer results hold the same data. A refresh that
+ * returns what the worker already has is then neither resent nor restored.
+ */
+export function samePayload(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false
+    for (let i = 0; i < a.length; i++) {
+      if (!samePayload(a[i], b[i])) return false
+    }
+    return true
+  }
+  if (Array.isArray(b)) return false
+  const keysA = Object.keys(a)
+  if (keysA.length !== Object.keys(b).length) return false
+  for (const key of keysA) {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return false
+    if (!samePayload((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) return false
+  }
+  return true
+}
+
+/**
  * Restore BigInt and other types from serialized strings
  */
 export function deserializeFromTransfer(obj: unknown): unknown {
@@ -567,10 +591,12 @@ export async function fetchProposalsThreadsData(agent: HttpAgent): Promise<any[]
 
 /**
  * Fetch all names from AppSneedDAO
+ * Plain objects, not Maps: serializeForTransfer turns a Map into {}, so the
+ * store used to receive no names at all and emptied the ones it had.
  */
 export async function fetchAllNamesData(agent: HttpAgent): Promise<{
-  principalNames: Map<string, { name: string; verified: boolean }>
-  neuronNames: Map<string, { name: string; verified: boolean }>
+  principalNames: Record<string, { name: string; verified: boolean }>
+  neuronNames: Record<string, { name: string; verified: boolean }>
 }> {
   const actor = getAppSneedDaoActor(agent)
 
@@ -580,16 +606,16 @@ export async function fetchAllNamesData(agent: HttpAgent): Promise<{
   ])
 
   // Process principal names
-  const principalNames = new Map<string, { name: string; verified: boolean }>()
+  const principalNames: Record<string, { name: string; verified: boolean }> = {}
   ;(principalNamesRaw as any[]).forEach(([principal, [name, verified]]) => {
-    principalNames.set(principal.toString(), { name, verified })
+    principalNames[principal.toString()] = { name, verified }
   })
 
   // Process neuron names
-  const neuronNames = new Map<string, { name: string; verified: boolean }>()
+  const neuronNames: Record<string, { name: string; verified: boolean }> = {}
   ;(neuronNamesRaw as any[]).forEach(([neuronKey, [name, verified]]) => {
     const mapKey = `${neuronKey.sns_root_canister_id.toString()}:${uint8ArrayToHex(neuronKey.neuron_id.id)}`
-    neuronNames.set(mapKey, { name, verified })
+    neuronNames[mapKey] = { name, verified }
   })
 
   return { principalNames, neuronNames }
@@ -1079,9 +1105,10 @@ export async function fetchUserPerformanceData(
       lastAllocationChange: nd.checkpoints?.length > 0
         ? nd.checkpoints[nd.checkpoints.length - 1].timestamp
         : BigInt(0),
-      // forward the raw checkpoints so PerformanceChart can render the line —
-      // it expects neuron.checkpoints[] with timestamp + totalPortfolioValue
-      checkpoints: nd.checkpoints ?? [],
+      // Not sent: nothing reads the raw history here (PerformanceChart loads its
+      // own graph in its worker), and it made this payload megabytes to clone
+      // to every tab and rewrite to IndexedDB on each refresh.
+      checkpoints: [],
       performanceScoreUSD: nd.performanceScoreUSD,
       performanceScoreICP: nd.performanceScoreICP,
       performance: {

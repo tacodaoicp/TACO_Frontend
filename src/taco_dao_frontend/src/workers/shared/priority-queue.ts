@@ -10,6 +10,9 @@ export interface QueueItem {
   priority: Priority
   addedAt: number
   retryCount: number
+  // Asked for with force (workerBridge.fetch(key, true)): never skipped as
+  // already fresh, and its result is always delivered
+  force?: boolean
 }
 
 /**
@@ -23,18 +26,24 @@ export class PriorityQueue {
   // queues them once more instead of dropping the request
   private rerun = new Map<DataKey, Priority>()
 
+  // Called after every enqueue, so the worker's queue loop can start the
+  // fetch at once instead of at its next poll
+  onEnqueue: (() => void) | null = null
+
   /**
    * Add item to queue or update its priority if already exists
    */
   enqueue(dataKey: DataKey, priority: Priority, force = false): void {
     if (force && this.processing.has(dataKey)) this.rerun.set(dataKey, priority)
 
-    // Remove existing entry for this dataKey (to update priority)
+    // Remove existing entry for this dataKey (to update priority). A force
+    // flag it carries is kept: re-queueing never downgrades a forced request.
     const existingIndex = this.items.findIndex((item) => item.dataKey === dataKey)
     let retryCount = 0
 
     if (existingIndex !== -1) {
       retryCount = this.items[existingIndex].retryCount
+      force = force || !!this.items[existingIndex].force
       this.items.splice(existingIndex, 1)
     }
 
@@ -43,9 +52,11 @@ export class PriorityQueue {
       priority,
       addedAt: Date.now(),
       retryCount,
+      force,
     })
 
     this.sort()
+    this.onEnqueue?.()
   }
 
   /**
@@ -78,7 +89,7 @@ export class PriorityQueue {
     const rerunPriority = this.rerun.get(dataKey)
     if (rerunPriority) {
       this.rerun.delete(dataKey)
-      this.enqueue(dataKey, rerunPriority)
+      this.enqueue(dataKey, rerunPriority, true)
     }
   }
 
@@ -128,6 +139,14 @@ export class PriorityQueue {
    */
   isProcessing(dataKey: DataKey): boolean {
     return this.processing.has(dataKey)
+  }
+
+  /**
+   * Check if the key's queued fetch was forced, or a forced request for it
+   * arrived while it was running (it then runs once more, see complete())
+   */
+  isForced(dataKey: DataKey): boolean {
+    return this.rerun.has(dataKey) || this.items.some((item) => item.dataKey === dataKey && item.force)
   }
 
   /**

@@ -26,6 +26,25 @@ export function setCacheNetwork(network: string | null): void {
   cacheNetwork = network
 }
 
+// A refresh that returns the payload already stored does not rewrite it (the
+// trade history is ~650 KB). The time of that refresh goes into this one small
+// row instead, and getCachedMany reports it as the entry's lastUpdated, so a
+// warm boot does not refetch data that was confirmed a moment ago.
+const REFRESHED_KEY = '__refreshed' as DataKey
+let refreshed: { network: string | null; times: Record<string, number> } | null = null
+let refreshedWrite: ReturnType<typeof setTimeout> | null = null
+
+/** Record that `dataKey` was refetched at `at` and its stored payload is still current */
+export function markRefreshed(dataKey: DataKey, at: number): void {
+  if (!refreshed || refreshed.network !== cacheNetwork) refreshed = { network: cacheNetwork, times: {} }
+  refreshed.times[dataKey] = at
+  if (refreshedWrite) return
+  refreshedWrite = setTimeout(() => {
+    refreshedWrite = null
+    if (refreshed) void setCached(REFRESHED_KEY, { ...refreshed.times })
+  }, 1_000)
+}
+
 /** A restored entry plus the tags it was written with */
 export interface CachedEntry<T = unknown> extends DataState<T> {
   network?: string
@@ -106,9 +125,10 @@ export async function getCached<T>(dataKey: DataKey): Promise<DataState<T> | nul
 
 /**
  * Store data in cache. `owner` is the principal (text) of user-specific data;
- * such an entry is only ever restored for that same principal.
+ * such an entry is only ever restored for that same principal. Resolves to
+ * whether the entry was written.
  */
-export async function setCached<T>(dataKey: DataKey, data: T, owner?: string): Promise<void> {
+export async function setCached<T>(dataKey: DataKey, data: T, owner?: string): Promise<boolean> {
   try {
     const db = await getDB()
     const cached: CachedData<T> = {
@@ -120,8 +140,10 @@ export async function setCached<T>(dataKey: DataKey, data: T, owner?: string): P
       ...(owner ? { owner } : {}),
     }
     await db.put(STORE_NAME, cached)
+    return true
   } catch (error) {
     console.error(`[IndexedDB] Error caching data for ${dataKey}:`, error)
+    return false
   }
 }
 
@@ -136,12 +158,22 @@ export async function getCachedMany(dataKeys: DataKey[]): Promise<Map<DataKey, C
   try {
     const db = await getDB()
     const tx = db.transaction(STORE_NAME, 'readonly')
-    const [rows] = await Promise.all([
+    const [rows, meta] = await Promise.all([
       Promise.all(dataKeys.map((key) => tx.store.get(key))),
+      tx.store.get(REFRESHED_KEY),
       tx.done,
     ])
+    // Keep the stored refresh times of keys this worker has not refreshed yet
+    if (meta && (!refreshed || refreshed.network === (meta.network ?? null))) {
+      refreshed = { network: meta.network ?? null, times: { ...(meta.data as Record<string, number>), ...refreshed?.times } }
+    }
     for (const cached of rows) {
-      if (cached && cached.version === 1) result.set(cached.dataKey, toEntry(cached))
+      if (cached && cached.version === 1) {
+        const entry = toEntry(cached)
+        const at = meta?.network === cached.network ? (meta?.data as Record<string, number>)[cached.dataKey] : undefined
+        if (at && at > entry.lastUpdated!) entry.lastUpdated = at
+        result.set(cached.dataKey, entry)
+      }
     }
   } catch (error) {
     console.error('[IndexedDB] Error getting cached data:', error)
@@ -194,6 +226,7 @@ export async function deleteCached(dataKey: DataKey): Promise<void> {
  * Clear all cached data
  */
 export async function clearAllCached(): Promise<void> {
+  refreshed = null
   try {
     const db = await getDB()
     await db.clear(STORE_NAME)
