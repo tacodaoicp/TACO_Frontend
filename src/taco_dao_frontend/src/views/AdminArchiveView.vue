@@ -536,7 +536,7 @@
                   <div v-if="expandedBlocks.includes(block.id)" class="block-details">
                     <div class="border-top border-secondary pt-2">
                       <!-- Formatted Block Details -->
-                      <div v-html="getFormattedBlockDetails(block.block)"></div>
+                      <div v-html="sanitizeHtml(getFormattedBlockDetails(block.block))"></div>
                       
                       <!-- Raw JSON (collapsible) -->
                       <div class="mt-3">
@@ -615,6 +615,7 @@
 </template>
 
 <script>
+import { sanitizeHtml } from '../utils/sanitizeHtml'
 import { ref } from 'vue'
 import TacoTitle from '../components/misc/TacoTitle.vue'
 import GNSFProposalDialog from '../components/proposals/GNSFProposalDialog.vue'
@@ -1625,6 +1626,7 @@ export default {
       }
     },
 
+        sanitizeHtml,
     getFormattedBlockDetails(blockData) {
       //console.log('=== getFormattedBlockDetails called ===', blockData)
       

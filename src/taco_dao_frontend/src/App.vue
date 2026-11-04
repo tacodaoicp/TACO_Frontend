@@ -78,7 +78,7 @@
         </div>
 
         <!-- toast body -->
-        <div v-html="toast.message" class="toast-body"></div>
+        <div class="toast-body">{{ toast.message }}</div>
 
       </div>
 

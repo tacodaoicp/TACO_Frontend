@@ -264,8 +264,8 @@
                                         <span class="fw-bold"
                                               style="color: var(--dark-brown-to-white);">DESCRIPTION</span>
 
-                                        <span class="taco-text-black-to-white"
-                                              v-html="nnsProposal.summary || 'No description available'"></span>
+                                        <MarkdownBody class="taco-text-black-to-white"
+                                                      :text="nnsProposal.summary || 'No description available'" />
 
                                     </div>
 
@@ -360,8 +360,8 @@
                                         <span class="fw-bold"
                                               style="color: var(--dark-brown-to-white);">DESCRIPTION</span>
 
-                                        <span class="taco-text-black-to-white" 
-                                             v-html="snsProposal.summary"></span>
+                                        <MarkdownBody class="taco-text-black-to-white"
+                                                      :text="snsProposal.summary" />
 
                                     </div>
 
@@ -690,6 +690,7 @@
 </style>
 
 <script setup lang="ts">
+import MarkdownBody from '../components/MarkdownBody.vue'
 
   /////////////
   // imports //

@@ -133,7 +133,7 @@
                                         </div>
                                         <div class="mb-2">
                                             <small class="text-muted">DESCRIPTION</small>
-                                            <div class="taco-text-black-to-white" v-html="nnsProposal.summary || 'No description available'"></div>
+                                            <MarkdownBody class="taco-text-black-to-white" :text="nnsProposal.summary || 'No description available'" />
                                         </div>
                                     </div>
                                 </div>
@@ -190,7 +190,7 @@
                                         </div>
                                         <div class="mb-2">
                                             <small class="text-muted">DESCRIPTION</small>
-                                            <div class="taco-text-black-to-white" v-html="snsProposal.summary"></div>
+                                            <MarkdownBody class="taco-text-black-to-white" :text="snsProposal.summary" />
                                         </div>
                                     </div>
                                 </div>
@@ -317,6 +317,7 @@
 </template>
 
 <script setup lang="ts">
+import MarkdownBody from '../components/MarkdownBody.vue'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'

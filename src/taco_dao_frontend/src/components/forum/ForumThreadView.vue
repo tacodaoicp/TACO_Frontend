@@ -647,7 +647,7 @@
                         <span class="forum-thread-view__details__key">Description</span>
 
                         <!-- description value -->
-                        <span class="forum-thread-view__details__value wordwrap-anywhere" v-html="proposal.summary"></span>
+                        <MarkdownBody class="forum-thread-view__details__value wordwrap-anywhere" :text="proposal.summary" />
 
                     </div>
 
@@ -2429,6 +2429,7 @@
 </style> 
 
 <script setup lang="ts">
+import MarkdownBody from '../MarkdownBody.vue'
 
     /////////////
     // Imports //

@@ -124,7 +124,7 @@
                   :runDisabled="false"
                   @run="runTest(item.key)"
                 >
-                  <div v-if="item.report" v-html="item.report" class="test-report"></div>
+                  <div v-if="item.report" v-html="sanitizeHtml(item.report)" class="test-report"></div>
                   <div v-else class="text-muted small">Click "Run" to execute this test</div>
                 </SystemStatusItem>
               </div>
@@ -318,6 +318,7 @@
 </style>
 
 <script setup lang="ts">
+import { sanitizeHtml } from '../utils/sanitizeHtml'
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 // @ts-ignore - Vue SFC import resolution
