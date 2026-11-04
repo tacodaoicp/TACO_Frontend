@@ -34,17 +34,18 @@ export function calculateRequiredDeposit(
 }
 
 /**
- * V2 deposit: make sure the exchange canister can pull `gross + transferFee`
- * via icrc2_transfer_from. Replaces the transfer-then-block flow when the
+ * V2 deposit: make sure the exchange canister can pull `gross` plus the
+ * transfer fee (the larger of `transferFee` and the ledger's live fee) via
+ * icrc2_transfer_from. Replaces the transfer-then-block flow when the
  * backend's V2 gates are open for this token.
  *
  * Allowance strategy (ensure-style, same as the bridge's ensureAllowance):
  * reuse a standing allowance when it already covers this trade — no ledger
  * fee, no extra call. Otherwise approve exactly what this trade pulls, with
- * no prompt, like the ICPSwap leg does. The approval expires after
- * APPROVAL_TTL_MS, so one left over by a trade that failed before its pull
- * lapses on its own. The spender is the exchange itself and every pull
- * consumes allowance, so the standing amount only ever shrinks.
+ * no prompt, like the ICPSwap leg does. The approval expires APPROVAL_TTL_MS
+ * after the replica's time, so one left over by a trade that failed before
+ * its pull lapses on its own. The spender is the exchange itself and every
+ * pull consumes allowance, so the standing amount only ever shrinks.
  *
  * - The pull draws from the caller's DEFAULT subaccount only.
  * - No journal entry: a V2 failure either moved nothing, or is tracked
@@ -52,6 +53,9 @@ export function calculateRequiredDeposit(
  * - Works for ICP too (the ICP ledger supports icrc2_approve).
  */
 const APPROVAL_TTL_MS = 30 * 60_000
+/** The ledger reads expires_at on its own clock. When the agent cannot sync with the replica, a device
+ *  clock far behind would make a 30 minute approval expired on arrival, so it gets a day instead. */
+const APPROVAL_TTL_UNSYNCED_MS = 24 * 60 * 60_000
 
 export async function approveExchangeDeposit(
   tokenCanisterId: string,
@@ -79,27 +83,35 @@ export async function approveExchangeDeposit(
 
   const ledger = Actor.createActor(icrcIDL, { agent, canisterId: tokenCanisterId })
   const spender = { owner: Principal.fromText(getCanisterId('exchange')), subaccount: [] as [] }
-  const needed = gross + transferFee
+  const store = useExchangeStore()
   // The store's allowance cache belongs to the tab's current principal.
-  const cacheIsOurs = () => !pin || useExchangeStore().principalText === owner.toText()
+  const cacheIsOurs = () => !pin || store.principalText === owner.toText()
+  // The replica's time once the agent has synced (the offset is 0 until then).
+  const nowMs = () => Date.now() + agent.getTimeDiffMsecs()
 
   // Reuse a standing allowance when it covers this trade. Reads the store's
   // allowance cache (warmed on token switch / page mount, refreshed after
   // every mutation), so this is usually instant. The 60s margin keeps the
   // pull off a dying approval. The cache is trusted only in the direction
   // that SKIPS work; an insufficient answer is re-verified live below.
-  const store = useExchangeStore()
+  // The pull pays the ledger's live fee, so the allowance covers the larger of
+  // it and the listed fee (read alongside, kept a minute and warmed with the
+  // allowance; the listed fee when the read fails).
+  const [liveFee, cur] = await Promise.all([
+    store.fetchLedgerFee(tokenCanisterId).catch(() => transferFee),
+    pin ? null : store.userAllowanceQuery(tokenCanisterId).ensure(30_000).catch(() => null), // unknown: verify live below
+  ])
+  const needed = gross + (liveFee > transferFee ? liveFee : transferFee)
   const sufficient = (v: { allowance: bigint; expiresAt: bigint | null } | null): boolean => {
     if (!v) return false
-    const marginNs = BigInt(Date.now() + 60_000) * 1_000_000n
+    const marginNs = BigInt(nowMs() + 60_000) * 1_000_000n
     return v.allowance >= needed && (v.expiresAt == null || v.expiresAt > marginNs)
   }
-  if (!pin) {
-    try {
-      const cur = await store.userAllowanceQuery(tokenCanisterId).ensure(30_000)
-      if (sufficient(cur)) return { approved: false }
-    } catch { /* allowance unknown — verify live below */ }
-  }
+  if (sufficient(cur)) return { approved: false }
+
+  // An approval may follow: sync the agent's clock with the replica while the
+  // live check runs (once per agent), so the expiry is on the ledger's clock.
+  const sync = agent.hasSyncedTime() ? null : withTimeout(agent.syncTime(), 5_000, 'syncTime').catch(() => {})
 
   // The cache said no or did not know. Take one LIVE look at the ledger via
   // the authed agent before opening a dialog: a fresh signed query heals every
@@ -123,9 +135,9 @@ export async function approveExchangeDeposit(
     if (sufficient(liveVal)) return { approved: false }
   } catch { /* live check unavailable — approve below */ }
 
-  // New approval needed: approve exactly what this trade pulls (never less: a short allowance
-  // is what traps the deviant sGLDT/EXE ledgers into an ambiguous pending pull).
-  const expiresAtNs = BigInt(Date.now() + APPROVAL_TTL_MS) * 1_000_000n
+  // New approval needed: approve exactly what this trade pulls.
+  await sync
+  const expiresAtNs = BigInt(nowMs() + (agent.hasSyncedTime() ? APPROVAL_TTL_MS : APPROVAL_TTL_UNSYNCED_MS)) * 1_000_000n
   const result = await ledger.icrc2_approve({
     fee: [], memo: [], from_subaccount: [], created_at_time: [],
     expected_allowance: [],

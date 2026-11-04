@@ -13,7 +13,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { Actor } from '@dfinity/agent'
-import { ICP_LEDGER_ID, isBaseToken } from '../constants/tokens'
+import { ICP_LEDGER_ID, FEE_HEADROOM_LEDGERS, isBaseToken } from '../constants/tokens'
 import { Principal } from '@dfinity/principal'
 import { idlFactory } from 'declarations/OTC_backend/OTC_backend.did.js'
 import { icrcIDL } from '../../shared/icrc-idl'
@@ -119,6 +119,10 @@ export const useExchangeStore = defineStore('exchange', () => {
   // gate queries below via onSuccess; read through useV2Deposit().
   const v2Enabled = ref(false)
   const v2AllowedTokens = ref<Set<string>>(new Set())
+  // Pending-pull lockouts seen this session (noteV2GateError). Kept apart from
+  // the gates above, which every refresh rebuilds from the backend.
+  const v2LockedTokens = ref<Set<string>>(new Set())
+  const v2LockedAll = ref(false)
   const icpPriceUSD = ref(0) // from external APIs (CoinGecko/Binance), the DAO, or a pool estimate
   // Where icpPriceUSD came from. An external or DAO price is never replaced by
   // a pool estimate; a pool estimate is replaced by a recent DAO price.
@@ -1271,11 +1275,12 @@ export const useExchangeStore = defineStore('exchange', () => {
     timeoutMs: 10_000,
   }))
 
-  /** Warm the allowance cache ahead of a possible V2 deposit (token switch,
-   *  page mount). No-op for anonymous users and non-V2 tokens. */
+  /** Warm the allowance and live fee caches ahead of a possible V2 deposit
+   *  (token switch, page mount). No-op for anonymous users and non-V2 tokens. */
   function prefetchExchangeAllowance(token: string) {
     if (!isAuthenticated.value || !useV2Deposit(token)) return
     userAllowanceQuery(token).prefetch()
+    void fetchLedgerFee(token).catch(() => {})
   }
 
   function refreshAllAllowances() {
@@ -1335,7 +1340,12 @@ export const useExchangeStore = defineStore('exchange', () => {
   // clear() calls ran with the key already ':anon' and removed nothing.
   // Memory is reset by each query's own principal watcher.
   watch(principalText, (p, prev) => {
-    if (prev && p !== prev) purgeUserCache(prev)
+    if (prev && p !== prev) {
+      purgeUserCache(prev)
+      // The exchange counts unresolved pulls per account.
+      v2LockedTokens.value = new Set()
+      v2LockedAll.value = false
+    }
   })
 
   // Login: eagerly prefetch the most-likely-needed user queries so the
@@ -1832,13 +1842,16 @@ export const useExchangeStore = defineStore('exchange', () => {
   /**
    * True when the V2 approve+pull deposit path should be used for this token.
    * localStorage 'taco_force_v1' = '1' forces the V1 path (debug lever).
+   * sGLDT and EXE always take V1 (see FEE_HEADROOM_LEDGERS), and so does a
+   * token after a pending-pull lockout this session.
    * Decide ONCE per user action (const at the top of the submit function) —
    * never re-read mid-flow, so a background gate refresh cannot desync the
    * approval from the exchange call.
    */
   function useV2Deposit(token: string): boolean {
     try { if (localStorage.getItem('taco_force_v1') === '1') return false } catch { /* ignore */ }
-    return v2Enabled.value && v2AllowedTokens.value.has(token)
+    return v2Enabled.value && v2AllowedTokens.value.has(token) && !FEE_HEADROOM_LEDGERS.has(token)
+      && !v2LockedAll.value && !v2LockedTokens.value.has(token)
   }
 
   async function refreshV2Gates(): Promise<void> {
@@ -1851,6 +1864,11 @@ export const useExchangeStore = defineStore('exchange', () => {
    * the first try, even if the re-fetch below is slow or fails), then
    * re-fetch for eventual consistency. The allowlist message ends with the
    * token id, so it can be cleared without threading the token through.
+   *
+   * A pending-pull lockout ("V2 temporarily unavailable ...") leaves V1
+   * working, so V2 stays off for the rest of the session: for the token the
+   * message ends with, or for every token when it names none (the
+   * exchange-wide cap). The gates are left alone (a refresh would undo it).
    */
   function noteV2GateError(res: unknown) {
     const msg = (res as any)?.Err?.InvalidInput
@@ -1863,6 +1881,12 @@ export const useExchangeStore = defineStore('exchange', () => {
       const next = new Set(v2AllowedTokens.value)
       next.delete(token)
       v2AllowedTokens.value = next
+    } else if (msg.startsWith('V2 temporarily unavailable')) {
+      let token = ''
+      try { token = Principal.fromText(msg.slice(msg.lastIndexOf(': ') + 2).trim()).toText() } catch { /* names no token */ }
+      if (token) v2LockedTokens.value = new Set(v2LockedTokens.value).add(token)
+      else v2LockedAll.value = true
+      return
     } else {
       return
     }

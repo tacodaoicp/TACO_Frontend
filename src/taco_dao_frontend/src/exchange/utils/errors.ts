@@ -3,6 +3,8 @@
  * Based on Section 20 of FRONTEND_DEV_GUIDE.md.
  */
 
+import { FEE_HEADROOM_LEDGERS } from '../constants/tokens'
+
 export type ErrorSeverity = 'info' | 'warning' | 'error' | 'success'
 
 export interface ExchangeError {
@@ -348,6 +350,16 @@ export function classifyExchangeError(err: any, ctx: ClassifyContext = {}): Exch
   if ('InvalidInput' in err && typeof err.InvalidInput === 'string') {
     const m = err.InvalidInput
     if (m.includes('already claimed by a concurrent')) {
+      // The public recovery refuses V2 pull blocks of these ledgers. Only an admin can pay them.
+      if ([...FEE_HEADROOM_LEDGERS].some(id => m.includes(id))) {
+        return {
+          severity: 'warning',
+          title: 'Deposit already claimed',
+          message: 'Your deposit reached the exchange but another process claimed it first. The funds are not lost. An admin will resolve it, so do not submit this trade again.',
+          recoverable: false,
+          action: 'none',
+        }
+      }
       return {
         severity: 'warning',
         title: 'Deposit already claimed',
@@ -360,7 +372,7 @@ export function classifyExchangeError(err: any, ctx: ClassifyContext = {}): Exch
       return {
         severity: 'warning',
         title: 'Deposits busy',
-        message: 'The exchange deposit queue is busy right now. Nothing was taken from your wallet. Please try again in a few minutes.',
+        message: 'The exchange is still settling earlier deposits, so it could not take this one. Your tokens stayed in your wallet, though an approval fee may have been charged. Try again and it will use the standard deposit method.',
         recoverable: true,
         action: 'retry',
       }

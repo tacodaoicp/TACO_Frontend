@@ -30,6 +30,7 @@ import { scaleAssetLegs, checkPlan, joinNames, ICP_WITHDRAW_FEE, MAX_TACO_TOKENS
 import { verifyLegs, requoteRule, type QuoteDeps } from './multiSellQuotes'
 import { planDebit, requiredDeposit, sellAllExactlyTotal, crossDexMaxReserve } from './crossDexCosts'
 import type { RunJournal, RunRecord } from './crossDexJournal'
+import { FEE_HEADROOM_LEDGERS } from '../constants/tokens'
 
 export const SALE_MIN_SESSION_MS = 15 * 60_000
 export const SECOND_CAP_MS = 30_000
@@ -38,7 +39,6 @@ export const LOCK_CAP_MS = 10 * 60_000
 /** Preflight waits this long for the V2 approvals: a hung approval must not use up the funds lock. */
 export const APPROVAL_WAIT_MS = 120_000
 const READ_TIMEOUT_MS = 10_000
-export const FEE_HEADROOM = new Set(['i2s4q-syaaa-aaaan-qz4sq-cai', 'rh2pm-ryaaa-aaaan-qeniq-cai'])
 
 export type RunPhase = 'idle' | 'confirming' | 'preparing' | 'selling' | 'settling'
   | 'complete' | 'partial' | 'failed' | 'stopped'
@@ -285,7 +285,7 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
   for (let k = 0; k < assets.length; k++) {
     const { a, input } = assets[k]
     const hasTaco = a.legs.some(l => l.dex === 'taco')
-    const v2 = hasTaco && !FEE_HEADROOM.has(a.address) && deps.useV2Deposit(a.address)
+    const v2 = hasTaco && !FEE_HEADROOM_LEDGERS.has(a.address) && deps.useV2Deposit(a.address)
     if (hasTaco && v2 !== input.v2) return back('moved')
     const cached = input.token.transfer_fee
     const live = fees[k]
@@ -301,7 +301,7 @@ async function preflight(ctx: SaleCtx, deps: SaleDeps, hooks: RunHooks): Promise
   for (let k = 0; k < assets.length; k++) {
     const { a, input } = assets[k]
     const t = tokens.get(a.address)!
-    const headroom = FEE_HEADROOM.has(a.address)
+    const headroom = FEE_HEADROOM_LEDGERS.has(a.address)
     let legs = a.legs
     if (input.atMax) {
       const exact = sellAllExactlyTotal(balances[k], legs, t.fee, tradingFeeBps, t.v2, headroom)

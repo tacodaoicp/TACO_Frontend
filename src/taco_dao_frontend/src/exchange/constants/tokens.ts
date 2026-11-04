@@ -22,9 +22,12 @@ export function isBaseToken(addr: string): boolean {
   return BASE_TOKEN_IDS.has(addr)
 }
 
-// sGLDT and EXE ledgers trap ("Natural subtraction underflow") on spec exact
-// balances and allowances, so every amount fill keeps one more transfer fee of
-// room for them, and CrossDEX Sell many keeps them on the TACO V1 path.
+// sGLDT and EXE ledgers take two fees from the payer's balance on
+// icrc2_transfer_from (one from the allowance, so an exact allowance is fine)
+// and trap ("Natural subtraction underflow") when the balance is short of that.
+// A V2 pull would cost them an extra fee and a trap leaves a pending pull, so
+// useV2Deposit keeps them on V1, and CrossDEX amount fills (ICPSwap pulls the
+// same way) keep one more transfer fee of room for them.
 export const SGLDT_LEDGER_ID = 'i2s4q-syaaa-aaaan-qz4sq-cai'
 export const EXE_LEDGER_ID = 'rh2pm-ryaaa-aaaan-qeniq-cai'
 export const FEE_HEADROOM_LEDGERS = new Set<string>([SGLDT_LEDGER_ID, EXE_LEDGER_ID])

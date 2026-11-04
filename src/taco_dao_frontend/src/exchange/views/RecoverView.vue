@@ -26,7 +26,8 @@
         <p class="recover-view__desc">
           One click checks every place funds can get stuck for your wallet: saved deposits on the exchange,
           interrupted CrossDEX swaps, every ICPSwap pool, the Neutrinite pylon, and pending exchange deposits.
-          Anything found is returned to your wallet. A full run can take a few minutes; you can watch it work below.
+          What can be returned goes back to your wallet, and pending exchange deposits are listed for an admin to resolve.
+          A full run can take a few minutes; you can watch it work below.
         </p>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <!-- a swap, sale or recovery still running in any tab: the run waits for it (never past the lock's cap) -->

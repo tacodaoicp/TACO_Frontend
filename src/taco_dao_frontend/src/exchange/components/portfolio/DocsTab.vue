@@ -181,8 +181,9 @@ dfx canister --network ic --identity my-key call &lt;TOKEN_LEDGER&gt; icrc2_appr
           token. Nothing moved. Use the V1 flow.
         </li>
         <li>
-          <code>InvalidInput "V2 temporarily unavailable ..."</code>: capacity limit.
-          Nothing moved. Safe to retry in a few minutes.
+          <code>InvalidInput "V2 temporarily unavailable ..."</code>: too many open pulls
+          of this token. Nothing moved by this call. Use the V1 flow, or retry once they
+          clear.
         </li>
         <li>
           <code>InsufficientFunds "V2 pull ... declined"</code>: your allowance or
