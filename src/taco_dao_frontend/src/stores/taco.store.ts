@@ -7370,6 +7370,16 @@ export const useTacoStore = defineStore('taco', () => {
         }
     }
 
+    // What SNS governance requires of a neuron that submits a proposal (public query)
+    const getProposalRequirements = async (): Promise<{ rejectCostE8s: bigint; minDissolveDelaySeconds: bigint }> => {
+        const snsGov: any = await createSnsGovernanceActorAnonymous('lhdfz-wqaaa-aaaaq-aae3q-cai');
+        const params = await snsGov.get_nervous_system_parameters(null) as any;
+        const rejectCostE8s = params.reject_cost_e8s?.[0];
+        const minDissolveDelaySeconds = params.neuron_minimum_dissolve_delay_to_vote_seconds?.[0];
+        if (rejectCostE8s === undefined || minDissolveDelaySeconds === undefined) throw new Error('SNS parameters are incomplete');
+        return { rejectCostE8s, minDissolveDelaySeconds };
+    }
+
     // Get grantable permissions from nervous system parameters
     const getGrantablePermissions = async (): Promise<number[]> => {
         try {
@@ -9530,6 +9540,7 @@ export const useTacoStore = defineStore('taco', () => {
         startDissolving,
         stopDissolving,
         disburseNeuron,
+        getProposalRequirements,
         getGrantablePermissions,
         addNeuronPermissions,
         removeNeuronPermissions,

@@ -35,7 +35,7 @@
               ❌ You need a neuron with proposal submission permission
             </div>
             <div v-if="isLoggedIn && hasProposalPermission && !hasSufficientTaco">
-              ❌ Your neuron needs at least {{ minTacoAmount }} undissolved TACO
+              ❌ You need {{ requirementText }}
             </div>
           </div>
         </div>
@@ -59,12 +59,10 @@ import { useProposalEligibility } from '../../composables/useProposalEligibility
 
 // Props
 interface Props {
-  minTacoAmount?: number
   redirectToProposalPage?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  minTacoAmount: 7,
   redirectToProposalPage: true
 })
 
@@ -86,12 +84,13 @@ const {
   hasProposalPermission,
   hasSufficientTaco,
   isEligible,
-  checkEligibility
+  checkEligibility,
+  requirementText
 } = useProposalEligibility()
 
 // Check eligibility on mount
 onMounted(async () => {
-  await checkEligibility(props.minTacoAmount)
+  await checkEligibility()
   
   if (isEligible.value) {
     emit('eligible')
@@ -116,7 +115,7 @@ const handleCreateProposal = () => {
 
 // Recheck eligibility
 const recheckEligibility = async () => {
-  await checkEligibility(props.minTacoAmount)
+  await checkEligibility()
   
   if (isEligible.value) {
     emit('eligible')

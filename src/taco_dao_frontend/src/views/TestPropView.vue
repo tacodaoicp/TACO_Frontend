@@ -22,7 +22,7 @@
             <ul class="text-muted mt-2">
               <li>Be logged in with your Internet Identity</li>
               <li>Have access to a TACO neuron with proposal submission permission</li>
-              <li>Have at least 7 TACO that are not dissolved in that neuron</li>
+              <li>Have enough TACO staked in that neuron to cover the reject cost, with a long enough dissolve delay</li>
             </ul>
           </div>
 
@@ -83,12 +83,12 @@
                     <i :class="hasSufficientTaco ? 'fa fa-check-circle text-success' : 'fa fa-times-circle text-danger'"></i>
                   </div>
                   <div class="eligibility-content">
-                    <h6>Sufficient Undissolved TACO</h6>
+                    <h6>Stake and Dissolve Delay</h6>
                     <p class="text-muted mb-0" v-if="hasSufficientTaco">
-                      You have at least 7 TACO that are not dissolved
+                      You have {{ requirementText }}. {{ rejectCostText }}.
                     </p>
                     <p class="text-muted mb-0" v-else-if="hasProposalPermission">
-                      Your neurons with proposal permission don't have enough undissolved TACO (need 7 TACO minimum)
+                      You need {{ requirementText }}
                     </p>
                     <p class="text-muted mb-0" v-else>
                       N/A - You need a neuron with proposal permission first
@@ -305,7 +305,9 @@ const {
   eligibleNeurons,
   isEligible,
   checkEligibility,
-  formatTaco
+  formatTaco,
+  requirementText,
+  rejectCostText
 } = useProposalEligibility()
 
 // Use the GNSF proposal composable

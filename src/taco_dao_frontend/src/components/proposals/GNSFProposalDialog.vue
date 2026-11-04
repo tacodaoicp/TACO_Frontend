@@ -38,6 +38,7 @@
 
           <!-- Eligibility Results -->
           <div v-if="eligibilityChecked" class="eligibility-results mb-3">
+            <div v-if="eligibilityError" class="alert alert-warning mb-2">Could not check your neurons: {{ eligibilityError }}</div>
             <div class="eligibility-item" :class="{ 'success': isLoggedIn, 'error': !isLoggedIn }">
               <i :class="isLoggedIn ? 'fa fa-check-circle text-success' : 'fa fa-times-circle text-danger'" class="me-2"></i>
               {{ isLoggedIn ? 'Logged in' : 'Not logged in - Please log in first' }}
@@ -50,7 +51,7 @@
             
             <div v-if="hasProposalPermission" class="eligibility-item" :class="{ 'success': hasSufficientTaco, 'error': !hasSufficientTaco }">
               <i :class="hasSufficientTaco ? 'fa fa-check-circle text-success' : 'fa fa-times-circle text-danger'" class="me-2"></i>
-              {{ hasSufficientTaco ? 'Has sufficient undissolved TACO (7+)' : 'Insufficient undissolved TACO (need 7+)' }}
+              {{ hasSufficientTaco ? 'Has' : 'Needs' }} {{ requirementText }}
             </div>
           </div>
 
@@ -59,6 +60,7 @@
             <!-- Neuron Selection -->
             <div class="mb-3">
               <label class="form-label">Select Neuron</label>
+              <div v-if="rejectCostText" class="form-text mb-1">{{ rejectCostText }}</div>
               <select v-model="selectedNeuronIndex" class="form-select" :disabled="submitting">
                 <option :value="null">Choose a neuron...</option>
                 <option 
@@ -208,13 +210,16 @@ const functionInfo = computed<GNSFunctionInfo | undefined>(() => {
 const {
   checking: checkingEligibility,
   eligibilityChecked,
+  errorMessage: eligibilityError,
   isLoggedIn,
   hasProposalPermission,
   hasSufficientTaco,
   eligibleNeurons,
   isEligible,
   checkEligibility,
-  formatTaco
+  formatTaco,
+  requirementText,
+  rejectCostText
 } = useProposalEligibility()
 
 // GNSF proposal composable

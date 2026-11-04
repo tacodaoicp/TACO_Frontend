@@ -17,13 +17,17 @@ export interface EligibilityResult {
   error: string | null
 }
 
+// NeuronPermissionType in SNS governance: 3 is SubmitProposal, 4 is Vote.
+const SUBMIT_PROPOSAL_PERMISSION = 3
+
 /**
  * Composable for checking if a user is eligible to create GNSF proposals
- * 
- * Requirements:
+ *
+ * The same checks SNS governance makes on a new proposal, with its live numbers:
  * 1. User must be logged in
- * 2. User must have a neuron with proposal submission permission (type 4)
- * 3. That neuron must have at least 7 TACO that are not dissolved
+ * 2. User must have a neuron with SubmitProposal permission
+ * 3. That neuron's stake, minus its fees, must cover the reject cost
+ * 4. Its dissolve delay must be at least the minimum to vote
  */
 export function useProposalEligibility() {
   const tacoStore = useTacoStore()
@@ -37,13 +41,23 @@ export function useProposalEligibility() {
   const hasProposalPermission = ref(false)
   const hasSufficientTaco = ref(false)
   const eligibleNeurons = ref<EligibleNeuron[]>([])
-  
+  const requirements = ref<{ rejectCostE8s: bigint; minDissolveDelaySeconds: bigint } | null>(null)
+
+  const requirementText = computed(() => {
+    if (!requirements.value) return 'a neuron that meets the current proposal requirements'
+    const { rejectCostE8s, minDissolveDelaySeconds } = requirements.value
+    return `a neuron with at least ${Number(rejectCostE8s) / 1e8} TACO and a dissolve delay of at least ${Number(minDissolveDelaySeconds) / 86400} days`
+  })
+  const rejectCostText = computed(() =>
+    requirements.value ? `${Number(requirements.value.rejectCostE8s) / 1e8} TACO is deducted if rejected` : ''
+  )
+
   const isEligible = computed(() => {
     return isLoggedIn.value && hasProposalPermission.value && hasSufficientTaco.value
   })
   
   /**
-   * Checks if a neuron has submit proposal permission (type 4) for the given user
+   * Checks if a neuron has submit proposal permission for the given user
    */
   const hasSubmitProposalPermission = (neuron: any, userPrincipalStr: string): boolean => {
     if (!neuron.permissions || !Array.isArray(neuron.permissions)) {
@@ -58,8 +72,7 @@ export function useProposalEligibility() {
         if (permissionPrincipal.toText() === userPrincipalStr) {
           const permissionTypes = permission.permission_type || []
           
-          // Check for submit proposal permission (type 4)
-          if (permissionTypes.includes(4)) {
+          if (permissionTypes.includes(SUBMIT_PROPOSAL_PERMISSION)) {
             return true
           }
         }
@@ -70,41 +83,36 @@ export function useProposalEligibility() {
   }
   
   /**
+   * A neuron's dissolve delay as SNS governance reads it: what is left of a dissolving
+   * neuron's timer, and 0 with no dissolve state.
+   */
+  const dissolveDelaySeconds = (neuron: any): bigint => {
+    const state = neuron.dissolve_state?.[0]
+    if (state?.DissolveDelaySeconds !== undefined) return BigInt(state.DissolveDelaySeconds)
+    if (state?.WhenDissolvedTimestampSeconds !== undefined) {
+      const left = BigInt(state.WhenDissolvedTimestampSeconds) - BigInt(Math.floor(Date.now() / 1000))
+      return left > 0n ? left : 0n
+    }
+    return 0n
+  }
+
+  /**
    * Checks if a neuron is undissolved (not dissolved)
    */
-  const isNeuronUndissolved = (neuron: any): boolean => {
-    const dissolveState = neuron.dissolve_state || []
-    
-    if (dissolveState.length === 0) {
-      return true // No dissolve state means not dissolving
-    }
-    
-    const state = dissolveState[0]
-    
-    // If WhenDissolvedTimestampSeconds exists and is in the past, it's dissolved
-    if (state.WhenDissolvedTimestampSeconds !== undefined) {
-      const dissolveTimestamp = Number(state.WhenDissolvedTimestampSeconds) * 1000
-      const now = Date.now()
-      
-      return dissolveTimestamp > now // Still dissolving or will dissolve in future
-    }
-    
-    // If it has DissolveDelaySeconds, it's not dissolved yet
-    return true
-  }
-  
+  const isNeuronUndissolved = (neuron: any): boolean => dissolveDelaySeconds(neuron) > 0n
+
   /**
-   * Checks if a neuron has sufficient stake (at least 7 TACO)
+   * A neuron's stake as SNS governance reads it: fees already charged do not count.
    */
-  const hasSufficientStake = (neuron: any, minTacoE8s: bigint = BigInt(7_00000000)): boolean => {
-    const stake = neuron.cached_neuron_stake_e8s || BigInt(0)
-    return stake >= minTacoE8s
+  const neuronStakeE8s = (neuron: any): bigint => {
+    const stake = BigInt(neuron.cached_neuron_stake_e8s || 0) - BigInt(neuron.neuron_fees_e8s || 0)
+    return stake > 0n ? stake : 0n
   }
-  
+
   /**
    * Main eligibility check function
    */
-  const checkEligibility = async (minTacoAmount: number = 7): Promise<EligibilityResult> => {
+  const checkEligibility = async (): Promise<EligibilityResult> => {
     checking.value = true
     eligibilityChecked.value = false
     errorMessage.value = null
@@ -131,8 +139,9 @@ export function useProposalEligibility() {
         }
       }
       
-      // Check 2 & 3: Fetch neurons and check permissions and TACO amount
-      const neurons = await tacoStore.getTacoNeurons()
+      // Check 2 to 4: Fetch the requirements and neurons, then check each neuron
+      const [neurons, live] = await Promise.all([tacoStore.getTacoNeurons(), tacoStore.getProposalRequirements()])
+      requirements.value = live
       
       if (!neurons || neurons.length === 0) {
         eligibilityChecked.value = true
@@ -149,21 +158,16 @@ export function useProposalEligibility() {
       // Get user's principal
       const userPrincipalStr = tacoStore.userPrincipal
       
-      // Ensure minTacoAmount is a valid number
-      const minAmount = typeof minTacoAmount === 'number' && !isNaN(minTacoAmount) ? minTacoAmount : 7
-      const minTacoE8s = BigInt(Math.floor(minAmount * 100000000)) // Convert to e8s
-      
-      // Check each neuron for proposal permission and sufficient undissolved TACO
+      // Check each neuron for proposal permission, stake and dissolve delay
       for (const neuron of neurons) {
         const hasPermission = hasSubmitProposalPermission(neuron, userPrincipalStr)
         
         if (hasPermission) {
           hasProposalPermission.value = true
           
-          const stake = neuron.cached_neuron_stake_e8s || BigInt(0)
+          const stake = neuronStakeE8s(neuron)
           const isUndissolved = isNeuronUndissolved(neuron)
-          const meetsStakeRequirement = hasSufficientStake(neuron, minTacoE8s)
-          const meetsRequirements = isUndissolved && meetsStakeRequirement
+          const meetsRequirements = stake >= live.rejectCostE8s && dissolveDelaySeconds(neuron) >= live.minDissolveDelaySeconds
           
           if (meetsRequirements && !hasSufficientTaco.value) {
             hasSufficientTaco.value = true
@@ -205,41 +209,6 @@ export function useProposalEligibility() {
       }
     } finally {
       checking.value = false
-    }
-  }
-  
-  /**
-   * Quick check without updating refs (useful for conditional rendering)
-   */
-  const quickCheckEligibility = async (minTacoAmount: number = 7): Promise<boolean> => {
-    try {
-      if (!tacoStore.userLoggedIn) {
-        return false
-      }
-      
-      const neurons = await tacoStore.getTacoNeurons()
-      if (!neurons || neurons.length === 0) {
-        return false
-      }
-      
-      const userPrincipalStr = tacoStore.userPrincipal
-      
-      // Ensure minTacoAmount is a valid number
-      const minAmount = typeof minTacoAmount === 'number' && !isNaN(minTacoAmount) ? minTacoAmount : 7
-      const minTacoE8s = BigInt(Math.floor(minAmount * 100000000))
-      
-      for (const neuron of neurons) {
-        if (hasSubmitProposalPermission(neuron, userPrincipalStr)) {
-          if (isNeuronUndissolved(neuron) && hasSufficientStake(neuron, minTacoE8s)) {
-            return true
-          }
-        }
-      }
-      
-      return false
-    } catch (error) {
-      console.error('Error in quick eligibility check:', error)
-      return false
     }
   }
   
@@ -292,8 +261,9 @@ export function useProposalEligibility() {
     hasProposalPermission.value = false
     hasSufficientTaco.value = false
     eligibleNeurons.value = []
+    requirements.value = null
   }
-  
+
   return {
     // State
     checking,
@@ -307,12 +277,14 @@ export function useProposalEligibility() {
     
     // Methods
     checkEligibility,
-    quickCheckEligibility,
     getNeuronsWithProposalPermission,
     hasSubmitProposalPermission,
     isNeuronUndissolved,
-    hasSufficientStake,
+    dissolveDelaySeconds,
+    neuronStakeE8s,
     formatTaco,
+    requirementText,
+    rejectCostText,
     reset
   }
 }
