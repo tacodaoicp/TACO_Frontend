@@ -234,9 +234,22 @@ export function formatRangePrice(price: number, maxDecimals: number = 6): string
   if (price >= 1_000_000) return (price / 1_000_000).toFixed(2) + 'M'
   if (price >= 1_000) return (price / 1_000).toFixed(2) + 'K'
   if (price >= 1) return price.toFixed(Math.min(4, maxDecimals))
-  // Small prices: show significant digits
-  const str = price.toFixed(maxDecimals)
+  // Small prices: maxDecimals, or more when needed for 4 significant digits
+  // (a fixed 6 turned 0.000000249 into "0"). toFixed below 1 never switches
+  // to exponent notation.
+  const decimals = Math.min(100, Math.max(maxDecimals, 3 - Math.floor(Math.log10(price))))
+  const str = price.toFixed(decimals)
   return str.replace(/0+$/, '').replace(/\.$/, '')
+}
+
+/**
+ * Price labels for a chart axis, given its percent (0 to 100) to price mapping.
+ * Six evenly spaced points, or the two ends and the middle when tiny prices make
+ * the labels too long to sit six across on a phone.
+ */
+export function axisPriceLabels(pctToPrice: (pct: number) => number): string[] {
+  const labels = [0, 20, 40, 60, 80, 100].map(p => formatRangePrice(pctToPrice(p)))
+  return labels.some(l => l.length > 8) ? [0, 50, 100].map(p => formatRangePrice(pctToPrice(p))) : labels
 }
 
 /**

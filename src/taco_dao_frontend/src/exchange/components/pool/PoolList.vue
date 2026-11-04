@@ -289,6 +289,12 @@ function getDecimals(address: string): number {
 // from stats instead of this constant.
 const LP_FEE_SHARE_PCT_DEFAULT = 70
 
+// toFixed(6) would show a tiny price as 0.000000.
+function formatPoolPrice(price: number): string {
+  if (!(price > 0)) return '—'
+  return price < 0.001 ? formatRangePrice(price) : price.toFixed(6)
+}
+
 // Display-friendly APR: avoids rounding genuinely tiny-but-positive yields
 // down to "0.00 %" (which reads as "no yield" even when the pool earns fees).
 function formatAPR(apr: number): string {
@@ -427,11 +433,11 @@ async function loadPools(force = false) {
           volume24hTok1,
           reserve0Formatted: r0 > 0 ? r0.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—',
           reserve1Formatted: r1 > 0 ? r1.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—',
-          priceFormatted: price > 0 ? price.toFixed(6) : '—',
+          priceFormatted: formatPoolPrice(price),
           hasLiquidity: r0 > 0 && r1 > 0,
           isDust: (r0 > 0 || r1 > 0) && (
-            r0 < Number(store.getTokenByAddress(t0)?.minimum_amount ?? 0n) * 10 / 10 ** dec0 ||
-            r1 < Number(store.getTokenByAddress(t1)?.minimum_amount ?? 0n) * 10 / 10 ** dec1
+            r0 <= Number(store.getTokenByAddress(t0)?.minimum_amount ?? 0n) / 10 ** dec0 ||
+            r1 <= Number(store.getTokenByAddress(t1)?.minimum_amount ?? 0n) / 10 ** dec1
           ),
           currentPrice: price,
           feeRateBps: Number(stats.feeRateBps),
@@ -487,11 +493,11 @@ async function loadPools(force = false) {
             volume24hTok1: 0,
             reserve0Formatted: r0 > 0 ? r0.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—',
             reserve1Formatted: r1 > 0 ? r1.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—',
-            priceFormatted: price > 0 ? price.toFixed(6) : '—',
+            priceFormatted: formatPoolPrice(price),
             hasLiquidity: r0 > 0 && r1 > 0,
             isDust: (r0 > 0 || r1 > 0) && (
-              r0 < Number(info0.minimum_amount ?? 0n) * 10 / 10 ** dec0 ||
-              r1 < Number(info1.minimum_amount ?? 0n) * 10 / 10 ** dec1
+              r0 <= Number(info0.minimum_amount ?? 0n) / 10 ** dec0 ||
+              r1 <= Number(info1.minimum_amount ?? 0n) / 10 ** dec1
             ),
             currentPrice: price,
             feeRateBps: Number(store.tradingFeeBps),

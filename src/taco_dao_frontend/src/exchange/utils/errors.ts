@@ -273,10 +273,17 @@ export async function verifyAfterTransportError(
  */
 const AUTO_REFUND_MESSAGES = [
   'Use addLiquidity for full-range positions',
+  'Range snaps to full-range sentinel',
+  'Price below minimum representable',
   'Invalid price range',
+  'Zero liquidity for range',
   'Amounts below minimum liquidity for new pool (pre-check)',
   'Amounts below minimum liquidity for new pool',
   'Amounts below minimum liquidity for pool recreation',
+  // #TokenPaused from the V1 adds (a paused token, or an amount at or below
+  // 10x the token minimum): each deposit is queued back minus one transfer fee.
+  'Validation failed',
+  'Token paused or below minimum',
 ]
 
 /**
@@ -285,9 +292,13 @@ const AUTO_REFUND_MESSAGES = [
  * automatically" message rather than the generic recovery flow.
  */
 export function isAutoRefundError(err: any): boolean {
-  const msg = err?.InvalidInput ?? err?.InsufficientFunds
+  const msg = err?.InvalidInput ?? err?.InsufficientFunds ?? err?.TokenPaused
   if (typeof msg !== 'string') return false
-  return AUTO_REFUND_MESSAGES.some(m => msg.includes(m))
+  const m = msg.toLowerCase()
+  // The exchange could not verify a deposit block, so that deposit was NOT
+  // refunded and still needs the Recover page.
+  if (m.includes('refund could not be queued')) return false
+  return AUTO_REFUND_MESSAGES.some(s => m.includes(s.toLowerCase()))
 }
 
 /**
@@ -358,7 +369,7 @@ export function classifyExchangeError(err: any, ctx: ClassifyContext = {}): Exch
       return {
         severity: 'warning',
         title: 'Deposit method changed',
-        message: 'The exchange switched this token back to the standard deposit method. Nothing was taken from your wallet. Please try again.',
+        message: 'The exchange switched this token back to the standard deposit method. Your tokens stayed in your wallet, though an approval fee may have been charged. Please try again.',
         recoverable: true,
         action: 'retry',
       }
@@ -387,7 +398,19 @@ export function classifyExchangeError(err: any, ctx: ClassifyContext = {}): Exch
 
   if ('InvalidInput' in err) return { severity: 'error', title: 'Invalid Input', message: err.InvalidInput, recoverable: false, action: 'none' }
   if ('TokenNotAccepted' in err) return { severity: 'error', title: 'Token Not Supported', message: err.TokenNotAccepted, recoverable: false, action: 'none' }
-  if ('TokenPaused' in err) return { severity: 'warning', title: 'Token Paused', message: `Token is currently paused: ${err.TokenPaused}`, recoverable: true, action: 'wait' }
+  if ('TokenPaused' in err) {
+    const m = String(err.TokenPaused)
+    // The exchange also uses this variant for amounts that are too small. LP
+    // adds need both amounts above 10x the token minimum, orders and fills
+    // need the amount above the minimum (and the order still open).
+    if (m.startsWith('Validation failed') || m.startsWith('Token paused or below minimum')) {
+      return { severity: 'warning', title: 'Amount too small', message: 'An amount is too small or a token is paused right now. Each amount must be more than 10 times its token minimum.', recoverable: true, action: 'none' }
+    }
+    if (m.startsWith('Amount too low or token paused')) {
+      return { severity: 'warning', title: 'Amount too small', message: 'The exchange refused this trade: the amount is below its minimum, a token is paused, or the order is no longer open. Refresh and try again.', recoverable: true, action: 'none' }
+    }
+    return { severity: 'warning', title: 'Token Paused', message: `Token is currently paused: ${m}`, recoverable: true, action: 'wait' }
+  }
   if ('InsufficientFunds' in err) return { severity: 'error', title: 'Insufficient Funds', message: err.InsufficientFunds, recoverable: true, action: 'recover' }
   if ('PoolNotFound' in err) return { severity: 'error', title: 'Pool Not Found', message: 'No liquidity pool available for this pair.', recoverable: false, action: 'none' }
   if ('OrderNotFound' in err) return { severity: 'warning', title: 'Order Not Found', message: 'Order not found.', recoverable: false, action: 'none' }

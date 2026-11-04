@@ -14,6 +14,7 @@
               type="button"
               class="add-liquidity__pair-btn"
               :class="{ 'add-liquidity__pair-btn--open': pairDropdownOpen }"
+              :disabled="submitting"
               @click="pairDropdownOpen = !pairDropdownOpen"
               aria-haspopup="listbox"
               :aria-expanded="pairDropdownOpen"
@@ -77,7 +78,11 @@
               <span class="tx-ink-3">Current price</span>
               <span class="tx-mono tx-tnum">
                 <template v-if="currentPrice > 0">1 {{ symbol0 }} = {{ formatPrice(currentPrice) }} {{ symbol1 }}</template>
-                <template v-else-if="isNewPool">New pool — you set the price</template>
+                <template v-else-if="isNewPool">New pool, you set the price</template>
+                <template v-else-if="poolRead === 'failed'">
+                  Could not read this pool
+                  <button type="button" class="tx-btn tx-btn--ghost tx-btn--sm" @click="loadPoolInfo(); loadRanges()">Try again</button>
+                </template>
                 <template v-else>—</template>
               </span>
             </div>
@@ -185,7 +190,7 @@
             v-else-if="mode === 'full' && isDustPool"
             class="add-liquidity__first-deposit-warning"
           >
-            Previous pool had residual dust — will be recreated with fresh prices based on your deposit ratio.
+            This pool only has dust left, so your deposit will rebuild it at the current price.
           </div>
         </section>
       </div>
@@ -238,8 +243,11 @@
                   @click="nudgePrice('lower', -1)"
                 >−</button>
                 <input
-                  :value="formatInputPrice(displayLower)"
-                  @input="onDisplayLowerInput(($event.target as HTMLInputElement).value)"
+                  :value="lowerDraft ?? formatInputPrice(displayLower)"
+                  @focus="startPriceDraft('lower'); selectOnFocus($event)"
+                  @input="lowerDraft = ($event.target as HTMLInputElement).value"
+                  @keydown.enter="($event.target as HTMLInputElement).blur()"
+                  @blur="commitPriceDraft('lower')"
                   class="tx-mono tx-tnum add-liquidity__price-input"
                   inputmode="decimal"
                 />
@@ -262,8 +270,11 @@
                   @click="nudgePrice('upper', -1)"
                 >−</button>
                 <input
-                  :value="formatInputPrice(displayUpper)"
-                  @input="onDisplayUpperInput(($event.target as HTMLInputElement).value)"
+                  :value="upperDraft ?? formatInputPrice(displayUpper)"
+                  @focus="startPriceDraft('upper'); selectOnFocus($event)"
+                  @input="upperDraft = ($event.target as HTMLInputElement).value"
+                  @keydown.enter="($event.target as HTMLInputElement).blur()"
+                  @blur="commitPriceDraft('upper')"
                   class="tx-mono tx-tnum add-liquidity__price-input"
                   inputmode="decimal"
                 />
@@ -368,7 +379,8 @@
 
           <!-- Phase indicator -->
           <div v-if="phase !== 'idle' && phase !== 'success'" class="add-liquidity__phase">
-            <template v-if="phase === 'deposit0'">Step 1/3: Depositing {{ symbol0 }}…</template>
+            <template v-if="phase === 'checking'">Checking the pool…</template>
+            <template v-else-if="phase === 'deposit0'">Step 1/3: Depositing {{ symbol0 }}…</template>
             <template v-else-if="phase === 'deposit1'">Step 2/3: Depositing {{ symbol1 }}…</template>
             <template v-else-if="phase === 'adding'">Step 3/3: Adding liquidity…</template>
           </div>
@@ -401,6 +413,7 @@ import {
   capitalEfficiency,
   priceToRatio,
   formatRangePrice,
+  axisPriceLabels,
   ratioToHumanPrice,
   isEffectivelyFullRange,
 } from '../../utils/concentrated'
@@ -408,6 +421,8 @@ import { useExchangeAuth } from '../../composables/useExchangeAuth'
 import { useExchangeToast } from '../../composables/useExchangeToast'
 import { useTokenBalance } from '../../composables/useTokenBalance'
 import { isTransportError, verifyAfterTransportError, type VerifyStatus } from '../../utils/errors'
+import { parseTokenAmount } from '../../utils/format'
+import { withTimeout } from '../../utils/withTimeout'
 
 import CoinIcon from '../common/CoinIcon.vue'
 import PairIcon from '../common/PairIcon.vue'
@@ -469,6 +484,8 @@ const filteredPairs = computed(() => {
   return pairs.value.filter(p => p.label.toLowerCase().includes(q))
 })
 function selectPair(key: string) {
+  // The submit functions read the pair again after every await.
+  if (submitting.value) return
   selectedPair.value = key
   pairSearch.value = ''
   pairDropdownOpen.value = false
@@ -517,28 +534,41 @@ const poolInfo = ref<any>(null)
 const poolReserve0 = ref(0n)
 const poolReserve1 = ref(0n)
 const currentPrice = ref(0) // token1-per-token0
+// Reserves and price stay 0 until a read answers. Only a reply can say the pair has no pool.
+const poolRead = ref<'loading' | 'failed' | 'loaded'>('loading')
 
 async function loadPoolInfo() {
-  if (!token0.value || !token1.value) return
+  const t0 = token0.value
+  const t1 = token1.value
+  if (!t0 || !t1) return
+  const firstRead = poolRead.value !== 'loaded'
+  if (firstRead) poolRead.value = 'loading'
   try {
-    const raw = await store.getAMMPoolInfo(token0.value, token1.value)
+    const raw = await withTimeout(store.getAMMPoolInfo(t0, t1), 10_000, 'getAMMPoolInfo')
+    // A reply for a pair the user already left must not land on the new one.
+    if (t0 !== token0.value || t1 !== token1.value) return
+    poolRead.value = 'loaded'
     const p = Array.isArray(raw) ? raw[0] ?? null : raw
     if (p && 'reserve0' in (p as any)) {
       poolInfo.value = p
       const pp = p as any
-      if (pp.token0 === token0.value) {
-        poolReserve0.value = pp.reserve0
-        poolReserve1.value = pp.reserve1
-      } else {
-        poolReserve0.value = pp.reserve1
-        poolReserve1.value = pp.reserve0
-      }
-      currentPrice.value = pp.price0 || 0
-      // Default concentrated range: ±25% of current price (only if unset)
-      if (currentPrice.value > 0 && priceLower.value <= 0) {
+      // The exchange answers in the pool's own order: price0 is its token1 per
+      // its token0, price1 the inverse. The pair picker can list the pool the
+      // other way round, so read the side that means this page's token1 per token0.
+      const sameOrder = pp.token0 === t0
+      const hadPrice = currentPrice.value > 0
+      poolReserve0.value = sameOrder ? pp.reserve0 : pp.reserve1
+      poolReserve1.value = sameOrder ? pp.reserve1 : pp.reserve0
+      currentPrice.value = (sameOrder ? pp.price0 : pp.price1) || 0
+      // Default concentrated range when a price first arrives: ±25% of it (only if
+      // unset). A later read must not replace the Full Range button's unbounded range.
+      if (!hadPrice && currentPrice.value > 0 && priceLower.value <= 0) {
         priceLower.value = currentPrice.value * 0.75
         priceUpper.value = currentPrice.value * 1.25
       }
+      // An amount typed before the price arrived never got its pair filled in. Later
+      // reads leave the amounts alone (see submit).
+      if (firstRead) repairAmounts()
     } else {
       poolInfo.value = null
       poolReserve0.value = 0n
@@ -546,19 +576,23 @@ async function loadPoolInfo() {
       currentPrice.value = 0
     }
   } catch {
-    poolInfo.value = null
-    poolReserve0.value = 0n
-    poolReserve1.value = 0n
-    currentPrice.value = 0
+    if (t0 !== token0.value || t1 !== token1.value) return
+    // A failed read must not look like a new pool, and must not undo a good read.
+    if (poolRead.value !== 'loaded') poolRead.value = 'failed'
   }
 }
 
-const isNewPool = computed(() => poolReserve0.value === 0n && poolReserve1.value === 0n)
+// The pool stores this pair the other way round (its token0 is this page's token1).
+const poolReversed = computed(() => !!poolInfo.value && (poolInfo.value as any).token0 !== token0.value)
+
+const isNewPool = computed(() => poolRead.value === 'loaded' && poolReserve0.value === 0n && poolReserve1.value === 0n)
 const isDustPool = computed(() => {
-  if (isNewPool.value) return false
-  const min0 = (info0.value?.minimum_amount ?? 0n) * 10n
-  const min1 = (info1.value?.minimum_amount ?? 0n) * 10n
-  return poolReserve0.value < min0 || poolReserve1.value < min1
+  if (poolRead.value !== 'loaded' || isNewPool.value) return false
+  // Same test as the exchange (addLiquidity needsNewPool): a side at or below
+  // 1x its token minimum gets the pool rebuilt.
+  const min0 = info0.value?.minimum_amount ?? 0n
+  const min1 = info1.value?.minimum_amount ?? 0n
+  return poolReserve0.value <= min0 || poolReserve1.value <= min1
 })
 const shouldUseInitial = computed(() => isNewPool.value || isDustPool.value)
 
@@ -580,6 +614,24 @@ function bigIntToDecimal(amount: bigint, decimals: number, maxFrac: number): str
   if (maxFrac === 0) return whole.toString()
   const fracStr = frac.toString().padStart(decimals, '0').slice(0, maxFrac)
   return `${whole}.${fracStr}`
+}
+// Typed amount to raw units, exactly. Anything that is not a plain number reads as 0.
+function toRaw(s: string, decimals: number): bigint {
+  try { return parseTokenAmount((s || '').trim() || '0', decimals) } catch { return 0n }
+}
+function trimZeros(s: string): string {
+  return s.includes('.') ? s.replace(/\.?0+$/, '') : s
+}
+// A raw amount as exact decimal text (0.01, not 0.01000000 or 1e-13).
+function fmtExact(raw: bigint, decimals: number): string {
+  return trimZeros(bigIntToDecimal(raw, decimals, decimals))
+}
+// Paired amounts keep up to 12 decimals (never more than the token has) and
+// at most 15 significant digits. A fixed 6 decimals turned a tiny leg such as
+// 0.0000003163 ckBTC into "0.000000", which went out as a zero amount.
+function fmtPaired(v: number, decimals: number): string {
+  const intDigits = v >= 1 ? Math.floor(Math.log10(v)) + 1 : 0
+  return trimZeros(v.toFixed(Math.max(0, Math.min(decimals, 12, 15 - intDigits))))
 }
 function onlyNumbers(e: KeyboardEvent) {
   if (e.key !== '.' && (e.key < '0' || e.key > '9')) e.preventDefault()
@@ -613,12 +665,11 @@ function onAmount0Change() {
     const pl = priceLower.value > 0 ? priceLower.value : 0.0001
     const pu = priceUpper.value
     const r = calculateAmounts(a0, true, currentPrice.value, pl, pu)
-    amount1.value = r.amount1 > 0 ? r.amount1.toFixed(Math.min(decimals1.value, 6)) : '0'
+    amount1.value = r.amount1 > 0 ? fmtPaired(r.amount1, decimals1.value) : '0'
   } else {
-    if (isNewPool.value || poolReserve0.value === 0n) return
-    const a1 = a0 * Number(poolReserve1.value) / Number(poolReserve0.value)
-      * (10 ** decimals0.value) / (10 ** decimals1.value)
-    amount1.value = a1.toFixed(Math.min(decimals1.value, 6))
+    const rate = fullRangeRate()
+    if (rate <= 0) return
+    amount1.value = fmtPaired(a0 * rate, decimals1.value)
   }
 }
 function onAmount1Change() {
@@ -629,13 +680,17 @@ function onAmount1Change() {
     const pl = priceLower.value > 0 ? priceLower.value : 0.0001
     const pu = priceUpper.value
     const r = calculateAmounts(a1, false, currentPrice.value, pl, pu)
-    amount0.value = r.amount0 > 0 ? r.amount0.toFixed(Math.min(decimals0.value, 6)) : '0'
+    amount0.value = r.amount0 > 0 ? fmtPaired(r.amount0, decimals0.value) : '0'
   } else {
-    if (isNewPool.value || poolReserve1.value === 0n) return
-    const a0 = a1 * Number(poolReserve0.value) / Number(poolReserve1.value)
-      * (10 ** decimals1.value) / (10 ** decimals0.value)
-    amount0.value = a0.toFixed(Math.min(decimals0.value, 6))
+    const rate = fullRangeRate()
+    if (rate <= 0) return
+    amount0.value = fmtPaired(a1 / rate, decimals0.value)
   }
+}
+// Recompute the paired amount from whichever side holds an amount.
+function repairAmounts() {
+  if (parseFloat(amount0.value) > 0) onAmount0Change()
+  else if (parseFloat(amount1.value) > 0) onAmount1Change()
 }
 
 // ── Concentrated range state (absolute prices) ────────────────────
@@ -659,10 +714,10 @@ const displayCurrentPrice = computed(() =>
 )
 
 const token0Disabled = computed(() =>
-  currentPrice.value > 0 && currentPrice.value >= priceUpper.value,
+  mode.value === 'concentrated' && currentPrice.value > 0 && currentPrice.value >= priceUpper.value,
 )
 const token1Disabled = computed(() =>
-  currentPrice.value > 0 && priceLower.value > 0 && currentPrice.value <= priceLower.value,
+  mode.value === 'concentrated' && currentPrice.value > 0 && priceLower.value > 0 && currentPrice.value <= priceLower.value,
 )
 
 const efficiencyMultiplier = computed(() => {
@@ -703,8 +758,7 @@ const chartMaxPct = computed(() => priceToPct(displayUpper.value))
 const chartAxisLabels = computed<string[]>(() => {
   const base = displayCurrentPrice.value
   if (base <= 0) return ['', '', '', '', '', '']
-  // 6 evenly-spaced points from 0% to 100%
-  return [0, 20, 40, 60, 80, 100].map(p => formatRangePrice(pctToPrice(p)))
+  return axisPriceLabels(pctToPrice)
 })
 
 // ── Real on-chain liquidity density for the curve ────────────────
@@ -712,16 +766,31 @@ const chartAxisLabels = computed<string[]>(() => {
 // the same pct-space the handles use, so bars and handles line up.
 const rangesRaw = ref<Array<any>>([])
 async function loadRanges() {
-  if (!token0.value || !token1.value) {
+  const t0 = token0.value
+  const t1 = token1.value
+  if (!t0 || !t1) {
     rangesRaw.value = []
     return
   }
   try {
-    const raw = await store.getPoolRanges(token0.value, token1.value)
+    const raw = await store.getPoolRanges(t0, t1)
+    if (t0 !== token0.value || t1 !== token1.value) return
     rangesRaw.value = Array.isArray(raw) ? raw : []
   } catch {
+    if (t0 !== token0.value || t1 !== token1.value) return
     rangesRaw.value = []
   }
+}
+// Token1 per token0 for full range pairing, 0 when there is nothing to pair with.
+// The exchange fills a full range add at the reserve ratio of the pool's full range
+// book. A dust pool, or a pool whose ranges show no such book, takes the deposit at
+// any ratio and keeps its price, and its reserves say nothing about it: pair at the price.
+const noFullRangeBook = computed(() => rangesRaw.value.length > 0 && !rangesRaw.value.some(r => isEffectivelyFullRange(r.ratioLower, r.ratioUpper)))
+function fullRangeRate(): number {
+  if (isNewPool.value) return 0
+  if (currentPrice.value > 0 && (isDustPool.value || noFullRangeBook.value)) return currentPrice.value
+  if (poolReserve0.value === 0n) return 0
+  return Number(poolReserve1.value) / Number(poolReserve0.value) * (10 ** decimals0.value) / (10 ** decimals1.value)
 }
 
 // V3-style "TVL by price" curve: for each chart column we sum the dollar
@@ -773,6 +842,15 @@ const realLiquidityBars = computed<LiquidityBar[]>(() => {
     if (isEffectivelyFullRange(r.ratioLower, r.ratioUpper)) {
       paN = 0
       pbN = Infinity
+    } else if (poolReversed.value) {
+      // getPoolRanges answers in the pool's own order: decode with the pool's
+      // decimals (its token0 is this page's token1), then flip to this page's
+      // token1 per token0.
+      const lo = ratioToHumanPrice(r.ratioLower, decimals1.value, decimals0.value)
+      const hi = ratioToHumanPrice(r.ratioUpper, decimals1.value, decimals0.value)
+      if (!isFinite(lo) || lo <= 0 || hi <= lo) continue
+      paN = 1 / hi
+      pbN = 1 / lo
     } else {
       paN = ratioToHumanPrice(r.ratioLower, decimals0.value, decimals1.value)
       pbN = ratioToHumanPrice(r.ratioUpper, decimals0.value, decimals1.value)
@@ -820,7 +898,7 @@ function setPriceLowerFromDisplay(dispVal: number) {
   } else {
     priceLower.value = dispVal
   }
-  onAmount0Change()
+  repairAmounts()
 }
 function setPriceUpperFromDisplay(dispVal: number) {
   if (inverted.value) {
@@ -828,7 +906,7 @@ function setPriceUpperFromDisplay(dispVal: number) {
   } else {
     priceUpper.value = !isFinite(dispVal) || dispVal <= 0 ? Infinity : dispVal
   }
-  onAmount0Change()
+  repairAmounts()
 }
 // Drag handler: when the handle hits the edge, widen the chart slightly
 // each move event so the user can keep dragging to extend the range.
@@ -848,17 +926,53 @@ function onChartMaxPct(pct: number) {
   if (pct >= 99.5) widenAtEdge()
   setPriceUpperFromDisplay(pctToPrice(pct))
 }
-function onDisplayLowerInput(raw: string) {
-  const v = parseFloat(raw)
-  if (!isFinite(v)) return
-  setPriceLowerFromDisplay(v)
-  ensureRangeFits(displayLower.value)
+// Typed prices stay as text while the field has focus and apply on blur or
+// Enter. Applying each keystroke rewrote the field with the formatted value
+// ("3.0000", "∞", "23.18K"), and parseFloat read "23.18K" as 23.18.
+const lowerDraft = ref<string | null>(null)
+const upperDraft = ref<string | null>(null)
+let draftStart = ''
+// Plain digits for the focused field: no K/M suffix, no grouping, no exponent.
+function plainPrice(v: number): string {
+  if (!isFinite(v) || v <= 0) return ''
+  return v.toLocaleString('en-US', { maximumSignificantDigits: 8, useGrouping: false })
 }
-function onDisplayUpperInput(raw: string) {
-  const v = parseFloat(raw)
-  if (!isFinite(v)) return
-  setPriceUpperFromDisplay(v)
-  ensureRangeFits(displayUpper.value)
+function startPriceDraft(which: 'lower' | 'upper') {
+  draftStart = plainPrice(which === 'lower' ? displayLower.value : displayUpper.value)
+  if (which === 'lower') lowerDraft.value = draftStart
+  else upperDraft.value = draftStart
+}
+// Typing right after Tab or a click must replace the old price. Writing the draft
+// clears the browser's select all and a mouse press then sets a caret, so select
+// once both are done.
+function selectOnFocus(e: FocusEvent) {
+  const el = e.target as HTMLInputElement
+  setTimeout(() => { if (document.activeElement === el) el.setSelectionRange(0, el.value.length) })
+}
+// A lone comma is a decimal comma ("0,0098"), never a thousands separator, and
+// a K or M suffix (as the field shows without focus) scales the number.
+function parsePriceText(raw: string): number {
+  let s = raw.trim()
+  if (!s.includes('.') && s.indexOf(',') === s.lastIndexOf(',')) s = s.replace(',', '.')
+  const m = /^(\d*\.?\d+|\d+\.)([kKmM]?)$/.exec(s)
+  if (!m) return NaN
+  return parseFloat(m[1]) * (m[2] === '' ? 1 : /k/i.test(m[2]) ? 1e3 : 1e6)
+}
+function commitPriceDraft(which: 'lower' | 'upper') {
+  const raw = which === 'lower' ? lowerDraft.value : upperDraft.value
+  if (which === 'lower') lowerDraft.value = null
+  else upperDraft.value = null
+  // Untouched: keep the exact price (and any nudge made meanwhile), not its 8 digit text.
+  if (raw == null || raw === draftStart) return
+  const v = parsePriceText(raw)
+  if (!isFinite(v) || v <= 0) return
+  if (which === 'lower') {
+    setPriceLowerFromDisplay(v)
+    ensureRangeFits(displayLower.value)
+  } else {
+    setPriceUpperFromDisplay(v)
+    ensureRangeFits(displayUpper.value)
+  }
 }
 function nudgePrice(which: 'lower' | 'upper', dir: 1 | -1) {
   const step = 1.01 ** dir // 1% step
@@ -887,13 +1001,13 @@ function applyPresetPct(pct: number) {
   const frac = pct / 100
   priceLower.value = currentPrice.value * (1 - frac)
   priceUpper.value = currentPrice.value * (1 + frac)
-  onAmount0Change()
+  repairAmounts()
 }
 function applyAutoRange() {
   if (currentPrice.value <= 0) return
   priceLower.value = currentPrice.value * 0.75
   priceUpper.value = currentPrice.value * 1.25
-  onAmount0Change()
+  repairAmounts()
 }
 function applyFullRangeInConcentrated() {
   // Sentinel for unbounded; the submit handler redirects to full-range flow
@@ -904,7 +1018,8 @@ function applyFullRangeInConcentrated() {
 }
 
 // ── Phase / error / recovery state ────────────────────────────────
-const phase = ref<'idle' | 'deposit0' | 'deposit1' | 'adding' | 'success'>('idle')
+const phase = ref<'idle' | 'checking' | 'deposit0' | 'deposit1' | 'adding' | 'success'>('idle')
+const submitting = computed(() => phase.value !== 'idle' && phase.value !== 'success')
 const error = ref('')
 const recoveryInfo = ref('')
 const lpMinted = ref('')
@@ -940,13 +1055,15 @@ function loadPendingDeposit() {
 
 // ── Submit ────────────────────────────────────────────────────────
 const canSubmit = computed(() => {
-  if (!selectedPair.value || !store.isAuthenticated) return false
-  if (phase.value !== 'idle' && phase.value !== 'success') return false
+  if (!selectedPair.value || !store.isAuthenticated || poolRead.value !== 'loaded') return false
+  if (submitting.value) return false
   const a0 = parseFloat(amount0.value)
   const a1 = parseFloat(amount1.value)
   if (mode.value === 'concentrated') {
-    if (token0Disabled.value) return a1 > 0
-    if (token1Disabled.value) return a0 > 0
+    // Every add needs both amounts above 10x their token minimum (V1 and V2).
+    // A range that leaves out the current price holds only one token, so the
+    // exchange always refuses it. A zero leg is refused on submit, with a reason.
+    if (priceUpper.value <= priceLower.value || token0Disabled.value || token1Disabled.value) return false
     return a0 > 0 || a1 > 0
   }
   return a0 > 0 && a1 > 0
@@ -954,17 +1071,47 @@ const canSubmit = computed(() => {
 
 const submitLabel = computed(() => {
   if (!store.isAuthenticated) return 'Connect Wallet'
-  if (phase.value === 'deposit0' || phase.value === 'deposit1' || phase.value === 'adding') return 'Processing…'
+  if (submitting.value) return 'Processing…'
   if (!selectedPair.value) return 'Select a pair'
+  if (poolRead.value === 'loading') return 'Loading pool…'
+  if (poolRead.value === 'failed') return 'Could not read this pool'
   if (mode.value === 'full') {
     if (isNewPool.value) return 'Create Pool'
     if (isDustPool.value) return 'Recreate Pool'
     return 'Add Liquidity (Full Range)'
   }
+  if (priceUpper.value <= priceLower.value) return 'Min price must be below max price'
+  if (token0Disabled.value || token1Disabled.value) return 'Range must include the current price'
   return 'Add Liquidity'
 })
 
+// Symbol of a token the exchange has paused (it refuses adds with it), or ''.
+function pausedSymbol(): string {
+  if (store.isTokenPaused(token0.value)) return symbol0.value
+  if (store.isTokenPaused(token1.value)) return symbol1.value
+  return ''
+}
+// V1 refusals queue each deposit back to the wallet, minus one ledger fee.
+const REFUND_NOTE = 'Your deposit is on its way back to your wallet, minus a network fee for each token.'
+
 async function submit() {
+  if (poolRead.value !== 'loaded') return
+  // Read the pool again before any funds move: the page may have been open for a
+  // while, and the range and new pool checks go by this. phase blocks the button
+  // and the picker meanwhile. A failed read keeps the last good state.
+  error.value = ''
+  const before = currentPrice.value
+  phase.value = 'checking'
+  await loadPoolInfo()
+  phase.value = 'idle'
+  // Never send amounts the user has not seen: if the price really moved, pair again
+  // and let them look. A smaller move only comes back as a small refund.
+  const after = currentPrice.value
+  if (before > 0 ? Math.abs(after / before - 1) > 0.005 : after > 0) {
+    repairAmounts()
+    error.value = 'The price moved. Check your amounts and try again.'
+    return
+  }
   if (mode.value === 'concentrated') await submitConcentrated()
   else await submitFullRange()
 }
@@ -972,16 +1119,21 @@ async function submit() {
 async function submitFullRange() {
   error.value = ''
   recoveryInfo.value = ''
-  const a0Raw = BigInt(Math.round(parseFloat(amount0.value) * 10 ** decimals0.value))
-  const a1Raw = BigInt(Math.round(parseFloat(amount1.value) * 10 ** decimals1.value))
+  const a0Raw = toRaw(amount0.value, decimals0.value)
+  const a1Raw = toRaw(amount1.value, decimals1.value)
+  const paused = pausedSymbol()
+  if (paused) {
+    error.value = `${paused} is paused on the exchange right now. Try again later.`
+    return
+  }
   const min0 = info0.value?.minimum_amount ?? 0n
   const min1 = info1.value?.minimum_amount ?? 0n
   if (a0Raw <= min0 * 10n) {
-    error.value = `${symbol0.value} amount too low. Must be > ${Number(min0 * 10n) / 10 ** decimals0.value}`
+    error.value = `${symbol0.value} amount must be more than ${fmtExact(min0 * 10n, decimals0.value)}`
     return
   }
   if (a1Raw <= min1 * 10n) {
-    error.value = `${symbol1.value} amount too low. Must be > ${Number(min1 * 10n) / 10 ** decimals1.value}`
+    error.value = `${symbol1.value} amount must be more than ${fmtExact(min1 * 10n, decimals1.value)}`
     return
   }
 
@@ -1008,6 +1160,17 @@ async function submitFullRange() {
     }
     if (balance1.value < a1Raw + fee1 * 2n) {
       error.value = `Not enough ${symbol1.value} to cover the deposit plus fees`
+      return
+    }
+  } else {
+    // V1 sends each token as its own transfer (amount plus one ledger fee).
+    // Check both before the first moves, so the second cannot fail after it.
+    if (balance0.value < a0Raw + fee0) {
+      error.value = `Not enough ${symbol0.value} to cover the deposit plus the network fee`
+      return
+    }
+    if (balance1.value < a1Raw + fee1) {
+      error.value = `Not enough ${symbol1.value} to cover the deposit plus the network fee`
       return
     }
   }
@@ -1116,9 +1279,15 @@ async function submitFullRange() {
         clearPendingDeposit()
         if (block0 != null) removeDepositFromCache(block0.toString(), token0.value)
         if (block1 != null) removeDepositFromCache(block1.toString(), token1.value)
-        error.value = 'Transaction rejected — your tokens are being refunded automatically.'
+        // Our own copy: the exchange's text is internal and has dashes. Besides
+        // #TokenPaused, the full range refusals are the pool minimum liquidity checks.
+        const why = 'TokenPaused' in result.Err
+          ? classifyExchangeError(result.Err).message
+          : 'These amounts are too small to start this pool.'
+        error.value = `${why} ${REFUND_NOTE}`
         phase.value = 'idle'
-        toast.info('Auto-Refund', 'Transaction rejected — your tokens are being refunded automatically.')
+        toast.info('Refund on its way', REFUND_NOTE)
+        void store.refreshAfterMutation('lp')
       } else {
         const classified = classifyExchangeError(result.Err)
         error.value = classified.message
@@ -1155,13 +1324,13 @@ async function submitFullRange() {
         amount0.value = ''
         amount1.value = ''
         void store.refreshAfterMutation('lp')
-        toast.success('Liquidity Added', 'Network hiccup during submit — confirmed via query.')
+        toast.success('Liquidity Added', 'The network dropped the reply, but your liquidity was added.')
         return
       }
       if (v2) {
         error.value = 'Network issue during submit. Check your positions and the Recover page before retrying.'
       } else {
-        error.value = 'Network issue during submit — refresh to verify before retrying.'
+        error.value = 'Network issue during submit. Refresh to check before retrying.'
         recoveryInfo.value = `If the deposits went through, their blocks are:\n` +
           `• ${symbol0.value}: block ${block0!.toString()}\n` +
           `• ${symbol1.value}: block ${block1!.toString()}\n` +
@@ -1185,35 +1354,57 @@ async function submitFullRange() {
 async function submitConcentrated() {
   error.value = ''
   recoveryInfo.value = ''
-  const a0Raw = BigInt(Math.round(parseFloat(amount0.value || '0') * 10 ** decimals0.value))
-  const a1Raw = BigInt(Math.round(parseFloat(amount1.value || '0') * 10 ** decimals1.value))
+  const a0Raw = toRaw(amount0.value, decimals0.value)
+  const a1Raw = toRaw(amount1.value, decimals1.value)
   if (a0Raw <= 0n && a1Raw <= 0n) {
     error.value = 'Enter an amount'
-    return
-  }
-  const min0 = (info0.value?.minimum_amount ?? 0n) * 10n
-  const min1 = (info1.value?.minimum_amount ?? 0n) * 10n
-  if (a0Raw > 0n && a0Raw < min0) {
-    error.value = `Minimum LP deposit for ${symbol0.value} is ${Number(min0) / 10 ** decimals0.value}`
-    return
-  }
-  if (a1Raw > 0n && a1Raw < min1) {
-    error.value = `Minimum LP deposit for ${symbol1.value} is ${Number(min1) / 10 ** decimals1.value}`
     return
   }
   if (priceLower.value <= 0 || !isFinite(priceUpper.value) || priceUpper.value <= priceLower.value) {
     error.value = 'Set a bounded price range. For unbounded positions, switch to Full Range.'
     return
   }
+  // V1 and V2 both refuse ("Validation failed") unless BOTH amounts are above
+  // 10x their token minimum, and on V1 only after the deposits went in.
+  if (token0Disabled.value || token1Disabled.value) {
+    error.value = 'This range does not include the current price, so it would hold only one token. The exchange needs both tokens in every position. Move the range so it covers the current price, or use Full Range.'
+    return
+  }
+  if (a0Raw <= 0n || a1Raw <= 0n) {
+    error.value = `Enter an amount for both ${symbol0.value} and ${symbol1.value}.`
+    return
+  }
+  const paused = pausedSymbol()
+  if (paused) {
+    error.value = `${paused} is paused on the exchange right now. Try again later.`
+    return
+  }
+  // Strictly more than 10x the minimum: exactly 10x is refused.
+  const min0 = (info0.value?.minimum_amount ?? 0n) * 10n
+  const min1 = (info1.value?.minimum_amount ?? 0n) * 10n
+  if (a0Raw <= min0) {
+    error.value = `${symbol0.value} amount must be more than ${fmtExact(min0, decimals0.value)}`
+    return
+  }
+  if (a1Raw <= min1) {
+    error.value = `${symbol1.value} amount must be more than ${fmtExact(min1, decimals1.value)}`
+    return
+  }
+  // New pool: the exchange sets the starting price from the two amounts, and
+  // a position counts as in range only strictly between its bounds.
+  if (currentPrice.value <= 0) {
+    const implied = parseFloat(amount1.value) / parseFloat(amount0.value)
+    if (!(implied > priceLower.value && implied < priceUpper.value)) {
+      error.value = `These amounts set a starting price of ${formatPrice(implied)} ${symbol1.value} per ${symbol0.value}, which is outside your range. Change the amounts or the range.`
+      return
+    }
+  }
   const ratioLower = priceToRatio(priceLower.value, decimals0.value, decimals1.value)
   const ratioUpper = priceToRatio(priceUpper.value, decimals0.value, decimals1.value)
 
-  // Path decided ONCE per action. LP V2 needs BOTH tokens allowlisted AND
-  // both legs present: the backend's refundability floor (each leg must
-  // exceed 3x its transfer fee) refuses zero legs, so one-sided adds stay
-  // on the V1 path.
-  const v2 = a0Raw > 0n && a1Raw > 0n
-    && store.useV2Deposit(token0.value) && store.useV2Deposit(token1.value)
+  // Path decided ONCE per action. LP V2 needs BOTH tokens allowlisted; both
+  // amounts are always present by now.
+  const v2 = store.useV2Deposit(token0.value) && store.useV2Deposit(token1.value)
   const fee0 = info0.value?.transfer_fee ?? 0n
   const fee1 = info1.value?.transfer_fee ?? 0n
   if (v2) {
@@ -1233,6 +1424,17 @@ async function submitConcentrated() {
     }
     if (balance1.value < a1Raw + fee1 * 2n) {
       error.value = `Not enough ${symbol1.value} to cover the deposit plus fees`
+      return
+    }
+  } else {
+    // V1 sends each token as its own transfer (amount plus one ledger fee).
+    // Check both before the first moves, so the second cannot fail after it.
+    if (balance0.value < a0Raw + fee0) {
+      error.value = `Not enough ${symbol0.value} to cover the deposit plus the network fee`
+      return
+    }
+    if (balance1.value < a1Raw + fee1) {
+      error.value = `Not enough ${symbol1.value} to cover the deposit plus the network fee`
       return
     }
   }
@@ -1328,15 +1530,22 @@ async function submitConcentrated() {
       if ('SystemError' in result.Err) void store.refreshAfterMutation('lp')
     } else {
       const { classifyExchangeError, isAutoRefundError } = await import('../../utils/errors')
+      const classified = classifyExchangeError(result.Err)
       if (isAutoRefundError(result.Err)) {
         if (block0 > 0n) removeDepositFromCache(block0.toString(), token0.value)
         if (block1 > 0n) removeDepositFromCache(block1.toString(), token1.value)
-        error.value = 'Transaction rejected — your tokens are being refunded automatically.'
+        // Our own copy: the exchange's text is internal and has dashes. Besides
+        // #TokenPaused, the concentrated refusals are all about the price range.
+        const why = 'TokenPaused' in result.Err
+          ? classified.message
+          : 'The exchange could not use this price range.'
+        error.value = `${why} ${REFUND_NOTE}`
         phase.value = 'idle'
-        toast.info('Auto-Refund', 'Transaction rejected — your tokens are being refunded automatically.')
+        toast.info('Refund on its way', REFUND_NOTE)
+        void store.refreshAfterMutation('lp')
       } else {
-        const classified = classifyExchangeError(result.Err)
         error.value = classified.message
+        recoveryInfo.value = 'If your balance went down, get the deposit back on the Recover page.'
         phase.value = 'idle'
         toast.error('Add Liquidity Failed', classified.message)
       }
@@ -1361,17 +1570,21 @@ async function submitConcentrated() {
         amount0.value = ''
         amount1.value = ''
         void store.refreshAfterMutation('lp')
-        toast.success('Position Created', 'Network hiccup during submit — confirmed via query.')
+        toast.success('Position Created', 'The network dropped the reply, but your position was created.')
         return
       }
       error.value = v2
         ? 'Network issue during submit. Check your positions and the Recover page before retrying.'
-        : 'Network issue during submit — refresh to verify before retrying.'
+        : 'Network issue during submit. Refresh to check before retrying.'
       phase.value = 'idle'
       toast.warning('Network issue', error.value)
       return
     }
     error.value = err.message || 'Failed to add liquidity'
+    // A V1 deposit already in the treasury stays there until it is recovered.
+    if (!v2 && !submitted && (block0 > 0n || block1 > 0n)) {
+      recoveryInfo.value = 'A deposit went through before this failed. You can get it back on the Recover page.'
+    }
     phase.value = 'idle'
     toast.error('Add Liquidity Failed', error.value)
   }
@@ -1482,10 +1695,18 @@ watch(selectedPair, () => {
   poolReserve0.value = 0n
   poolReserve1.value = 0n
   currentPrice.value = 0
+  poolRead.value = 'loading'
   rangesRaw.value = []
   chartRange.value = CHART_RANGE_DEFAULT
   loadPoolInfo()
   loadRanges()
+})
+// The user's own add or swap changes the pool.
+const offPoolMutation = store.onMutation((kind) => {
+  if (kind === 'swap' || kind === 'lp') {
+    void loadPoolInfo()
+    void loadRanges()
+  }
 })
 
 // If the caller didn't preselect a pair, default to TACO/ICP once the
@@ -1522,6 +1743,7 @@ onMounted(() => {
 })
 onUnmounted(() => {
   document.removeEventListener('click', onPairOutside)
+  offPoolMutation()
 })
 </script>
 
@@ -1574,6 +1796,7 @@ onUnmounted(() => {
 
     &:hover,
     &--open { border-color: var(--tx-line-hi); }
+    &:disabled { cursor: not-allowed; opacity: 0.6; }
   }
   &__pair-label {
     flex: 1;

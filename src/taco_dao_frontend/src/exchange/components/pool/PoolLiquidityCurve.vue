@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useExchangeStore } from '../../store/exchange.store'
-import { ratioToHumanPrice, isEffectivelyFullRange, formatRangePrice } from '../../utils/concentrated'
+import { ratioToHumanPrice, isEffectivelyFullRange, axisPriceLabels } from '../../utils/concentrated'
 import LiquidityCurve, { type LiquidityBar } from '../common/LiquidityCurve.vue'
 
 const props = defineProps<{
@@ -138,12 +138,10 @@ const bars = computed<LiquidityBar[]>(() => {
   return out
 })
 
-// 6 evenly-spaced price labels across the chart range.
+// Evenly spaced price labels across the chart range.
 const axisLabels = computed<string[]>(() => {
   if (props.currentPrice <= 0) return []
-  return [0, 20, 40, 60, 80, 100].map(p =>
-    formatRangePrice(pctToPrice(p, props.currentPrice)),
-  )
+  return axisPriceLabels(p => pctToPrice(p, props.currentPrice))
 })
 
 watch(() => `${props.token0}|${props.token1}`, () => {
