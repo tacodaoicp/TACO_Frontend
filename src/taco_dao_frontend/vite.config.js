@@ -8,6 +8,7 @@ import { vendorChunks, checkVendorChunk } from './build/vendor-chunk.js';
 import latin1Output from './build/latin1-output.js';
 import faSubset from './build/fonts.mjs';
 import pagePrefetch from './build/page-prefetch.js';
+import candidIntDecode from './build/candid-int-decode.js';
 
 // Load base .env first, then environment-specific overrides
 dotenv.config({ path: '../../.env' });
@@ -48,12 +49,14 @@ export default defineConfig({
   worker: {
     format: 'es',
     plugins: [
+      candidIntDecode(),
       environment('all', { prefix: 'CANISTER_' }),
       environment('all', { prefix: 'DFX_' }),
       latin1Output(),
     ],
   },
   plugins: [
+    candidIntDecode(),
     vue(),
     faSubset(),
     environment('all', { prefix: 'CANISTER_' }),
