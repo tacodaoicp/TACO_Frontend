@@ -282,6 +282,9 @@ const AUTO_REFUND_MESSAGES = [
   'Amounts below minimum liquidity for new pool (pre-check)',
   'Amounts below minimum liquidity for new pool',
   'Amounts below minimum liquidity for pool recreation',
+  // One token adds: a range that holds the price, or a price that moved into it.
+  'One-sided add: the range must lie entirely',
+  'Price moved into the range',
   // #TokenPaused from the V1 adds (a paused token, or an amount at or below
   // 10x the token minimum): each deposit is queued back minus one transfer fee.
   'Validation failed',

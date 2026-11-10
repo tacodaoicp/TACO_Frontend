@@ -192,6 +192,13 @@
           >
             This pool only has dust left, so your deposit will rebuild it at the current price.
           </div>
+          <div
+            v-else-if="mode === 'concentrated' && (token0Disabled || token1Disabled)"
+            class="add-liquidity__one-side-note"
+          >
+            This range doesn't include the current price, so it takes only {{ token1Disabled ? symbol0 : symbol1 }}.
+            It earns fees once the price moves into the range.
+          </div>
         </section>
       </div>
 
@@ -687,8 +694,11 @@ function onAmount1Change() {
     amount0.value = fmtPaired(a1 / rate, decimals0.value)
   }
 }
-// Recompute the paired amount from whichever side holds an amount.
+// Recompute the paired amount from whichever side holds an amount. A side the
+// range doesn't use is cleared first, so it can't count in the totals.
 function repairAmounts() {
+  if (token0Disabled.value) amount0.value = ''
+  if (token1Disabled.value) amount1.value = ''
   if (parseFloat(amount0.value) > 0) onAmount0Change()
   else if (parseFloat(amount1.value) > 0) onAmount1Change()
 }
@@ -718,6 +728,15 @@ const token0Disabled = computed(() =>
 )
 const token1Disabled = computed(() =>
   mode.value === 'concentrated' && currentPrice.value > 0 && priceLower.value > 0 && currentPrice.value <= priceLower.value,
+)
+
+// The exchange takes one token only strictly outside the range, after rounding
+// the bounds down by up to 0.1%. Keep 0.5% clear of the price, so a small move
+// before the add lands can't turn it into a refund.
+const ONE_SIDE_MARGIN = 0.005
+const tooCloseToPrice = computed(() =>
+  (token1Disabled.value && currentPrice.value > priceLower.value * (1 - ONE_SIDE_MARGIN)) ||
+  (token0Disabled.value && currentPrice.value < priceUpper.value * (1 + ONE_SIDE_MARGIN)),
 )
 
 const efficiencyMultiplier = computed(() => {
@@ -1060,10 +1079,11 @@ const canSubmit = computed(() => {
   const a0 = parseFloat(amount0.value)
   const a1 = parseFloat(amount1.value)
   if (mode.value === 'concentrated') {
-    // Every add needs both amounts above 10x their token minimum (V1 and V2).
-    // A range that leaves out the current price holds only one token, so the
-    // exchange always refuses it. A zero leg is refused on submit, with a reason.
-    if (priceUpper.value <= priceLower.value || token0Disabled.value || token1Disabled.value) return false
+    // A range above the current price holds only token0, one below it only token1.
+    // In range both are needed: a zero leg is refused on submit, with a reason.
+    if (priceUpper.value <= priceLower.value || tooCloseToPrice.value) return false
+    if (token0Disabled.value) return a1 > 0
+    if (token1Disabled.value) return a0 > 0
     return a0 > 0 || a1 > 0
   }
   return a0 > 0 && a1 > 0
@@ -1081,7 +1101,7 @@ const submitLabel = computed(() => {
     return 'Add Liquidity (Full Range)'
   }
   if (priceUpper.value <= priceLower.value) return 'Min price must be below max price'
-  if (token0Disabled.value || token1Disabled.value) return 'Range must include the current price'
+  if (tooCloseToPrice.value) return 'Move the range a little away from the price'
   return 'Add Liquidity'
 })
 
@@ -1354,24 +1374,30 @@ async function submitFullRange() {
 async function submitConcentrated() {
   error.value = ''
   recoveryInfo.value = ''
-  const a0Raw = toRaw(amount0.value, decimals0.value)
-  const a1Raw = toRaw(amount1.value, decimals1.value)
-  if (a0Raw <= 0n && a1Raw <= 0n) {
-    error.value = 'Enter an amount'
-    return
-  }
   if (priceLower.value <= 0 || !isFinite(priceUpper.value) || priceUpper.value <= priceLower.value) {
     error.value = 'Set a bounded price range. For unbounded positions, switch to Full Range.'
     return
   }
-  // V1 and V2 both refuse ("Validation failed") unless BOTH amounts are above
-  // 10x their token minimum, and on V1 only after the deposits went in.
-  if (token0Disabled.value || token1Disabled.value) {
-    error.value = 'This range does not include the current price, so it would hold only one token. The exchange needs both tokens in every position. Move the range so it covers the current price, or use Full Range.'
+  // A range above the current price holds only token0, one below it only token1.
+  // The other side goes as 0, with no transfer or approval. A new pool has no
+  // price yet, so it always takes both.
+  const need0 = !token0Disabled.value
+  const need1 = !token1Disabled.value
+  if (tooCloseToPrice.value) {
+    error.value = 'Your range starts right at the current price. Move it a little further away, or widen it to include the price.'
     return
   }
-  if (a0Raw <= 0n || a1Raw <= 0n) {
-    error.value = `Enter an amount for both ${symbol0.value} and ${symbol1.value}.`
+  // The exchange refuses a one token add on a pool with a side at 0.
+  if (!(need0 && need1) && (poolReserve0.value === 0n || poolReserve1.value === 0n)) {
+    error.value = 'This pool has no proper price yet, so a position needs both tokens. Pick a range that includes the price.'
+    return
+  }
+  const a0Raw = need0 ? toRaw(amount0.value, decimals0.value) : 0n
+  const a1Raw = need1 ? toRaw(amount1.value, decimals1.value) : 0n
+  if ((need0 && a0Raw <= 0n) || (need1 && a1Raw <= 0n)) {
+    error.value = need0 && need1
+      ? `Enter an amount for both ${symbol0.value} and ${symbol1.value}.`
+      : `Enter an amount for ${need0 ? symbol0.value : symbol1.value}.`
     return
   }
   const paused = pausedSymbol()
@@ -1382,11 +1408,11 @@ async function submitConcentrated() {
   // Strictly more than 10x the minimum: exactly 10x is refused.
   const min0 = (info0.value?.minimum_amount ?? 0n) * 10n
   const min1 = (info1.value?.minimum_amount ?? 0n) * 10n
-  if (a0Raw <= min0) {
+  if (need0 && a0Raw <= min0) {
     error.value = `${symbol0.value} amount must be more than ${fmtExact(min0, decimals0.value)}`
     return
   }
-  if (a1Raw <= min1) {
+  if (need1 && a1Raw <= min1) {
     error.value = `${symbol1.value} amount must be more than ${fmtExact(min1, decimals1.value)}`
     return
   }
@@ -1402,38 +1428,38 @@ async function submitConcentrated() {
   const ratioLower = priceToRatio(priceLower.value, decimals0.value, decimals1.value)
   const ratioUpper = priceToRatio(priceUpper.value, decimals0.value, decimals1.value)
 
-  // Path decided ONCE per action. LP V2 needs BOTH tokens allowlisted; both
-  // amounts are always present by now.
+  // Path decided ONCE per action: V2 only with BOTH tokens allowlisted, also
+  // when one goes as 0 (the exchange would take it with just the sent one).
   const v2 = store.useV2Deposit(token0.value) && store.useV2Deposit(token1.value)
   const fee0 = info0.value?.transfer_fee ?? 0n
   const fee1 = info1.value?.transfer_fee ?? 0n
   if (v2) {
-    if (a0Raw <= fee0 * 3n) {
+    if (need0 && a0Raw <= fee0 * 3n) {
       error.value = `${symbol0.value} amount must be more than ${bigIntToDecimal(fee0 * 3n, decimals0.value, Math.min(decimals0.value, 6))} (3x the transfer fee)`
       return
     }
-    if (a1Raw <= fee1 * 3n) {
+    if (need1 && a1Raw <= fee1 * 3n) {
       error.value = `${symbol1.value} amount must be more than ${bigIntToDecimal(fee1 * 3n, decimals1.value, Math.min(decimals1.value, 6))} (3x the transfer fee)`
       return
     }
     // Each V2 leg debits amount + 2x fee (approval tx + pull fee). Check both
     // up front so the second approval can never fail after the first fee is paid.
-    if (balance0.value < a0Raw + fee0 * 2n) {
+    if (need0 && balance0.value < a0Raw + fee0 * 2n) {
       error.value = `Not enough ${symbol0.value} to cover the deposit plus fees`
       return
     }
-    if (balance1.value < a1Raw + fee1 * 2n) {
+    if (need1 && balance1.value < a1Raw + fee1 * 2n) {
       error.value = `Not enough ${symbol1.value} to cover the deposit plus fees`
       return
     }
   } else {
     // V1 sends each token as its own transfer (amount plus one ledger fee).
     // Check both before the first moves, so the second cannot fail after it.
-    if (balance0.value < a0Raw + fee0) {
+    if (need0 && balance0.value < a0Raw + fee0) {
       error.value = `Not enough ${symbol0.value} to cover the deposit plus the network fee`
       return
     }
-    if (balance1.value < a1Raw + fee1) {
+    if (need1 && balance1.value < a1Raw + fee1) {
       error.value = `Not enough ${symbol1.value} to cover the deposit plus the network fee`
       return
     }
@@ -1463,22 +1489,28 @@ async function submitConcentrated() {
 
   try {
     if (v2) {
-      phase.value = 'deposit0'
-      try { await approveExchangeDeposit(token0.value, a0Raw, fee0) }
-      catch (e: any) {
-        if (isApprovalDeclined(e)) { error.value = ''; phase.value = 'idle'; toast.info('Approval cancelled', 'Nothing left your wallet.'); return }
-        throw e
-      }
-      phase.value = 'deposit1'
-      try { await approveExchangeDeposit(token1.value, a1Raw, fee1) }
-      catch (e: any) {
-        if (isApprovalDeclined(e)) {
-          error.value = ''
-          phase.value = 'idle'
-          toast.info('Approval cancelled', `${symbol0.value} was already approved and that fee was paid. Nothing else left your wallet. Retrying reuses that approval at no extra fee.`)
-          return
+      if (need0) {
+        phase.value = 'deposit0'
+        try { await approveExchangeDeposit(token0.value, a0Raw, fee0) }
+        catch (e: any) {
+          if (isApprovalDeclined(e)) { error.value = ''; phase.value = 'idle'; toast.info('Approval cancelled', 'Nothing left your wallet.'); return }
+          throw e
         }
-        throw e
+      }
+      if (need1) {
+        phase.value = 'deposit1'
+        try { await approveExchangeDeposit(token1.value, a1Raw, fee1) }
+        catch (e: any) {
+          if (isApprovalDeclined(e)) {
+            error.value = ''
+            phase.value = 'idle'
+            toast.info('Approval cancelled', need0
+              ? `${symbol0.value} was already approved and that fee was paid. Nothing else left your wallet. Retrying reuses that approval at no extra fee.`
+              : 'Nothing left your wallet.')
+            return
+          }
+          throw e
+        }
       }
     } else {
       if (a0Raw > 0n) {
@@ -1524,9 +1556,9 @@ async function submitConcentrated() {
       // V2 typed errors leave no treasury deposit to recover (see submitFullRange).
       const { classifyExchangeError } = await import('../../utils/errors')
       const classified = classifyExchangeError(result.Err)
-      error.value = classified.message
+      error.value = oneSideRefusal(result.Err) || classified.message
       phase.value = 'idle'
-      toast.error('Add Liquidity Failed', classified.message)
+      toast.error('Add Liquidity Failed', error.value)
       if ('SystemError' in result.Err) void store.refreshAfterMutation('lp')
     } else {
       const { classifyExchangeError, isAutoRefundError } = await import('../../utils/errors')
@@ -1538,10 +1570,11 @@ async function submitConcentrated() {
         // #TokenPaused, the concentrated refusals are all about the price range.
         const why = 'TokenPaused' in result.Err
           ? classified.message
-          : 'The exchange could not use this price range.'
-        error.value = `${why} ${REFUND_NOTE}`
+          : oneSideRefusal(result.Err) || 'The exchange could not use this price range.'
+        const note = need0 && need1 ? REFUND_NOTE : 'Your deposit is on its way back to your wallet, minus a network fee.'
+        error.value = `${why} ${note}`
         phase.value = 'idle'
-        toast.info('Refund on its way', REFUND_NOTE)
+        toast.info('Refund on its way', note)
         void store.refreshAfterMutation('lp')
       } else {
         error.value = classified.message
@@ -1588,6 +1621,14 @@ async function submitConcentrated() {
     phase.value = 'idle'
     toast.error('Add Liquidity Failed', error.value)
   }
+}
+
+// Plain copy for the exchange's two one token refusals, or ''.
+function oneSideRefusal(err: any): string {
+  const m = typeof err?.InvalidInput === 'string' ? err.InvalidInput : ''
+  if (m.includes('Price moved into the range')) return 'The price moved into your range, so it now needs both tokens.'
+  if (m.includes('One-sided add')) return 'The price is too close to your range for one token. Move the range a little further away.'
+  return ''
 }
 
 // ── Summary displays ─────────────────────────────────────────────
@@ -1896,6 +1937,13 @@ onUnmounted(() => {
   }
 
   &__eff { margin-top: 12px; }
+
+  &__one-side-note {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--tx-ink-3);
+    line-height: 1.4;
+  }
 
   &__first-deposit-warning {
     margin-top: 12px;
